@@ -56,6 +56,14 @@ jobs:
       - name: Run Rust Tests
         run: cargo test
         working-directory: src-tauri
+
+      - name: AI Pipeline Integration Test
+        if: matrix.platform == 'ubuntu-24.04'
+        run: |
+          mkdir -p test_models
+          wget https://raw.githubusercontent.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB/master/models/onnx/version-RFB-320.onnx -O test_models/version-RFB-320.onnx
+          cargo test -- --ignored test_full_inference_on_sample
+        working-directory: src-tauri
         
       - name: Build Tauri App
         # Just compile everything without creating installers to save CI time

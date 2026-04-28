@@ -92,79 +92,127 @@
               </div>
             </template>
             <v-card-title class="text-h6 text-zinc-primary font-weight-bold">AI Models</v-card-title>
+            <template v-slot:append v-if="pendingCount > 0">
+               <div class="text-right">
+                  <div class="text-caption font-weight-bold text-black">Indexing {{ pendingCount }} photos</div>
+                  <div class="text-caption text-zinc-muted" style="font-size: 10px;">ETA: {{ formatEta(globalEta) }}</div>
+               </div>
+            </template>
           </v-card-item>
 
           <v-card-text class="pt-4">
-            <v-list lines="two" class="bg-transparent">
-              <v-list-item class="px-0">
-                <template v-slot:prepend>
-                  <v-checkbox v-model="selectedModels" value="clip" hide-details class="mt-0 siegu-checkbox" color="black"></v-checkbox>
-                </template>
-                <template v-slot:title>
-                  <div class="font-weight-bold text-zinc-primary d-flex align-center">
-                    CLIP Model
-                    <v-chip v-if="downloadedModels.includes('clip')" size="x-small" variant="flat" class="ml-2" color="success">Ready</v-chip>
-                  </div>
-                </template>
-                <template v-slot:subtitle>
-                  <span class="text-zinc-secondary">Semantic search and content classification (350MB)</span>
-                </template>
-                <div v-if="downloadProgress['clip-visual'] || downloadProgress['clip-text'] || downloadProgress['clip-tokenizer']" class="mt-2 px-2">
-                  <v-progress-linear
-                    :model-value="getProgress('clip')"
-                    color="black"
-                    bg-color="#f4f4f5"
-                    height="4"
-                    rounded
-                  ></v-progress-linear>
-                </div>
-              </v-list-item>
+            <v-row dense>
+              <v-col v-for="model in aiModels" :key="model.id" cols="12" md="6" class="mb-2">
+                <v-card variant="outlined" border class="border-subtle rounded-lg fill-height d-flex flex-column">
+                  <v-card-item class="pb-2">
+                    <template v-slot:prepend>
+                      <v-checkbox v-model="selectedModels" :value="model.id" hide-details density="compact" color="black" class="ma-0 pa-0"></v-checkbox>
+                    </template>
+                    <v-card-title class="text-subtitle-1 font-weight-bold d-flex align-center">
+                      {{ model.title }}
+                      <v-chip v-if="downloadedModels.includes(model.id)" size="x-small" color="success" variant="flat" class="ml-2">Ready</v-chip>
+                    </v-card-title>
+                  </v-card-item>
 
-              <v-list-item class="px-0">
-                <template v-slot:prepend>
-                  <v-checkbox v-model="selectedModels" value="ultraface" hide-details class="mt-0 siegu-checkbox" color="black"></v-checkbox>
-                </template>
-                <template v-slot:title>
-                  <div class="font-weight-bold text-zinc-primary d-flex align-center">
-                    UltraFace Model
-                    <v-chip v-if="downloadedModels.includes('ultraface')" size="x-small" variant="flat" class="ml-2" color="success">Ready</v-chip>
-                  </div>
-                </template>
-                <template v-slot:subtitle>
-                  <span class="text-zinc-secondary">Fast local face detection and grouping (2MB)</span>
-                </template>
-                <div v-if="downloadProgress.ultraface" class="mt-2 px-2">
-                  <v-progress-linear
-                    :model-value="getProgress('ultraface')"
-                    color="black"
-                    bg-color="#f4f4f5"
-                    height="4"
-                    rounded
-                  ></v-progress-linear>
-                </div>
-              </v-list-item>
-            </v-list>
+                  <v-card-text class="py-0 flex-grow-1">
+                    <div class="text-body-2 text-zinc-primary">{{ model.desc }}</div>
+                    <div class="text-caption text-zinc-muted mt-1 font-italic">{{ model.search }}</div>
+                    <div class="text-caption text-zinc-muted mt-1">File size: {{ model.size }}</div>
+
+                    <!-- Progress Area -->
+                    <div v-if="isModelProcessing(model.id)" class="mt-4">
+                      <div class="d-flex justify-space-between text-caption mb-1">
+                        <span class="font-weight-bold text-black">Running...</span>
+                        <span>{{ getModelPending(model.id) }} left</span>
+                      </div>
+                      <v-progress-linear
+                        indeterminate
+                        color="black"
+                        height="4"
+                        rounded
+                      ></v-progress-linear>
+                    </div>
+
+                    <!-- Download Progress -->
+                    <div v-if="isModelDownloading(model.id)" class="mt-4">
+                       <v-progress-linear
+                        :model-value="getProgress(model.id)"
+                        color="black"
+                        bg-color="#f4f4f5"
+                        height="4"
+                        rounded
+                      ></v-progress-linear>
+                    </div>
+                  </v-card-text>
+
+                  <v-card-actions class="pt-2 pb-3 px-4">
+                    <v-spacer></v-spacer>
+                    <v-btn
+                      v-if="!downloadedModels.includes(model.id)"
+                      variant="flat"
+                      size="small"
+                      color="black"
+                      prepend-icon="mdi-download"
+                      :loading="isModelDownloading(model.id)"
+                      @click="downloadModels(false, [model.id])"
+                    >
+                      Download
+                    </v-btn>
+                    <div v-else class="d-flex ga-2">
+                       <v-btn
+                        variant="tonal"
+                        size="small"
+                        color="zinc-muted"
+                        icon="mdi-refresh"
+                        :loading="isModelDownloading(model.id)"
+                        @click="downloadModels(true, [model.id])"
+                        title="Update Model"
+                      ></v-btn>
+                      <v-btn
+                        variant="tonal"
+                        size="small"
+                        color="black"
+                        prepend-icon="mdi-play"
+                        :disabled="isModelProcessing(model.id)"
+                        @click="runModel(model.id)"
+                      >
+                        Run Now
+                      </v-btn>
+                    </div>
+                  </v-card-actions>
+                </v-card>
+              </v-col>
+            </v-row>
           </v-card-text>
 
-          <v-card-actions class="pa-4 bg-zinc-50">
-             <v-spacer></v-spacer>
+          <v-card-actions class="pa-4 bg-zinc-50 border-top-subtle">
              <v-btn
+              v-if="missingSelectedCount > 0"
               variant="flat"
-              color="#000000"
-              theme="dark"
-              :disabled="selectedModels.length === 0 || isDownloading"
+              color="black"
+              size="small"
+              class="font-weight-bold"
+              prepend-icon="mdi-download-multiple"
+              @click="downloadModels(false, selectedModels)"
               :loading="isDownloading"
-              @click="confirmDownload()"
-              class="siegu-btn px-6"
-              height="44"
             >
-              <div class="d-flex align-center">
-                <div class="siegu-icon-circle siegu-icon-circle-sm mr-3">
-                  <v-icon size="14" color="white">mdi-download</v-icon>
-                </div>
-                <span class="text-white font-weight-bold">{{ downloadedModels.length === 2 ? 'Update Models' : 'Download Models' }}</span>
-              </div>
+              Download Selected ({{ missingSelectedCount }})
             </v-btn>
+            <v-btn
+              v-else-if="selectedModels.length > 0"
+              variant="text"
+              color="black"
+              size="small"
+              class="font-weight-bold"
+              prepend-icon="mdi-check-all"
+              disabled
+            >
+              All Selected Ready
+            </v-btn>
+             <v-spacer></v-spacer>
+             <div class="text-caption text-zinc-muted">
+                {{ downloadedModels.length }} of {{ aiModels.length }} models ready
+             </div>
           </v-card-actions>
         </v-card>
 
@@ -415,6 +463,24 @@ export default {
     downloadedModels: [],
     selectedModels: [],
     downloadProgress: {},
+    pendingCount: 0,
+    globalEta: 0,
+    unlistenEta: null,
+    unlistenProgress: null,
+    unlistenModelProgress: null,
+    modelProgress: {}, // { model_id: { pending, total } }
+    aiModels: [
+      { id: 'clip', title: 'Smart Search', desc: 'Finds objects and scenes in your photos.', search: "Try searching: 'dog', 'beach', 'sunset'", size: '350MB' },
+      { id: 'ultraface', title: 'Face Grouping', desc: 'Finds faces and groups them by person.', search: "Try searching: 'Mom', 'John'", size: '2MB' },
+      { id: 'ocr', title: 'Text Finder', desc: 'Reads text inside photos like receipts.', search: "Try searching: 'Receipt', 'Invoice', 'Menu'", size: '20MB' },
+      { id: 'nsfw', title: 'Safe Mode', desc: 'Detects and hides sensitive content.', search: "Helps keep your library family-friendly.", size: '80MB' },
+      { id: 'aesthetics', title: 'Quality Scorer', desc: 'Rates photos by how good they look.', search: "Helps you find your best shots quickly.", size: '80MB' },
+      { id: 'blip', title: 'Photo Describer', desc: 'Writes sentences about what is in photos.', search: "Try searching: 'Family eating outside'", size: '950MB' },
+      { id: 'yolo', title: 'Object Pro', desc: 'Pinpoint accuracy for finding specific items.', search: "Adds deep tags for 80+ common objects.", size: '15MB' },
+      { id: 'arcface', title: 'Face Pro', desc: 'Advanced recognition for better grouping.', search: "drastically improves face matching accuracy.", size: '120MB' },
+      { id: 'midas', title: 'Depth Vision', desc: 'Analyzes 3D depth in landscapes.', search: "Adds depth-based filters to your library.", size: '60MB' },
+      { id: 'whisper', title: 'Audio Search', desc: 'Transcribes words spoken in videos.', search: "Search for things people said in videos.", size: '150MB' },
+    ],
     logs: [],
     performance: {
       scanThreads: 4,
@@ -440,6 +506,11 @@ export default {
       path: ""
     }
   }),
+  computed: {
+    missingSelectedCount() {
+      return this.selectedModels.filter(id => !this.downloadedModels.includes(id)).length;
+    }
+  },
   async mounted() {
     listen("log-message", (event) => {
       const log = {
@@ -460,6 +531,25 @@ export default {
         this.isDownloading = false;
         this.checkExistingModels();
         this.$emit('models-ready');
+    });
+
+    this.unlistenProgress = await listen("indexing-progress", (event) => {
+        this.pendingCount = event.payload;
+    });
+
+    this.unlistenEta = await listen("indexing-eta", (event) => {
+        this.globalEta = event.payload;
+    });
+
+    this.unlistenModelProgress = await listen("model-progress", (event) => {
+        const { model, pending, total } = event.payload;
+        this.modelProgress = { 
+          ...this.modelProgress, 
+          [model]: { 
+            pending, 
+            total: total || (this.modelProgress[model]?.total || 0) 
+          } 
+        };
     });
 
     this.dataDir = await homeDir();
@@ -515,29 +605,32 @@ export default {
         const downloaded = await invoke("check_models");
         this.downloadedModels = downloaded;
         this.checkResults = JSON.stringify(downloaded);
-        this.selectedModels = ["clip", "ultraface"];
-        // Auto-download removed for better user experience/data saving
+        this.selectedModels = ["clip", "ultraface", "ocr", "nsfw", "aesthetics", "yolo", "blip", "arcface", "midas", "whisper"];
     },
-    confirmDownload() {
-      const missing = ["clip", "ultraface"].filter(m => !this.downloadedModels.includes(m));
-      if (missing.length === 0) {
-        this.downloadModels(true); // Force update if already ready
-        return;
+    async downloadModels(forceUpdate = false, specificModels = null) {
+      let modelsToDownload = specificModels || this.selectedModels;
+      if (!forceUpdate && !specificModels) {
+        modelsToDownload = ["clip", "ultraface", "ocr", "nsfw", "aesthetics", "yolo", "blip", "arcface", "midas", "whisper"].filter(m => !this.downloadedModels.includes(m));
       }
+      if (!modelsToDownload || modelsToDownload.length === 0) return;
       
-      let size = "approx. 1MB";
-      if (missing.includes('clip')) size = "approx. 600MB";
-      
-      this.downloadDialog = {
-        show: true,
-        title: "Download AI Models?",
-        message: `Siegu needs to download ${missing.join(" and ")} models (${size}) to enable local search and face detection. This will use your data connection.`,
-        models: missing
-      };
-    },
-    startConfirmedDownload() {
-      this.downloadDialog.show = false;
-      this.downloadModels(false);
+      this.isDownloading = true;
+      // Initialize progress tracking for requested models
+      modelsToDownload.forEach(m => {
+        if (m === 'clip') {
+           this.downloadProgress['clip-visual'] = { downloaded: 0, total: 1 };
+        } else if (m === 'ocr') {
+           this.downloadProgress['ocr-det'] = { downloaded: 0, total: 1 };
+        } else {
+           this.downloadProgress[m] = { downloaded: 0, total: 1 };
+        }
+      });
+
+      try {
+        await invoke('download_models', { models: modelsToDownload });
+      } catch (err) {
+        this.isDownloading = false;
+      }
     },
     getProgress(model) {
       if (model === 'clip') {
@@ -553,6 +646,19 @@ export default {
         if (total === 0) return this.downloadedModels.includes('clip') ? 100 : 0;
         return (downloaded / total) * 100;
       }
+      if (model === 'ocr') {
+        const parts = ['ocr-det', 'ocr-rec', 'ocr-dict'];
+        let downloaded = 0;
+        let total = 0;
+        parts.forEach(p => {
+          if (this.downloadProgress[p]) {
+            downloaded += this.downloadProgress[p].downloaded;
+            total += this.downloadProgress[p].total || 0;
+          }
+        });
+        if (total === 0) return this.downloadedModels.includes('ocr') ? 100 : 0;
+        return (downloaded / total) * 100;
+      }
       const progress = this.downloadProgress[model];
       if (!progress || !progress.total) return this.downloadedModels.includes(model) ? 100 : 0;
       return (progress.downloaded / progress.total) * 100;
@@ -564,19 +670,33 @@ export default {
       const i = Math.floor(Math.log(bytes) / Math.log(k));
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     },
-    async downloadModels(forceUpdate = false) {
-      let modelsToDownload = this.selectedModels;
-      if (!forceUpdate) {
-        modelsToDownload = ["clip", "ultraface"].filter(m => !this.downloadedModels.includes(m));
-      }
-      if (modelsToDownload.length === 0) return;
-      this.isDownloading = true;
-      this.downloadProgress = {};
+    formatEta(ms) {
+      if (!ms || ms < 0) return 'calculating...';
+      const totalSeconds = Math.floor(ms / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      if (hours > 0) return `${hours}h ${minutes}m`;
+      if (minutes > 0) return `${minutes}m`;
+      return `${totalSeconds % 60}s`;
+    },
+    async runModel(modelId) {
       try {
-        await invoke('download_models', { models: modelsToDownload });
+        await invoke("analyze_model", { modelId });
       } catch (err) {
-        this.isDownloading = false;
+        console.error("Failed to start model analysis", err);
       }
+    },
+    isModelProcessing(modelId) {
+      const progress = this.modelProgress[modelId];
+      return progress && progress.pending > 0;
+    },
+    getModelPending(modelId) {
+      return this.modelProgress[modelId]?.pending || 0;
+    },
+    isModelDownloading(modelId) {
+      if (modelId === 'clip') return this.downloadProgress['clip-visual'] || this.downloadProgress['clip-text'] || this.downloadProgress['clip-tokenizer'];
+      if (modelId === 'ocr') return this.downloadProgress['ocr-det'] || this.downloadProgress['ocr-rec'] || this.downloadProgress['ocr-dict'];
+      return !!this.downloadProgress[modelId];
     },
     async cleanupDb() {
       this.cleanupDialog.show = true;
@@ -640,6 +760,11 @@ export default {
         this.list_directories();
       });
     }
+  },
+  beforeUnmount() {
+    if (this.unlistenEta) this.unlistenEta();
+    if (this.unlistenProgress) this.unlistenProgress();
+    if (this.unlistenModelProgress) this.unlistenModelProgress();
   }
 };
 </script>
@@ -650,5 +775,8 @@ export default {
 }
 .siegu-expansion :deep(.v-expansion-panel-title) {
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+.border-top-subtle {
+  border-top: 1px solid rgba(0, 0, 0, 0.05) !important;
 }
 </style>

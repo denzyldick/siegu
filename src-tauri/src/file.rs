@@ -268,11 +268,15 @@ pub fn scan_folder(
                 created,
                 objects: HashMap::new(),
                 properties: HashMap::new(),
-                latitude,
-                longitude,
+                latitude: 0.0,
+                longitude: 0.0,
                 favorite: false,
-                indexed: 1,
+                indexed: 0,
+                caption: None,
+                aesthetics_score: None,
+                ai_status: database::AiStatus::default(),
             };
+
 
             let _ = batch_tx.send(photo);
 
@@ -283,7 +287,7 @@ pub fn scan_folder(
                         .pending_count
                         .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 }
-                let _ = tx.send(id);
+                let _ = tx.send(crate::ml::Job::AnalyzeSingle(id));
             }
         });
     });

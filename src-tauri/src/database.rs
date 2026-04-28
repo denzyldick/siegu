@@ -18,6 +18,8 @@ pub struct PhotoSyncInfo {
     pub longitude: Option<f64>,
     pub objects: String, // JSON array of {class, probability}
     pub faces: String,   // JSON array of {face_id, crop_path, encoded, person_id}
+    pub caption: Option<String>,
+    pub aesthetics_score: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
@@ -49,7 +51,7 @@ impl Database {
         let mut results = Vec::new();
         // Only select photos that have been indexed (have at least one entry in object or faces table)
         // AND are NOT inside a 'siegu' folder (to prevent re-syncing synced files)
-        let sql = "SELECT id, location, created, latitude, longitude FROM photo p 
+        let sql = "SELECT id, location, created, latitude, longitude, caption, aesthetics_score FROM photo p 
                    WHERE (EXISTS (SELECT 1 FROM object WHERE photo_id = p.id) 
                    OR EXISTS (SELECT 1 FROM faces WHERE photo_id = p.id))
                    AND p.location NOT LIKE '%/siegu/%'
@@ -103,6 +105,8 @@ impl Database {
                     longitude: row.get(4).ok(),
                     objects: serde_json::to_string(&objects).unwrap_or("[]".to_string()),
                     faces: serde_json::to_string(&faces).unwrap_or("[]".to_string()),
+                    caption: row.get(5).ok(),
+                    aesthetics_score: row.get(6).ok(),
                 })
             });
             if let Ok(iter) = iter {
@@ -115,7 +119,7 @@ impl Database {
     }
 
     pub fn get_photo_sync_info_by_id(&self, photo_id: &str) -> Result<PhotoSyncInfo, String> {
-        let sql = "SELECT id, location, created, latitude, longitude FROM photo WHERE id = ?1";
+        let sql = "SELECT id, location, created, latitude, longitude, caption, aesthetics_score FROM photo WHERE id = ?1";
         self.connection
             .query_row(sql, [photo_id], |row| {
                 let id: String = row.get(0)?;
@@ -165,6 +169,8 @@ impl Database {
                     longitude: row.get(4).ok(),
                     objects: serde_json::to_string(&objects).unwrap_or("[]".to_string()),
                     faces: serde_json::to_string(&faces).unwrap_or("[]".to_string()),
+                    caption: row.get(5).ok(),
+                    aesthetics_score: row.get(6).ok(),
                 })
             })
             .map_err(|e| e.to_string())
@@ -179,12 +185,17 @@ impl Database {
         let _ = conn.execute("PRAGMA journal_mode=WAL;", ());
         let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
 
-        let _ = conn.execute("CREATE TABLE IF NOT EXISTS photo (id STRING PRIMARY KEY, location STRING, encoded STRING, created DATE_TIME, latitude REAL, longitude REAL, indexed INTEGER DEFAULT 0);", ());
+        let _ = conn.execute("CREATE TABLE IF NOT EXISTS photo (id STRING PRIMARY KEY, location STRING, encoded STRING, created DATE_TIME, latitude REAL, longitude REAL, indexed INTEGER DEFAULT 0, caption TEXT, aesthetics_score REAL);", ());
+        let _ = conn.execute("CREATE TABLE IF NOT EXISTS ai_status (photo_id STRING PRIMARY KEY, clip INTEGER DEFAULT 0, face INTEGER DEFAULT 0, ocr INTEGER DEFAULT 0, nsfw INTEGER DEFAULT 0, aesthetics INTEGER DEFAULT 0, yolo INTEGER DEFAULT 0, blip INTEGER DEFAULT 0, arcface INTEGER DEFAULT 0, midas INTEGER DEFAULT 0, whisper INTEGER DEFAULT 0, sam INTEGER DEFAULT 0, superres INTEGER DEFAULT 0);", ());
+        let _ = conn.execute("CREATE TABLE IF NOT EXISTS ocr (photo_id STRING, text TEXT);", ());
+        let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_ocr_photo_id ON ocr(photo_id);", ());
 
         // Simple migration: try to add columns if they don't exist (ignore errors if they do)
         let _ = conn.execute("ALTER TABLE photo ADD COLUMN latitude REAL;", ());
         let _ = conn.execute("ALTER TABLE photo ADD COLUMN longitude REAL;", ());
         let _ = conn.execute("ALTER TABLE photo ADD COLUMN created DATE_TIME;", ());
+        let _ = conn.execute("ALTER TABLE photo ADD COLUMN caption TEXT;", ());
+        let _ = conn.execute("ALTER TABLE photo ADD COLUMN aesthetics_score REAL;", ());
         let _ = conn.execute(
             "ALTER TABLE photo ADD COLUMN sync_needed INTEGER DEFAULT 0;",
             (),
@@ -358,13 +369,15 @@ impl Database {
             if is_uuid {
                 "AND (p.id = ?3 OR EXISTS(SELECT 1 FROM faces WHERE photo_id=p.id AND person_id = ?3))"
             } else {
-                "AND (p.location LIKE ?3 OR p.id LIKE ?3 OR EXISTS(SELECT 1 FROM object WHERE photo_id=p.id AND class LIKE ?3) OR EXISTS(SELECT 1 FROM faces f JOIN people p_name ON f.person_id = p_name.id WHERE f.photo_id=p.id AND p_name.name LIKE ?3))"
+                "AND (p.location LIKE ?3 OR p.id LIKE ?3 OR p.caption LIKE ?3 OR EXISTS(SELECT 1 FROM object WHERE photo_id=p.id AND class LIKE ?3) OR EXISTS(SELECT 1 FROM ocr WHERE photo_id=p.id AND text LIKE ?3) OR EXISTS(SELECT 1 FROM faces f JOIN people p_name ON f.person_id = p_name.id WHERE f.photo_id=p.id AND p_name.name LIKE ?3))"
             }
         } else {
             ""
         };
 
-        let sql = format!("SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed FROM photo p WHERE 1=1 {fav_filter} {video_filter} {q_filter} ORDER BY p.created DESC LIMIT ?1, ?2");
+        let sql = format!("SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, 
+            s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres 
+            FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE 1=1 {fav_filter} {video_filter} {q_filter} ORDER BY p.created DESC LIMIT ?1, ?2");
         if let Ok(mut stmt) = self.connection.prepare(&sql) {
             let q_param = if is_uuid {
                 query.to_string()
@@ -388,6 +401,22 @@ impl Database {
                     longitude: row.get(4).unwrap_or(0.0),
                     favorite: row.get(6).unwrap_or(false),
                     indexed: row.get(7).unwrap_or(0),
+                    caption: row.get(8).ok(),
+                    aesthetics_score: row.get(9).ok(),
+                    ai_status: AiStatus {
+                        clip: row.get(10).unwrap_or(0),
+                        face: row.get(11).unwrap_or(0),
+                        ocr: row.get(12).unwrap_or(0),
+                        nsfw: row.get(13).unwrap_or(0),
+                        aesthetics: row.get(14).unwrap_or(0),
+                        yolo: row.get(15).unwrap_or(0),
+                        blip: row.get(16).unwrap_or(0),
+                        arcface: row.get(17).unwrap_or(0),
+                        midas: row.get(18).unwrap_or(0),
+                        whisper: row.get(19).unwrap_or(0),
+                        sam: row.get(20).unwrap_or(0),
+                        superres: row.get(21).unwrap_or(0),
+                    },
                 })
             }) {
                 for p in iter.flatten() {
@@ -424,15 +453,43 @@ impl Database {
 
     pub fn get_all_photos_with_location(&self) -> Vec<Photo> {
         let mut photos = Vec::new();
-        if let Ok(mut stmt) = self.connection.prepare("SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed FROM photo p WHERE (p.latitude != 0.0 OR p.longitude != 0.0)") {
+        let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, 
+            s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres 
+            FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE (p.latitude != 0.0 OR p.longitude != 0.0)";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([], |row| {
                 Ok(Photo {
-                    id: row.get(0)?, location: row.get(1)?, encoded: row.get(2)?, created: row.get(5).unwrap_or_default(),
-                    objects: HashMap::new(), properties: HashMap::new(), latitude: row.get(3).unwrap_or(0.0), longitude: row.get(4).unwrap_or(0.0), favorite: row.get(6).unwrap_or(false),
+                    id: row.get(0)?,
+                    location: row.get(1)?,
+                    encoded: row.get(2)?,
+                    created: row.get(5).unwrap_or_default(),
+                    objects: HashMap::new(),
+                    properties: HashMap::new(),
+                    latitude: row.get(3).unwrap_or(0.0),
+                    longitude: row.get(4).unwrap_or(0.0),
+                    favorite: row.get(6).unwrap_or(false),
                     indexed: row.get(7).unwrap_or(0),
+                    caption: row.get(8).ok(),
+                    aesthetics_score: row.get(9).ok(),
+                    ai_status: AiStatus {
+                        clip: row.get(10).unwrap_or(0),
+                        face: row.get(11).unwrap_or(0),
+                        ocr: row.get(12).unwrap_or(0),
+                        nsfw: row.get(13).unwrap_or(0),
+                        aesthetics: row.get(14).unwrap_or(0),
+                        yolo: row.get(15).unwrap_or(0),
+                        blip: row.get(16).unwrap_or(0),
+                        arcface: row.get(17).unwrap_or(0),
+                        midas: row.get(18).unwrap_or(0),
+                        whisper: row.get(19).unwrap_or(0),
+                        sam: row.get(20).unwrap_or(0),
+                        superres: row.get(21).unwrap_or(0),
+                    },
                 })
             }) {
-                for p in iter.flatten() { photos.push(p); }
+                for p in iter.flatten() {
+                    photos.push(p);
+                }
             }
         }
         photos
@@ -643,15 +700,43 @@ impl Database {
 
     pub fn get_photos_for_person(&self, person_id: &str) -> Vec<Photo> {
         let mut photos = Vec::new();
-        if let Ok(mut stmt) = self.connection.prepare("SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed FROM photo p JOIN faces f ON p.id = f.photo_id WHERE f.person_id = ?1 GROUP BY p.id") {
+        let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, 
+            s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres 
+            FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id JOIN faces f ON p.id = f.photo_id WHERE f.person_id = ?1 GROUP BY p.id";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([person_id], |row| {
                 Ok(Photo {
-                    id: row.get(0)?, location: row.get(1)?, encoded: row.get(2)?, created: row.get(5).unwrap_or_default(),
-                    objects: HashMap::new(), properties: HashMap::new(), latitude: row.get(3).unwrap_or(0.0), longitude: row.get(4).unwrap_or(0.0), favorite: row.get(6).unwrap_or(false),
-                    indexed: 2, // These are linked photos, so they must be indexed
+                    id: row.get(0)?,
+                    location: row.get(1)?,
+                    encoded: row.get(2)?,
+                    created: row.get(5).unwrap_or_default(),
+                    objects: HashMap::new(),
+                    properties: HashMap::new(),
+                    latitude: row.get(3).unwrap_or(0.0),
+                    longitude: row.get(4).unwrap_or(0.0),
+                    favorite: row.get(6).unwrap_or(false),
+                    indexed: row.get(7).unwrap_or(2),
+                    caption: row.get(8).ok(),
+                    aesthetics_score: row.get(9).ok(),
+                    ai_status: AiStatus {
+                        clip: row.get(10).unwrap_or(0),
+                        face: row.get(11).unwrap_or(0),
+                        ocr: row.get(12).unwrap_or(0),
+                        nsfw: row.get(13).unwrap_or(0),
+                        aesthetics: row.get(14).unwrap_or(0),
+                        yolo: row.get(15).unwrap_or(0),
+                        blip: row.get(16).unwrap_or(0),
+                        arcface: row.get(17).unwrap_or(0),
+                        midas: row.get(18).unwrap_or(0),
+                        whisper: row.get(19).unwrap_or(0),
+                        sam: row.get(20).unwrap_or(0),
+                        superres: row.get(21).unwrap_or(0),
+                    },
                 })
             }) {
-                for p in iter.flatten() { photos.push(p); }
+                for p in iter.flatten() {
+                    photos.push(p);
+                }
             }
         }
         photos
@@ -897,9 +982,16 @@ impl Database {
             .execute("UPDATE photo SET indexed = ?1 WHERE id = ?2", (indexed, id));
     }
 
+    pub fn update_ai_status(&self, photo_id: &str, model: &str, status: i32) {
+        let sql = format!("INSERT INTO ai_status (photo_id, {model}) VALUES (?1, ?2) ON CONFLICT(photo_id) DO UPDATE SET {model} = ?2");
+        let _ = self.connection.execute(&sql, (photo_id, status));
+    }
+
     pub fn get_unindexed_photos(&self) -> Vec<Photo> {
         let mut photos = Vec::new();
-        let sql = "SELECT id, location, encoded, latitude, longitude, created, indexed FROM photo WHERE indexed < 2 LIMIT 50";
+        let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, p.indexed, p.caption, p.aesthetics_score, 
+            s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres 
+            FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE p.indexed < 2 LIMIT 50";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([], |row| {
                 Ok(Photo {
@@ -913,6 +1005,22 @@ impl Database {
                     longitude: row.get(4).unwrap_or(0.0),
                     favorite: false,
                     indexed: row.get(6).unwrap_or(0),
+                    caption: row.get(7).ok(),
+                    aesthetics_score: row.get(8).ok(),
+                    ai_status: AiStatus {
+                        clip: row.get(9).unwrap_or(0),
+                        face: row.get(10).unwrap_or(0),
+                        ocr: row.get(11).unwrap_or(0),
+                        nsfw: row.get(12).unwrap_or(0),
+                        aesthetics: row.get(13).unwrap_or(0),
+                        yolo: row.get(14).unwrap_or(0),
+                        blip: row.get(15).unwrap_or(0),
+                        arcface: row.get(16).unwrap_or(0),
+                        midas: row.get(17).unwrap_or(0),
+                        whisper: row.get(18).unwrap_or(0),
+                        sam: row.get(19).unwrap_or(0),
+                        superres: row.get(20).unwrap_or(0),
+                    },
                 })
             }) {
                 for p in iter.flatten() {
@@ -922,6 +1030,35 @@ impl Database {
         }
         photos
     }
+
+    pub fn get_photos_missing_model(&self, model: &str) -> Vec<String> {
+        let mut ids = Vec::new();
+        let sql = format!("SELECT p.id FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE s.{model} = 0 OR s.{model} IS NULL");
+        if let Ok(mut stmt) = self.connection.prepare(&sql) {
+            if let Ok(iter) = stmt.query_map([], |row| row.get::<_, String>(0)) {
+                for id in iter.flatten() {
+                    ids.push(id);
+                }
+            }
+        }
+        ids
+    }
+}
+
+#[derive(Debug, Clone, Serialize, serde::Deserialize, Default)]
+pub struct AiStatus {
+    pub clip: i32,
+    pub face: i32,
+    pub ocr: i32,
+    pub nsfw: i32,
+    pub aesthetics: i32,
+    pub yolo: i32,
+    pub blip: i32,
+    pub arcface: i32,
+    pub midas: i32,
+    pub whisper: i32,
+    pub sam: i32,
+    pub superres: i32,
 }
 
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
@@ -936,6 +1073,9 @@ pub struct Photo {
     pub longitude: f64,
     pub favorite: bool,
     pub indexed: i32, // 0: new, 1: metadata only, 2: fully processed
+    pub caption: Option<String>,
+    pub aesthetics_score: Option<f64>,
+    pub ai_status: AiStatus,
 }
 
 #[derive(Debug, Clone, Serialize)]

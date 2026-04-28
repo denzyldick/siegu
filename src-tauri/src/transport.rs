@@ -615,6 +615,9 @@ impl WebRtcClient {
                                                     longitude: lon_thumb,
                                                     favorite: false,
                                                     indexed: 2,
+                                                    caption: None,
+                                                    aesthetics_score: None,
+                                                    ai_status: crate::database::AiStatus::default(),
                                                 });
                                             });
 
@@ -917,6 +920,9 @@ impl WebRtcClient {
                                                     longitude: lon_thumb,
                                                     favorite: false,
                                                     indexed: 2,
+                                                    caption: None,
+                                                    aesthetics_score: None,
+                                                    ai_status: crate::database::AiStatus::default(),
                                                 });
                                             });
 

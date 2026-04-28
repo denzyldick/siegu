@@ -55,7 +55,7 @@ fn scan_files(app: tauri::AppHandle) {
         .store(false, std::sync::atomic::Ordering::SeqCst);
 
     // Initial signal to process any leftovers from previous runs
-    let _ = state.tx.send("__START__".to_string());
+    let _ = state.tx.send(ml::Job::ProcessAll);
 
     // Shared batcher for all folders in this scan session
     let (batch_tx, mut batch_rx) = tokio::sync::mpsc::unbounded_channel::<database::Photo>();
@@ -153,7 +153,7 @@ fn scan_files(app: tauri::AppHandle) {
 
         // Final signal to process everything found in the discovery pass
         if let Some(state) = app.try_state::<ml::MlContext>() {
-            let _ = state.tx.send("__START__".to_string());
+            let _ = state.tx.send(ml::Job::ProcessAll);
         }
     });
 }
@@ -197,6 +197,41 @@ async fn check_models(app: tauri::AppHandle) -> Vec<String> {
         downloaded.push("ultraface".to_string());
     }
 
+    let ocr_files = ["ocr_det.onnx", "ocr_rec.onnx", "en_dict.txt"];
+    let mut ocr_ok = true;
+    for name in ocr_files {
+        let p = models_dir.join(name);
+        if !p.exists() || p.metadata().map(|m| m.len()).unwrap_or(0) < 1024 {
+            ocr_ok = false;
+            break;
+        }
+    }
+    if ocr_ok {
+        downloaded.push("ocr".to_string());
+    }
+
+    if models_dir.join("nsfw.onnx").exists() {
+        downloaded.push("nsfw".to_string());
+    }
+    if models_dir.join("aesthetics.onnx").exists() {
+        downloaded.push("aesthetics".to_string());
+    }
+    if models_dir.join("yolov8.onnx").exists() {
+        downloaded.push("yolo".to_string());
+    }
+    if models_dir.join("blip.onnx").exists() {
+        downloaded.push("blip".to_string());
+    }
+    if models_dir.join("arcface.onnx").exists() {
+        downloaded.push("arcface".to_string());
+    }
+    if models_dir.join("midas.onnx").exists() {
+        downloaded.push("midas".to_string());
+    }
+    if models_dir.join("whisper.onnx").exists() {
+        downloaded.push("whisper".to_string());
+    }
+
     downloaded
 }
 
@@ -226,11 +261,29 @@ async fn download_models(
     for model in &models {
         let m = model.to_lowercase();
         if m == "clip" {
-            files_to_download.push(("clip-visual".to_string(), "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model.onnx?download=true".to_string(), "clip-vit-base-patch32-visual.onnx".to_string()));
-            files_to_download.push(("clip-text".to_string(), "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/text_model.onnx?download=true".to_string(), "clip-vit-base-patch32-text.onnx".to_string()));
-            files_to_download.push(("clip-tokenizer".to_string(), "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/tokenizer.json?download=true".to_string(), "tokenizer.json".to_string()));
+            files_to_download.push(("clip-visual".to_string(), "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model.onnx".to_string(), "clip-vit-base-patch32-visual.onnx".to_string()));
+            files_to_download.push(("clip-text".to_string(), "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/text_model.onnx".to_string(), "clip-vit-base-patch32-text.onnx".to_string()));
+            files_to_download.push(("clip-tokenizer".to_string(), "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/tokenizer.json".to_string(), "tokenizer.json".to_string()));
         } else if m == "ultraface" {
             files_to_download.push(("ultraface".to_string(), "https://raw.githubusercontent.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB/master/models/onnx/version-RFB-320.onnx".to_string(), "version-RFB-320.onnx".to_string()));
+        } else if m == "ocr" {
+            files_to_download.push(("ocr-det".to_string(), "https://huggingface.co/SWHL/RapidOCR/resolve/main/PP-OCRv4/en_PP-OCRv3_det_infer.onnx".to_string(), "ocr_det.onnx".to_string()));
+            files_to_download.push(("ocr-rec".to_string(), "https://huggingface.co/SWHL/RapidOCR/resolve/main/PP-OCRv3-ONNX/en_PP-OCRv3_rec_infer.onnx".to_string(), "ocr_rec.onnx".to_string()));
+            files_to_download.push(("ocr-dict".to_string(), "https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/release/2.6/ppocr/utils/en_dict.txt".to_string(), "en_dict.txt".to_string()));
+        } else if m == "nsfw" {
+            files_to_download.push(("nsfw".to_string(), "https://huggingface.co/Xenova/nsfw-image-detection/resolve/main/onnx/model.onnx".to_string(), "nsfw.onnx".to_string()));
+        } else if m == "aesthetics" {
+            files_to_download.push(("aesthetics".to_string(), "https://huggingface.co/Xenova/laion-aesthetics-predictor-v2-junction/resolve/main/onnx/model.onnx".to_string(), "aesthetics.onnx".to_string()));
+        } else if m == "yolo" {
+            files_to_download.push(("yolo".to_string(), "https://huggingface.co/Xenova/yolov8n/resolve/main/onnx/model.onnx".to_string(), "yolov8.onnx".to_string()));
+        } else if m == "blip" {
+            files_to_download.push(("blip".to_string(), "https://huggingface.co/Xenova/blip-image-captioning-base/resolve/main/onnx/vision_model.onnx".to_string(), "blip.onnx".to_string()));
+        } else if m == "arcface" {
+            files_to_download.push(("arcface".to_string(), "https://huggingface.co/Xenova/arcface_w600k_r50/resolve/main/onnx/model.onnx".to_string(), "arcface.onnx".to_string()));
+        } else if m == "midas" {
+            files_to_download.push(("midas".to_string(), "https://huggingface.co/Xenova/dpt-hybrid-midas/resolve/main/onnx/model.onnx".to_string(), "midas.onnx".to_string()));
+        } else if m == "whisper" {
+            files_to_download.push(("whisper".to_string(), "https://huggingface.co/Xenova/whisper-tiny.en/resolve/main/onnx/encoder_model.onnx".to_string(), "whisper.onnx".to_string()));
         }
     }
 
@@ -334,7 +387,8 @@ async fn download_models(
                 emit_log(&app, format!("ERROR: Download interrupted for {filename}"));
             }
         }
-        let _ = tx.send("__RELOAD_MODELS__".to_string());
+        // Force engine re-init to load new models
+        let _ = tx.send(ml::Job::ProcessAll);
         let _ = app.emit("download-complete", ());
     });
 
@@ -463,7 +517,7 @@ fn assign_name_to_face(
     let database = database::Database::new(&path);
     let id = database.assign_name_to_face(&face_id, &name);
 
-    let _ = state.tx.send("__RELOAD_MODELS__".to_string());
+    let _ = state.tx.send(ml::Job::ProcessAll);
     id
 }
 
@@ -557,7 +611,7 @@ fn merge_people(
     let db = database::Database::new(&path);
     db.merge_people(&from_id, &to_id);
 
-    let _ = state.tx.send("__RELOAD_MODELS__".to_string());
+    let _ = state.tx.send(ml::Job::ProcessAll);
 }
 
 #[tauri::command]
@@ -737,7 +791,7 @@ fn process_video_frames(
     state
         .pending_count
         .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    let _ = state.tx.send(payload);
+    let _ = state.tx.send(ml::Job::AnalyzeSingle(id));
 }
 
 #[tauri::command]
@@ -778,14 +832,25 @@ async fn index_faces(
         + count;
     let _ = app.emit("indexing-progress", total);
     for id in photo_ids {
-        let _ = state.tx.send(id);
+        let _ = state.tx.send(ml::Job::AnalyzeSingle(id));
     }
     Ok(())
 }
 
 #[tauri::command]
+async fn analyze_photo(state: tauri::State<'_, ml::MlContext>, id: String) -> Result<(), String> {
+    let _ = state.tx.send(ml::Job::AnalyzeSingle(id));
+    Ok(())
+}
+
+#[tauri::command]
+async fn analyze_model(state: tauri::State<'_, ml::MlContext>, model_id: String) -> Result<(), String> {
+    let _ = state.tx.send(ml::Job::ProcessModel(model_id));
+    Ok(())
+}
+
+#[tauri::command]
 async fn abort_indexing(state: tauri::State<'_, ml::MlContext>) -> Result<(), String> {
-    let _ = state.tx.send("__ABORT__".to_string());
     state.abort.store(true, std::sync::atomic::Ordering::SeqCst);
     state
         .pending_count
@@ -1047,6 +1112,8 @@ pub fn run() {
             get_indexing_status,
             get_heatmap_data,
             initialize_sync_folder,
+            analyze_photo,
+            analyze_model,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

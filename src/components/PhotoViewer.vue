@@ -74,6 +74,23 @@
         <v-divider class="opacity-5"></v-divider>
 
         <v-list class="bg-transparent px-4">
+          <div class="mb-4" v-if="currentPhoto?.indexed < 2">
+             <v-btn
+               block
+               variant="flat"
+               color="black"
+               prepend-icon="mdi-auto-fix"
+               :loading="isAnalyzing"
+               @click="analyzePhoto"
+               class="text-none"
+             >
+               Analyze Photo
+             </v-btn>
+             <div v-if="globalEta" class="text-caption text-zinc-muted mt-2 text-center">
+                Library indexing: {{ formatEta(globalEta) }} remaining
+             </div>
+          </div>
+
           <div class="mb-6 pt-4">
             <div class="text-caption text-zinc-muted mb-1 text-uppercase tracking-widest">File Details</div>
             <div class="d-flex align-start mb-2">
@@ -85,6 +102,16 @@
           </div>
 
           <v-divider class="opacity-5 mb-4"></v-divider>
+
+          <!-- Caption Section -->
+          <div class="mb-6" v-if="currentPhoto?.caption">
+            <div class="text-caption text-zinc-muted mb-1 text-uppercase tracking-widest">AI Caption</div>
+            <div class="text-body-2 text-zinc-primary font-italic">
+              "{{ currentPhoto.caption }}"
+            </div>
+          </div>
+
+          <v-divider class="opacity-5 mb-4" v-if="currentPhoto?.caption"></v-divider>
 
           <div class="mb-6" v-if="hasExif">
             <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">Camera Settings</div>
@@ -197,6 +224,9 @@ export default {
     os: '',
     mediaPort: null,
     detectedFaces: [],
+    isAnalyzing: false,
+    globalEta: 0,
+    unlistenEta: null,
   }),
   computed: {
     isMobile() {
@@ -293,6 +323,37 @@ export default {
       });
       this.close();
     },
+    async analyzePhoto() {
+      if (!this.currentPhoto || this.isAnalyzing) return;
+      this.isAnalyzing = true;
+      try {
+        await invoke("analyze_photo", { id: this.currentPhoto.id });
+        // The worker will emit photo-received via WebRTC sync logic or we can listen for general updates
+        // For simple local feedback, we poll or wait a bit then refresh faces
+        setTimeout(() => {
+           this.fetchFaces();
+           this.isAnalyzing = false;
+        }, 2000);
+      } catch (e) {
+        console.error("Analysis failed", e);
+        this.isAnalyzing = false;
+      }
+    },
+    formatEta(ms) {
+      if (!ms || ms < 0) return 'calculating...';
+      const totalSeconds = Math.floor(ms / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      if (hours > 0) return `${hours}h ${minutes}m`;
+      if (minutes > 0) return `${minutes}m`;
+      return `${totalSeconds % 60}s`;
+    },
+    async listenForEta() {
+      const { listen } = await import('@tauri-apps/api/event');
+      this.unlistenEta = await listen('indexing-eta', (event) => {
+        this.globalEta = event.payload;
+      });
+    },
     close() { this.visible = false; },
     next() {
         if (this.photos.length === 0) return;
@@ -341,9 +402,11 @@ export default {
       window.addEventListener('keydown', this.handleKeydown);
       try { this.os = await invoke("get_os"); } catch (e) {}
       try { this.mediaPort = await invoke("get_media_server_port"); } catch (e) { console.error("Failed to get media server port", e); }
+      this.listenForEta();
   },
   beforeUnmount() {
       window.removeEventListener('keydown', this.handleKeydown);
+      if (this.unlistenEta) this.unlistenEta();
   }
 }
 </script>
