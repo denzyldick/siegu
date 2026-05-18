@@ -5,9 +5,7 @@ use std::time::SystemTime;
 use tauri::Emitter;
 use tauri::Manager;
 
-mod config;
 mod database;
-mod directory;
 mod face_detector;
 mod file;
 mod ml;
@@ -125,12 +123,17 @@ fn scan_files(app: tauri::AppHandle) {
                 return;
             }
             let progress = (i as f32 / total as f32 * 100.0) as u32;
-            let _ = app.emit("scan-progress", serde_json::json!({ "status": "scanning", "progress": progress, "current": i + 1, "total": total, "current_directory": folder }));
+            let _ = app.emit("scan-progress", serde_json::json!({ "status": "discovering", "progress": progress, "current": i + 1, "total": total, "current_directory": folder }));
             println!("Scanning folder {} of {}: {}", i + 1, total, folder);
             file::scan_folder(&app, folder.clone(), &path, &batch_tx_shared);
         }
 
         println!("Finished scanning all folders. Updating last scan time...");
+        let _ = app.emit(
+            "scan-progress",
+            serde_json::json!({ "status": "indexing", "progress": 100, "message": "Analyzing photos with AI..." }),
+        );
+
         let database = database::Database::new(&path);
         let timestamp = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -138,17 +141,13 @@ fn scan_files(app: tauri::AppHandle) {
             .as_secs()
             .to_string();
         database.set_last_scan_time(timestamp);
-        let _ = app.emit(
-            "scan-progress",
-            serde_json::json!({ "status": "complete", "progress": 100 }),
-        );
 
         use tauri_plugin_notification::NotificationExt;
         let _ = app
             .notification()
             .builder()
             .title("Siegu")
-            .body("Media scan complete")
+            .body("Files discovered, analyzing with AI...")
             .show();
 
         // Final signal to process everything found in the discovery pass
@@ -263,25 +262,43 @@ async fn download_models(
         if m == "clip" {
             files_to_download.push(("clip-visual".to_string(), "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model.onnx".to_string(), "clip-vit-base-patch32-visual.onnx".to_string()));
             files_to_download.push(("clip-text".to_string(), "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/text_model.onnx".to_string(), "clip-vit-base-patch32-text.onnx".to_string()));
-            files_to_download.push(("clip-tokenizer".to_string(), "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/tokenizer.json".to_string(), "tokenizer.json".to_string()));
+            files_to_download.push((
+                "clip-tokenizer".to_string(),
+                "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/tokenizer.json"
+                    .to_string(),
+                "tokenizer.json".to_string(),
+            ));
         } else if m == "ultraface" {
             files_to_download.push(("ultraface".to_string(), "https://raw.githubusercontent.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB/master/models/onnx/version-RFB-320.onnx".to_string(), "version-RFB-320.onnx".to_string()));
         } else if m == "ocr" {
             files_to_download.push(("ocr-det".to_string(), "https://huggingface.co/SWHL/RapidOCR/resolve/main/PP-OCRv4/en_PP-OCRv3_det_infer.onnx".to_string(), "ocr_det.onnx".to_string()));
-            files_to_download.push(("ocr-rec".to_string(), "https://huggingface.co/SWHL/RapidOCR/resolve/main/PP-OCRv3-ONNX/en_PP-OCRv3_rec_infer.onnx".to_string(), "ocr_rec.onnx".to_string()));
+            files_to_download.push(("ocr-rec".to_string(), "https://huggingface.co/SWHL/RapidOCR/resolve/main/PP-OCRv3/en_PP-OCRv3_rec_infer.onnx".to_string(), "ocr_rec.onnx".to_string()));
             files_to_download.push(("ocr-dict".to_string(), "https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/release/2.6/ppocr/utils/en_dict.txt".to_string(), "en_dict.txt".to_string()));
         } else if m == "nsfw" {
-            files_to_download.push(("nsfw".to_string(), "https://huggingface.co/Xenova/nsfw-image-detection/resolve/main/onnx/model.onnx".to_string(), "nsfw.onnx".to_string()));
+            files_to_download.push(("nsfw".to_string(), "https://huggingface.co/onnx-community/nsfw_image_detection-ONNX/resolve/main/onnx/model.onnx".to_string(), "nsfw.onnx".to_string()));
         } else if m == "aesthetics" {
-            files_to_download.push(("aesthetics".to_string(), "https://huggingface.co/Xenova/laion-aesthetics-predictor-v2-junction/resolve/main/onnx/model.onnx".to_string(), "aesthetics.onnx".to_string()));
+            files_to_download.push(("aesthetics".to_string(), "https://huggingface.co/fsw/aesthetic-predictor-v2-5_onnx/resolve/main/aesthetic_predictor_v2_5.onnx".to_string(), "aesthetics.onnx".to_string()));
         } else if m == "yolo" {
-            files_to_download.push(("yolo".to_string(), "https://huggingface.co/Xenova/yolov8n/resolve/main/onnx/model.onnx".to_string(), "yolov8.onnx".to_string()));
+            files_to_download.push((
+                "yolo".to_string(),
+                "https://huggingface.co/webml/yolov8n/resolve/main/onnx/yolov8n.onnx".to_string(),
+                "yolov8.onnx".to_string(),
+            ));
         } else if m == "blip" {
-            files_to_download.push(("blip".to_string(), "https://huggingface.co/Xenova/blip-image-captioning-base/resolve/main/onnx/vision_model.onnx".to_string(), "blip.onnx".to_string()));
+            files_to_download.push(("blip".to_string(), "https://huggingface.co/onnx-community/Salesforce_blip-image-captioning-base/resolve/main/split_0.onnx".to_string(), "blip.onnx".to_string()));
         } else if m == "arcface" {
-            files_to_download.push(("arcface".to_string(), "https://huggingface.co/Xenova/arcface_w600k_r50/resolve/main/onnx/model.onnx".to_string(), "arcface.onnx".to_string()));
+            files_to_download.push((
+                "arcface".to_string(),
+                "https://huggingface.co/crj/dl-ws/resolve/main/arcface_w600k_r50.onnx".to_string(),
+                "arcface.onnx".to_string(),
+            ));
         } else if m == "midas" {
-            files_to_download.push(("midas".to_string(), "https://huggingface.co/Xenova/dpt-hybrid-midas/resolve/main/onnx/model.onnx".to_string(), "midas.onnx".to_string()));
+            files_to_download.push((
+                "midas".to_string(),
+                "https://huggingface.co/Xenova/dpt-hybrid-midas/resolve/main/onnx/model.onnx"
+                    .to_string(),
+                "midas.onnx".to_string(),
+            ));
         } else if m == "whisper" {
             files_to_download.push(("whisper".to_string(), "https://huggingface.co/Xenova/whisper-tiny.en/resolve/main/onnx/encoder_model.onnx".to_string(), "whisper.onnx".to_string()));
         }
@@ -396,6 +413,7 @@ async fn download_models(
 }
 
 #[tauri::command]
+#[allow(non_snake_case)]
 async fn list_files(
     app: tauri::AppHandle,
     offset: usize,
@@ -647,6 +665,7 @@ async fn remove_directory_full(app: tauri::AppHandle, path: String) {
 }
 
 #[tauri::command]
+#[allow(non_snake_case)]
 async fn start_webrtc_session(
     app: tauri::AppHandle,
     state: tauri::State<'_, WebRtcState>,
@@ -704,9 +723,14 @@ async fn stop_webrtc_session(state: tauri::State<'_, WebRtcState>) -> Result<(),
 
 #[tauri::command]
 fn get_indexing_status(state: tauri::State<'_, ml::MlContext>) -> usize {
-    state
+    let count = state
         .pending_count
-        .load(std::sync::atomic::Ordering::SeqCst)
+        .load(std::sync::atomic::Ordering::SeqCst);
+    if count > 1_000_000 {
+        0
+    } else {
+        count
+    }
 }
 
 #[tauri::command]
@@ -788,9 +812,6 @@ fn process_video_frames(
         payload.push_str("|||");
         payload.push_str(&frame);
     }
-    state
-        .pending_count
-        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     let _ = state.tx.send(ml::Job::AnalyzeSingle(id));
 }
 
@@ -816,24 +837,9 @@ async fn index_faces(
     state_map.insert("indexing_mode".to_string(), "immediate".to_string());
     db.set_state(state_map);
 
-    let mut photo_ids = Vec::new();
-    if let Ok(mut stmt) = db.connection.prepare("SELECT id FROM photo") {
-        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
-            for id in rows.flatten() {
-                photo_ids.push(id);
-            }
-        }
-    }
-    println!("Found {} photos to index", photo_ids.len());
-    let count = photo_ids.len();
-    let total = state
-        .pending_count
-        .fetch_add(count, std::sync::atomic::Ordering::SeqCst)
-        + count;
-    let _ = app.emit("indexing-progress", total);
-    for id in photo_ids {
-        let _ = state.tx.send(ml::Job::AnalyzeSingle(id));
-    }
+    let _ = state
+        .tx
+        .send(ml::Job::ProcessModel("ultraface".to_string()));
     Ok(())
 }
 
@@ -844,7 +850,10 @@ async fn analyze_photo(state: tauri::State<'_, ml::MlContext>, id: String) -> Re
 }
 
 #[tauri::command]
-async fn analyze_model(state: tauri::State<'_, ml::MlContext>, model_id: String) -> Result<(), String> {
+async fn analyze_model(
+    state: tauri::State<'_, ml::MlContext>,
+    model_id: String,
+) -> Result<(), String> {
     let _ = state.tx.send(ml::Job::ProcessModel(model_id));
     Ok(())
 }
@@ -1093,6 +1102,7 @@ pub fn run() {
             join_network,
             remove_device,
             list_devices,
+            list_objects,
             server::generate_pairing_codes,
             server::hash_pairing_code,
             start_webrtc_session,

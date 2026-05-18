@@ -50,6 +50,7 @@ export default {
     },
     imageSrc() {
       if (!this.photo || !this.photo.location) return '';
+      if (this.photo.encoded && !this.isVideo) return this.photo.encoded;
       return convertFileSrc(this.photo.location);
     }
   },

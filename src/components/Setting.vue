@@ -92,42 +92,122 @@
               </div>
             </template>
             <v-card-title class="text-h6 text-zinc-primary font-weight-bold">AI Models</v-card-title>
-            <template v-slot:append v-if="pendingCount > 0">
+            <template v-slot:append v-if="activeModelSummary || pendingCount > 0">
                <div class="text-right">
-                  <div class="text-caption font-weight-bold text-black">Indexing {{ pendingCount }} photos</div>
-                  <div class="text-caption text-zinc-muted" style="font-size: 10px;">ETA: {{ formatEta(globalEta) }}</div>
+                  <div v-if="activeModelSummary" class="text-caption font-weight-bold text-black">
+                    {{ activeModelSummary }}
+                  </div>
+                  <div v-else class="text-caption font-weight-bold text-black">Indexing {{ formatIndexingCount(pendingCount) }} AI jobs</div>
+                  <div v-if="pendingCount > 0" class="text-caption text-zinc-muted" style="font-size: 10px;">ETA: {{ formatEta(globalEta) }}</div>
                </div>
             </template>
           </v-card-item>
 
           <v-card-text class="pt-4">
+            <v-sheet
+              v-if="visibleActivityModel"
+              class="ai-activity-strip d-flex align-center justify-space-between px-4 py-3 mb-4 rounded-lg"
+              color="#f4f4f5"
+              border
+            >
+              <div class="d-flex align-center min-width-0">
+                <v-progress-circular
+                  v-if="isModelProcessing(visibleActivityModel.id)"
+                  indeterminate
+                  size="20"
+                  width="2"
+                  color="black"
+                  class="mr-3 flex-shrink-0"
+                ></v-progress-circular>
+                <v-icon
+                  v-else
+                  size="20"
+                  color="#18181b"
+                  class="mr-3 flex-shrink-0"
+                >
+                  {{ getModelActivityIcon(visibleActivityModel.id) }}
+                </v-icon>
+                <div class="min-width-0">
+                  <div class="text-caption text-zinc-muted font-weight-bold">
+                    {{ isModelProcessing(visibleActivityModel.id) ? 'Current AI model' : 'Latest AI model' }}
+                  </div>
+                  <div class="text-body-2 text-zinc-primary font-weight-bold text-truncate">
+                    {{ visibleActivityModel.title }} · {{ getModelStatusText(visibleActivityModel.id) }}
+                  </div>
+                </div>
+              </div>
+              <v-chip
+                size="small"
+                color="black"
+                variant="flat"
+                class="ml-3 flex-shrink-0"
+              >
+                {{ getModelStatusLabel(visibleActivityModel.id) }}
+              </v-chip>
+            </v-sheet>
+
             <v-row dense>
-              <v-col v-for="model in aiModels" :key="model.id" cols="12" md="6" class="mb-2">
-                <v-card variant="outlined" border class="border-subtle rounded-lg fill-height d-flex flex-column">
+              <v-col v-for="model in sortedModels" :key="model.id" cols="12" md="6" class="mb-2">
+                <v-card
+                  variant="outlined"
+                  border
+                  class="border-subtle rounded-lg fill-height d-flex flex-column ai-model-card"
+                  :class="{ 'ai-model-card-active': isModelActive(model.id) }"
+                >
                   <v-card-item class="pb-2">
                     <template v-slot:prepend>
                       <v-checkbox v-model="selectedModels" :value="model.id" hide-details density="compact" color="black" class="ma-0 pa-0"></v-checkbox>
                     </template>
-                    <v-card-title class="text-subtitle-1 font-weight-bold d-flex align-center">
-                      {{ model.title }}
-                      <v-chip v-if="downloadedModels.includes(model.id)" size="x-small" color="success" variant="flat" class="ml-2">Ready</v-chip>
+                    <v-card-title class="text-subtitle-1 font-weight-bold d-flex align-center flex-wrap ga-1">
+                      <span>{{ model.title }}</span>
+                      <v-chip
+                        v-if="isModelActive(model.id)"
+                        size="x-small"
+                        color="black"
+                        variant="flat"
+                        class="ml-1"
+                        prepend-icon="mdi-progress-clock"
+                      >
+                        {{ getModelStatusLabel(model.id) }}
+                      </v-chip>
+                      <v-chip
+                        v-else-if="downloadedModels.includes(model.id)"
+                        size="x-small"
+                        color="success"
+                        variant="flat"
+                        class="ml-1"
+                        prepend-icon="mdi-check"
+                      >
+                        Ready
+                      </v-chip>
                     </v-card-title>
                   </v-card-item>
 
                   <v-card-text class="py-0 flex-grow-1">
                     <div class="text-body-2 text-zinc-primary">{{ model.desc }}</div>
                     <div class="text-caption text-zinc-muted mt-1 font-italic">{{ model.search }}</div>
-                    <div class="text-caption text-zinc-muted mt-1">File size: {{ model.size }}</div>
+                    <div class="d-flex align-center justify-space-between mt-2 model-status-line">
+                      <span class="text-caption text-zinc-muted">File size: {{ model.size }}</span>
+                      <span
+                        class="text-caption font-weight-bold model-status-text"
+                        :class="isModelActive(model.id) ? 'text-black' : 'text-zinc-muted'"
+                        :title="getModelStatusText(model.id)"
+                      >
+                        {{ getModelStatusText(model.id) }}
+                      </span>
+                    </div>
 
                     <!-- Progress Area -->
                     <div v-if="isModelProcessing(model.id)" class="mt-4">
                       <div class="d-flex justify-space-between text-caption mb-1">
-                        <span class="font-weight-bold text-black">Running...</span>
-                        <span>{{ getModelPending(model.id) }} left</span>
+                        <span class="font-weight-bold text-black">{{ getModelStatusLabel(model.id) }}</span>
+                        <span>{{ getModelProgressText(model.id) }}</span>
                       </div>
                       <v-progress-linear
-                        indeterminate
+                        :indeterminate="!hasModelProgressTotal(model.id)"
+                        :model-value="getModelProgressPercent(model.id)"
                         color="black"
+                        bg-color="#e4e4e7"
                         height="4"
                         rounded
                       ></v-progress-linear>
@@ -154,17 +234,19 @@
                       color="black"
                       prepend-icon="mdi-download"
                       :loading="isModelDownloading(model.id)"
+                      :disabled="isAnyModelProcessing"
                       @click="downloadModels(false, [model.id])"
                     >
                       Download
                     </v-btn>
-                    <div v-else class="d-flex ga-2">
+                    <div v-else-if="!embedded" class="d-flex ga-2">
                        <v-btn
                         variant="tonal"
                         size="small"
                         color="zinc-muted"
                         icon="mdi-refresh"
                         :loading="isModelDownloading(model.id)"
+                        :disabled="isAnyModelProcessing"
                         @click="downloadModels(true, [model.id])"
                         title="Update Model"
                       ></v-btn>
@@ -173,10 +255,11 @@
                         size="small"
                         color="black"
                         prepend-icon="mdi-play"
-                        :disabled="isModelProcessing(model.id)"
+                        :loading="isModelProcessing(model.id)"
+                        :disabled="isAnyModelProcessing && !isModelProcessing(model.id)"
                         @click="runModel(model.id)"
                       >
-                        Run Now
+                        {{ isModelProcessing(model.id) ? getModelStatusLabel(model.id) : 'Run Now' }}
                       </v-btn>
                     </div>
                   </v-card-actions>
@@ -195,6 +278,7 @@
               prepend-icon="mdi-download-multiple"
               @click="downloadModels(false, selectedModels)"
               :loading="isDownloading"
+              :disabled="isAnyModelProcessing"
             >
               Download Selected ({{ missingSelectedCount }})
             </v-btn>
@@ -463,23 +547,31 @@ export default {
     downloadedModels: [],
     selectedModels: [],
     downloadProgress: {},
+    downloadingModels: {},
     pendingCount: 0,
     globalEta: 0,
+    unlistenLog: null,
+    unlistenDownloadProgress: null,
+    unlistenDownloadComplete: null,
     unlistenEta: null,
     unlistenProgress: null,
     unlistenModelProgress: null,
+    uiClock: null,
+    uiNow: Date.now(),
+    activeModelId: null,
+    activeModelHoldUntil: 0,
     modelProgress: {}, // { model_id: { pending, total } }
     aiModels: [
       { id: 'clip', title: 'Smart Search', desc: 'Finds objects and scenes in your photos.', search: "Try searching: 'dog', 'beach', 'sunset'", size: '350MB' },
       { id: 'ultraface', title: 'Face Grouping', desc: 'Finds faces and groups them by person.', search: "Try searching: 'Mom', 'John'", size: '2MB' },
       { id: 'ocr', title: 'Text Finder', desc: 'Reads text inside photos like receipts.', search: "Try searching: 'Receipt', 'Invoice', 'Menu'", size: '20MB' },
-      { id: 'nsfw', title: 'Safe Mode', desc: 'Detects and hides sensitive content.', search: "Helps keep your library family-friendly.", size: '80MB' },
-      { id: 'aesthetics', title: 'Quality Scorer', desc: 'Rates photos by how good they look.', search: "Helps you find your best shots quickly.", size: '80MB' },
-      { id: 'blip', title: 'Photo Describer', desc: 'Writes sentences about what is in photos.', search: "Try searching: 'Family eating outside'", size: '950MB' },
+      { id: 'nsfw', title: 'Safe Mode', desc: 'Detects and hides sensitive content.', search: "Helps keep your library family-friendly.", size: '328MB' },
+      { id: 'aesthetics', title: 'Quality Scorer', desc: 'Rates photos by how good they look.', search: "Helps you find your best shots quickly.", size: '1.6GB' },
+      { id: 'blip', title: 'Photo Describer', desc: 'Writes sentences about what is in photos.', search: "Try searching: 'Family eating outside'", size: '329MB' },
       { id: 'yolo', title: 'Object Pro', desc: 'Pinpoint accuracy for finding specific items.', search: "Adds deep tags for 80+ common objects.", size: '15MB' },
-      { id: 'arcface', title: 'Face Pro', desc: 'Advanced recognition for better grouping.', search: "drastically improves face matching accuracy.", size: '120MB' },
-      { id: 'midas', title: 'Depth Vision', desc: 'Analyzes 3D depth in landscapes.', search: "Adds depth-based filters to your library.", size: '60MB' },
-      { id: 'whisper', title: 'Audio Search', desc: 'Transcribes words spoken in videos.', search: "Search for things people said in videos.", size: '150MB' },
+      { id: 'arcface', title: 'Face Pro', desc: 'Advanced recognition for better grouping.', search: "drastically improves face matching accuracy.", size: '166MB' },
+      { id: 'midas', title: 'Depth Vision', desc: 'Analyzes 3D depth in landscapes.', search: "Adds depth-based filters to your library.", size: '508MB' },
+      { id: 'whisper', title: 'Audio Search', desc: 'Transcribes words spoken in videos.', search: "Search for things people said in videos.", size: '31MB' },
     ],
     logs: [],
     performance: {
@@ -509,10 +601,44 @@ export default {
   computed: {
     missingSelectedCount() {
       return this.selectedModels.filter(id => !this.downloadedModels.includes(id)).length;
+    },
+    sortedModels() {
+      return [...this.aiModels].sort((a, b) => {
+        const aDownloaded = this.downloadedModels.includes(a.id);
+        const bDownloaded = this.downloadedModels.includes(b.id);
+        const aActive = this.isModelActive(a.id);
+        const bActive = this.isModelActive(b.id);
+        if (aActive && !bActive) return -1;
+        if (!aActive && bActive) return 1;
+        if (aDownloaded && !bDownloaded) return -1;
+        if (!aDownloaded && bDownloaded) return 1;
+        return 0;
+      });
+    },
+    processingModels() {
+      return this.aiModels.filter(model => this.isModelProcessing(model.id));
+    },
+    isAnyModelProcessing() {
+      return this.processingModels.length > 0;
+    },
+    activeModelSummary() {
+      if (!this.visibleActivityModel) return "";
+      return `${this.getModelStatusLabel(this.visibleActivityModel.id)}: ${this.visibleActivityModel.title}`;
+    },
+    visibleActivityModel() {
+      if (!this.activeModelId) return null;
+      const model = this.aiModels.find(m => m.id === this.activeModelId);
+      if (!model) return null;
+      if (this.isModelProcessing(model.id) || this.uiNow < this.activeModelHoldUntil) return model;
+      return null;
     }
   },
   async mounted() {
-    listen("log-message", (event) => {
+    this.uiClock = window.setInterval(() => {
+      this.uiNow = Date.now();
+    }, 1000);
+
+    this.unlistenLog = await listen("log-message", (event) => {
       const log = {
         time: new Date().toLocaleTimeString(),
         message: event.payload,
@@ -522,19 +648,21 @@ export default {
       if (this.logs.length > 100) this.logs.pop();
     });
 
-    listen("download-progress", (event) => {
+    this.unlistenDownloadProgress = await listen("download-progress", (event) => {
         const { model, downloaded, total } = event.payload;
         this.downloadProgress = { ...this.downloadProgress, [model]: { downloaded, total } };
     });
 
-    listen("download-complete", () => {
+    this.unlistenDownloadComplete = await listen("download-complete", () => {
         this.isDownloading = false;
+        this.downloadingModels = {};
+        this.downloadProgress = {};
         this.checkExistingModels();
         this.$emit('models-ready');
     });
 
     this.unlistenProgress = await listen("indexing-progress", (event) => {
-        this.pendingCount = event.payload;
+        this.pendingCount = this.normalizeIndexingCount(event.payload);
     });
 
     this.unlistenEta = await listen("indexing-eta", (event) => {
@@ -542,12 +670,26 @@ export default {
     });
 
     this.unlistenModelProgress = await listen("model-progress", (event) => {
-        const { model, pending, total } = event.payload;
+        const { model, pending, total, status, message } = event.payload;
+        const previous = this.modelProgress[model] || {};
+        const normalizedPending = typeof pending === "number" ? pending : previous.pending;
+        const normalizedTotal = typeof total === "number" ? total : previous.total;
+        const normalizedStatus = status || (normalizedPending > 0 ? "running" : "idle");
+        this.activeModelId = model;
+        if (["completed", "up_to_date", "unavailable", "error"].includes(normalizedStatus)) {
+          this.activeModelHoldUntil = Date.now() + 15000;
+        } else {
+          this.activeModelHoldUntil = 0;
+        }
         this.modelProgress = { 
           ...this.modelProgress, 
           [model]: { 
-            pending, 
-            total: total || (this.modelProgress[model]?.total || 0) 
+            ...previous,
+            pending: normalizedPending, 
+            total: normalizedTotal,
+            status: normalizedStatus,
+            message: message || previous.message || "",
+            updatedAt: Date.now(),
           } 
         };
     });
@@ -563,6 +705,14 @@ export default {
     this.list_directories();
   },
   methods: {
+    normalizeIndexingCount(value) {
+      const count = Number(value);
+      if (!Number.isSafeInteger(count) || count < 0 || count > 1000000) return 0;
+      return count;
+    },
+    formatIndexingCount(value) {
+      return this.normalizeIndexingCount(value).toLocaleString();
+    },
     async fetchLogs() {
       try {
         const logsStr = await invoke("get_logs", { limit: 100 });
@@ -615,6 +765,10 @@ export default {
       if (!modelsToDownload || modelsToDownload.length === 0) return;
       
       this.isDownloading = true;
+      this.downloadingModels = {
+        ...this.downloadingModels,
+        ...Object.fromEntries(modelsToDownload.map(m => [m, true]))
+      };
       // Initialize progress tracking for requested models
       modelsToDownload.forEach(m => {
         if (m === 'clip') {
@@ -630,6 +784,10 @@ export default {
         await invoke('download_models', { models: modelsToDownload });
       } catch (err) {
         this.isDownloading = false;
+        modelsToDownload.forEach(m => {
+          delete this.downloadingModels[m];
+        });
+        this.downloadingModels = { ...this.downloadingModels };
       }
     },
     getProgress(model) {
@@ -680,23 +838,90 @@ export default {
       return `${totalSeconds % 60}s`;
     },
     async runModel(modelId) {
+      const previous = this.modelProgress[modelId] || {};
+      this.activeModelId = modelId;
+      this.activeModelHoldUntil = 0;
+      this.modelProgress = {
+        ...this.modelProgress,
+        [modelId]: {
+          ...previous,
+          pending: previous.pending || null,
+          total: previous.total || null,
+          status: "starting",
+          updatedAt: Date.now(),
+        }
+      };
       try {
         await invoke("analyze_model", { modelId });
       } catch (err) {
+        this.modelProgress = {
+          ...this.modelProgress,
+          [modelId]: {
+            ...this.modelProgress[modelId],
+            pending: 0,
+            status: "idle",
+            updatedAt: Date.now(),
+          }
+        };
         console.error("Failed to start model analysis", err);
       }
     },
     isModelProcessing(modelId) {
       const progress = this.modelProgress[modelId];
-      return progress && progress.pending > 0;
+      return !!progress && (progress.status === "starting" || progress.pending > 0);
+    },
+    isModelActive(modelId) {
+      return this.activeModelId === modelId && (this.isModelProcessing(modelId) || this.uiNow < this.activeModelHoldUntil);
     },
     getModelPending(modelId) {
       return this.modelProgress[modelId]?.pending || 0;
     },
+    hasModelProgressTotal(modelId) {
+      return (this.modelProgress[modelId]?.total || 0) > 0;
+    },
+    getModelProgressPercent(modelId) {
+      const progress = this.modelProgress[modelId];
+      if (!progress || !progress.total) return 0;
+      const pending = Math.max(progress.pending || 0, 0);
+      return Math.max(0, Math.min(100, ((progress.total - pending) / progress.total) * 100));
+    },
+    getModelProgressText(modelId) {
+      const progress = this.modelProgress[modelId];
+      if (!progress || progress.status === "starting") return "Starting";
+      if (!progress.total) return `${progress.pending || 0} left`;
+      return `${Math.max(progress.total - (progress.pending || 0), 0)} of ${progress.total}`;
+    },
+    getModelStatusLabel(modelId) {
+      const progress = this.modelProgress[modelId];
+      if (progress?.status === "starting") return "Starting";
+      if (progress?.status === "completed") return "Finished";
+      if (progress?.status === "up_to_date") return "Up to date";
+      if (progress?.status === "unavailable") return "Unavailable";
+      if (progress?.status === "error") return "Error";
+      return "Running";
+    },
+    getModelStatusText(modelId) {
+      const progress = this.modelProgress[modelId];
+      if (this.isModelProcessing(modelId)) return this.getModelProgressText(modelId);
+      if (progress?.message) return progress.message;
+      if (progress?.status === "completed") return "Finished";
+      if (progress?.status === "up_to_date") return "Up to date";
+      if (progress?.status === "unavailable") return "Not available";
+      if (progress?.status === "error") return "Error";
+      if (progress?.total > 0 && progress?.pending === 0) return "Finished";
+      if (progress?.total === 0 && progress?.pending === 0) return "Up to date";
+      if (this.downloadedModels.includes(modelId)) return "Ready to run";
+      return "Not downloaded";
+    },
+    getModelActivityIcon(modelId) {
+      const status = this.modelProgress[modelId]?.status;
+      if (status === "completed" || status === "up_to_date") return "mdi-check-circle-outline";
+      if (status === "unavailable") return "mdi-alert-circle-outline";
+      if (status === "error") return "mdi-alert-outline";
+      return "mdi-robot-outline";
+    },
     isModelDownloading(modelId) {
-      if (modelId === 'clip') return this.downloadProgress['clip-visual'] || this.downloadProgress['clip-text'] || this.downloadProgress['clip-tokenizer'];
-      if (modelId === 'ocr') return this.downloadProgress['ocr-det'] || this.downloadProgress['ocr-rec'] || this.downloadProgress['ocr-dict'];
-      return !!this.downloadProgress[modelId];
+      return !!this.downloadingModels[modelId];
     },
     async cleanupDb() {
       this.cleanupDialog.show = true;
@@ -762,6 +987,10 @@ export default {
     }
   },
   beforeUnmount() {
+    if (this.uiClock) window.clearInterval(this.uiClock);
+    if (this.unlistenLog) this.unlistenLog();
+    if (this.unlistenDownloadProgress) this.unlistenDownloadProgress();
+    if (this.unlistenDownloadComplete) this.unlistenDownloadComplete();
     if (this.unlistenEta) this.unlistenEta();
     if (this.unlistenProgress) this.unlistenProgress();
     if (this.unlistenModelProgress) this.unlistenModelProgress();
@@ -778,5 +1007,27 @@ export default {
 }
 .border-top-subtle {
   border-top: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+.ai-model-card {
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+.ai-activity-strip {
+  border-color: rgba(24, 24, 27, 0.18) !important;
+}
+.ai-model-card-active {
+  border-color: #18181b !important;
+  background-color: #fafafa !important;
+  box-shadow: inset 3px 0 0 #18181b;
+}
+.model-status-line {
+  gap: 12px;
+}
+.model-status-text {
+  flex: 1;
+  min-width: 96px;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

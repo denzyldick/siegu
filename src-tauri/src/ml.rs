@@ -30,6 +30,71 @@ pub struct MlContext {
     pub abort: Arc<std::sync::atomic::AtomicBool>,
 }
 
+const MAX_REASONABLE_PENDING: usize = 1_000_000;
+type FaceEmbeddingStore = Arc<Mutex<Vec<(String, Vec<f32>)>>>;
+
+fn job_status_model(model_id: &str) -> Option<&'static str> {
+    match model_id {
+        "clip" => Some("clip"),
+        "ultraface" | "face" => Some("face"),
+        "ocr" => Some("ocr"),
+        "nsfw" => Some("nsfw"),
+        "aesthetics" => Some("aesthetics"),
+        "yolo" => Some("yolo"),
+        "blip" => Some("blip"),
+        "arcface" => Some("arcface"),
+        "midas" => Some("midas"),
+        "whisper" => Some("whisper"),
+        _ => None,
+    }
+}
+
+fn should_run_model(target_model: Option<&str>, model: &str) -> bool {
+    target_model.is_none_or(|target| target == model)
+}
+
+// The pending counter is shared by UI commands, discovery, and background model work.
+// Clamp obviously invalid values so stale underflows do not leave the UI stuck indexing forever.
+fn decrement_pending_count(counter: &AtomicUsize) -> usize {
+    counter
+        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+            if current > MAX_REASONABLE_PENDING {
+                Some(0)
+            } else {
+                Some(current.saturating_sub(1))
+            }
+        })
+        .map(|previous| {
+            if previous > MAX_REASONABLE_PENDING {
+                0
+            } else {
+                previous.saturating_sub(1)
+            }
+        })
+        .unwrap_or(0)
+}
+
+fn increment_pending_count(counter: &AtomicUsize, amount: usize) -> usize {
+    counter
+        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+            let base = if current > MAX_REASONABLE_PENDING {
+                0
+            } else {
+                current
+            };
+            Some(base.saturating_add(amount))
+        })
+        .map(|previous| {
+            let base = if previous > MAX_REASONABLE_PENDING {
+                0
+            } else {
+                previous
+            };
+            base.saturating_add(amount)
+        })
+        .unwrap_or(amount)
+}
+
 // Model wrappers to handle different engine types
 #[derive(Clone)]
 enum ModelEngine {
@@ -46,9 +111,12 @@ impl ModelEngine {
             ModelEngine::Ort(session) => {
                 let shape = input.shape().to_vec();
                 let data = input.into_raw_vec_and_offset().0;
-                let tensor = ort::value::Value::from_array((shape, data)).map_err(|e| e.to_string())?;
+                let tensor =
+                    ort::value::Value::from_array((shape, data)).map_err(|e| e.to_string())?;
                 let mut lock = session.lock().unwrap();
-                let outputs = lock.run(ort::inputs![_input_name => &tensor]).map_err(|e| e.to_string())?;
+                let outputs = lock
+                    .run(ort::inputs![_input_name => &tensor])
+                    .map_err(|e| e.to_string())?;
                 let mut results = Vec::new();
                 for i in 0..outputs.len() {
                     if let Ok((_shape, data)) = outputs[i].try_extract_tensor::<f32>() {
@@ -62,11 +130,15 @@ impl ModelEngine {
                 let tract_tensor: tract_onnx::prelude::Tensor = input.into();
                 let mut inputs = vec![];
                 let input_count = plan.model().input_outlets().unwrap().len();
-                for _ in 0..input_count { inputs.push(tract_tensor.clone().into()); }
+                for _ in 0..input_count {
+                    inputs.push(tract_tensor.clone().into());
+                }
                 let result = plan.run(inputs.into()).map_err(|e| e.to_string())?;
                 let mut results = Vec::new();
-                for i in 0..result.len() {
-                    if let Some(output) = result[i].as_slice::<f32>().ok() { results.extend_from_slice(output); }
+                for output in result.iter() {
+                    if let Ok(output) = output.as_slice::<f32>() {
+                        results.extend_from_slice(output);
+                    }
                 }
                 Ok(results)
             }
@@ -80,22 +152,77 @@ fn compute_text_embeddings(
     tokenizer: &tokenizers::Tokenizer,
 ) -> Vec<(String, Vec<f32>)> {
     let search_vocabulary = vec![
-        "a passport", "a driver's license", "an id card", "a document", "a receipt", "a screenshot", "a meme", "a text message",
-        "a cat", "a dog", "a pet", "an animal", "a car", "a vehicle", "a motorcycle", "a bicycle", "a person", "a selfie",
-        "a group of people", "a crowd", "a building", "a house", "architecture", "a city", "a landscape", "nature", "a mountain",
-        "a beach", "water", "food", "a meal", "a drink", "coffee", "a laptop", "a computer", "a phone", "a screen", "electronics",
-        "a piece of furniture", "a room interior", "a sunset", "the sky", "clouds", "art", "a drawing", "a painting",
+        "a passport",
+        "a driver's license",
+        "an id card",
+        "a document",
+        "a receipt",
+        "a screenshot",
+        "a meme",
+        "a text message",
+        "a cat",
+        "a dog",
+        "a pet",
+        "an animal",
+        "a car",
+        "a vehicle",
+        "a motorcycle",
+        "a bicycle",
+        "a person",
+        "a selfie",
+        "a group of people",
+        "a crowd",
+        "a building",
+        "a house",
+        "architecture",
+        "a city",
+        "a landscape",
+        "nature",
+        "a mountain",
+        "a beach",
+        "water",
+        "food",
+        "a meal",
+        "a drink",
+        "coffee",
+        "a laptop",
+        "a computer",
+        "a phone",
+        "a screen",
+        "electronics",
+        "a piece of furniture",
+        "a room interior",
+        "a sunset",
+        "the sky",
+        "clouds",
+        "art",
+        "a drawing",
+        "a painting",
     ];
 
     let mut embeddings = Vec::new();
     for text_label in search_vocabulary {
         if let Ok(encoding) = tokenizer.encode(format!("a photo of {text_label}"), true) {
             #[cfg(not(target_os = "android"))]
-            let mut ids = encoding.get_ids().iter().map(|&x| x as i64).collect::<Vec<i64>>();
+            let mut ids = encoding
+                .get_ids()
+                .iter()
+                .map(|&x| x as i64)
+                .collect::<Vec<i64>>();
             #[cfg(target_os = "android")]
-            let mut ids = encoding.get_ids().iter().map(|&x| x as i32).collect::<Vec<i32>>();
+            let mut ids = encoding
+                .get_ids()
+                .iter()
+                .map(|&x| x as i32)
+                .collect::<Vec<i32>>();
 
-            if ids.len() > 77 { ids.truncate(77); } else { while ids.len() < 77 { ids.push(0); } }
+            if ids.len() > 77 {
+                ids.truncate(77);
+            } else {
+                while ids.len() < 77 {
+                    ids.push(0);
+                }
+            }
 
             #[cfg(not(target_os = "android"))]
             let arr = Array2::from_shape_vec((1, 77), ids).unwrap();
@@ -108,11 +235,18 @@ fn compute_text_embeddings(
                 let data = arr.into_raw_vec_and_offset().0;
                 if let Ok(id_tensor) = ort::value::Value::from_array((shape, data)) {
                     if let Ok(outputs) = text_model.run(ort::inputs!["input_ids" => &id_tensor]) {
-                        if let Ok((_shape, text_emb_tensor)) = outputs[0].try_extract_tensor::<f32>() {
+                        if let Ok((_shape, text_emb_tensor)) =
+                            outputs[0].try_extract_tensor::<f32>()
+                        {
                             let mut text_embedding = vec![0.0; 512];
                             text_embedding.copy_from_slice(text_emb_tensor);
-                            let text_norm: f32 = text_embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
-                            if text_norm > 0.0 { for v in text_embedding.iter_mut() { *v /= text_norm; } }
+                            let text_norm: f32 =
+                                text_embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
+                            if text_norm > 0.0 {
+                                for v in text_embedding.iter_mut() {
+                                    *v /= text_norm;
+                                }
+                            }
                             embeddings.push((text_label.to_string(), text_embedding));
                         }
                     }
@@ -124,14 +258,23 @@ fn compute_text_embeddings(
                 let tract_tensor: tract_onnx::prelude::Tensor = arr.into();
                 let mut inputs = vec![];
                 let input_count = text_model.model().input_outlets().unwrap().len();
-                for _ in 0..input_count { inputs.push(tract_tensor.clone().into()); }
+                for _ in 0..input_count {
+                    inputs.push(tract_tensor.clone().into());
+                }
 
                 if let Ok(result) = text_model.run(inputs.into()) {
                     if let Some(output) = result[0].as_slice::<f32>().ok() {
                         let mut text_embedding = output.to_vec();
-                        if text_embedding.len() > 512 { text_embedding.truncate(512); }
-                        let text_norm: f32 = text_embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
-                        if text_norm > 0.0 { for v in text_embedding.iter_mut() { *v /= text_norm; } }
+                        if text_embedding.len() > 512 {
+                            text_embedding.truncate(512);
+                        }
+                        let text_norm: f32 =
+                            text_embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
+                        if text_norm > 0.0 {
+                            for v in text_embedding.iter_mut() {
+                                *v /= text_norm;
+                            }
+                        }
                         embeddings.push((text_label.to_string(), text_embedding));
                     }
                 }
@@ -189,102 +332,178 @@ pub fn start_background_worker(
         let mut arcface_model: Option<ModelEngine> = None;
         let mut midas_model: Option<ModelEngine> = None;
         let mut whisper_model: Option<ModelEngine> = None;
-        let mut tokenizer: Option<Arc<tokenizers::Tokenizer>> = None;
         let mut text_embeddings: Arc<Vec<(String, Vec<f32>)>> = Arc::new(Vec::new());
-        let known_people: Arc<Mutex<Vec<(String, Vec<f32>)>>> = Arc::new(Mutex::new(Vec::new()));
+        let known_people: FaceEmbeddingStore = Arc::new(Mutex::new(Vec::new()));
         let mut ocr_alphabet: Arc<Vec<String>> = Arc::new(Vec::new());
         let mut engine_initialized = false;
 
         let db = Arc::new(Mutex::new(Database::new(&db_path)));
         let config = db.lock().unwrap().get_state();
-        let num_threads: usize = config.get("scan_threads").and_then(|s| s.parse().ok()).unwrap_or(2);
+        let num_threads: usize = config
+            .get("scan_threads")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(2);
 
-        let pool = rayon::ThreadPoolBuilder::new().num_threads(num_threads).build().unwrap();
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(num_threads)
+            .build()
+            .unwrap();
         let mut avg_photo_time_ms = 1000f64;
 
         while let Some(job) = rx.blocking_recv() {
-            if abort_clone.load(Ordering::SeqCst) {
-                if matches!(job, Job::ProcessAll) { continue; }
+            if abort_clone.load(Ordering::SeqCst) && matches!(job, Job::ProcessAll) {
+                continue;
             }
 
             if !engine_initialized {
-                emit_log(&app_handle, "ML Worker: Initializing AI Engines...".to_string());
+                emit_log(
+                    &app_handle,
+                    "ML Worker: Initializing AI Engines...".to_string(),
+                );
                 #[cfg(not(target_os = "android"))]
-                { let _ = ort::init().with_name("siegu").commit(); }
+                {
+                    let _ = ort::init().with_name("siegu").commit();
+                }
                 engine_initialized = true;
 
-                let is_ok = |p: &Path| p.exists() && p.metadata().map(|m| m.len()).unwrap_or(0) > 1024 * 1024;
-                tokenizer = tokenizers::Tokenizer::from_file(&clip_tokenizer_path).ok().map(Arc::new);
+                let is_ok = |p: &Path| {
+                    p.exists() && p.metadata().map(|m| m.len()).unwrap_or(0) > 1024 * 1024
+                };
+                let tokenizer = tokenizers::Tokenizer::from_file(&clip_tokenizer_path)
+                    .ok()
+                    .map(Arc::new);
 
                 if is_ok(&ultraface_path) {
                     #[cfg(not(target_os = "android"))]
-                    if let Ok(s) = Session::builder().unwrap().with_optimization_level(GraphOptimizationLevel::Disable).unwrap().commit_from_file(&ultraface_path) {
+                    if let Ok(s) = Session::builder()
+                        .unwrap()
+                        .with_optimization_level(GraphOptimizationLevel::Disable)
+                        .unwrap()
+                        .commit_from_file(&ultraface_path)
+                    {
                         face_detector = Some(ModelEngine::Ort(Arc::new(Mutex::new(s))));
                     }
                 }
                 if is_ok(&clip_visual_path) {
                     #[cfg(not(target_os = "android"))]
-                    if let Ok(s) = Session::builder().unwrap().with_optimization_level(GraphOptimizationLevel::Disable).unwrap().commit_from_file(&clip_visual_path) {
+                    if let Ok(s) = Session::builder()
+                        .unwrap()
+                        .with_optimization_level(GraphOptimizationLevel::Disable)
+                        .unwrap()
+                        .commit_from_file(&clip_visual_path)
+                    {
                         clip_visual = Some(ModelEngine::Ort(Arc::new(Mutex::new(s))));
                     }
                 }
-                if is_ok(&clip_text_path) && tokenizer.is_some() {
+                if is_ok(&clip_text_path) {
                     #[cfg(not(target_os = "android"))]
-                    if let Ok(mut s) = Session::builder().unwrap().with_optimization_level(GraphOptimizationLevel::Disable).unwrap().commit_from_file(&clip_text_path) {
-                        text_embeddings = Arc::new(compute_text_embeddings(&mut s, tokenizer.as_ref().unwrap()));
+                    if let Some(tokenizer) = tokenizer.as_ref() {
+                        if let Ok(mut s) = Session::builder()
+                            .unwrap()
+                            .with_optimization_level(GraphOptimizationLevel::Disable)
+                            .unwrap()
+                            .commit_from_file(&clip_text_path)
+                        {
+                            text_embeddings = Arc::new(compute_text_embeddings(&mut s, tokenizer));
+                        }
                     }
                 }
                 if is_ok(&ocr_det_path) {
                     #[cfg(not(target_os = "android"))]
-                    if let Ok(s) = Session::builder().unwrap().with_optimization_level(GraphOptimizationLevel::Disable).unwrap().commit_from_file(&ocr_det_path) {
+                    if let Ok(s) = Session::builder()
+                        .unwrap()
+                        .with_optimization_level(GraphOptimizationLevel::Disable)
+                        .unwrap()
+                        .commit_from_file(&ocr_det_path)
+                    {
                         ocr_det = Some(ModelEngine::Ort(Arc::new(Mutex::new(s))));
                     }
                 }
                 if is_ok(&ocr_rec_path) {
                     #[cfg(not(target_os = "android"))]
-                    if let Ok(s) = Session::builder().unwrap().with_optimization_level(GraphOptimizationLevel::Disable).unwrap().commit_from_file(&ocr_rec_path) {
+                    if let Ok(s) = Session::builder()
+                        .unwrap()
+                        .with_optimization_level(GraphOptimizationLevel::Disable)
+                        .unwrap()
+                        .commit_from_file(&ocr_rec_path)
+                    {
                         ocr_rec = Some(ModelEngine::Ort(Arc::new(Mutex::new(s))));
                     }
                 }
                 if is_ok(&nsfw_path) {
                     #[cfg(not(target_os = "android"))]
-                    if let Ok(s) = Session::builder().unwrap().with_optimization_level(GraphOptimizationLevel::Disable).unwrap().commit_from_file(&nsfw_path) {
+                    if let Ok(s) = Session::builder()
+                        .unwrap()
+                        .with_optimization_level(GraphOptimizationLevel::Disable)
+                        .unwrap()
+                        .commit_from_file(&nsfw_path)
+                    {
                         nsfw_model = Some(ModelEngine::Ort(Arc::new(Mutex::new(s))));
                     }
                 }
                 if is_ok(&aesthetics_path) {
                     #[cfg(not(target_os = "android"))]
-                    if let Ok(s) = Session::builder().unwrap().with_optimization_level(GraphOptimizationLevel::Disable).unwrap().commit_from_file(&aesthetics_path) {
+                    if let Ok(s) = Session::builder()
+                        .unwrap()
+                        .with_optimization_level(GraphOptimizationLevel::Disable)
+                        .unwrap()
+                        .commit_from_file(&aesthetics_path)
+                    {
                         aesthetics_model = Some(ModelEngine::Ort(Arc::new(Mutex::new(s))));
                     }
                 }
                 if is_ok(&yolo_path) {
                     #[cfg(not(target_os = "android"))]
-                    if let Ok(s) = Session::builder().unwrap().with_optimization_level(GraphOptimizationLevel::Disable).unwrap().commit_from_file(&yolo_path) {
+                    if let Ok(s) = Session::builder()
+                        .unwrap()
+                        .with_optimization_level(GraphOptimizationLevel::Disable)
+                        .unwrap()
+                        .commit_from_file(&yolo_path)
+                    {
                         yolo_model = Some(ModelEngine::Ort(Arc::new(Mutex::new(s))));
                     }
                 }
                 if is_ok(&blip_path) {
                     #[cfg(not(target_os = "android"))]
-                    if let Ok(s) = Session::builder().unwrap().with_optimization_level(GraphOptimizationLevel::Disable).unwrap().commit_from_file(&blip_path) {
+                    if let Ok(s) = Session::builder()
+                        .unwrap()
+                        .with_optimization_level(GraphOptimizationLevel::Disable)
+                        .unwrap()
+                        .commit_from_file(&blip_path)
+                    {
                         blip_model = Some(ModelEngine::Ort(Arc::new(Mutex::new(s))));
                     }
                 }
                 if is_ok(&arcface_path) {
                     #[cfg(not(target_os = "android"))]
-                    if let Ok(s) = Session::builder().unwrap().with_optimization_level(GraphOptimizationLevel::Disable).unwrap().commit_from_file(&arcface_path) {
+                    if let Ok(s) = Session::builder()
+                        .unwrap()
+                        .with_optimization_level(GraphOptimizationLevel::Disable)
+                        .unwrap()
+                        .commit_from_file(&arcface_path)
+                    {
                         arcface_model = Some(ModelEngine::Ort(Arc::new(Mutex::new(s))));
                     }
                 }
                 if is_ok(&midas_path) {
                     #[cfg(not(target_os = "android"))]
-                    if let Ok(s) = Session::builder().unwrap().with_optimization_level(GraphOptimizationLevel::Disable).unwrap().commit_from_file(&midas_path) {
+                    if let Ok(s) = Session::builder()
+                        .unwrap()
+                        .with_optimization_level(GraphOptimizationLevel::Disable)
+                        .unwrap()
+                        .commit_from_file(&midas_path)
+                    {
                         midas_model = Some(ModelEngine::Ort(Arc::new(Mutex::new(s))));
                     }
                 }
                 if is_ok(&whisper_path) {
                     #[cfg(not(target_os = "android"))]
-                    if let Ok(s) = Session::builder().unwrap().with_optimization_level(GraphOptimizationLevel::Disable).unwrap().commit_from_file(&whisper_path) {
+                    if let Ok(s) = Session::builder()
+                        .unwrap()
+                        .with_optimization_level(GraphOptimizationLevel::Disable)
+                        .unwrap()
+                        .commit_from_file(&whisper_path)
+                    {
                         whisper_model = Some(ModelEngine::Ort(Arc::new(Mutex::new(s))));
                     }
                 }
@@ -296,59 +515,153 @@ pub fn start_background_worker(
                     ocr_alphabet = Arc::new(alphabet);
                 }
                 let people_vec = db.lock().unwrap().get_all_people_with_embeddings();
-                if let Ok(mut lock) = known_people.lock() { *lock = people_vec; }
+                if let Ok(mut lock) = known_people.lock() {
+                    *lock = people_vec;
+                }
                 emit_log(&app_handle, "ML Worker: Engine Ready.".to_string());
             }
 
-            let (photo_ids, target_model) = match job {
-                Job::AnalyzeSingle(id) => (vec![id], None),
+            let (photo_ids, target_model, progress_model) = match job {
+                Job::AnalyzeSingle(id) => (vec![id], None, None),
                 Job::ProcessModel(model_id) => {
-                    let lock = db.lock().unwrap();
-                    (lock.get_photos_missing_model(&model_id), Some(model_id))
+                    if model_id == "whisper" {
+                        emit_log(
+                            &app_handle,
+                            "ML Worker: Audio Search is downloaded but video transcription is not wired into the worker yet.".to_string(),
+                        );
+                        let _ = app_handle.emit(
+                            "model-progress",
+                            serde_json::json!({
+                                "model": model_id,
+                                "pending": 0,
+                                "total": 0,
+                                "status": "unavailable",
+                                "message": "Video transcription is not wired yet"
+                            }),
+                        );
+                        (Vec::new(), None, None)
+                    } else if let Some(status_model) = job_status_model(&model_id) {
+                        let lock = db.lock().unwrap();
+                        (
+                            lock.get_photos_missing_model(status_model),
+                            Some(status_model.to_string()),
+                            Some(model_id),
+                        )
+                    } else {
+                        emit_log(
+                            &app_handle,
+                            format!("ERROR: Unknown AI model requested: {model_id}"),
+                        );
+                        let _ = app_handle.emit(
+                            "model-progress",
+                            serde_json::json!({
+                                "model": model_id,
+                                "pending": 0,
+                                "total": 0,
+                                "status": "error",
+                                "message": "Unknown AI model"
+                            }),
+                        );
+                        (Vec::new(), None, None)
+                    }
                 }
                 Job::ProcessAll => {
                     let lock = db.lock().unwrap();
-                    (lock.get_unindexed_photos().iter().map(|p| p.id.clone()).collect(), None)
+                    (
+                        lock.get_unindexed_photos()
+                            .iter()
+                            .map(|p| p.id.clone())
+                            .collect(),
+                        None,
+                        None,
+                    )
                 }
             };
 
-            if photo_ids.is_empty() { continue; }
-            
-            if let Some(ref model) = target_model {
-                let _ = app_handle.emit("model-progress", serde_json::json!({
-                    "model": model,
-                    "pending": photo_ids.len(),
-                    "total": photo_ids.len()
-                }));
+            if photo_ids.is_empty() {
+                if let Some(ref model) = progress_model {
+                    emit_log(
+                        &app_handle,
+                        format!("ML Worker: No photos need {model} analysis."),
+                    );
+                    let _ = app_handle.emit(
+                        "model-progress",
+                        serde_json::json!({
+                            "model": model,
+                            "pending": 0,
+                            "total": 0,
+                            "status": "up_to_date",
+                            "message": "No photos need this model"
+                        }),
+                    );
+                }
+                continue;
             }
 
-            pending_count_clone.store(photo_ids.len(), Ordering::SeqCst);
-            let _ = app_handle.emit("indexing-progress", photo_ids.len());
+            if let Some(ref model) = progress_model {
+                emit_log(
+                    &app_handle,
+                    format!("ML Worker: Running {model} on {} photos.", photo_ids.len()),
+                );
+                let _ = app_handle.emit(
+                    "model-progress",
+                    serde_json::json!({
+                        "model": model,
+                        "pending": photo_ids.len(),
+                        "total": photo_ids.len(),
+                        "status": "running"
+                    }),
+                );
+            }
+
+            let total_pending = increment_pending_count(&pending_count_clone, photo_ids.len());
+            let _ = app_handle.emit("indexing-progress", total_pending);
 
             for photo_id in photo_ids {
-                if abort_clone.load(Ordering::SeqCst) { break; }
+                if abort_clone.load(Ordering::SeqCst) {
+                    break;
+                }
                 let start_time = std::time::Instant::now();
                 let target_model_task = target_model.clone();
+                let progress_model_task = progress_model.clone();
 
                 let photo_entry = {
                     let lock = db.lock().unwrap();
                     let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, p.indexed, p.caption, p.aesthetics_score, 
                         s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres 
                         FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE p.id = ?1";
-                    lock.connection.query_row(sql, [&photo_id], |row| {
-                        Ok(crate::database::Photo {
-                            id: row.get(0)?, location: row.get(1)?, encoded: row.get(2)?, created: row.get(5).unwrap_or_default(),
-                            objects: std::collections::HashMap::new(), properties: std::collections::HashMap::new(),
-                            latitude: row.get(3).unwrap_or(0.0), longitude: row.get(4).unwrap_or(0.0), favorite: false,
-                            indexed: row.get(6).unwrap_or(0), caption: row.get(7).ok(), aesthetics_score: row.get(8).ok(),
-                            ai_status: crate::database::AiStatus {
-                                clip: row.get(9).unwrap_or(0), face: row.get(10).unwrap_or(0), ocr: row.get(11).unwrap_or(0),
-                                nsfw: row.get(12).unwrap_or(0), aesthetics: row.get(13).unwrap_or(0), yolo: row.get(14).unwrap_or(0),
-                                blip: row.get(15).unwrap_or(0), arcface: row.get(16).unwrap_or(0), midas: row.get(17).unwrap_or(0),
-                                whisper: row.get(18).unwrap_or(0), sam: row.get(19).unwrap_or(0), superres: row.get(20).unwrap_or(0),
-                            },
+                    lock.connection
+                        .query_row(sql, [&photo_id], |row| {
+                            Ok(crate::database::Photo {
+                                id: row.get(0)?,
+                                location: row.get(1)?,
+                                encoded: row.get(2)?,
+                                created: row.get(5).unwrap_or_default(),
+                                objects: std::collections::HashMap::new(),
+                                properties: std::collections::HashMap::new(),
+                                latitude: row.get(3).unwrap_or(0.0),
+                                longitude: row.get(4).unwrap_or(0.0),
+                                favorite: false,
+                                indexed: row.get(6).unwrap_or(0),
+                                caption: row.get(7).ok(),
+                                aesthetics_score: row.get(8).ok(),
+                                ai_status: crate::database::AiStatus {
+                                    clip: row.get(9).unwrap_or(0),
+                                    face: row.get(10).unwrap_or(0),
+                                    ocr: row.get(11).unwrap_or(0),
+                                    nsfw: row.get(12).unwrap_or(0),
+                                    aesthetics: row.get(13).unwrap_or(0),
+                                    yolo: row.get(14).unwrap_or(0),
+                                    blip: row.get(15).unwrap_or(0),
+                                    arcface: row.get(16).unwrap_or(0),
+                                    midas: row.get(17).unwrap_or(0),
+                                    whisper: row.get(18).unwrap_or(0),
+                                    sam: row.get(19).unwrap_or(0),
+                                    superres: row.get(20).unwrap_or(0),
+                                },
+                            })
                         })
-                    }).ok()
+                        .ok()
                 };
 
                 if let Some(photo_entry) = photo_entry {
@@ -356,8 +669,20 @@ pub fn start_background_worker(
                     let photo_loc_actual = photo_entry.location.clone();
                     let app_handle_task = app_handle.clone();
                     let pending_count_task = Arc::clone(&pending_count_clone);
+
+                    let _ = app_handle.emit(
+                        "current-ai-job",
+                        serde_json::json!({
+                            "id": photo_id,
+                            "filename": Path::new(&photo_entry.location)
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .unwrap_or(""),
+                            "model": target_model.clone().unwrap_or_default(),
+                        }),
+                    );
                     let db_task = Arc::clone(&db);
-                    
+
                     let clip_visual_task = clip_visual.clone();
                     let face_detector_task = face_detector.clone();
                     let ocr_det_task = ocr_det.clone();
@@ -375,6 +700,7 @@ pub fn start_background_worker(
                     let faces_dir_task = faces_dir.clone();
                     let abort_task = Arc::clone(&abort_clone);
                     let target_model_inner = target_model_task.clone();
+                    let progress_model_inner = progress_model_task.clone();
 
                     pool.spawn(move || {
                         if abort_task.load(Ordering::SeqCst) { return; }
@@ -383,7 +709,7 @@ pub fn start_background_worker(
                             let img = dynamic_img.to_rgb8();
 
                             // Tier 2: CLIP Visual
-                            if photo_entry.ai_status.clip == 0 {
+                            if should_run_model(target_model_inner.as_deref(), "clip") && photo_entry.ai_status.clip == 0 {
                                 if let Some(ref visual_model) = clip_visual_task {
                                     let resized = image::imageops::resize(&img, 224, 224, image::imageops::FilterType::Triangle);
                                     let mut input_img = Array4::<f32>::zeros((1, 3, 224, 224));
@@ -402,17 +728,26 @@ pub fn start_background_worker(
                                             similarities.push((text_label, dot_product));
                                         }
                                         similarities.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                                        let top_matches = similarities
+                                            .iter()
+                                            .take(5)
+                                            .map(|(class_name, score)| format!("{class_name} ({score:.2})"))
+                                            .collect::<Vec<_>>()
+                                            .join(", ");
                                         let lock = db_task.lock().unwrap();
                                         for (class_name, score) in similarities.iter().take(5) {
                                             let _ = lock.connection.execute("INSERT INTO object (photo_id, class, probability) VALUES(?1, ?2, ?3)", (&photo_id_task, class_name, &score.to_string()));
                                         }
                                         lock.update_ai_status(&photo_id_task, "clip", 1);
+                                        emit_log(&app_handle_task, format!("ML Worker: CLIP tags for {photo_id_task}: {top_matches}"));
                                     }
+                                } else if progress_model_inner.is_some() {
+                                    emit_log(&app_handle_task, "ERROR: CLIP model is not loaded. Download or update Smart Search first.".to_string());
                                 }
                             }
 
                             // Tier 1: Aesthetics
-                            if photo_entry.ai_status.aesthetics == 0 {
+                            if should_run_model(target_model_inner.as_deref(), "aesthetics") && photo_entry.ai_status.aesthetics == 0 {
                                 if let Some(ref model) = aesthetics_task {
                                     let resized = image::imageops::resize(&img, 224, 224, image::imageops::FilterType::Triangle);
                                     let mut input = Array4::<f32>::zeros((1, 3, 224, 224));
@@ -426,12 +761,15 @@ pub fn start_background_worker(
                                         let lock = db_task.lock().unwrap();
                                         let _ = lock.connection.execute("UPDATE photo SET aesthetics_score = ?1 WHERE id = ?2", (score as f64, &photo_id_task));
                                         lock.update_ai_status(&photo_id_task, "aesthetics", 1);
+                                        emit_log(&app_handle_task, format!("ML Worker: Aesthetic score for {photo_id_task}: {score:.2}"));
                                     }
+                                } else if progress_model_inner.is_some() {
+                                    emit_log(&app_handle_task, "ERROR: Aesthetics model is not loaded. Download or update Quality Scorer first.".to_string());
                                 }
                             }
 
                             // Tier 1: NSFW
-                            if photo_entry.ai_status.nsfw == 0 {
+                            if should_run_model(target_model_inner.as_deref(), "nsfw") && photo_entry.ai_status.nsfw == 0 {
                                 if let Some(ref model) = nsfw_task {
                                     let resized = image::imageops::resize(&img, 224, 224, image::imageops::FilterType::Triangle);
                                     let mut input = Array4::<f32>::zeros((1, 3, 224, 224));
@@ -445,12 +783,15 @@ pub fn start_background_worker(
                                         let lock = db_task.lock().unwrap();
                                         let _ = lock.connection.execute("INSERT INTO properties (photo_id, key, value) VALUES(?1, 'nsfw', ?2)", (&photo_id_task, &nsfw_score.to_string()));
                                         lock.update_ai_status(&photo_id_task, "nsfw", 1);
+                                        emit_log(&app_handle_task, format!("ML Worker: NSFW score for {photo_id_task}: {nsfw_score:.2}"));
                                     }
+                                } else if progress_model_inner.is_some() {
+                                    emit_log(&app_handle_task, "ERROR: NSFW model is not loaded. Download or update Safe Mode first.".to_string());
                                 }
                             }
 
                             // Tier 2: OCR
-                            if photo_entry.ai_status.ocr == 0 {
+                            if should_run_model(target_model_inner.as_deref(), "ocr") && photo_entry.ai_status.ocr == 0 {
                                 if let Some(ref _det_model) = ocr_det_task {
                                     if let Some(ref rec_model) = ocr_rec_task {
                                         let rec_h = 48; let rec_w = 320;
@@ -477,17 +818,22 @@ pub fn start_background_worker(
                                                 if !recognized_text.trim().is_empty() {
                                                     let lock = db_task.lock().unwrap();
                                                     let _ = lock.connection.execute("INSERT INTO ocr (photo_id, text) VALUES(?1, ?2)", (&photo_id_task, &recognized_text));
+                                                    emit_log(&app_handle_task, format!("ML Worker: OCR text for {photo_id_task}: {}", recognized_text.trim()));
+                                                } else {
+                                                    emit_log(&app_handle_task, format!("ML Worker: OCR found no text for {photo_id_task}."));
                                                 }
                                             }
                                         }
                                         let lock = db_task.lock().unwrap();
                                         lock.update_ai_status(&photo_id_task, "ocr", 1);
                                     }
+                                } else if progress_model_inner.is_some() {
+                                    emit_log(&app_handle_task, "ERROR: OCR model is not loaded. Download or update Text Finder first.".to_string());
                                 }
                             }
 
                             // Tier 2: YOLOv8
-                            if photo_entry.ai_status.yolo == 0 {
+                            if should_run_model(target_model_inner.as_deref(), "yolo") && photo_entry.ai_status.yolo == 0 {
                                 if let Some(ref model) = yolo_task {
                                     let resized = image::imageops::resize(&img, 640, 640, image::imageops::FilterType::Triangle);
                                     let mut input = Array4::<f32>::zeros((1, 3, 640, 640));
@@ -512,17 +858,26 @@ pub fn start_background_worker(
                                             if max_conf > 0.6 { found_classes.insert(max_cls); }
                                         }
                                         let lock = db_task.lock().unwrap();
+                                        let found_count = found_classes.len();
                                         for cls_idx in found_classes {
                                             let _ = lock.connection.execute("INSERT INTO object (photo_id, class, probability) VALUES(?1, ?2, '0.9')", (&photo_id_task, &format!("yolo_{cls_idx}")));
                                         }
                                         lock.update_ai_status(&photo_id_task, "yolo", 1);
+                                        emit_log(&app_handle_task, format!("ML Worker: YOLO found {found_count} object classes for {photo_id_task}."));
                                     }
+                                } else if progress_model_inner.is_some() {
+                                    emit_log(&app_handle_task, "ERROR: YOLO model is not loaded. Download or update Object Pro first.".to_string());
                                 }
                             }
 
                             // Tier 1: Face Detection
-                            if photo_entry.ai_status.face == 0 {
+                            let should_run_face = should_run_model(target_model_inner.as_deref(), "face")
+                                && photo_entry.ai_status.face == 0;
+                            let should_run_arcface = should_run_model(target_model_inner.as_deref(), "arcface")
+                                && photo_entry.ai_status.arcface == 0;
+                            if should_run_face || should_run_arcface {
                                 if let Some(ref face_model) = face_detector_task {
+                                    let mut face_count = 0usize;
                                     let (orig_w, orig_h) = (img.width() as f32, img.height() as f32);
                                     let resized = image::imageops::resize(&img, 320, 240, image::imageops::FilterType::Triangle);
                                     let mut input = Array4::<f32>::zeros((1, 3, 240, 320));
@@ -557,7 +912,7 @@ pub fn start_background_worker(
                                                         let crop_path = format!("{faces_dir_task}/{face_id}.jpg");
                                                         if face_crop.save(&crop_path).is_ok() {
                                                             let mut face_embedding = Vec::new();
-                                                            
+
                                                             // Use ArcFace if available (higher accuracy)
                                                             if let Some(ref model) = arcface_task {
                                                                 let f_resized = image::imageops::resize(&face_crop, 112, 112, image::imageops::FilterType::Triangle);
@@ -613,6 +968,7 @@ pub fn start_background_worker(
                                                             let encoded = format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(buffer.get_ref()));
                                                             let lock = db_task.lock().unwrap();
                                                             lock.store_face(Face { photo_id: photo_id_task.clone(), face_id: face_id.clone(), crop_path, encoded, embedding: face_embedding, person_id: assigned_person_id });
+                                                            face_count += 1;
                                                         }
                                                     }
                                                 }
@@ -620,12 +976,19 @@ pub fn start_background_worker(
                                         }
                                     }
                                     let lock = db_task.lock().unwrap();
+                                    let _ = lock.connection.execute("INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES(?1, 'face_count', ?2)", (&photo_id_task, &face_count.to_string()));
                                     lock.update_ai_status(&photo_id_task, "face", 1);
+                                    if arcface_task.is_some() {
+                                        lock.update_ai_status(&photo_id_task, "arcface", 1);
+                                    }
+                                    emit_log(&app_handle_task, format!("ML Worker: Face analysis found {face_count} faces for {photo_id_task}."));
+                                } else if progress_model_inner.is_some() {
+                                    emit_log(&app_handle_task, "ERROR: Face model is not loaded. Download or update Face Grouping first.".to_string());
                                 }
                             }
 
                             // Tier 3: BLIP (Captioning)
-                            if photo_entry.ai_status.blip == 0 {
+                            if should_run_model(target_model_inner.as_deref(), "blip") && photo_entry.ai_status.blip == 0 {
                                 if let Some(ref model) = blip_task {
                                     let resized = image::imageops::resize(&img, 384, 384, image::imageops::FilterType::Triangle);
                                     let mut input = Array4::<f32>::zeros((1, 3, 384, 384));
@@ -640,12 +1003,15 @@ pub fn start_background_worker(
                                         let lock = db_task.lock().unwrap();
                                         let _ = lock.connection.execute("UPDATE photo SET caption = 'AI Generated Caption' WHERE id = ?1", [&photo_id_task]);
                                         lock.update_ai_status(&photo_id_task, "blip", 1);
+                                        emit_log(&app_handle_task, format!("ML Worker: BLIP caption placeholder stored for {photo_id_task}."));
                                     }
+                                } else if progress_model_inner.is_some() {
+                                    emit_log(&app_handle_task, "ERROR: BLIP model is not loaded. Download or update Photo Describer first.".to_string());
                                 }
                             }
 
                             // Tier 3: MiDaS (Depth)
-                            if photo_entry.ai_status.midas == 0 {
+                            if should_run_model(target_model_inner.as_deref(), "midas") && photo_entry.ai_status.midas == 0 {
                                 if let Some(ref model) = midas_task {
                                     let resized = image::imageops::resize(&img, 256, 256, image::imageops::FilterType::Triangle);
                                     let mut input = Array4::<f32>::zeros((1, 3, 256, 256));
@@ -657,16 +1023,23 @@ pub fn start_background_worker(
                                     if let Ok(_data) = model.run(input, "0") {
                                         let lock = db_task.lock().unwrap();
                                         lock.update_ai_status(&photo_id_task, "midas", 1);
+                                        emit_log(&app_handle_task, format!("ML Worker: MiDaS depth analysis completed for {photo_id_task}."));
                                     }
+                                } else if progress_model_inner.is_some() {
+                                    emit_log(&app_handle_task, "ERROR: MiDaS model is not loaded. Download or update Depth Vision first.".to_string());
                                 }
                             }
+                        } else {
+                            emit_log(&app_handle_task, format!("ERROR: Could not open image for AI analysis: {photo_loc_actual}"));
                         }
 
                         // Finalize
                         let lock = db_task.lock().unwrap();
-                        lock.update_photo_indexed(&photo_id_task, 2);
+                        if target_model_inner.is_none() {
+                            lock.update_photo_indexed(&photo_id_task, 2);
+                        }
                         let _ = lock.connection.execute("UPDATE photo SET sync_needed = 1 WHERE id = ?1", [&photo_id_task]);
-                        
+
                         if let Some(state) = app_handle_task.try_state::<crate::WebRtcState>() {
                             let mut tx_lock = state.sync_tx.blocking_lock();
                             if let Some(tx) = tx_lock.as_mut() {
@@ -676,20 +1049,32 @@ pub fn start_background_worker(
                             }
                         }
 
-                        let current = pending_count_task.fetch_sub(1, Ordering::SeqCst);
-                        let remaining = current.saturating_sub(1);
+                        let _ = app_handle_task.emit("photo-updated", serde_json::json!({
+                            "id": photo_id_task,
+                        }));
+
+                        let remaining = decrement_pending_count(&pending_count_task);
                         let _ = app_handle_task.emit("indexing-progress", remaining);
                         let _ = app_handle_task.emit("indexing-eta", (remaining as f64) * avg_photo_time_ms);
-                        
-                        if let Some(ref model) = target_model_inner {
+
+                        if remaining == 0 {
+                            let _ = app_handle_task.emit("scan-progress", serde_json::json!({
+                                "status": "complete",
+                                "progress": 100,
+                            }));
+                        }
+
+                        if let Some(ref model) = progress_model_inner {
                             let _ = app_handle_task.emit("model-progress", serde_json::json!({
                                 "model": model,
                                 "pending": remaining,
+                                "status": if remaining == 0 { "completed" } else { "running" },
                             }));
                         }
                     });
                 }
-                avg_photo_time_ms = (avg_photo_time_ms * 0.9) + (start_time.elapsed().as_millis() as f64 * 0.1);
+                avg_photo_time_ms =
+                    (avg_photo_time_ms * 0.9) + (start_time.elapsed().as_millis() as f64 * 0.1);
             }
         }
     });

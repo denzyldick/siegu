@@ -56,6 +56,18 @@ export default {
       show: false,
       message: ''
     },
+    currentScanFile: {
+      current: 0,
+      total: 0,
+      filename: '',
+      eta_secs: 0
+    },
+    currentAiJob: {
+      id: '',
+      filename: '',
+      model: ''
+    },
+    modelProgress: {},
   }),
   async mounted() {
     invoke("get_os").then(os => this.os = os);
@@ -86,11 +98,11 @@ export default {
     });
 
     invoke("get_indexing_status").then(count => {
-      this.indexingCount = count;
+      this.indexingCount = this.normalizeIndexingCount(count);
     });
 
     listen("indexing-progress", (event) => {
-      this.indexingCount = event.payload;
+      this.indexingCount = this.normalizeIndexingCount(event.payload);
     });
 
     invoke("get_people").then(response => {
@@ -105,7 +117,7 @@ export default {
     listen("scan-progress", (event) => {
       const data = event.payload;
       this.scanStatus = data.status;
-      if (data.status === 'scanning') {
+      if (data.status === 'discovering') {
         this.scanning = true;
         this.scanProgress = {
           current: data.current || 0,
@@ -113,13 +125,39 @@ export default {
           progress: data.progress || 0,
           current_directory: data.current_directory || ''
         };
+      } else if (data.status === 'indexing') {
+        this.scanning = true;
       } else if (data.status === 'complete') {
         this.scanning = false;
-        this.scanStatus = 'complete';
-        this.scanProgress.progress = 100;
+        this.currentScanFile = { current: 0, total: 0, filename: '', eta_secs: 0 };
+        this.currentAiJob = { id: '', filename: '', model: '' };
         this.lastScanTime = new Date().toLocaleString();
         setTimeout(() => { this.scanStatus = 'idle'; }, 3000);
       }
+    });
+
+    listen("file-scan-progress", (event) => {
+      const data = event.payload;
+      this.currentScanFile = {
+        current: data.current || 0,
+        total: data.total || 0,
+        filename: data.filename || '',
+        eta_secs: data.eta_secs || 0
+      };
+    });
+
+    listen("current-ai-job", (event) => {
+      const data = event.payload;
+      this.currentAiJob = {
+        id: data.id || '',
+        filename: data.filename || '',
+        model: data.model || ''
+      };
+    });
+
+    listen("model-progress", (event) => {
+      const data = event.payload;
+      this.modelProgress = { ...this.modelProgress, [data.model]: data };
     });
 
     listen("sync-progress", (event) => {
@@ -188,6 +226,14 @@ export default {
     hasActiveFilters() {
       return this.filters.favoritesOnly || this.filters.dateRange !== 'all' || this.filters.folder;
     },
+    isActive() {
+      return this.scanStatus === 'discovering' || this.scanStatus === 'indexing' || this.indexingCount > 0;
+    },
+    statusLabel() {
+      if (this.scanStatus === 'discovering') return 'Scanning...';
+      if (this.scanStatus === 'indexing' || this.indexingCount > 0) return 'Indexing...';
+      return 'Refresh';
+    },
     filteredPeople() {
       if (!this.faces) return [];
       if (!this.query) return this.faces.slice(0, 10);
@@ -196,6 +242,14 @@ export default {
     }
   },
   methods: {
+    normalizeIndexingCount(value) {
+      const count = Number(value);
+      if (!Number.isSafeInteger(count) || count < 0 || count > 1000000) return 0;
+      return count;
+    },
+    formatIndexingCount(value) {
+      return this.normalizeIndexingCount(value).toLocaleString();
+    },
     resetFilters() {
       this.filters = { favoritesOnly: false, videosOnly: false, dateRange: 'all', folder: null };
     },
@@ -205,7 +259,7 @@ export default {
       });
     },
     scan: async function () {
-      this.scanStatus = 'scanning';
+      this.scanStatus = 'discovering';
       this.scanning = true;
       await invoke("scan_files");
     },
@@ -248,6 +302,12 @@ export default {
     async checkModels() {
       const downloaded = await invoke("check_models");
       this.downloadedModels = downloaded;
+    },
+    formatEta(secs) {
+      if (secs < 60) return `${secs}s`;
+      const mins = Math.floor(secs / 60);
+      const remainSecs = secs % 60;
+      return `${mins}m ${remainSecs}s`;
     },
     async finishSetupAndScan() {
       this.clean_install = false;
@@ -469,10 +529,10 @@ export default {
                 <v-btn v-bind="props" color="#000000" theme="dark" variant="flat" :class="isMobile ? 'px-2' : 'px-4'" height="40" rounded="lg">
                   <div class="d-flex align-center">
                     <div :class="isMobile ? '' : 'mr-2'">
-                      <v-progress-circular v-if="scanStatus === 'scanning' || indexingCount > 0" indeterminate size="16" width="2" color="white"></v-progress-circular>
+                      <v-progress-circular v-if="isActive" indeterminate size="16" width="2" color="white"></v-progress-circular>
                       <v-icon v-else size="18" color="white">mdi-sync</v-icon>
                     </div>
-                    <span v-if="!isMobile" class="text-white font-weight-bold">{{ scanStatus === 'scanning' ? 'Scanning...' : (indexingCount > 0 ? 'Indexing...' : 'Refresh') }}</span>
+                    <span v-if="!isMobile" class="text-white font-weight-bold">{{ statusLabel }}</span>
                   </div>
                 </v-btn>
               </template>
@@ -481,7 +541,7 @@ export default {
                   <div class="text-overline font-weight-black text-zinc-muted mb-1">LIBRARY STATUS</div>
                   <div class="d-flex align-center justify-space-between">
                     <div class="text-subtitle-1 font-weight-bold text-zinc-primary">Siegu Sync</div>
-                    <v-chip v-if="scanStatus === 'scanning'" size="x-small" color="black" variant="flat" class="text-white">ACTIVE</v-chip>
+                    <v-chip v-if="isActive" size="x-small" color="black" variant="flat" class="text-white">{{ statusLabel }}</v-chip>
                   </div>
                 </div>
 
@@ -493,21 +553,52 @@ export default {
                       </template>
                       <v-list-item-title class="text-zinc-primary font-weight-bold">File Scanner</v-list-item-title>
                       <v-list-item-subtitle class="text-zinc-secondary">
-                        {{ scanStatus === 'scanning' ? `Processing folder ${scanProgress.current}/${scanProgress.total}` : 'Idle' }}
+                        {{ scanStatus === 'discovering' ? `Processing folder ${scanProgress.current}/${scanProgress.total}` : scanStatus === 'indexing' ? 'Switched to AI analysis' : 'Idle' }}
                       </v-list-item-subtitle>
-                      <div v-if="scanStatus === 'scanning'" class="mt-2">
-                        <v-progress-linear :model-value="scanProgress.progress" color="black" height="4" rounded></v-progress-linear>
+
+                      <div v-if="scanStatus === 'discovering'" class="mt-2">
+                        <div v-if="currentScanFile.total > 0" class="d-flex align-center justify-space-between mb-1">
+                          <span class="text-caption text-zinc-muted text-truncate" style="max-width: 200px;">{{ currentScanFile.filename || 'Scanning...' }}</span>
+                          <span class="text-caption text-zinc-muted ml-2">{{ currentScanFile.current }}/{{ currentScanFile.total }}</span>
+                        </div>
+                        <v-progress-linear v-if="currentScanFile.total > 0" :model-value="(currentScanFile.current / currentScanFile.total) * 100" color="black" height="4" rounded></v-progress-linear>
+                        <div v-if="currentScanFile.eta_secs > 0" class="text-caption text-zinc-muted mt-1">
+                          ~{{ formatEta(currentScanFile.eta_secs) }} remaining
+                        </div>
+                      </div>
+
+                      <div v-if="scanStatus === 'indexing'" class="mt-2">
+                        <v-progress-linear indeterminate color="black" height="4" rounded></v-progress-linear>
                       </div>
                     </v-list-item>
 
-                    <v-list-item class="px-0">
+                    <v-list-item class="px-0 mb-4">
                       <template v-slot:prepend>
                         <v-icon color="zinc-muted" class="mr-3">mdi-auto-fix</v-icon>
                       </template>
                       <v-list-item-title class="text-zinc-primary font-weight-bold">AI Intelligence</v-list-item-title>
                       <v-list-item-subtitle class="text-zinc-secondary">
-                        {{ indexingCount > 0 ? `${indexingCount} faces remaining` : 'All memories indexed' }}
+                        {{ indexingCount > 0 ? `${formatIndexingCount(indexingCount)} AI jobs remaining` : (scanStatus === 'indexing' ? 'Finalizing...' : 'All memories indexed') }}
                       </v-list-item-subtitle>
+                      <div v-if="currentAiJob.filename && indexingCount > 0" class="mt-2 bg-zinc-50 rounded-lg pa-2 border-subtle">
+                        <div class="d-flex align-center">
+                          <v-progress-circular indeterminate size="12" width="2" color="black" class="mr-2"></v-progress-circular>
+                          <div class="text-caption text-zinc-primary text-truncate" style="max-width: 220px;">
+                            {{ currentAiJob.filename }}
+                          </div>
+                        </div>
+                        <div v-if="currentAiJob.model" class="text-caption text-zinc-muted mt-1 ml-5">
+                          Model: {{ currentAiJob.model }}
+                        </div>
+                      </div>
+                      <div v-if="Object.keys(modelProgress).length > 0" class="mt-2">
+                        <div v-for="(mp, key) in modelProgress" :key="key" class="d-flex align-center justify-space-between mb-1">
+                          <span class="text-caption text-zinc-muted text-capitalize">{{ key }}</span>
+                          <v-chip :color="mp.status === 'completed' ? 'success' : mp.status === 'error' ? 'error' : 'default'" size="x-small" variant="flat" class="text-white" density="compact">
+                            {{ mp.status === 'completed' ? 'Done' : mp.status === 'running' ? `${mp.pending} left` : mp.status }}
+                          </v-chip>
+                        </div>
+                      </div>
                     </v-list-item>
                   </v-list>
 
@@ -518,7 +609,7 @@ export default {
                   </div>
 
                   <v-btn 
-                    v-if="scanStatus !== 'scanning' && indexingCount === 0" 
+                    v-if="!isActive" 
                     @click="scan()" 
                     variant="flat" 
                     color="black"
@@ -629,6 +720,40 @@ export default {
         </v-app-bar>
   
         <v-main class="bg-siegu-main">
+          <!-- Persistent Progress Banner -->
+          <v-slide-y-reverse-transition>
+            <div v-if="isActive" class="progress-banner">
+              <div class="progress-banner-inner px-4 py-2">
+                <div class="d-flex align-center justify-space-between flex-wrap ga-2">
+                  <div class="d-flex align-center ga-2 min-width-0 flex-shrink-1" style="max-width: 55%;">
+                    <v-progress-circular indeterminate size="16" width="2" color="black"></v-progress-circular>
+                    <div class="text-caption font-weight-bold text-zinc-primary text-truncate">
+                      <template v-if="scanStatus === 'discovering'">
+                        <span>Discovering: </span>
+                        <span v-if="currentScanFile.filename" class="text-zinc-muted font-weight-regular">{{ currentScanFile.filename }}</span>
+                        <span v-else class="text-zinc-muted font-weight-regular">{{ scanProgress.current_directory ? scanProgress.current_directory.split('/').pop() : '...' }}</span>
+                      </template>
+                      <template v-else-if="scanStatus === 'indexing' || indexingCount > 0">
+                        <span>Indexing: </span>
+                        <span v-if="currentAiJob.filename" class="text-zinc-muted font-weight-regular">{{ currentAiJob.filename }}</span>
+                        <span v-else class="text-zinc-muted font-weight-regular">{{ formatIndexingCount(indexingCount) }} jobs remaining</span>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="d-flex align-center ga-3 flex-shrink-0">
+                    <span v-if="scanStatus === 'discovering' && currentScanFile.total > 0" class="text-caption text-zinc-muted">
+                      {{ currentScanFile.current }}/{{ currentScanFile.total }}
+                      <span v-if="currentScanFile.eta_secs > 0"> · ~{{ formatEta(currentScanFile.eta_secs) }}</span>
+                    </span>
+                    <span v-else-if="indexingCount > 0" class="text-caption text-zinc-muted">
+                      {{ formatIndexingCount(indexingCount) }} left
+                    </span>
+                    <v-progress-linear v-if="scanStatus === 'discovering' && currentScanFile.total > 0" :model-value="(currentScanFile.current / currentScanFile.total) * 100" color="black" height="4" rounded max-width="120" class="progress-bar-mini"></v-progress-linear>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </v-slide-y-reverse-transition>
           <Photos v-if="current_page === 'home'" :search-query="search" :filters="filters" @clear-search="search = null" />
           <People v-if="current_page === 'people'" @search-person="addPersonToSearch" />
           <Map v-if="current_page === 'location'" />
@@ -747,5 +872,26 @@ export default {
 .siegu-dock-btn--active {
   color: #18181b !important;
   background: rgba(0, 0, 0, 0.05) !important;
+}
+
+.progress-banner {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #fafafa;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.progress-banner-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.progress-bar-mini {
+  min-width: 80px;
+}
+
+.min-width-0 {
+  min-width: 0;
 }
 </style>

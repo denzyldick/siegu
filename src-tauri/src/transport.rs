@@ -20,7 +20,7 @@ use webrtc::{
     },
 };
 
-use crate::database::{Database, PhotoSyncInfo};
+use crate::database::{Database, ImportedPhoto, PhotoSyncInfo};
 use std::collections::HashMap;
 use tauri::Emitter;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -34,6 +34,16 @@ pub struct SyncProgress {
     pub bytes_per_second: u64,
     pub items_completed: usize,
     pub items_total: usize,
+}
+
+struct OutgoingFile {
+    id: String,
+    path: String,
+    created: String,
+    latitude: Option<f64>,
+    longitude: Option<f64>,
+    objects: String,
+    faces: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -170,17 +180,12 @@ impl WebRtcClient {
     async fn send_file(
         &self,
         dc: Arc<webrtc::data_channel::RTCDataChannel>,
-        photo_id: String,
-        file_path: String,
-        created: String,
-        latitude: Option<f64>,
-        longitude: Option<f64>,
-        objects: String,
-        faces: String,
+        outgoing: OutgoingFile,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let path = Path::new(&file_path);
+        let photo_id = outgoing.id.clone();
+        let path = Path::new(&outgoing.path);
         if !path.exists() {
-            return Err(format!("File not found: {file_path}").into());
+            return Err(format!("File not found: {}", outgoing.path).into());
         }
 
         let mut file = tokio::fs::File::open(path).await?;
@@ -198,11 +203,11 @@ impl WebRtcClient {
                 id: photo_id.clone(),
                 filename: filename.clone(),
                 size,
-                created,
-                latitude,
-                longitude,
-                objects,
-                faces,
+                created: outgoing.created,
+                latitude: outgoing.latitude,
+                longitude: outgoing.longitude,
+                objects: outgoing.objects,
+                faces: outgoing.faces,
             },
         )
         .await?;
@@ -602,7 +607,16 @@ impl WebRtcClient {
                                                 let db = Database::new(&config_path_thumb);
 
                                                 // Now import with thumbnail included - only now it becomes visible in library
-                                                db.import_photo(&id_thumb, &path_thumb, &created_thumb, Some(lat_thumb), Some(lon_thumb), &objects_thumb, &faces_thumb, &thumb);
+                                                db.import_photo(ImportedPhoto {
+                                                    id: &id_thumb,
+                                                    location: &path_thumb,
+                                                    created: &created_thumb,
+                                                    latitude: Some(lat_thumb),
+                                                    longitude: Some(lon_thumb),
+                                                    objects_json: &objects_thumb,
+                                                    faces_json: &faces_thumb,
+                                                    encoded: &thumb,
+                                                });
 
                                                 let _ = app_thumb.emit("photo-received", crate::database::Photo {
                                                     id: id_thumb,
@@ -693,7 +707,22 @@ impl WebRtcClient {
                                     ) {
                                         let dc_send = Arc::clone(&dc);
                                         let self_task = self_inner.clone();
-                                        tokio::spawn(async move { let _ = self_task.send_file(dc_send, id, path, created, lat, lon, objects, faces).await; });
+                                        tokio::spawn(async move {
+                                            let _ = self_task
+                                                .send_file(
+                                                    dc_send,
+                                                    OutgoingFile {
+                                                        id,
+                                                        path,
+                                                        created,
+                                                        latitude: lat,
+                                                        longitude: lon,
+                                                        objects,
+                                                        faces,
+                                                    },
+                                                )
+                                                .await;
+                                        });
                                     }
                                 }
                             }
@@ -836,7 +865,22 @@ impl WebRtcClient {
                                     ) {
                                         let dc_send = Arc::clone(&dc);
                                         let self_task = self_inner.clone();
-                                        tokio::spawn(async move { let _ = self_task.send_file(dc_send, id, path, created, lat, lon, objects, faces).await; });
+                                        tokio::spawn(async move {
+                                            let _ = self_task
+                                                .send_file(
+                                                    dc_send,
+                                                    OutgoingFile {
+                                                        id,
+                                                        path,
+                                                        created,
+                                                        latitude: lat,
+                                                        longitude: lon,
+                                                        objects,
+                                                        faces,
+                                                    },
+                                                )
+                                                .await;
+                                        });
                                     }
                                 }
                                 SyncMessage::FileHeader { id, filename, size, created, latitude, longitude, objects, faces } => {
@@ -907,7 +951,16 @@ impl WebRtcClient {
                                                 let db = Database::new(&config_path_thumb);
 
                                                 // Now import with thumbnail included - only now it becomes visible in library
-                                                db.import_photo(&id_thumb, &path_thumb, &created_thumb, Some(lat_thumb), Some(lon_thumb), &objects_thumb, &faces_thumb, &thumb);
+                                                db.import_photo(ImportedPhoto {
+                                                    id: &id_thumb,
+                                                    location: &path_thumb,
+                                                    created: &created_thumb,
+                                                    latitude: Some(lat_thumb),
+                                                    longitude: Some(lon_thumb),
+                                                    objects_json: &objects_thumb,
+                                                    faces_json: &faces_thumb,
+                                                    encoded: &thumb,
+                                                });
 
                                                 let _ = app_thumb.emit("photo-received", crate::database::Photo {
                                                     id: id_thumb,

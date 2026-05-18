@@ -143,7 +143,8 @@ export default {
     unlistenReceived: null,
     unlistenUpdated: null,
     scanBuffer: [],
-    scanInterval: null
+    scanInterval: null,
+    reloadTimer: null
   }),
   props: {
     searchQuery: {
@@ -205,6 +206,7 @@ export default {
     if (this.unlistenReceived) this.unlistenReceived();
     if (this.unlistenUpdated) this.unlistenUpdated();
     if (this.scanInterval) clearInterval(this.scanInterval);
+    if (this.reloadTimer) clearTimeout(this.reloadTimer);
   },
   methods: {
     updateGroups(newImages) {
@@ -347,6 +349,14 @@ export default {
         this.loading = false;
       }
     },
+    scheduleReload() {
+      if (this.reloadTimer) clearTimeout(this.reloadTimer);
+      this.reloadTimer = setTimeout(() => {
+        this.paging.offset = 0;
+        this.allLoaded = false;
+        this.list_files();
+      }, 200);
+    },
     async handleToggleFavorite(id) {
       try {
         const isNowFavorite = await invoke("toggle_favorite", { id: id });
@@ -378,16 +388,12 @@ export default {
   },
   watch: {
     searchQuery() {
-      this.paging.offset = 0;
-      this.allLoaded = false;
-      this.list_files();
+      this.scheduleReload();
     },
     filters: {
       deep: true,
       handler() {
-        this.paging.offset = 0;
-        this.allLoaded = false;
-        this.list_files();
+        this.scheduleReload();
       }
     }
   },

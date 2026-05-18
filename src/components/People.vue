@@ -22,7 +22,7 @@
             <div v-else class="d-flex align-center bg-white border-subtle rounded-lg px-4 py-2 shadow-sm animate-pulse">
               <v-progress-circular indeterminate size="16" width="2" color="#18181b" class="mr-3"></v-progress-circular>
               <div class="text-caption font-weight-black text-zinc-primary">
-                Indexing: {{ indexingCount }} remaining
+                Indexing: {{ formatIndexingCount(indexingCount) }} remaining
               </div>
             </div>
 
@@ -364,12 +364,12 @@ export default {
 
     // Check initial indexing status
     invoke("get_indexing_status").then(count => {
-      this.indexingCount = count;
+      this.indexingCount = this.normalizeIndexingCount(count);
     });
 
     // Listen for progress updates
     this.unlistenProgress = await listen("indexing-progress", (event) => {
-      this.indexingCount = event.payload;
+      this.indexingCount = this.normalizeIndexingCount(event.payload);
       if (this.indexingCount === 0) {
         this.fetchData(); // Refresh data when indexing is complete
       }
@@ -379,6 +379,14 @@ export default {
     if (this.unlistenProgress) this.unlistenProgress();
   },
   methods: {
+    normalizeIndexingCount(value) {
+      const count = Number(value);
+      if (!Number.isSafeInteger(count) || count < 0 || count > 1000000) return 0;
+      return count;
+    },
+    formatIndexingCount(value) {
+      return this.normalizeIndexingCount(value).toLocaleString();
+    },
     async startIndexing() {
       try {
         await invoke("index_faces");

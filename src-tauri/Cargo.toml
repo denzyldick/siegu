@@ -64,6 +64,7 @@ num_cpus = "1.16.0"
 ffmpeg-sidecar = { version = "2.4.0", features = ["download_ffmpeg"] }
 tauri-plugin-notification = "2.3.3"
 notify = "6"
+heic = "0.1.4"
 
 [dev-dependencies]
 tempfile = "3.8"

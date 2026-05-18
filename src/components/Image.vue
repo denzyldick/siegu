@@ -1,51 +1,72 @@
 <template>
-  <div
-    class="image-item-container"
-    ref="container"
-    :class="{ 'is-selected': selected, 'selection-active': selectionMode }"
-    @click="handleClick"
-  >
-    <div class="image-wrapper shadow-sm">
-      <template v-if="isVisible">
-        <video v-if="isVideo" :src="videoUrl + '#t=0.5'" class="photo-img" muted preload="metadata"></video>
-        <img v-else :src="imageSrc" loading="lazy" alt="Photo" class="photo-img" />
-        
-        <div class="scrim-overlay"></div>
+    <div
+      class="image-item-container"
+      ref="container"
+      :class="{ 'is-selected': selected, 'selection-active': selectionMode }"
+      @click="handleClick"
+    >
+      <div class="image-wrapper shadow-sm">
+        <template v-if="isVisible">
+          <video v-if="isVideo" :src="videoUrl + '#t=0.5'" class="photo-img" muted preload="metadata"></video>
+          <img v-else :src="imageSrc" loading="lazy" alt="Photo" class="photo-img" @error="onImageError" />
+          
+          <div class="scrim-overlay"></div>
 
-        <!-- Video Indicator -->
-        <div v-if="isVideo" class="video-indicator">
-          <v-icon color="white" size="20">mdi-play</v-icon>
+          <!-- Video Indicator -->
+          <div v-if="isVideo" class="video-indicator">
+            <v-icon color="white" size="20">mdi-play</v-icon>
+          </div>
+
+          <!-- Selection Mode UI -->
+          <div v-if="selectionMode" class="selection-indicator">
+            <div class="check-circle" :class="{ 'checked': selected }">
+              <v-icon v-if="selected" color="white" size="16">mdi-check</v-icon>
+            </div>
+          </div>
+
+          <!-- Favorite Button -->
+          <button
+            v-if="!selectionMode"
+            class="action-btn favorite-action"
+            :class="{ 'is-fav': isFavorite }"
+            @click.stop="toggleFavorite"
+          >
+            <v-icon size="18" :color="isFavorite ? '#ef4444' : 'white'">
+              {{ isFavorite ? 'mdi-heart' : 'mdi-heart-outline' }}
+            </v-icon>
+          </button>
+        </template>
+        <div v-else class="viewport-placeholder h-100 w-100 d-flex align-center justify-center">
         </div>
-
-        <!-- Selection Mode UI -->
-        <div v-if="selectionMode" class="selection-indicator">
-          <div class="check-circle" :class="{ 'checked': selected }">
-            <v-icon v-if="selected" color="white" size="16">mdi-check</v-icon>
+      </div>
+      <!-- Image Info Footer -->
+      <div v-if="!selectionMode" class="image-info">
+        <div class="image-info-top">
+          <div class="image-tags" v-if="tags.length > 0">
+            <span v-for="tag in tags" :key="tag" class="info-tag">{{ tag }}</span>
+          </div>
+          <div class="image-meta" v-if="hasResults">
+            <v-icon size="12" color="#a1a1aa">mdi-auto-fix</v-icon>
           </div>
         </div>
-
-        <!-- Favorite Button -->
-        <button
-          v-if="!selectionMode"
-          class="action-btn favorite-action"
-          :class="{ 'is-fav': isFavorite }"
-          @click.stop="toggleFavorite"
-        >
-          <v-icon size="18" :color="isFavorite ? '#ef4444' : 'white'">
-            {{ isFavorite ? 'mdi-heart' : 'mdi-heart-outline' }}
-          </v-icon>
-        </button>
-
-        <!-- AI Tags -->
-        <div class="ai-tags-preview" v-if="tags.length > 0 && !selectionMode">
-          <span v-for="tag in tags" :key="tag" class="tag-pill">{{ tag }}</span>
+        <div class="image-caption" v-if="path.caption">
+          {{ path.caption }}
         </div>
-      </template>
-      <div v-else class="viewport-placeholder h-100 w-100 d-flex align-center justify-center">
-        <!-- Minimal placeholder to keep grid stable -->
+        <div class="image-details" v-if="hasResults">
+          <span v-if="path.aesthetics_score != null" class="detail-item" title="Aesthetics score">
+            <v-icon size="10" color="#a1a1aa">mdi-star</v-icon>
+            {{ formatScore(path.aesthetics_score) }}
+          </span>
+          <span v-if="faceCount > 0" class="detail-item" title="Faces detected">
+            <v-icon size="10" color="#a1a1aa">mdi-face</v-icon>
+            {{ faceCount }}
+          </span>
+          <span v-if="path.indexed === 2" class="detail-item" title="Fully indexed">
+            <v-icon size="10" color="#22c55e">mdi-check-circle</v-icon>
+          </span>
+        </div>
       </div>
     </div>
-  </div>
 </template>
 
 <script>
@@ -89,14 +110,12 @@ export default {
     },
     imageSrc() {
       if (!this.path || !this.path.location) return null;
-      
-      // Load real photo if it's not a video
+      if (this.path.encoded && !this.isVideo) {
+        return this.path.encoded;
+      }
       if (!this.isVideo) {
         return convertFileSrc(this.path.location);
       }
-
-      // For videos, we don't have a direct "real photo" to show in <img> 
-      // without a thumbnail, so we'll show the placeholder for now.
       return null;
     },
     isFavorite() {
@@ -111,8 +130,20 @@ export default {
       if (!this.path || !this.path.objects) return [];
       return Object.entries(this.path.objects)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 2)
+        .slice(0, 3)
         .map(entry => entry[0]);
+    },
+    faceCount() {
+      if (!this.path || !this.path.properties) return 0;
+      const v = this.path.properties['face_count'];
+      return v ? parseInt(v) : 0;
+    },
+    hasResults() {
+      if (!this.path) return false;
+      return (this.path.objects && Object.keys(this.path.objects).length > 0)
+        || this.path.aesthetics_score != null
+        || this.path.caption
+        || this.path.indexed >= 2;
     }
   },
   methods: {
@@ -120,7 +151,7 @@ export default {
         this.observer = new IntersectionObserver((entries) => {
           this.isVisible = entries[0].isIntersecting;
         }, {
-          rootMargin: '200px', // Pre-load before it enters and keep it a bit after
+          rootMargin: '200px',
           threshold: 0.01
         });
         
@@ -130,6 +161,14 @@ export default {
       },
       toggleFavorite() {
           this.$emit('toggle-favorite', this.path.id);
+      },
+      formatScore(score) {
+        if (score == null) return '';
+        const v = typeof score === 'string' ? parseFloat(score) : score;
+        return v.toFixed(2);
+      },
+      onImageError(e) {
+        console.error('[Image] Failed to load:', this.path?.location, 'encoded:', this.path?.encoded ? 'yes' : 'no', 'src type:', this.path?.encoded ? 'base64' : 'convertFileSrc');
       },
       handleClick() {
         if (this.selectionMode) {
@@ -312,5 +351,66 @@ export default {
 
 .shadow-sm {
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Image Info Footer */
+.image-info {
+  margin-top: 6px;
+  padding: 0 2px;
+}
+
+.image-info-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.image-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.info-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: #71717a;
+  background: #f4f4f5;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.image-meta {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.image-caption {
+  font-size: 11px;
+  color: #52525b;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-details {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.detail-item {
+  font-size: 10px;
+  color: #a1a1aa;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 </style>

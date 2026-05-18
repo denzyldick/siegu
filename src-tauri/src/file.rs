@@ -13,6 +13,7 @@ use std::fs::File;
 use std::path::Path;
 
 use std::io::BufReader;
+use std::io::Cursor;
 use std::string::String;
 
 use crate::ml::MlContext;
@@ -90,8 +91,71 @@ fn emit_log(app: &tauri::AppHandle, message: String) {
     let _ = app.emit("log-message", message);
 }
 
+fn decode_heic_image(path: &Path) -> Option<image::DynamicImage> {
+    use heic::{DecoderConfig, PixelLayout};
+    let data = std::fs::read(path).ok()?;
+    let output = DecoderConfig::new()
+        .decode(&data, PixelLayout::Rgba8)
+        .ok()?;
+    let img = image::DynamicImage::ImageRgba8(image::RgbaImage::from_raw(
+        output.width,
+        output.height,
+        output.data,
+    )?);
+    Some(img)
+}
+
+fn build_thumbnail_data_uri(path: &Path, ext: &str) -> String {
+    if ["mp4", "mkv", "mov", "avi", "webm"].contains(&ext) {
+        return String::new();
+    }
+
+    let img = match image::open(path) {
+        Ok(img) => img,
+        Err(e) => {
+            if ext == "heic" || ext == "heif" {
+                match decode_heic_image(path) {
+                    Some(img) => img,
+                    None => {
+                        eprintln!(
+                            "[siegu] Failed to decode HEIC for thumbnail: {} - {e}",
+                            path.display()
+                        );
+                        return String::new();
+                    }
+                }
+            } else {
+                eprintln!(
+                    "[siegu] Failed to open image for thumbnail ({}): {} - {e}",
+                    ext,
+                    path.display()
+                );
+                return String::new();
+            }
+        }
+    };
+
+    let thumbnail = img.thumbnail(640, 640);
+    let mut buffer = Cursor::new(Vec::new());
+    if thumbnail
+        .write_to(&mut buffer, image::ImageOutputFormat::Jpeg(72))
+        .is_ok()
+    {
+        let encoded = general_purpose::STANDARD.encode(buffer.get_ref());
+        format!("data:image/jpeg;base64,{encoded}")
+    } else {
+        eprintln!(
+            "[siegu] Failed to encode thumbnail as JPEG: {}",
+            path.display()
+        );
+        String::new()
+    }
+}
+
+/// Recursively discovers supported media files, stores new rows in batches, and queues AI work.
 ///
-/// This is will scan a folder recursively and store all the images in the database.
+/// Discovery intentionally records metadata and thumbnails first. The heavier model inference runs
+/// on the ML worker so folder scans stay responsive and progress events remain regular.
 pub fn scan_folder(
     app: &tauri::AppHandle,
     directory: String,
@@ -166,13 +230,13 @@ pub fn scan_folder(
         return;
     }
 
-    emit_log(
-        app,
-        format!("Processing {} new photos...", new_paths_to_process.len()),
-    );
+    let total_files = new_paths_to_process.len();
+    emit_log(app, format!("Processing {total_files} new photos..."));
 
     let app_handle = Arc::new(app.clone());
     let abort_flag_task = Arc::clone(&abort_flag);
+    let files_processed = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let scan_start = Arc::new(std::time::Instant::now());
 
     // Create a local thread pool for this scan to avoid blocking the global one
     let pool = rayon::ThreadPoolBuilder::new()
@@ -202,12 +266,16 @@ pub fn scan_folder(
                 .and_then(|e| e.to_str())
                 .unwrap_or("")
                 .to_lowercase();
-            let _is_video = ["mp4", "mkv", "mov", "avi", "webm"].contains(&ext.as_str());
+            let is_video = ["mp4", "mkv", "mov", "avi", "webm"].contains(&ext.as_str());
 
             let mut latitude = 0.0;
             let mut longitude = 0.0;
             let mut created = String::new();
-            let encoded = String::new();
+            let encoded = if is_video {
+                String::new()
+            } else {
+                build_thumbnail_data_uri(path, &ext)
+            };
 
             if let Ok(file) = File::open(path) {
                 let mut buff = BufReader::new(&file);
@@ -268,8 +336,8 @@ pub fn scan_folder(
                 created,
                 objects: HashMap::new(),
                 properties: HashMap::new(),
-                latitude: 0.0,
-                longitude: 0.0,
+                latitude,
+                longitude,
                 favorite: false,
                 indexed: 0,
                 caption: None,
@@ -277,16 +345,35 @@ pub fn scan_folder(
                 ai_status: database::AiStatus::default(),
             };
 
+            let processed = files_processed.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+            if processed.is_multiple_of(25) || processed == total_files {
+                let filename = Path::new(&path_str)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("")
+                    .to_string();
+                let elapsed = scan_start.elapsed().as_secs_f64();
+                let rate = processed as f64 / elapsed.max(0.001);
+                let eta_secs = if rate > 0.0 {
+                    ((total_files - processed) as f64 / rate) as u64
+                } else {
+                    0
+                };
+                let _ = app_handle.emit(
+                    "file-scan-progress",
+                    serde_json::json!({
+                        "current": processed,
+                        "total": total_files,
+                        "filename": filename,
+                        "eta_secs": eta_secs,
+                    }),
+                );
+            }
 
             let _ = batch_tx.send(photo);
 
             // Signal the background worker that there is work to do
             if let Some(ref tx) = tx_clone {
-                if let Some(state) = app_handle.try_state::<MlContext>() {
-                    state
-                        .pending_count
-                        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                }
                 let _ = tx.send(crate::ml::Job::AnalyzeSingle(id));
             }
         });

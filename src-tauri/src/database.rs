@@ -36,6 +36,17 @@ pub struct SyncFace {
     pub person_id: Option<String>,
 }
 
+pub struct ImportedPhoto<'a> {
+    pub id: &'a str,
+    pub location: &'a str,
+    pub created: &'a str,
+    pub latitude: Option<f64>,
+    pub longitude: Option<f64>,
+    pub objects_json: &'a str,
+    pub faces_json: &'a str,
+    pub encoded: &'a str,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct FaceWithPerson {
     pub photo_id: String,
@@ -187,8 +198,14 @@ impl Database {
 
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS photo (id STRING PRIMARY KEY, location STRING, encoded STRING, created DATE_TIME, latitude REAL, longitude REAL, indexed INTEGER DEFAULT 0, caption TEXT, aesthetics_score REAL);", ());
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS ai_status (photo_id STRING PRIMARY KEY, clip INTEGER DEFAULT 0, face INTEGER DEFAULT 0, ocr INTEGER DEFAULT 0, nsfw INTEGER DEFAULT 0, aesthetics INTEGER DEFAULT 0, yolo INTEGER DEFAULT 0, blip INTEGER DEFAULT 0, arcface INTEGER DEFAULT 0, midas INTEGER DEFAULT 0, whisper INTEGER DEFAULT 0, sam INTEGER DEFAULT 0, superres INTEGER DEFAULT 0);", ());
-        let _ = conn.execute("CREATE TABLE IF NOT EXISTS ocr (photo_id STRING, text TEXT);", ());
-        let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_ocr_photo_id ON ocr(photo_id);", ());
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS ocr (photo_id STRING, text TEXT);",
+            (),
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ocr_photo_id ON ocr(photo_id);",
+            (),
+        );
 
         // Simple migration: try to add columns if they don't exist (ignore errors if they do)
         let _ = conn.execute("ALTER TABLE photo ADD COLUMN latitude REAL;", ());
@@ -305,31 +322,6 @@ impl Database {
         );
     }
 
-    pub fn store_photo(&self, photo: Photo) {
-        let _ = self.connection.execute(
-            "INSERT OR REPLACE INTO photo(id, location, encoded, latitude, longitude, created, indexed) VALUES(?1, ?2, ?3, ?4, ?5, ?6, 2)",
-            (&photo.id, &photo.location, &photo.encoded, &photo.latitude, &photo.longitude, &photo.created),
-        );
-        for (object, probability) in photo.objects {
-            let _ = self.connection.execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES(?1, ?2, ?3)",
-                (&photo.id, &object, &probability.to_string()),
-            );
-        }
-        for (key, value) in photo.properties {
-            let _ = self.connection.execute(
-                "INSERT into properties (photo_id, key, value) VALUES(?1, ?2, ?3)",
-                (&photo.id, &key, &value),
-            );
-        }
-    }
-
-    pub fn update_photo_thumbnail(&self, id: &str, encoded: &str) {
-        let _ = self
-            .connection
-            .execute("UPDATE photo SET encoded = ?1 WHERE id = ?2", (encoded, id));
-    }
-
     pub fn list_objects(&self, query: &str) -> Vec<String> {
         let mut objects = Vec::new();
         let sql = "SELECT class FROM object WHERE class LIKE ?1 UNION SELECT value FROM properties WHERE (key LIKE '%City%' OR key LIKE '%Country%' OR key LIKE '%State%') AND value LIKE ?1 GROUP BY 1";
@@ -341,6 +333,60 @@ impl Database {
             }
         }
         objects
+    }
+
+    fn enrich_objects(&self, photos: &mut [Photo]) {
+        if photos.is_empty() {
+            return;
+        }
+        let ids: Vec<String> = photos.iter().map(|p| format!("'{}'", p.id)).collect();
+        let sql = format!(
+            "SELECT photo_id, class, probability FROM object WHERE photo_id IN ({})",
+            ids.join(",")
+        );
+        if let Ok(mut stmt) = self.connection.prepare(&sql) {
+            if let Ok(iter) = stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            }) {
+                for row in iter.flatten() {
+                    if let Some(p) = photos.iter_mut().find(|p| p.id == row.0) {
+                        if let Ok(prob) = row.2.parse::<f64>() {
+                            p.objects.insert(row.1, prob);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn enrich_properties(&self, photos: &mut [Photo]) {
+        if photos.is_empty() {
+            return;
+        }
+        let ids: Vec<String> = photos.iter().map(|p| format!("'{}'", p.id)).collect();
+        let sql = format!(
+            "SELECT photo_id, key, value FROM properties WHERE photo_id IN ({})",
+            ids.join(",")
+        );
+        if let Ok(mut stmt) = self.connection.prepare(&sql) {
+            if let Ok(iter) = stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            }) {
+                for row in iter.flatten() {
+                    if let Some(p) = photos.iter_mut().find(|p| p.id == row.0) {
+                        p.properties.insert(row.1, row.2);
+                    }
+                }
+            }
+        }
     }
 
     pub fn list_photos(
@@ -424,6 +470,8 @@ impl Database {
                 }
             }
         }
+        self.enrich_objects(&mut photos);
+        self.enrich_properties(&mut photos);
         photos
     }
 
@@ -492,6 +540,8 @@ impl Database {
                 }
             }
         }
+        self.enrich_objects(&mut photos);
+        self.enrich_properties(&mut photos);
         photos
     }
 
@@ -614,12 +664,12 @@ impl Database {
         let count = embeddings.len() as f32;
         let mut centroid = vec![0.0f32; 512];
         for emb in embeddings {
-            for i in 0..512 {
-                centroid[i] += emb[i];
+            for (sum, value) in centroid.iter_mut().zip(emb.iter()).take(512) {
+                *sum += value;
             }
         }
-        for i in 0..512 {
-            centroid[i] /= count;
+        for value in centroid.iter_mut().take(512) {
+            *value /= count;
         }
 
         let norm: f32 = centroid.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -814,54 +864,43 @@ impl Database {
             .execute("DELETE FROM directory WHERE name = ?1", [path]);
     }
 
-    pub fn path_exists(&self, path: &str) -> bool {
-        self.connection
-            .query_row("SELECT 1 FROM photo WHERE location = ?1", [path], |_| {
-                Ok(true)
-            })
-            .unwrap_or(false)
-    }
-
-    pub fn import_photo(
-        &self,
-        id: &str,
-        location: &str,
-        created: &str,
-        latitude: Option<f64>,
-        longitude: Option<f64>,
-        objects_json: &str,
-        faces_json: &str,
-        encoded: &str,
-    ) {
+    pub fn import_photo(&self, photo: ImportedPhoto<'_>) {
         let _ = self.connection.execute(
             "INSERT OR REPLACE INTO photo (id, location, created, latitude, longitude, encoded) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            (id, location, created, latitude, longitude, encoded),
+            (
+                photo.id,
+                photo.location,
+                photo.created,
+                photo.latitude,
+                photo.longitude,
+                photo.encoded,
+            ),
         );
 
         // Clear existing metadata to avoid duplicates
         let _ = self
             .connection
-            .execute("DELETE FROM object WHERE photo_id = ?1", [id]);
+            .execute("DELETE FROM object WHERE photo_id = ?1", [photo.id]);
         let _ = self
             .connection
-            .execute("DELETE FROM faces WHERE photo_id = ?1", [id]);
+            .execute("DELETE FROM faces WHERE photo_id = ?1", [photo.id]);
 
         // Import objects
-        if let Ok(objects) = serde_json::from_str::<Vec<SyncObject>>(objects_json) {
+        if let Ok(objects) = serde_json::from_str::<Vec<SyncObject>>(photo.objects_json) {
             for obj in objects {
                 let _ = self.connection.execute(
                     "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
-                    (id, obj.class, obj.probability),
+                    (photo.id, obj.class, obj.probability),
                 );
             }
         }
 
         // Import faces
-        if let Ok(faces) = serde_json::from_str::<Vec<SyncFace>>(faces_json) {
+        if let Ok(faces) = serde_json::from_str::<Vec<SyncFace>>(photo.faces_json) {
             for face in faces {
                 let _ = self.connection.execute(
                     "INSERT OR REPLACE INTO faces (photo_id, face_id, crop_path, encoded, person_id) VALUES (?1, ?2, ?3, ?4, ?5)",
-                    (id, face.face_id, face.crop_path, face.encoded, face.person_id),
+                    (photo.id, face.face_id, face.crop_path, face.encoded, face.person_id),
                 );
             }
         }
@@ -917,21 +956,6 @@ impl Database {
             }
         }
         results
-    }
-
-    pub fn store_photo_metadata(
-        &self,
-        id: &str,
-        location: &str,
-        encoded: &str,
-        created: &str,
-        latitude: f64,
-        longitude: f64,
-    ) {
-        let _ = self.connection.execute(
-            "INSERT OR REPLACE INTO photo(id, location, encoded, created, latitude, longitude, indexed) VALUES(?1, ?2, ?3, ?4, ?5, ?6, 1)",
-            (id, location, encoded, created, latitude, longitude),
-        );
     }
 
     pub fn store_photo_batch(&mut self, photos: &[Photo]) -> Result<(), String> {
