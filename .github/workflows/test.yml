@@ -57,11 +57,42 @@ jobs:
         run: cargo test
         working-directory: src-tauri
 
+      - name: Cache AI test models
+        if: matrix.platform == 'ubuntu-24.04'
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/test_models
+          key: ai-test-models-v1
+
       - name: AI Pipeline Integration Test
         if: matrix.platform == 'ubuntu-24.04'
         run: |
           mkdir -p test_models
-          wget https://raw.githubusercontent.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB/master/models/onnx/version-RFB-320.onnx -O test_models/version-RFB-320.onnx
+          download_model() {
+            local url="$1"
+            local output="$2"
+            if [ -s "$output" ]; then
+              echo "Using cached $output"
+              return
+            fi
+            curl --fail --location --retry 3 --retry-delay 5 "$url" --output "$output"
+          }
+
+          download_model "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model.onnx" "test_models/clip-vit-base-patch32-visual.onnx"
+          download_model "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/text_model.onnx" "test_models/clip-vit-base-patch32-text.onnx"
+          download_model "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/tokenizer.json" "test_models/tokenizer.json"
+          download_model "https://raw.githubusercontent.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB/master/models/onnx/version-RFB-320.onnx" "test_models/version-RFB-320.onnx"
+          download_model "https://huggingface.co/SWHL/RapidOCR/resolve/main/PP-OCRv4/en_PP-OCRv3_det_infer.onnx" "test_models/ocr_det.onnx"
+          download_model "https://huggingface.co/SWHL/RapidOCR/resolve/main/PP-OCRv3/en_PP-OCRv3_rec_infer.onnx" "test_models/ocr_rec.onnx"
+          download_model "https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/release/2.6/ppocr/utils/en_dict.txt" "test_models/en_dict.txt"
+          download_model "https://huggingface.co/onnx-community/nsfw_image_detection-ONNX/resolve/main/onnx/model.onnx" "test_models/nsfw.onnx"
+          download_model "https://huggingface.co/fsw/aesthetic-predictor-v2-5_onnx/resolve/main/aesthetic_predictor_v2_5.onnx" "test_models/aesthetics.onnx"
+          download_model "https://huggingface.co/webml/yolov8n/resolve/main/onnx/yolov8n.onnx" "test_models/yolov8.onnx"
+          download_model "https://huggingface.co/onnx-community/Salesforce_blip-image-captioning-base/resolve/main/split_0.onnx" "test_models/blip.onnx"
+          download_model "https://huggingface.co/crj/dl-ws/resolve/main/arcface_w600k_r50.onnx" "test_models/arcface.onnx"
+          download_model "https://huggingface.co/Xenova/dpt-hybrid-midas/resolve/main/onnx/model.onnx" "test_models/midas.onnx"
+          download_model "https://huggingface.co/Xenova/whisper-tiny.en/resolve/main/onnx/encoder_model.onnx" "test_models/whisper.onnx"
+
           cargo test -- --ignored test_full_inference_on_sample
         working-directory: src-tauri
         

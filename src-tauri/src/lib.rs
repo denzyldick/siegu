@@ -10,6 +10,8 @@ mod face_detector;
 mod file;
 mod ml;
 mod server;
+#[cfg(test)]
+mod test;
 mod transport;
 
 struct WebRtcState {

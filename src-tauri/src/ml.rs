@@ -97,7 +97,7 @@ fn increment_pending_count(counter: &AtomicUsize, amount: usize) -> usize {
 
 // Model wrappers to handle different engine types
 #[derive(Clone)]
-enum ModelEngine {
+pub(crate) enum ModelEngine {
     #[cfg(not(target_os = "android"))]
     Ort(Arc<Mutex<Session>>),
     #[cfg(target_os = "android")]
@@ -105,7 +105,7 @@ enum ModelEngine {
 }
 
 impl ModelEngine {
-    fn run(&self, input: Array4<f32>, _input_name: &str) -> Result<Vec<f32>, String> {
+    pub(crate) fn run(&self, input: Array4<f32>, _input_name: &str) -> Result<Vec<f32>, String> {
         match self {
             #[cfg(not(target_os = "android"))]
             ModelEngine::Ort(session) => {
