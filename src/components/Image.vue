@@ -8,7 +8,7 @@
       <div class="image-wrapper shadow-sm">
         <template v-if="isVisible">
           <video v-if="isVideo" :src="videoUrl + '#t=0.5'" class="photo-img" muted preload="metadata"></video>
-          <img v-else :src="imageSrc" loading="lazy" alt="Photo" class="photo-img" @error="onImageError" />
+          <img v-else :src="imageSrc" loading="lazy" :alt="$t('image.alt_photo')" class="photo-img" @error="onImageError" />
           
           <div class="scrim-overlay"></div>
 
@@ -53,15 +53,15 @@
           {{ path.caption }}
         </div>
         <div class="image-details" v-if="hasResults">
-          <span v-if="path.aesthetics_score != null" class="detail-item" title="Aesthetics score">
+          <span v-if="path.aesthetics_score != null" class="detail-item" :title="$t('image.aesthetics_score')">
             <v-icon size="10" color="#a1a1aa">mdi-star</v-icon>
             {{ formatScore(path.aesthetics_score) }}
           </span>
-          <span v-if="faceCount > 0" class="detail-item" title="Faces detected">
+          <span v-if="faceCount > 0" class="detail-item" :title="$t('image.faces_detected')">
             <v-icon size="10" color="#a1a1aa">mdi-face</v-icon>
             {{ faceCount }}
           </span>
-          <span v-if="path.indexed === 2" class="detail-item" title="Fully indexed">
+          <span v-if="path.indexed === 2" class="detail-item" :title="$t('image.fully_indexed')">
             <v-icon size="10" color="#22c55e">mdi-check-circle</v-icon>
           </span>
         </div>

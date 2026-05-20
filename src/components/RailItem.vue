@@ -6,8 +6,8 @@
     @click="$emit('click')"
   >
     <template v-if="isVisible">
-      <video v-if="isVideo" :src="videoUrl + '#t=0.5'" alt="thumb" muted preload="metadata" />
-      <img v-else :src="imageSrc" alt="thumb" />
+      <video v-if="isVideo" :src="videoUrl + '#t=0.5'" :alt="$t('rail.alt_thumb')" muted preload="metadata" />
+      <img v-else :src="imageSrc" :alt="$t('rail.alt_thumb')" />
       <div v-if="isVideo" class="rail-video-icon">
         <v-icon size="12" color="white">mdi-play</v-icon>
       </div>

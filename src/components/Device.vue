@@ -1,10 +1,10 @@
 <template>
   <v-card flat max-width="344">
     <qrcode-svg v-if="value !== null" :value />
-    <v-card-title>Arch-linux </v-card-title>
-    <v-card-subtitle>This device</v-card-subtitle>
+    <v-card-title>{{ deviceName }}</v-card-title>
+    <v-card-subtitle>{{ $t('devices.this_device') }}</v-card-subtitle>
     <v-card-actions>
-      <v-btn variant="flat" class="siegu-btn px-4">Sync</v-btn>
+      <v-btn variant="flat" class="siegu-btn px-4">{{ $t('devices.sync_now') }}</v-btn>
       <v-spacer></v-spacer>
 
       <v-btn
@@ -18,7 +18,7 @@
       <div v-show="show">
         <v-divider></v-divider>
 
-        <v-card-text>more information </v-card-text>
+        <v-card-text>{{ $t('devices.more_info') }}</v-card-text>
       </div>
     </v-expand-transition>
   </v-card>
@@ -34,6 +34,7 @@ export default {
   data: () => ({
     show: false,
     value: null,
+    deviceName: '',
   }),
   async created() {
     let port = "9489";
@@ -42,6 +43,12 @@ export default {
     let path = "/new-device";
     let message = "http://" + ip + ":" + port + path;
     this.value = message;
+    try {
+      const os = await (await import('@tauri-apps/api/core')).invoke("get_os");
+      this.deviceName = os.charAt(0).toUpperCase() + os.slice(1);
+    } catch (e) {
+      this.deviceName = navigator.platform || 'Unknown';
+    }
   },
 };
 </script>

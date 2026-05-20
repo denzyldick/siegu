@@ -53,7 +53,8 @@ export default {
     os: '',
     syncStatus: {
       status: 'idle',
-      progress: 0
+      progress: 0,
+      type: 'idle'
     },
     syncError: {
       show: false,
@@ -191,18 +192,20 @@ export default {
 
     listen("photo-received", (event) => {
       this.syncStatus = {
-        status: `Received new memory: ${event.payload.id}`,
-        progress: 100
+        status: this.$t('sync.received_memory', { id: event.payload.id }),
+        progress: 100,
+        type: 'received'
       };
-      setTimeout(() => { if (this.syncStatus.status.startsWith('Received')) this.syncStatus.status = 'idle'; }, 2000);
+      setTimeout(() => { if (this.syncStatus.type === 'received') { this.syncStatus.status = 'idle'; this.syncStatus.type = 'idle'; } }, 2000);
     });
 
     listen("photo-synced", (event) => {
       this.syncStatus = {
-        status: `Synced memory ${event.payload} to device`,
-        progress: 100
+        status: this.$t('sync.synced_memory', { id: event.payload }),
+        progress: 100,
+        type: 'synced'
       };
-      setTimeout(() => { if (this.syncStatus.status.startsWith('Synced')) this.syncStatus.status = 'idle'; }, 2000);
+      setTimeout(() => { if (this.syncStatus.type === 'synced') { this.syncStatus.status = 'idle'; this.syncStatus.type = 'idle'; } }, 2000);
     });
 
     listen("sync-error", (event) => {
@@ -210,7 +213,7 @@ export default {
         show: true,
         message: event.payload
       };
-      this.syncStatus.status = 'Error';
+      this.syncStatus.status = this.$t('sync.error_status');
     });
 
     this.checkModels();
@@ -338,7 +341,7 @@ export default {
       } catch (err) {
         this.syncError = {
           show: true,
-          message: `Failed to initialize sync folder: ${err}`
+          message: this.$t('sync.folder_init_error', { error: err })
         };
       }
     },
@@ -613,7 +616,7 @@ export default {
                         </div>
                         <v-progress-linear v-if="currentScanFile.total > 0" :model-value="(currentScanFile.current / currentScanFile.total) * 100" color="black" height="4" rounded></v-progress-linear>
                         <div v-if="currentScanFile.eta_secs > 0" class="text-caption text-zinc-muted mt-1">
-                          ~{{ formatEta(currentScanFile.eta_secs) }} remaining
+                          {{ $t('sync.time_remaining', { time: formatEta(currentScanFile.eta_secs) }) }}
                         </div>
                       </div>
 
@@ -737,7 +740,7 @@ export default {
               </template>
               <template v-slot:prepend-item>
                 <div v-if="!search && recentSearches.length > 0">
-                  <v-list-subheader class="text-zinc-muted text-uppercase tracking-widest text-caption py-2">Recent</v-list-subheader>
+                  <v-list-subheader class="text-zinc-muted text-uppercase tracking-widest text-caption py-2">{{ $t('search.recent') }}</v-list-subheader>
                   <div class="pa-2 d-flex flex-column ga-1">
                     <div v-for="(term, i) in recentSearches.slice(0, 5)" :key="i" class="d-flex align-center cursor-pointer px-2 py-1 rounded-lg recent-item" @click="search = term; addRecentSearch(term); current_page = 'home'">
                       <v-icon size="16" color="#a1a1aa" class="mr-2">mdi-history</v-icon>
@@ -839,7 +842,7 @@ export default {
                       <span v-if="currentScanFile.eta_secs > 0"> · ~{{ formatEta(currentScanFile.eta_secs) }}</span>
                     </span>
                     <span v-else-if="indexingCount > 0" class="text-caption text-zinc-muted">
-                      {{ formatIndexingCount(indexingCount) }} left
+                      {{ $t('sync.jobs_left', { count: formatIndexingCount(indexingCount) }) }}
                     </span>
                     <v-progress-linear v-if="scanStatus === 'discovering' && currentScanFile.total > 0" :model-value="(currentScanFile.current / currentScanFile.total) * 100" color="black" height="4" rounded max-width="120" class="progress-bar-mini"></v-progress-linear>
                   </div>
@@ -907,7 +910,7 @@ export default {
         <div class="text-subtitle-2 font-weight-bold">{{ syncError.message }}</div>
       </div>
       <template v-slot:actions>
-        <v-btn variant="text" @click="syncError.show = false">Close</v-btn>
+        <v-btn variant="text" @click="syncError.show = false">{{ $t('common.close') }}</v-btn>
       </template>
     </v-snackbar>
 
