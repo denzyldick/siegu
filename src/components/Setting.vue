@@ -515,6 +515,12 @@
         v-model="showFolderPicker"
         @select="onFolderSelected"
     />
+    <v-snackbar v-model="snackbar.show" :timeout="3000" location="bottom" color="black">
+      <div class="d-flex align-center">
+        <v-icon size="small" class="mr-3" :color="snackbar.error ? 'error' : 'white'">{{ snackbar.error ? 'mdi-alert-circle' : 'mdi-check-circle' }}</v-icon>
+        <span class="text-body-2">{{ snackbar.text }}</span>
+      </div>
+    </v-snackbar>
   </v-container>
 </template>
 
@@ -550,6 +556,7 @@ export default {
     downloadingModels: {},
     pendingCount: 0,
     globalEta: 0,
+    snackbar: { show: false, text: '', error: false },
     unlistenLog: null,
     unlistenDownloadProgress: null,
     unlistenDownloadComplete: null,
@@ -727,6 +734,7 @@ export default {
     async clearLogs() {
       await invoke("clear_logs");
       this.logs = [];
+      this.showSnackbar("Logs cleared");
     },
     getModeLabel(val) {
       return this.indexingModes.find(m => m.value === val)?.title || val;
@@ -744,12 +752,17 @@ export default {
         this.performance.indexingMode = config.indexing_mode;
       }
     },
+    showSnackbar(text, error = false) {
+      this.snackbar = { show: true, text, error };
+    },
     async savePerformanceConfig() {
       await invoke("save_config", { key: "scan_threads", value: this.performance.scanThreads.toString() });
+      this.showSnackbar("Scan threads saved");
     },
     async setIndexingMode(mode) {
       this.performance.indexingMode = mode;
       await invoke("save_config", { key: "indexing_mode", value: mode });
+      this.showSnackbar(`Indexing mode set to ${this.getModeLabel(mode)}`);
     },
     async loadModelEnabledStates() {
       const configStr = await invoke("get_config");
@@ -764,6 +777,8 @@ export default {
     async toggleModel(modelId) {
       const key = "model_enabled_" + modelId;
       await invoke("save_config", { key, value: this.modelEnabled[modelId] ? "true" : "false" });
+      const label = this.aiModels.find(m => m.id === modelId)?.title || modelId;
+      this.showSnackbar(`${label} ${this.modelEnabled[modelId] ? 'enabled' : 'disabled'}`);
     },
     async checkExistingModels() {
         const downloaded = await invoke("check_models");
@@ -867,6 +882,7 @@ export default {
       };
       try {
         await invoke("analyze_model", { modelId });
+        this.showSnackbar(`${this.aiModels.find(m => m.id === modelId)?.title || modelId} analysis started`);
       } catch (err) {
         this.modelProgress = {
           ...this.modelProgress,
@@ -877,7 +893,7 @@ export default {
             updatedAt: Date.now(),
           }
         };
-        console.error("Failed to start model analysis", err);
+        this.showSnackbar(`Failed to start ${this.aiModels.find(m => m.id === modelId)?.title || modelId}`, true);
       }
     },
     isModelProcessing(modelId) {
@@ -967,7 +983,10 @@ export default {
         await new Promise(r => setTimeout(r, 300));
         await invoke("remove_directory_full", { path });
         this.list_directories();
-      } catch (err) {}
+        this.showSnackbar("Folder removed");
+      } catch (err) {
+        this.showSnackbar("Failed to remove folder", true);
+      }
     },
     async select_directory() {
       if (this.isAndroid) {
@@ -992,11 +1011,15 @@ export default {
       });
     },
     remove_directory(path) {
-      invoke("remove_directory", { path }).then(() => { this.list_directories(); });
+      invoke("remove_directory", { path }).then(() => {
+        this.list_directories();
+        this.showSnackbar("Folder removed from watch list");
+      });
     },
     onFolderSelected(path) {
       invoke("add_directory", { path }).then(() => {
         this.list_directories();
+        this.showSnackbar("Folder added");
       });
     }
   },
