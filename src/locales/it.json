@@ -25,14 +25,13 @@
     "ready_desc": "La configurazione è completa. Ora è il momento di trovare i tuoi ricordi.",
     "finish_setup": "Completa Configurazione & Sincronizza",
     "start_scan": "Avvia Scansione Iniziale",
-    "scan_desc": "Questo troverà tutte le tue foto e avvierà l'elaborazione AI."
-  },
-  "nav": {
-    "home": "Home",
-    "people": "Persone",
-    "map": "Mappa",
-    "devices": "Dispositivi",
-    "settings": "Impostazioni"
+    "scan_desc": "Questo troverà tutte le tue foto e avvierà l'elaborazione AI.",
+    "greet_desc": "Your private, AI-powered photo library. No cloud, no uploads — just your memories, organized locally.",
+    "setup_local": "Set Up Locally",
+    "setup_local_desc": "Index photos from folders on this computer",
+    "join_library": "Join a Library",
+    "join_library_desc": "Sync with another device on your network",
+    "ai_disclaimer": "AI models run entirely on your device. No data ever leaves your computer."
   },
   "search": {
     "placeholder": "Cerca ricordi...",
@@ -49,7 +48,8 @@
     "help_ocr": "Testo nelle foto (scontrini, cartelli)",
     "disabled_title": "Ricerca non disponibile",
     "disabled_desc": "La ricerca richiede dati indicizzati. Aggiungi una cartella e attendi il completamento dell'indicizzazione prima di usare la ricerca.",
-    "disabled_got_it": "Ho capito"
+    "disabled_got_it": "Ho capito",
+    "recent": "Recent"
   },
   "sync": {
     "status_label": "STATO LIBRERIA",
@@ -70,7 +70,12 @@
     "refresh_files": "Aggiorna file e indice AI",
     "processing_bg": "Elaborazione in background...",
     "discovering": "Scoperta: ",
-    "jobs_left": "{count} rimasti"
+    "jobs_left": "{count} rimasti",
+    "time_remaining": "~{time} remaining",
+    "received_memory": "Received new memory: {id}",
+    "synced_memory": "Synced memory {id} to device",
+    "error_status": "Error",
+    "folder_init_error": "Failed to initialize sync folder: {error}"
   },
   "filters": {
     "favorites_only": "Solo preferiti",
@@ -96,22 +101,37 @@
     "load_more": "Carica altri",
     "items_selected": "{count} elementi selezionati",
     "favorite": "Preferito",
-    "remove": "Rimuovi"
+    "remove": "Rimuovi",
+    "recent": "Recent",
+    "label_photos": "Photos:",
+    "label_videos": "Videos:"
   },
   "people": {
     "title": "Persone & Volti",
     "desc": "Siegu trova automaticamente i volti e li raggruppa per persona.",
-    "named": "Con nome",
-    "unnamed": "Senza nome",
-    "indexing_hint": "I volti appariranno man mano che le foto vengono indicizzate. Torna dopo il completamento dell'indicizzazione.",
     "no_faces": "Nessun volto trovato ancora",
     "no_faces_desc": "Le foto sono in fase di analisi. I volti appariranno qui una volta rilevati.",
-    "name_face": "Dai un nome a questa persona",
     "merge": "Unisci",
     "rename": "Rinomina",
-    "delete": "Elimina",
-    "search_person": "Cerca per persona",
-    "photos_of": "Foto di {name}"
+    "index_faces": "Index Faces",
+    "indexing_remaining": "{count} faces remaining",
+    "named_count": "{count} named",
+    "your_people": "Your People",
+    "new_faces": "New Faces",
+    "name_group": "Name this group",
+    "who_is_this": "Who is this?",
+    "name_placeholder": "Enter a name...",
+    "confirm_identity": "Confirm Identity",
+    "profile_actions": "Profile Actions",
+    "new_name_for": "New name for {name}",
+    "update_name": "Update Name",
+    "merge_desc": "Merge {name} into another profile",
+    "target_profile": "Target profile",
+    "confirm_merge": "Confirm Merge",
+    "grouped_faces": "Grouped Faces",
+    "appearances_in_cluster": "{count} appearances in this group",
+    "name_this_group": "Name this group",
+    "confirm_remove_face": "Remove this face from the group?"
   },
   "map": {
     "title": "Vista Mappa",
@@ -129,7 +149,16 @@
     "disconnect": "Disconnetti",
     "this_device": "Questo dispositivo",
     "photos_count": "{count} foto",
-    "videos_count": "{count} video"
+    "videos_count": "{count} video",
+    "no_devices_desc_alt": "Link a device using the pairing code to sync your library.",
+    "remove_device": "Remove Device",
+    "local_environment": "Local Environment",
+    "connected": "Connected",
+    "system": "System:",
+    "online": "Online",
+    "remove_device_title": "Remove Device?",
+    "remove_device_confirm": "Are you sure you want to remove {name}? This will stop all synchronization with this device.",
+    "more_info": "more information"
   },
   "settings": {
     "title": "Impostazioni",
@@ -172,7 +201,34 @@
     "manual_enabled": "Modalità manuale attivata. Indicizzazione interrotta.",
     "system_logs": "Log di Sistema",
     "no_logs": "Nessun log registrato ancora.",
-    "clear_logs": "Cancella Cronologia Log"
+    "clear_logs": "Cancella Cronologia Log",
+    "update_model": "Update Model",
+    "eta_label": "ETA: {time}",
+    "indexing_jobs": "Indexing {count} AI jobs",
+    "disable_model": "Disable",
+    "enable_model": "Enable",
+    "logs_cleared": "Logs cleared",
+    "scan_threads_saved": "Scan threads saved",
+    "model_enabled": "{model} enabled",
+    "model_disabled": "{model} disabled",
+    "analysis_started": "{model} analysis started",
+    "analysis_failed": "Failed to start {model}",
+    "folder_removed": "Folder removed",
+    "folder_removed_failed": "Failed to remove folder",
+    "folder_removed_watch": "Folder removed from watch list",
+    "folder_added": "Folder added",
+    "calculating": "calculating...",
+    "model_status_starting": "Starting",
+    "model_status_finished": "Finished",
+    "model_status_up_to_date": "Up to date",
+    "model_status_unavailable": "Unavailable",
+    "model_status_error": "Error",
+    "model_status_running": "Running",
+    "model_status_not_available": "Not available",
+    "model_status_ready_to_run": "Ready to run",
+    "model_status_not_downloaded": "Not downloaded",
+    "model_n_remaining": "{n} left",
+    "model_n_of_total": "{n} of {total}"
   },
   "language": {
     "label": "Lingua",
@@ -180,8 +236,7 @@
     "nl": "Nederlands",
     "fr": "Français",
     "es": "Español",
-    "pap": "Papiamentu",
-    "it": "Italiano"
+    "pap": "Papiamentu"
   },
   "guided_tour": {
     "welcome_title": "Benvenuto in Siegu!",
@@ -207,5 +262,135 @@
     "next": "Avanti",
     "skip": "Salta",
     "done": "Fatto"
+  },
+  "common": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "remove": "Remove",
+    "save": "Save",
+    "loading": "Loading..."
+  },
+  "image": {
+    "alt_photo": "Photo",
+    "aesthetics_score": "Aesthetics score",
+    "faces_detected": "Faces detected",
+    "fully_indexed": "Fully indexed"
+  },
+  "rail": {
+    "alt_thumb": "Photo thumbnail"
+  },
+  "connect": {
+    "link_device_title": "Link Device",
+    "link_device_desc": "Sync your library across your own hardware.",
+    "host": "Host",
+    "join": "Join",
+    "device_found": "Device Found!",
+    "establishing_link": "Establishing secure link...",
+    "link_established": "Link Established!",
+    "ready_to_sync": "Ready to synchronize.",
+    "manual_phrase": "Manual Phrase",
+    "scan_qr": "Scan QR Code",
+    "scan_qr_desc": "Point your camera at the host's QR code.",
+    "open_camera": "Open Camera",
+    "or_enter_manually": "Or enter manually",
+    "phrase_placeholder": "Enter 4-word phrase",
+    "link_device_button": "Link Device",
+    "disconnected": "Disconnected",
+    "generating_key": "Generating secure pair key...",
+    "pairing_error": "Pairing Error.",
+    "waiting_for_partner": "Waiting for partner device to scan or type phrase...",
+    "awaiting_webrtc": "Signaling channel requested. Awaiting WebRTC connection.",
+    "error_connecting": "Error connecting: {error}",
+    "joining_room": "Joining room...",
+    "error_joining": "Error joining: {error}",
+    "start_syncing": "Start Syncing",
+    "awaiting_webrtc_receiver": "Signaling channel requested. Awaiting WebRTC Receiver connection."
+  },
+  "photo_viewer": {
+    "metadata": "Metadata",
+    "analyze": "Analyze Photo",
+    "analyzing": "Analyzing",
+    "library_indexing": "Library indexing: {time} remaining",
+    "file_details": "File Details",
+    "ai_caption": "AI Caption",
+    "camera_settings": "Camera Settings",
+    "date_taken": "Date Taken",
+    "resolution": "Resolution",
+    "iso": "ISO",
+    "shutter": "Shutter",
+    "aperture": "Aperture",
+    "people_in_photo": "People in this Photo",
+    "no_faces": "No faces detected.",
+    "unnamed": "Unnamed",
+    "ai_insights": "AI Insights",
+    "no_insights": "No AI insights generated yet.",
+    "run_model": "Run Model",
+    "running_model": "Running {model}...",
+    "analysis_complete": "AI analysis: {models} ({time}s)",
+    "model_complete": "{model} analysis complete ({time}s)",
+    "model_failed": "{model} analysis failed",
+    "calculating": "calculating..."
+  },
+  "folder_picker": {
+    "select_folder": "Select Folder",
+    "current_path": "Current Path",
+    "go_up": "Go up one level",
+    "no_subfolders": "No subfolders found",
+    "access_denied": "Access denied or invalid path.",
+    "permission_error": "Failed to access folder. Please ensure you have granted storage permissions."
+  },
+  "models": {
+    "clip": {
+      "title": "Smart Search",
+      "desc": "Finds objects and scenes in your photos.",
+      "search": "Try searching: 'dog', 'beach', 'sunset'"
+    },
+    "ultraface": {
+      "title": "Face Grouping",
+      "desc": "Finds faces and groups them by person.",
+      "search": "Try searching: 'Mom', 'John'"
+    },
+    "ocr": {
+      "title": "Text Finder",
+      "desc": "Reads text inside photos like receipts.",
+      "search": "Try searching: 'Receipt', 'Invoice', 'Menu'"
+    },
+    "nsfw": {
+      "title": "Safe Mode",
+      "desc": "Detects and hides sensitive content.",
+      "search": "Helps keep your library family-friendly."
+    },
+    "aesthetics": {
+      "title": "Quality Scorer",
+      "desc": "Rates photos by how good they look.",
+      "search": "Helps you find your best shots quickly."
+    },
+    "blip": {
+      "title": "Photo Describer",
+      "desc": "Writes sentences about what is in photos.",
+      "search": "Try searching: 'Family eating outside'"
+    },
+    "yolo": {
+      "title": "Object Pro",
+      "desc": "Pinpoint accuracy for finding specific items.",
+      "search": "Adds deep tags for 80+ common objects."
+    },
+    "arcface": {
+      "title": "Face Pro",
+      "desc": "Advanced recognition for better grouping.",
+      "search": "drastically improves face matching accuracy."
+    },
+    "midas": {
+      "title": "Depth Vision",
+      "desc": "Analyzes 3D depth in landscapes.",
+      "search": "Adds depth-based filters to your library."
+    },
+    "whisper": {
+      "title": "Audio Search",
+      "desc": "Transcribes words spoken in videos.",
+      "search": "Search for things people said in videos."
+    }
   }
 }
