@@ -255,6 +255,12 @@ impl Database {
             "CREATE INDEX IF NOT EXISTS idx_properties_photo_id ON properties(photo_id);",
             (),
         );
+        // Migration: rename old yolo_N tags to proper COCO class names
+        let coco = ["person","bicycle","car","motorcycle","airplane","bus","train","truck","boat","traffic light","fire hydrant","stop sign","parking meter","bench","bird","cat","dog","horse","sheep","cow","elephant","bear","zebra","giraffe","backpack","umbrella","handbag","tie","suitcase","frisbee","skis","snowboard","sports ball","kite","baseball bat","baseball glove","skateboard","surfboard","tennis racket","bottle","wine glass","cup","fork","knife","spoon","bowl","banana","apple","sandwich","orange","broccoli","carrot","hot dog","pizza","donut","cake","chair","couch","potted plant","bed","dining table","toilet","tv","laptop","mouse","remote","keyboard","cell phone","microwave","oven","toaster","sink","refrigerator","book","clock","vase","scissors","teddy bear","hair drier","toothbrush"];
+        for (i, name) in coco.iter().enumerate() {
+            let _ = conn.execute("UPDATE object SET class = ?1 WHERE class = ?2", rusqlite::params![name, format!("yolo_{i}")]);
+        }
+        let _ = conn.execute("DELETE FROM object WHERE class LIKE 'yolo_%'", []);
         let _ = conn.execute(
             "CREATE TABLE IF NOT EXISTS device(ip STRING, name STRING, offer STRING);",
             (),

@@ -910,7 +910,7 @@ pub fn start_background_worker(
                                         // We just check for high-confidence classes to tag
                                         let num_classes = 80;
                                         let num_anchors = 8400;
-                                        let mut found_classes = std::collections::HashSet::new();
+                                        let mut found_classes: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
                                         for a in 0..num_anchors {
                                             let mut max_conf = 0.0f32;
                                             let mut max_cls = 0;
@@ -918,12 +918,16 @@ pub fn start_background_worker(
                                                 let conf = data[num_anchors * (4 + c) + a];
                                                 if conf > max_conf { max_conf = conf; max_cls = c; }
                                             }
-                                            if max_conf > 0.6 { found_classes.insert(max_cls); }
+                                            if max_conf > 0.6 {
+                                                found_classes.entry(max_cls).and_modify(|e| *e = e.max(max_conf)).or_insert(max_conf);
+                                            }
                                         }
+                                        const COCO_CLASSES: &[&str] = &["person","bicycle","car","motorcycle","airplane","bus","train","truck","boat","traffic light","fire hydrant","stop sign","parking meter","bench","bird","cat","dog","horse","sheep","cow","elephant","bear","zebra","giraffe","backpack","umbrella","handbag","tie","suitcase","frisbee","skis","snowboard","sports ball","kite","baseball bat","baseball glove","skateboard","surfboard","tennis racket","bottle","wine glass","cup","fork","knife","spoon","bowl","banana","apple","sandwich","orange","broccoli","carrot","hot dog","pizza","donut","cake","chair","couch","potted plant","bed","dining table","toilet","tv","laptop","mouse","remote","keyboard","cell phone","microwave","oven","toaster","sink","refrigerator","book","clock","vase","scissors","teddy bear","hair drier","toothbrush"];
                                         let lock = db_task.lock().unwrap();
                                         let found_count = found_classes.len();
-                                        for cls_idx in found_classes {
-                                            let _ = lock.connection.execute("INSERT INTO object (photo_id, class, probability) VALUES(?1, ?2, '0.9')", (&photo_id_task, &format!("yolo_{cls_idx}")));
+                                        for (cls_idx, conf) in found_classes {
+                                            let name = COCO_CLASSES.get(cls_idx).copied().unwrap_or("unknown");
+                                            let _ = lock.connection.execute("INSERT INTO object (photo_id, class, probability) VALUES(?1, ?2, ?3)", (&photo_id_task, name, &conf.to_string()));
                                         }
                                         lock.update_ai_status(&photo_id_task, "yolo", 1);
                                         model_timings.insert("yolo".to_string(), __start.elapsed().as_secs_f64());
