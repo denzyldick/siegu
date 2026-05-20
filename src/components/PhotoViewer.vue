@@ -68,7 +68,7 @@
           class="border-s border-subtle info-drawer"
         >
         <v-toolbar color="transparent" density="compact">
-          <v-toolbar-title class="text-zinc-primary text-subtitle-1 font-weight-bold">Metadata</v-toolbar-title>
+          <v-toolbar-title class="text-zinc-primary text-subtitle-1 font-weight-bold">{{ $t('photo_viewer.metadata') }}</v-toolbar-title>
         </v-toolbar>
 
         <v-divider class="opacity-5"></v-divider>
@@ -84,18 +84,18 @@
                @click="analyzePhoto"
                class="text-none"
              >
-               Analyze Photo
-             </v-btn>
-              <div v-if="isAnalyzing" class="text-caption text-zinc-muted mt-2 text-center">
-                <span class="analyzing-dots">Analyzing</span>
+                {{ $t('photo_viewer.analyze') }}
+              </v-btn>
+               <div v-if="isAnalyzing" class="text-caption text-zinc-muted mt-2 text-center">
+                 <span class="analyzing-dots">{{ $t('photo_viewer.analyzing') }}</span>
               </div>
               <div v-else-if="globalEta" class="text-caption text-zinc-muted mt-2 text-center">
-                 Library indexing: {{ formatEta(globalEta) }} remaining
+                 {{ $t('photo_viewer.library_indexing', { time: formatEta(globalEta) }) }}
               </div>
           </div>
 
           <div class="mb-6 pt-4">
-            <div class="text-caption text-zinc-muted mb-1 text-uppercase tracking-widest">File Details</div>
+            <div class="text-caption text-zinc-muted mb-1 text-uppercase tracking-widest">{{ $t('photo_viewer.file_details') }}</div>
             <div class="d-flex align-start mb-2">
               <v-icon size="small" color="#71717a" class="mr-2 mt-1">mdi-file-document-outline</v-icon>
               <div class="text-body-2 text-zinc-secondary word-break-all">
@@ -108,7 +108,7 @@
 
           <!-- Caption Section -->
           <div class="mb-6" v-if="currentPhoto?.caption">
-            <div class="text-caption text-zinc-muted mb-1 text-uppercase tracking-widest">AI Caption</div>
+            <div class="text-caption text-zinc-muted mb-1 text-uppercase tracking-widest">{{ $t('photo_viewer.ai_caption') }}</div>
             <div class="text-body-2 text-zinc-primary font-italic">
               "{{ currentPhoto.caption }}"
             </div>
@@ -117,7 +117,7 @@
           <v-divider class="opacity-5 mb-4" v-if="currentPhoto?.caption"></v-divider>
 
           <div class="mb-6" v-if="hasExif">
-            <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">Camera Settings</div>
+            <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">{{ $t('photo_viewer.camera_settings') }}</div>
 
             <div class="d-flex align-center mb-4" v-if="exifData.make || exifData.model">
               <v-icon size="small" color="#71717a" class="mr-2">mdi-camera</v-icon>
@@ -126,23 +126,23 @@
 
             <v-row dense>
               <v-col cols="6" v-if="exifData.date" class="mb-3">
-                <div class="text-caption text-zinc-muted">Date Taken</div>
+                <div class="text-caption text-zinc-muted">{{ $t('photo_viewer.date_taken') }}</div>
                 <div class="text-body-2 text-zinc-secondary">{{ exifData.date }}</div>
               </v-col>
               <v-col cols="6" v-if="exifData.dimensions" class="mb-3">
-                <div class="text-caption text-zinc-muted">Resolution</div>
+                <div class="text-caption text-zinc-muted">{{ $t('photo_viewer.resolution') }}</div>
                 <div class="text-body-2 text-zinc-secondary">{{ exifData.dimensions }}</div>
               </v-col>
               <v-col cols="6" v-if="exifData.iso" class="mb-3">
-                <div class="text-caption text-zinc-muted">ISO</div>
+                <div class="text-caption text-zinc-muted">{{ $t('photo_viewer.iso') }}</div>
                 <div class="text-body-2 text-zinc-secondary">{{ exifData.iso }}</div>
               </v-col>
               <v-col cols="6" v-if="exifData.shutter" class="mb-3">
-                <div class="text-caption text-zinc-muted">Shutter</div>
+                <div class="text-caption text-zinc-muted">{{ $t('photo_viewer.shutter') }}</div>
                 <div class="text-body-2 text-zinc-secondary">{{ exifData.shutter }}</div>
               </v-col>
               <v-col cols="6" v-if="exifData.aperture" class="mb-3">
-                <div class="text-caption text-zinc-muted">Aperture</div>
+                <div class="text-caption text-zinc-muted">{{ $t('photo_viewer.aperture') }}</div>
                 <div class="text-body-2 text-zinc-secondary">{{ exifData.aperture }}</div>
               </v-col>
             </v-row>
@@ -151,9 +151,9 @@
           <v-divider class="opacity-5 mb-4"></v-divider>
 
           <div class="mb-6">
-            <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">People in this Photo</div>
+            <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">{{ $t('photo_viewer.people_in_photo') }}</div>
             <div v-if="detectedFaces.length === 0" class="text-body-2 text-zinc-muted font-italic">
-              No faces detected.
+              {{ $t('photo_viewer.no_faces') }}
             </div>
             <div class="d-flex flex-wrap ga-3">
               <div 
@@ -167,7 +167,7 @@
                   <v-img :src="face.encoded" cover></v-img>
                 </v-avatar>
                 <div class="text-caption text-zinc-primary text-truncate text-center w-100 font-weight-bold">
-                  {{ face.person_name || 'Unnamed' }}
+                  {{ face.person_name || $t('photo_viewer.unnamed') }}
                 </div>
               </div>
             </div>
@@ -176,10 +176,10 @@
           <v-divider class="opacity-5 mb-4"></v-divider>
 
           <div class="mb-6">
-            <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">AI Insights</div>
+            <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">{{ $t('photo_viewer.ai_insights') }}</div>
 
             <div v-if="aiTags.length === 0" class="text-body-2 text-zinc-muted font-italic">
-              No AI insights generated yet.
+              {{ $t('photo_viewer.no_insights') }}
             </div>
 
             <div v-for="tag in aiTags" :key="tag.name" class="mb-4">
@@ -200,11 +200,11 @@
           <v-divider class="opacity-5 mb-4" v-if="modelChips.length > 0"></v-divider>
 
           <div class="mb-6" v-if="modelChips.length > 0">
-            <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">Run Model</div>
+            <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">{{ $t('photo_viewer.run_model') }}</div>
             <div v-if="isAnalyzingModel" class="d-flex align-center mb-3">
               <v-progress-circular indeterminate size="16" width="2" color="black" class="mr-2"></v-progress-circular>
               <span class="text-body-2 text-zinc-primary font-weight-bold">
-                Running {{ (modelInfo.find(m => m.id === isAnalyzingModel) || {}).label || isAnalyzingModel }}…
+                {{ $t('photo_viewer.running_model', { model: $t('models.' + isAnalyzingModel + '.title') }) }}
                 <span class="text-caption text-zinc-muted ml-1">({{ formatElapsed(runStartTime, runTimerTick) }})</span>
               </span>
             </div>
@@ -221,7 +221,7 @@
                 @click="runSingleModel(m.id)"
                 class="font-weight-bold"
               >
-                {{ m.label }}
+                {{ $t('models.' + m.id + '.title') }}
               </v-chip>
             </div>
           </div>
@@ -274,15 +274,15 @@ export default {
     downloadedModels: [],
     isAnalyzingModel: null,
     modelInfo: [
-      { id: 'clip', label: 'Smart Search' },
-      { id: 'face', label: 'Face Grouping' },
-      { id: 'ocr', label: 'Text Finder' },
-      { id: 'nsfw', label: 'Safe Mode' },
-      { id: 'aesthetics', label: 'Quality Scorer' },
-      { id: 'yolo', label: 'Object Pro' },
-      { id: 'blip', label: 'Photo Describer' },
-      { id: 'arcface', label: 'Face Pro' },
-      { id: 'midas', label: 'Depth Vision' },
+      { id: 'clip' },
+      { id: 'ultraface' },
+      { id: 'ocr' },
+      { id: 'nsfw' },
+      { id: 'aesthetics' },
+      { id: 'yolo' },
+      { id: 'blip' },
+      { id: 'arcface' },
+      { id: 'midas' },
     ],
   }),
   computed: {
@@ -365,12 +365,11 @@ export default {
       const status = this.currentPhoto.ai_status || {};
       return this.modelInfo
         .filter(m => {
-          const downloadId = m.id === 'face' ? 'ultraface' : m.id;
-          return this.downloadedModels.includes(downloadId);
+          return this.downloadedModels.includes(m.id);
         })
         .map(m => ({
           id: m.id,
-          label: m.label,
+          label: this.$t('models.' + m.id + '.title'),
           done: status[m.id] === 1,
         }));
     },
@@ -394,7 +393,7 @@ export default {
       if (!face.person_id) return;
       this.$emit('navigate-to-person', {
         id: face.person_id,
-        name: face.person_name || 'Unnamed Person'
+        name: face.person_name || this.$t('photo_viewer.unnamed')
       });
       this.close();
     },
@@ -420,7 +419,7 @@ export default {
             if (r.has_caption) parts.push('caption');
             if (parts.length === 0) parts.push('nothing detected');
 
-            this.snackbar.text = `AI analysis: ${parts.join(', ')} (${elapsed}s)`;
+            this.snackbar.text = this.$t('photo_viewer.analysis_complete', { models: parts.join(', '), time: elapsed });
             this.snackbar.show = true;
 
             this.refreshPhoto(photoId);
@@ -456,8 +455,8 @@ export default {
             this.showInfo = true;
             const modelTimings = event.payload.model_timings || {};
             const modelTime = modelTimings[modelId];
-            const elapsed = modelTime ? ` (${modelTime.toFixed(1)}s)` : ` (${((Date.now() - this.runStartTime) / 1000).toFixed(1)}s)`;
-            this.snackbar.text = `${this.modelInfo.find(m => m.id === modelId)?.label || modelId} analysis complete${elapsed}`;
+            const elapsed = (modelTime || ((Date.now() - this.runStartTime) / 1000)).toFixed(1);
+            this.snackbar.text = this.$t('photo_viewer.model_complete', { model: this.$t('models.' + modelId + '.title'), time: elapsed });
             this.snackbar.error = false;
             this.snackbar.show = true;
           }
@@ -468,7 +467,7 @@ export default {
         console.error("Model analysis failed", e);
         this.isAnalyzingModel = null;
         if (this.runTimer) { clearInterval(this.runTimer); this.runTimer = null; }
-        this.snackbar.text = `${this.modelInfo.find(m => m.id === modelId)?.label || modelId} analysis failed`;
+        this.snackbar.text = this.$t('photo_viewer.model_failed', { model: this.$t('models.' + modelId + '.title') });
         this.snackbar.error = true;
         this.snackbar.show = true;
       }
@@ -487,7 +486,7 @@ export default {
       }
     },
     formatEta(ms) {
-      if (!ms || ms < 0) return 'calculating...';
+      if (!ms || ms < 0) return this.$t('photo_viewer.calculating');
       const totalSeconds = Math.floor(ms / 1000);
       const hours = Math.floor(totalSeconds / 3600);
       const minutes = Math.floor((totalSeconds % 3600) / 60);

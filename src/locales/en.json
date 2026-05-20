@@ -11,97 +11,14 @@
     "save": "Save",
     "loading": "Loading..."
   },
-  "onboarding": {
-    "add_media_title": "Add your media",
-    "add_media_desc": "Select the folders where you keep your photos and videos.",
-    "continue_ai": "Continue to AI Setup",
-    "ai_title": "AI Intelligence",
-    "ai_desc": "Download the neural models to enable face recognition and semantic search.",
-    "model_info": "The models are approx. 600MB. We recommend using Wi-Fi.",
-    "download_required": "Download Required",
-    "continue": "Continue",
-    "sync_title": "Sync & Protect",
-    "sync_desc": "Sync your library across your phone and other computers. This creates a private, serverless backup of your memories.",
-    "target_sync_folder": "Target Sync Folder",
-    "sync_storage": "Where to store synced photos",
-    "auto_select": "Auto-select (Default Folder)",
-    "change": "Change",
-    "link_device": "Link a Device",
-    "skip": "Skip for now",
-    "start_syncing": "Start Syncing",
-    "device_linked": "Device Linked Successfully!",
-    "ready_title": "Ready to go!",
-    "ready_desc": "Setup is complete. Now it's time to find your memories.",
-    "finish_setup": "Finish Setup & Sync",
-    "start_scan": "Start Initial Scan",
-    "scan_desc": "This will find all your photos and start AI processing.",
-    "greet_desc": "Your private, AI-powered media sanctuary. Organize, search, and protect your memories entirely on your own terms.",
-    "setup_local": "Setup Local Library",
-    "setup_local_desc": "Index photos from folders on this device.",
-    "join_library": "Join Library",
-    "join_library_desc": "Sync with an existing Siegu network.",
-    "ai_disclaimer": "By continuing, you agree that AI processing happens locally on your device."
+  "image": {
+    "alt_photo": "Photo",
+    "aesthetics_score": "Aesthetics score",
+    "faces_detected": "Faces detected",
+    "fully_indexed": "Fully indexed"
   },
-  "nav": {
-    "home": "Home",
-    "people": "People",
-    "map": "Map",
-    "devices": "Devices",
-    "settings": "Settings"
-  },
-  "search": {
-    "placeholder": "Search memories...",
-    "no_data": "No search data available yet. Index some photos first.",
-    "people_section": "People",
-    "top_suggestions": "Top Suggestions",
-    "help_title": "Search Guide",
-    "help_desc": "You can search by:",
-    "help_tags": "Tags & objects — e.g. 'dog', 'car', 'sunset'",
-    "help_people": "People names — e.g. 'Mom', 'John'",
-    "help_location": "Locations — e.g. 'Paris, France'",
-    "help_date": "Dates — e.g. '2024', 'January 2024', '2024-03'",
-    "help_caption": "Photo captions",
-    "help_ocr": "Text in photos (receipts, signs)",
-    "disabled_title": "Search Not Available",
-    "disabled_desc": "Search requires indexed data. Please add a folder and allow indexing to complete before using search.",
-    "disabled_got_it": "Got it"
-  },
-  "sync": {
-    "status_label": "LIBRARY STATUS",
-    "file_scanner": "File Scanner",
-    "processing_folder": "Processing folder {current}/{total}",
-    "switched_ai": "Switched to AI analysis",
-    "idle": "Idle",
-    "scanning": "Scanning...",
-    "indexing": "Indexing...",
-    "refresh": "Refresh",
-    "ai_intelligence": "AI Intelligence",
-    "jobs_remaining": "{count} AI jobs remaining",
-    "finalizing": "Finalizing...",
-    "all_indexed": "All memories indexed",
-    "model_label": "Model: {model}",
-    "last_sync": "Last sync: {time}",
-    "sync_library": "Sync Library",
-    "refresh_files": "Refresh files & AI index",
-    "processing_bg": "Processing in background...",
-    "discovering": "Discovering: ",
-    "jobs_left": "{count} left",
-    "time_remaining": "~{time} remaining",
-    "up_to_date": "Up to date",
-    "received_memory": "Received new memory: {id}",
-    "synced_memory": "Synced memory {id} to device",
-    "sync_error": "Error"
-  },
-  "filters": {
-    "favorites_only": "Favorites only",
-    "videos_only": "Videos only",
-    "date_range": "Date Range",
-    "all": "All",
-    "month": "Month",
-    "year": "Year",
-    "folder": "Folder",
-    "all_folders": "All folders",
-    "reset": "Reset Filters"
+  "rail": {
+    "alt_thumb": "Photo thumbnail"
   },
   "photos": {
     "items_count": "{count} items",
@@ -116,42 +33,10 @@
     "load_more": "Load more",
     "items_selected": "{count} items selected",
     "favorite": "Favorite",
-    "remove": "Remove"
-  },
-  "people": {
-    "title": "People & Faces",
-    "desc": "Siegu automatically finds faces and groups them by person.",
-    "named": "Named",
-    "unnamed": "Unnamed",
-    "indexing_hint": "Faces will appear as photos are indexed. Check back after indexing completes.",
-    "no_faces": "No faces found yet",
-    "no_faces_desc": "Photos are being analyzed. Faces will appear here once detected.",
-    "name_face": "Name this person",
-    "merge": "Merge",
-    "rename": "Rename",
-    "delete": "Delete",
-    "search_person": "Search by person",
-    "photos_of": "Photos of {name}",
-    "index_faces": "Index Faces",
-    "indexing_remaining": "Indexing: {count} remaining",
-    "named_count": "{count} Named",
-    "your_people": "Your People",
-    "new_faces": "New Faces",
-    "name_group": "Name Group",
-    "who_is_this": "Who is this?",
-    "name_placeholder": "Search existing or type new name...",
-    "confirm_identity": "Confirm Identity",
-    "profile_actions": "Profile Actions",
-    "new_name_for": "NEW NAME FOR {name}",
-    "update_name": "Update Name",
-    "merge_desc": "Combine all photos of {name} into the profile selected below.",
-    "target_profile": "Target Profile",
-    "confirm_merge": "Confirm Merge",
-    "grouped_faces": "Grouped Faces",
-    "appearances_in_cluster": "{count} APPEARANCES IN THIS CLUSTER",
-    "name_this_group": "Name This Group",
-    "confirm_remove_face": "Are you sure you want to remove this face detection?",
-    "no_faces_detected": "No faces detected in this photo."
+    "remove": "Remove",
+    "recent": "Recent",
+    "label_photos": "Photos:",
+    "label_videos": "Videos:"
   },
   "map": {
     "title": "Map View",
@@ -164,7 +49,8 @@
     "desc": "Connect your devices to sync your library.",
     "add_device": "Add Device",
     "no_devices": "No devices connected",
-    "no_devices_desc": "Link a device using the pairing code to sync your library.",
+    "no_devices_desc": "Link your mobile devices or other computers to sync and access your media library from anywhere.",
+    "no_devices_desc_alt": "Link a device using the pairing code to sync your library.",
     "sync_now": "Sync Now",
     "disconnect": "Disconnect",
     "this_device": "This device",
@@ -201,7 +87,9 @@
     "awaiting_webrtc": "Signaling channel requested. Awaiting WebRTC connection.",
     "error_connecting": "Error connecting: {error}",
     "joining_room": "Joining room...",
-    "error_joining": "Error joining: {error}"
+    "error_joining": "Error joining: {error}",
+    "start_syncing": "Start Syncing",
+    "awaiting_webrtc_receiver": "Signaling channel requested. Awaiting WebRTC Receiver connection."
   },
   "photo_viewer": {
     "metadata": "Metadata",
@@ -224,8 +112,9 @@
     "run_model": "Run Model",
     "running_model": "Running {model}...",
     "analysis_complete": "AI analysis: {models} ({time}s)",
-    "model_complete": "{model} analysis complete ({time})",
-    "model_failed": "{model} analysis failed"
+    "model_complete": "{model} analysis complete ({time}s)",
+    "model_failed": "{model} analysis failed",
+    "calculating": "calculating..."
   },
   "folder_picker": {
     "select_folder": "Select Folder",
@@ -337,5 +226,57 @@
     "next": "Next",
     "skip": "Skip",
     "done": "Done"
+  },
+  "models": {
+    "clip": {
+      "title": "Smart Search",
+      "desc": "Finds objects and scenes in your photos.",
+      "search": "Try searching: 'dog', 'beach', 'sunset'"
+    },
+    "ultraface": {
+      "title": "Face Grouping",
+      "desc": "Finds faces and groups them by person.",
+      "search": "Try searching: 'Mom', 'John'"
+    },
+    "ocr": {
+      "title": "Text Finder",
+      "desc": "Reads text inside photos like receipts.",
+      "search": "Try searching: 'Receipt', 'Invoice', 'Menu'"
+    },
+    "nsfw": {
+      "title": "Safe Mode",
+      "desc": "Detects and hides sensitive content.",
+      "search": "Helps keep your library family-friendly."
+    },
+    "aesthetics": {
+      "title": "Quality Scorer",
+      "desc": "Rates photos by how good they look.",
+      "search": "Helps you find your best shots quickly."
+    },
+    "blip": {
+      "title": "Photo Describer",
+      "desc": "Writes sentences about what is in photos.",
+      "search": "Try searching: 'Family eating outside'"
+    },
+    "yolo": {
+      "title": "Object Pro",
+      "desc": "Pinpoint accuracy for finding specific items.",
+      "search": "Adds deep tags for 80+ common objects."
+    },
+    "arcface": {
+      "title": "Face Pro",
+      "desc": "Advanced recognition for better grouping.",
+      "search": "drastically improves face matching accuracy."
+    },
+    "midas": {
+      "title": "Depth Vision",
+      "desc": "Analyzes 3D depth in landscapes.",
+      "search": "Adds depth-based filters to your library."
+    },
+    "whisper": {
+      "title": "Audio Search",
+      "desc": "Transcribes words spoken in videos.",
+      "search": "Search for things people said in videos."
+    }
   }
 }
