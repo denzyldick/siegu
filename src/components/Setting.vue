@@ -683,7 +683,7 @@ export default {
 
     this.unlistenLog = await listen("log-message", (event) => {
       const log = {
-        time: new Date().toLocaleTimeString(),
+        time: new Date().toLocaleTimeString(localStorage.getItem('siegu_language') || 'en'),
         message: event.payload,
         type: event.payload.toLowerCase().includes("error") ? "error" : "info"
       };
@@ -753,7 +753,7 @@ export default {
       return count;
     },
     formatIndexingCount(value) {
-      return this.normalizeIndexingCount(value).toLocaleString();
+      return this.normalizeIndexingCount(value).toLocaleString(localStorage.getItem('siegu_language') || 'en');
     },
     setLanguage(code) {
       this.currentLang = code;
@@ -765,7 +765,7 @@ export default {
         const logsStr = await invoke("get_logs", { limit: 100 });
         const parsed = JSON.parse(logsStr);
         this.logs = parsed.map(l => ({
-          time: new Date(l.timestamp).toLocaleTimeString(),
+          time: new Date(l.timestamp).toLocaleTimeString(localStorage.getItem('siegu_language') || 'en'),
           message: l.message,
           type: l.level === 'error' ? 'error' : 'info'
         }));

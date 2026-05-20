@@ -385,7 +385,7 @@ export default {
       return count;
     },
     formatIndexingCount(value) {
-      return this.normalizeIndexingCount(value).toLocaleString();
+      return this.normalizeIndexingCount(value).toLocaleString(localStorage.getItem('siegu_language') || 'en');
     },
     async startIndexing() {
       try {

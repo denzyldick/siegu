@@ -254,7 +254,7 @@ export default {
   },
   methods: {
     updateGroups(newImages) {
-        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const locale = localStorage.getItem('siegu_language') || 'en';
         const affectedGroups = new Set();
         
         newImages.forEach(image => {
@@ -271,7 +271,8 @@ export default {
                         const year = dateParts[0];
                         const monthIdx = parseInt(dateParts[1]) - 1;
                         if (monthIdx >= 0 && monthIdx < 12) {
-                            image._groupKey = `${monthNames[monthIdx]} ${year}`;
+                            const monthName = new Date(parseInt(year), monthIdx).toLocaleString(locale, { month: 'long' });
+                            image._groupKey = `${monthName} ${year}`;
                             image._sortKey = `${year}${dateParts[1].padStart(2, '0')}`;
                         }
                     }

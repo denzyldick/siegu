@@ -97,7 +97,7 @@ export default {
       if (time !== "Never") {
         const timestamp = parseInt(time);
         const date = new Date(timestamp * 1000);
-        this.lastScanTime = date.toLocaleString();
+        this.lastScanTime = date.toLocaleString(this.getLocale());
       }
     });
 
@@ -135,7 +135,7 @@ export default {
         this.scanning = false;
         this.currentScanFile = { current: 0, total: 0, filename: '', eta_secs: 0 };
         this.currentAiJob = { id: '', filename: '', model: '' };
-        this.lastScanTime = new Date().toLocaleString();
+        this.lastScanTime = new Date().toLocaleString(this.getLocale());
         setTimeout(() => { this.scanStatus = 'idle'; }, 3000);
       }
     });
@@ -268,8 +268,11 @@ export default {
       if (!Number.isSafeInteger(count) || count < 0 || count > 1000000) return 0;
       return count;
     },
+    getLocale() {
+      return localStorage.getItem('siegu_language') || 'en';
+    },
     formatIndexingCount(value) {
-      return this.normalizeIndexingCount(value).toLocaleString();
+      return this.normalizeIndexingCount(value).toLocaleString(this.getLocale());
     },
     resetFilters() {
       this.filters = { favoritesOnly: false, videosOnly: false, dateRange: 'all', folder: null };
