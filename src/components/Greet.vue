@@ -25,7 +25,7 @@ export default {
             Siegu
           </h1>
           <p class="text-subtitle-1 text-zinc-secondary mb-10 max-w-500 mx-auto">
-            Your private, AI-powered media sanctuary. Organize, search, and protect your memories entirely on your own terms.
+            {{ $t('onboarding.greet_desc') }}
           </p>
 
           <div class="d-flex flex-column ga-4">
@@ -39,8 +39,8 @@ export default {
                   <v-icon color="white">mdi-folder-plus</v-icon>
                 </div>
                 <div class="text-left">
-                  <div class="font-weight-bold text-white">Setup Local Library</div>
-                  <div class="text-caption text-white-muted">Index photos from folders on this device.</div>
+                  <div class="font-weight-bold text-white">{{ $t('onboarding.setup_local') }}</div>
+                  <div class="text-caption text-white-muted">{{ $t('onboarding.setup_local_desc') }}</div>
                 </div>
               </div>
             </v-card>
@@ -55,15 +55,15 @@ export default {
                   <v-icon color="white">mdi-sync</v-icon>
                 </div>
                 <div class="text-left">
-                  <div class="font-weight-bold text-white">Join Library</div>
-                  <div class="text-caption text-white-muted">Sync with an existing Siegu network.</div>
+                  <div class="font-weight-bold text-white">{{ $t('onboarding.join_library') }}</div>
+                  <div class="text-caption text-white-muted">{{ $t('onboarding.join_library_desc') }}</div>
                 </div>
               </div>
             </v-card>
           </div>
 
           <div class="text-caption text-zinc-muted px-10 mt-10">
-            By continuing, you agree that AI processing happens locally on your device.
+            {{ $t('onboarding.ai_disclaimer') }}
           </div>
         </div>
       </v-col>

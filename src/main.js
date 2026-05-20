@@ -6,6 +6,21 @@ import "@mdi/font/css/materialdesignicons.css";
 import * as components from "vuetify/components";
 //import { directives } from "vuetify/directives";
 import { createVuetify } from "vuetify/dist/vuetify.js";
+import { createI18n } from "vue-i18n";
+import en from "./locales/en.json";
+import nl from "./locales/nl.json";
+import fr from "./locales/fr.json";
+import es from "./locales/es.json";
+import pap from "./locales/pap.json";
+
+const savedLang = localStorage.getItem("siegu_language") || "en";
+
+const i18n = createI18n({
+  legacy: false,
+  locale: savedLang,
+  fallbackLocale: "en",
+  messages: { en, nl, fr, es, pap },
+});
 
 const vuetify = createVuetify({
   components,
@@ -55,4 +70,4 @@ const vuetify = createVuetify({
     },
   },
 });
-let app = createApp(App).use(vuetify).mount("#app");
+let app = createApp(App).use(vuetify).use(i18n).mount("#app");

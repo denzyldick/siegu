@@ -363,7 +363,7 @@ pub fn start_background_worker(
         let mut last_auto_job: Option<Instant> = None;
 
         while let Some(job) = rx.blocking_recv() {
-            if abort_clone.load(Ordering::SeqCst) && !matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_)) {
+            if abort_clone.load(Ordering::SeqCst) && !matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _)) {
                 continue;
             }
 
@@ -803,12 +803,12 @@ pub fn start_background_worker(
                                 if abort_task.load(Ordering::SeqCst) { return; }
                                 let __start = std::time::Instant::now();
                                 if let Some(ref model) = aesthetics_task {
-                                    let resized = image::imageops::resize(&img, 224, 224, image::imageops::FilterType::Triangle);
-                                    let mut input = Array4::<f32>::zeros((1, 3, 224, 224));
+                                    let resized = image::imageops::resize(&img, 384, 384, image::imageops::FilterType::Triangle);
+                                    let mut input = Array4::<f32>::zeros((1, 3, 384, 384));
                                     for (x, y, pixel) in resized.enumerate_pixels() {
-                                        input[[0, 0, y as usize, x as usize]] = (pixel[0] as f32 / 255.0 - 0.48145466) / 0.26862954;
-                                        input[[0, 1, y as usize, x as usize]] = (pixel[1] as f32 / 255.0 - 0.4578275) / 0.2613026;
-                                        input[[0, 2, y as usize, x as usize]] = (pixel[2] as f32 / 255.0 - 0.40821073) / 0.2757771;
+                                        input[[0, 0, y as usize, x as usize]] = pixel[0] as f32 / 127.5 - 1.0;
+                                        input[[0, 1, y as usize, x as usize]] = pixel[1] as f32 / 127.5 - 1.0;
+                                        input[[0, 2, y as usize, x as usize]] = pixel[2] as f32 / 127.5 - 1.0;
                                     }
                                     if let Ok(data) = model.run(input, "input") {
                                         let score = data[0];

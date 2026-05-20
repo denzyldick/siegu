@@ -8,6 +8,7 @@ use tauri::Manager;
 mod database;
 mod face_detector;
 mod file;
+mod geocode;
 mod ml;
 mod server;
 #[cfg(test)]
@@ -619,18 +620,57 @@ async fn get_top_tags(app: tauri::AppHandle) -> String {
         return "[]".to_string();
     }
     let database = database::Database::new(&path);
-    let mut tags: Vec<String> = Vec::new();
+    let mut suggestions: Vec<database::SearchSuggestion> = Vec::new();
+
     if let Ok(mut stmt) = database
         .connection
         .prepare("SELECT class FROM object GROUP BY class ORDER BY COUNT(*) DESC LIMIT 5")
     {
-        if let Ok(iter) = stmt.query_map([], |row| row.get(0)) {
+        if let Ok(iter) = stmt.query_map([], |row| {
+            Ok(database::SearchSuggestion {
+                title: row.get(0)?,
+                suggestion_type: "tag".to_string(),
+            })
+        }) {
             for item in iter.flatten() {
-                tags.push(item);
+                suggestions.push(item);
             }
         }
     }
-    serde_json::to_string(&tags).unwrap_or("[]".to_string())
+
+    if let Ok(mut stmt) = database
+        .connection
+        .prepare("SELECT value FROM properties WHERE key = 'location_name' GROUP BY value ORDER BY COUNT(*) DESC LIMIT 5")
+    {
+        if let Ok(iter) = stmt.query_map([], |row| {
+            Ok(database::SearchSuggestion {
+                title: row.get(0)?,
+                suggestion_type: "location".to_string(),
+            })
+        }) {
+            for item in iter.flatten() {
+                suggestions.push(item);
+            }
+        }
+    }
+
+    if let Ok(mut stmt) = database
+        .connection
+        .prepare("SELECT name FROM people WHERE name IS NOT NULL GROUP BY name ORDER BY COUNT(*) DESC LIMIT 5")
+    {
+        if let Ok(iter) = stmt.query_map([], |row| {
+            Ok(database::SearchSuggestion {
+                title: row.get(0)?,
+                suggestion_type: "person".to_string(),
+            })
+        }) {
+            for item in iter.flatten() {
+                suggestions.push(item);
+            }
+        }
+    }
+
+    serde_json::to_string(&suggestions).unwrap_or("[]".to_string())
 }
 
 #[tauri::command]
@@ -949,6 +989,61 @@ async fn get_os() -> String {
 }
 
 #[tauri::command]
+async fn resolve_photo_locations(app: tauri::AppHandle) -> Result<(), String> {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return Err("Config path empty".to_string());
+    }
+    let db = database::Database::new(&path);
+    let sql = "SELECT id, latitude, longitude FROM photo WHERE (latitude != 0.0 OR longitude != 0.0) AND id NOT IN (SELECT photo_id FROM properties WHERE key = 'location_name')";
+    let mut resolved = 0usize;
+    if let Ok(mut stmt) = db.connection.prepare(sql) {
+        if let Ok(rows) = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, f64>(1).unwrap_or(0.0),
+                row.get::<_, f64>(2).unwrap_or(0.0),
+            ))
+        }) {
+            for row in rows.flatten() {
+                let (id, lat, lon) = row;
+                if let Some((city, country)) = geocode::find_nearest_city(lat, lon) {
+                    let location_name = format!("{}, {}", city, country);
+                    let _ = db.connection.execute(
+                        "INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
+                        rusqlite::params![id, location_name],
+                    );
+                    resolved += 1;
+                }
+            }
+        }
+    }
+    println!("Resolved {} photo locations", resolved);
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_location_names(app: tauri::AppHandle) -> Vec<String> {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return Vec::new();
+    }
+    let db = database::Database::new(&path);
+    let mut names = Vec::new();
+    if let Ok(mut stmt) = db
+        .connection
+        .prepare("SELECT DISTINCT value FROM properties WHERE key = 'location_name' ORDER BY value")
+    {
+        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
+            for row in rows.flatten() {
+                names.push(row);
+            }
+        }
+    }
+    names
+}
+
+#[tauri::command]
 async fn initialize_sync_folder(app: tauri::AppHandle, path: String) -> Result<(), String> {
     let target = std::path::PathBuf::from(&path).join("siegu");
     if let Err(e) = std::fs::create_dir_all(&target) {
@@ -1192,6 +1287,8 @@ pub fn run() {
             analyze_photo,
             analyze_photo_model,
             analyze_model,
+            resolve_photo_locations,
+            get_location_names,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

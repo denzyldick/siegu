@@ -87,6 +87,52 @@ mod tests {
         input
     }
 
+    #[test]
+    fn test_analyze_single_bypasses_abort_flag() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+        use crate::ml::Job;
+
+        let abort = Arc::new(AtomicBool::new(true));
+
+        // AnalyzeSingle should NOT be skipped when abort is set
+        let job = Job::AnalyzeSingle("test".to_string());
+        let should_skip = abort.load(Ordering::SeqCst)
+            && !matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _));
+        assert!(!should_skip, "AnalyzeSingle must process even when abort is set");
+
+        // AnalyzeSingleWithModel should NOT be skipped when abort is set
+        let job = Job::AnalyzeSingleWithModel("test".to_string(), "clip".to_string());
+        let should_skip = abort.load(Ordering::SeqCst)
+            && !matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _));
+        assert!(!should_skip, "AnalyzeSingleWithModel must process even when abort is set");
+
+        // ProcessAll SHOULD be skipped when abort is set
+        let job = Job::ProcessAll;
+        let should_skip = abort.load(Ordering::SeqCst)
+            && !matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _));
+        assert!(should_skip, "ProcessAll must be blocked when abort is set");
+
+        // ProcessModel SHOULD be skipped when abort is set
+        let job = Job::ProcessModel("clip".to_string());
+        let should_skip = abort.load(Ordering::SeqCst)
+            && !matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _));
+        assert!(should_skip, "ProcessModel must be blocked when abort is set");
+
+        // AutoAnalyzeSingle should NOT be skipped
+        let job = Job::AutoAnalyzeSingle("test".to_string());
+        let should_skip = abort.load(Ordering::SeqCst)
+            && !matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _));
+        assert!(!should_skip, "AutoAnalyzeSingle must process even when abort is set");
+
+        // When abort is false, nothing should be skipped
+        abort.store(false, Ordering::SeqCst);
+        let job = Job::ProcessAll;
+        let should_skip = abort.load(Ordering::SeqCst)
+            && !matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _));
+        assert!(!should_skip, "Nothing should be skipped when abort is false");
+    }
+
     #[cfg(not(target_os = "android"))]
     fn assert_downloaded_model(path: &Path) {
         let metadata = std::fs::metadata(path)

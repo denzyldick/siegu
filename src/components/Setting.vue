@@ -313,6 +313,33 @@
           </v-card-actions>
         </v-card>
 
+        <!-- Language Section -->
+        <v-card variant="flat" color="#ffffff" rounded="xl" class="mb-6 border-subtle overflow-hidden">
+          <v-card-item class="bg-zinc-100 py-4">
+            <template v-slot:prepend>
+              <div class="siegu-icon-circle-dark mr-3">
+                <v-icon color="#ffffff" size="small">mdi-translate</v-icon>
+              </div>
+            </template>
+            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ $t('language.label') }}</v-card-title>
+          </v-card-item>
+          <v-card-text class="pt-4">
+            <v-select
+              :model-value="currentLang"
+              @update:model-value="setLanguage"
+              :items="availableLanguages"
+              item-title="label"
+              item-value="code"
+              variant="solo-filled"
+              density="compact"
+              hide-details
+              flat
+              rounded="lg"
+              class="siegu-field"
+            ></v-select>
+          </v-card-text>
+        </v-card>
+
         <!-- Maintenance Section -->
         <v-card v-if="!embedded" variant="flat" color="#ffffff" rounded="xl" class="mb-6 border-subtle overflow-hidden">
           <v-card-item class="bg-zinc-100 py-4">
@@ -604,7 +631,8 @@ export default {
     removeFolderDialog: {
       show: false,
       path: ""
-    }
+    },
+    currentLang: localStorage.getItem("siegu_language") || "en",
   }),
   computed: {
     missingSelectedCount() {
@@ -639,6 +667,13 @@ export default {
       if (!model) return null;
       if (this.isModelProcessing(model.id) || this.uiNow < this.activeModelHoldUntil) return model;
       return null;
+    },
+    availableLanguages() {
+      const codes = ["en", "nl", "fr", "es", "pap"];
+      return codes.map(code => ({
+        code,
+        label: this.$t(`language.${code}`),
+      }));
     }
   },
   async mounted() {
@@ -720,6 +755,11 @@ export default {
     formatIndexingCount(value) {
       return this.normalizeIndexingCount(value).toLocaleString();
     },
+    setLanguage(code) {
+      this.currentLang = code;
+      localStorage.setItem("siegu_language", code);
+      window.location.reload();
+    },
     async fetchLogs() {
       try {
         const logsStr = await invoke("get_logs", { limit: 100 });
@@ -762,7 +802,12 @@ export default {
     async setIndexingMode(mode) {
       this.performance.indexingMode = mode;
       await invoke("save_config", { key: "indexing_mode", value: mode });
-      this.showSnackbar(`Indexing mode set to ${this.getModeLabel(mode)}`);
+      if (mode === "manual") {
+        await invoke("abort_indexing");
+        this.showSnackbar(`Manual mode enabled. Indexing stopped.`);
+      } else {
+        this.showSnackbar(`Indexing mode set to ${this.getModeLabel(mode)}`);
+      }
     },
     async loadModelEnabledStates() {
       const configStr = await invoke("get_config");

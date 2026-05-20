@@ -45,6 +45,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
+      - name: Check translations
+        run: npm run check:translations
+
       - name: Check Rust formatting
         run: cargo fmt
         working-directory: src-tauri

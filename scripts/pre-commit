@@ -3,6 +3,10 @@ set -e
 
 echo "Running pre-commit hooks..."
 
+# Check for missing translations
+echo "Checking translations..."
+node scripts/check-translations.js
+
 # Format and fix Rust code
 echo "Checking src-tauri..."
 cd src-tauri

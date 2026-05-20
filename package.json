@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "check:translations": "node scripts/check-translations.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -27,6 +28,7 @@
     "leaflet.markercluster": "^1.5.3",
     "qrcode.vue": "^3.6.0",
     "vue": "^3.5.13",
+    "vue-i18n": "^11.4.4",
     "vue-leaflet": "^0.1.0",
     "vuetify": "^3.7.7"
   },

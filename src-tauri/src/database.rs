@@ -6,6 +6,13 @@ use std::{
 use rusqlite::Connection;
 use serde::Serialize;
 
+#[derive(Debug, Clone, Serialize)]
+pub struct SearchSuggestion {
+    pub title: String,
+    #[serde(rename = "type")]
+    pub suggestion_type: String,
+}
+
 pub struct Database {
     pub connection: Connection,
 }
@@ -255,12 +262,6 @@ impl Database {
             "CREATE INDEX IF NOT EXISTS idx_properties_photo_id ON properties(photo_id);",
             (),
         );
-        // Migration: rename old yolo_N tags to proper COCO class names
-        let coco = ["person","bicycle","car","motorcycle","airplane","bus","train","truck","boat","traffic light","fire hydrant","stop sign","parking meter","bench","bird","cat","dog","horse","sheep","cow","elephant","bear","zebra","giraffe","backpack","umbrella","handbag","tie","suitcase","frisbee","skis","snowboard","sports ball","kite","baseball bat","baseball glove","skateboard","surfboard","tennis racket","bottle","wine glass","cup","fork","knife","spoon","bowl","banana","apple","sandwich","orange","broccoli","carrot","hot dog","pizza","donut","cake","chair","couch","potted plant","bed","dining table","toilet","tv","laptop","mouse","remote","keyboard","cell phone","microwave","oven","toaster","sink","refrigerator","book","clock","vase","scissors","teddy bear","hair drier","toothbrush"];
-        for (i, name) in coco.iter().enumerate() {
-            let _ = conn.execute("UPDATE object SET class = ?1 WHERE class = ?2", rusqlite::params![name, format!("yolo_{i}")]);
-        }
-        let _ = conn.execute("DELETE FROM object WHERE class LIKE 'yolo_%'", []);
         let _ = conn.execute(
             "CREATE TABLE IF NOT EXISTS device(ip STRING, name STRING, offer STRING);",
             (),
@@ -340,11 +341,19 @@ impl Database {
         );
     }
 
-    pub fn list_objects(&self, query: &str) -> Vec<String> {
+    pub fn list_objects(&self, query: &str) -> Vec<SearchSuggestion> {
         let mut objects = Vec::new();
-        let sql = "SELECT class FROM object WHERE class LIKE ?1 UNION SELECT value FROM properties WHERE (key LIKE '%City%' OR key LIKE '%Country%' OR key LIKE '%State%') AND value LIKE ?1 GROUP BY 1";
+        let sql = "SELECT class, 'tag' FROM object WHERE class LIKE ?1 \
+            UNION SELECT value, 'location' FROM properties WHERE key = 'location_name' AND value LIKE ?1 \
+            UNION SELECT name, 'person' FROM people WHERE name IS NOT NULL AND name LIKE ?1 \
+            LIMIT 20";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
-            if let Ok(iter) = stmt.query_map([format!("%{query}%")], |row| row.get(0)) {
+            if let Ok(iter) = stmt.query_map([format!("%{query}%")], |row| {
+                Ok(SearchSuggestion {
+                    title: row.get(0)?,
+                    suggestion_type: row.get(1)?,
+                })
+            }) {
                 for item in iter.flatten() {
                     objects.push(item);
                 }
@@ -440,7 +449,12 @@ impl Database {
             if is_uuid {
                 "AND (p.id = ?3 OR EXISTS(SELECT 1 FROM faces WHERE photo_id=p.id AND person_id = ?3))"
             } else {
-                "AND (p.location LIKE ?3 OR p.id LIKE ?3 OR p.caption LIKE ?3 OR EXISTS(SELECT 1 FROM object WHERE photo_id=p.id AND class LIKE ?3) OR EXISTS(SELECT 1 FROM ocr WHERE photo_id=p.id AND text LIKE ?3) OR EXISTS(SELECT 1 FROM faces f JOIN people p_name ON f.person_id = p_name.id WHERE f.photo_id=p.id AND p_name.name LIKE ?3))"
+                "AND (p.location LIKE ?3 OR p.id LIKE ?3 OR p.caption LIKE ?3 \
+                    OR EXISTS(SELECT 1 FROM object WHERE photo_id=p.id AND class LIKE ?3) \
+                    OR EXISTS(SELECT 1 FROM ocr WHERE photo_id=p.id AND text LIKE ?3) \
+                    OR EXISTS(SELECT 1 FROM faces f JOIN people p_name ON f.person_id = p_name.id WHERE f.photo_id=p.id AND p_name.name LIKE ?3) \
+                    OR EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='location_name' AND value LIKE ?3) \
+                    OR p.created LIKE ?3)"
             }
         } else {
             ""
