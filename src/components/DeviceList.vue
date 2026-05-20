@@ -4,9 +4,9 @@
       <div>
         <div class="d-flex align-center mb-1">
           <v-icon color="#18181b" size="28" class="mr-3">mdi-devices</v-icon>
-          <h1 class="text-h4 font-weight-bold text-zinc-primary">Devices</h1>
+          <h1 class="text-h4 font-weight-bold text-zinc-primary">{{ $t('devices.title') }}</h1>
         </div>
-        <div class="text-subtitle-1 text-zinc-secondary">Manage your connected devices</div>
+        <div class="text-subtitle-1 text-zinc-secondary">{{ $t('devices.desc') }}</div>
       </div>
       <Connect />
     </div>
@@ -14,8 +14,8 @@
     <!-- Empty State -->
     <div v-if="devices.length === 0" class="d-flex flex-column align-center justify-center py-16 text-center animate-fade-in">
       <v-icon size="64" color="#d4d4d8" class="mb-4">mdi-laptop-off</v-icon>
-      <div class="text-h6 text-zinc-secondary font-weight-bold">No connected devices</div>
-      <p class="text-body-2 text-zinc-muted mt-1 max-w-400 mx-auto">Link your mobile devices or other computers to sync and access your media library from anywhere.</p>
+      <div class="text-h6 text-zinc-secondary font-weight-bold">{{ $t('devices.no_devices') }}</div>
+      <p class="text-body-2 text-zinc-muted mt-1 max-w-400 mx-auto">{{ $t('devices.no_devices_desc') }}</p>
     </div>
 
     <v-row v-else>
@@ -29,9 +29,9 @@
             </template>
             <v-card-title class="text-zinc-primary text-subtitle-1 font-weight-bold d-flex align-center">
               {{ device.title }}
-              <v-chip v-if="device.host" size="x-small" variant="flat" color="black" class="text-white ml-2 font-weight-bold" style="height: 18px">This Device</v-chip>
+              <v-chip v-if="device.host" size="x-small" variant="flat" color="black" class="text-white ml-2 font-weight-bold" style="height: 18px">{{ $t('devices.this_device') }}</v-chip>
             </v-card-title>
-            <v-card-subtitle class="text-zinc-secondary text-caption">{{ device.host ? 'Local Environment' : (device.subtitle || 'Connected') }}</v-card-subtitle>
+            <v-card-subtitle class="text-zinc-secondary text-caption">{{ device.host ? $t('devices.local_environment') : (device.subtitle || $t('devices.connected')) }}</v-card-subtitle>
 
             <template v-slot:append>
                <div class="d-flex align-center ga-1">
@@ -44,7 +44,7 @@
                       <template v-slot:prepend>
                         <v-icon size="small" color="error">mdi-delete-outline</v-icon>
                       </template>
-                      <v-list-item-title class="text-error font-weight-bold">Remove Device</v-list-item-title>
+                      <v-list-item-title class="text-error font-weight-bold">{{ $t('devices.remove_device') }}</v-list-item-title>
                     </v-list-item>
                   </v-list>
                 </v-menu>
@@ -57,19 +57,19 @@
                <div class="bg-zinc-50 rounded-lg pa-3 mb-4 border-subtle">
                   <div class="d-flex align-center mb-2">
                     <v-icon size="14" color="zinc-muted" class="mr-2">mdi-desktop-tower-monitor</v-icon>
-                    <span class="text-caption text-zinc-secondary font-weight-bold uppercase tracking-wider">System:</span>
+                    <span class="text-caption text-zinc-secondary font-weight-bold uppercase tracking-wider">{{ $t('devices.system') }}</span>
                     <v-spacer></v-spacer>
                     <span class="text-caption text-zinc-primary font-weight-bold capitalize">{{ device.os }}</span>
                   </div>
                   <div class="d-flex align-center mb-2">
                     <v-icon size="14" color="zinc-muted" class="mr-2">mdi-image-multiple-outline</v-icon>
-                    <span class="text-caption text-zinc-secondary">Photos:</span>
+                    <span class="text-caption text-zinc-secondary">{{ $t('photos.label_photos') }}</span>
                     <v-spacer></v-spacer>
                     <span class="text-caption text-zinc-primary font-weight-bold">{{ device.photo_count }}</span>
                   </div>
                   <div class="d-flex align-center">
                     <v-icon size="14" color="zinc-muted" class="mr-2">mdi-video-outline</v-icon>
-                    <span class="text-caption text-zinc-secondary">Videos:</span>
+                    <span class="text-caption text-zinc-secondary">{{ $t('photos.label_videos') }}</span>
                     <v-spacer></v-spacer>
                     <span class="text-caption text-zinc-primary font-weight-bold">{{ device.video_count }}</span>
                   </div>
@@ -94,11 +94,11 @@
                <div v-else class="d-flex align-center mt-2">
                    <v-btn v-if="!device.host" variant="flat" color="black" class="siegu-btn flex-grow-1" size="small" @click="startSync">
                     <v-icon start size="small">mdi-sync</v-icon>
-                    Sync Now
+                    {{ $t('devices.sync_now') }}
                    </v-btn>
-                   <v-chip v-else size="x-small" color="success" variant="flat" class="text-white text-none border-subtle">
-                       Online
-                   </v-chip>
+                    <v-chip v-else size="x-small" color="success" variant="flat" class="text-white text-none border-subtle">
+                        {{ $t('devices.online') }}
+                    </v-chip>
                </div>
           </v-card-text>
         </v-card>
@@ -111,16 +111,16 @@
         <div class="siegu-icon-circle-error mb-4">
           <v-icon color="white">mdi-alert-outline</v-icon>
         </div>
-        <v-card-title class="text-h5 font-weight-bold text-zinc-primary px-0 pb-2">Remove Device?</v-card-title>
+        <v-card-title class="text-h5 font-weight-bold text-zinc-primary px-0 pb-2">{{ $t('devices.remove_device_title') }}</v-card-title>
         <v-card-text class="text-zinc-secondary px-0 pb-6">
-          Are you sure you want to remove <strong>{{ deviceToDelete }}</strong>? This will stop all synchronization with this device.
+          <span v-html="$t('devices.remove_device_confirm', { name: deviceToDelete })"></span>
         </v-card-text>
         <v-card-actions class="px-0 ga-3">
           <v-btn variant="flat" color="#f4f4f5" class="siegu-btn flex-grow-1 text-zinc-primary" height="44" @click="deleteDialog = false">
-            Cancel
+            {{ $t('common.cancel') }}
           </v-btn>
           <v-btn variant="flat" color="error" class="siegu-btn flex-grow-1" height="44" @click="confirmDelete" :loading="deleting">
-            Remove
+            {{ $t('common.remove') }}
           </v-btn>
         </v-card-actions>
       </v-card>

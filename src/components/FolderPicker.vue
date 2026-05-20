@@ -5,17 +5,17 @@
         <v-btn icon @click="close" color="#18181b">
           <v-icon>mdi-close</v-icon>
         </v-btn>
-        <v-toolbar-title class="text-zinc-primary font-weight-bold">Select Folder</v-toolbar-title>
+        <v-toolbar-title class="text-zinc-primary font-weight-bold">{{ $t('folder_picker.select_folder') }}</v-toolbar-title>
         <v-spacer></v-spacer>
         <v-btn variant="flat" @click="selectCurrent" class="siegu-btn px-4 mr-2">
-          Select Folder
+          {{ $t('folder_picker.select_folder') }}
         </v-btn>
       </v-toolbar>
 
       <v-card-text class="pa-0">
         <!-- Current Path Breadcrumb/Display -->
         <div class="pa-4 border-bottom">
-            <div class="text-caption text-medium-emphasis mb-1">Current Path</div>
+            <div class="text-caption text-medium-emphasis mb-1">{{ $t('folder_picker.current_path') }}</div>
             <div class="text-subtitle-1 font-weight-medium text-truncate">{{ currentPath }}</div>
         </div>
 
@@ -34,7 +34,7 @@
               <v-icon color="grey-darken-1">mdi-arrow-up-bold</v-icon>
             </template>
             <v-list-item-title>..</v-list-item-title>
-            <v-list-item-subtitle>Go up one level</v-list-item-subtitle>
+            <v-list-item-subtitle>{{ $t('folder_picker.go_up') }}</v-list-item-subtitle>
           </v-list-item>
 
           <v-divider v-if="canGoUp"></v-divider>
@@ -56,7 +56,7 @@
 
           <div v-else class="text-center py-8 text-medium-emphasis">
             <v-icon color="grey-lighten-1" size="large" class="mb-2">mdi-folder-open-outline</v-icon>
-            <div>No subfolders found</div>
+            <div>{{ $t('folder_picker.no_subfolders') }}</div>
           </div>
 
         </v-list>
@@ -127,9 +127,8 @@ export default {
         this.currentPath = path;
       } catch (err) {
         console.error("Error reading directory:", err);
-        this.error = "Access denied or invalid path.";
-        // Optional: emit error or show snackbar
-        alert("Failed to access folder. Please ensure you have granted storage permissions.");
+        this.error = this.$t('folder_picker.access_denied');
+        alert(this.$t('folder_picker.permission_error'));
       } finally {
         this.loading = false;
       }

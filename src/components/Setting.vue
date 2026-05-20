@@ -6,9 +6,9 @@
           <div>
             <div class="d-flex align-center mb-1">
               <v-icon color="#18181b" size="28" class="mr-3">mdi-cog-outline</v-icon>
-              <h1 class="text-h4 font-weight-bold text-zinc-primary">Settings</h1>
+              <h1 class="text-h4 font-weight-bold text-zinc-primary">{{ $t('settings.title') }}</h1>
             </div>
-            <div class="text-subtitle-1 text-zinc-secondary">Configure your library and AI preferences</div>
+            <div class="text-subtitle-1 text-zinc-secondary">{{ $t('settings.desc') }}</div>
           </div>
         </div>
 
@@ -20,7 +20,7 @@
                 <v-icon color="#ffffff" size="small">mdi-folder-lock</v-icon>
               </div>
             </template>
-            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">Authorized Folders</v-card-title>
+            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ $t('settings.folders') }}</v-card-title>
           </v-card-item>
 
           <v-card-text class="pt-4">
@@ -44,10 +44,10 @@
                         </template>
                         <v-list size="small" class="siegu-list">
                           <v-list-item @click="remove_directory(directory.value)">
-                            <v-list-item-title>Remove Folder Reference</v-list-item-title>
+                            <v-list-item-title>{{ $t('settings.remove_folder') }}</v-list-item-title>
                           </v-list-item>
                           <v-list-item @click="remove_directory_full(directory.value)" color="error">
-                            <v-list-item-title>Wipe Local Data & Remove</v-list-item-title>
+                            <v-list-item-title>{{ $t('settings.wipe_folder') }}</v-list-item-title>
                           </v-list-item>
                         </v-list>
                       </v-menu>
@@ -57,7 +57,7 @@
                 </v-list>
               </div>
               <div v-else class="text-center py-8 text-zinc-muted border border-dashed rounded-lg border-subtle">
-                <div>No folders added yet.</div>
+                <div>{{ $t('settings.no_folders') }}</div>
               </div>
             </v-expand-transition>
           </v-card-text>
@@ -76,7 +76,7 @@
                 <div class="siegu-icon-circle siegu-icon-circle-sm mr-2">
                   <v-icon size="14" color="white">mdi-folder-plus</v-icon>
                 </div>
-                <span class="text-white font-weight-bold">Add Folder</span>
+                <span class="text-white font-weight-bold">{{ $t('settings.add_folder') }}</span>
               </div>
             </v-btn>
           </v-card-actions>
@@ -91,14 +91,14 @@
                 <v-icon color="#ffffff" size="small">mdi-robot-outline</v-icon>
               </div>
             </template>
-            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">AI Models</v-card-title>
+            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ $t('settings.ai_models') }}</v-card-title>
             <template v-slot:append v-if="activeModelSummary || pendingCount > 0">
                <div class="text-right">
                   <div v-if="activeModelSummary" class="text-caption font-weight-bold text-black">
                     {{ activeModelSummary }}
                   </div>
-                  <div v-else class="text-caption font-weight-bold text-black">Indexing {{ formatIndexingCount(pendingCount) }} AI jobs</div>
-                  <div v-if="pendingCount > 0" class="text-caption text-zinc-muted" style="font-size: 10px;">ETA: {{ formatEta(globalEta) }}</div>
+                  <div v-else class="text-caption font-weight-bold text-black">{{ $t('settings.indexing_jobs', { count: formatIndexingCount(pendingCount) }) }}</div>
+                  <div v-if="pendingCount > 0" class="text-caption text-zinc-muted" style="font-size: 10px;">{{ $t('settings.eta_label', { time: formatEta(globalEta) }) }}</div>
                </div>
             </template>
           </v-card-item>
@@ -129,7 +129,7 @@
                 </v-icon>
                 <div class="min-width-0">
                   <div class="text-caption text-zinc-muted font-weight-bold">
-                    {{ isModelProcessing(visibleActivityModel.id) ? 'Current AI model' : 'Latest AI model' }}
+                    {{ isModelProcessing(visibleActivityModel.id) ? $t('settings.current_model') : $t('settings.latest_model') }}
                   </div>
                   <div class="text-body-2 text-zinc-primary font-weight-bold text-truncate">
                     {{ visibleActivityModel.title }} · {{ getModelStatusText(visibleActivityModel.id) }}
@@ -159,7 +159,7 @@
                       <v-checkbox v-model="selectedModels" :value="model.id" hide-details density="compact" color="black" class="ma-0 pa-0"></v-checkbox>
                     </template>
                     <v-card-title class="text-subtitle-1 font-weight-bold d-flex align-center flex-wrap ga-1">
-                      <span>{{ model.title }}</span>
+                      <span>{{ $t('models.' + model.id + '.title') }}</span>
                       <v-chip
                         v-if="isModelActive(model.id)"
                         size="x-small"
@@ -178,7 +178,7 @@
                         class="ml-1"
                         prepend-icon="mdi-check"
                       >
-                        Ready
+                        {{ $t('settings.ready') }}
                       </v-chip>
                     </v-card-title>
                     <template v-slot:append>
@@ -191,16 +191,16 @@
                         @change="toggleModel(model.id)"
                         :true-value="true"
                         :false-value="false"
-                        :title="(modelEnabled[model.id] ? 'Disable' : 'Enable') + ' ' + model.title + ' during analysis'"
+                        :title="(modelEnabled[model.id] ? $t('settings.disable_model') : $t('settings.enable_model')) + ' ' + $t('models.' + model.id + '.title')"
                       ></v-switch>
                     </template>
                   </v-card-item>
 
                   <v-card-text class="py-0 flex-grow-1">
-                    <div class="text-body-2 text-zinc-primary">{{ model.desc }}</div>
-                    <div class="text-caption text-zinc-muted mt-1 font-italic">{{ model.search }}</div>
+                    <div class="text-body-2 text-zinc-primary">{{ $t('models.' + model.id + '.desc') }}</div>
+                    <div class="text-caption text-zinc-muted mt-1 font-italic">{{ $t('models.' + model.id + '.search') }}</div>
                     <div class="d-flex align-center justify-space-between mt-2 model-status-line">
-                      <span class="text-caption text-zinc-muted">File size: {{ model.size }}</span>
+                      <span class="text-caption text-zinc-muted">{{ $t('settings.file_size', { size: model.size }) }}</span>
                       <span
                         class="text-caption font-weight-bold model-status-text"
                         :class="isModelActive(model.id) ? 'text-black' : 'text-zinc-muted'"
@@ -250,7 +250,7 @@
                       :disabled="isAnyModelProcessing"
                       @click="downloadModels(false, [model.id])"
                     >
-                      Download
+                      {{ $t('settings.download') }}
                     </v-btn>
                     <div v-else-if="!embedded" class="d-flex ga-2">
                        <v-btn
@@ -261,7 +261,7 @@
                         :loading="isModelDownloading(model.id)"
                         :disabled="isAnyModelProcessing"
                         @click="downloadModels(true, [model.id])"
-                        title="Update Model"
+                        :title="$t('settings.update_model')"
                       ></v-btn>
                       <v-btn
                         variant="tonal"
@@ -272,7 +272,7 @@
                         :disabled="isAnyModelProcessing && !isModelProcessing(model.id)"
                         @click="runModel(model.id)"
                       >
-                        {{ isModelProcessing(model.id) ? getModelStatusLabel(model.id) : 'Run Now' }}
+                        {{ isModelProcessing(model.id) ? getModelStatusLabel(model.id) : $t('settings.run_now') }}
                       </v-btn>
                     </div>
                   </v-card-actions>
@@ -293,7 +293,7 @@
               :loading="isDownloading"
               :disabled="isAnyModelProcessing"
             >
-              Download Selected ({{ missingSelectedCount }})
+              {{ $t('settings.download_selected', { count: missingSelectedCount }) }}
             </v-btn>
             <v-btn
               v-else-if="selectedModels.length > 0"
@@ -304,11 +304,11 @@
               prepend-icon="mdi-check-all"
               disabled
             >
-              All Selected Ready
+              {{ $t('settings.all_selected_ready') }}
             </v-btn>
              <v-spacer></v-spacer>
              <div class="text-caption text-zinc-muted">
-                {{ downloadedModels.length }} of {{ aiModels.length }} models ready
+                {{ $t('settings.models_ready', { count: downloadedModels.length, total: aiModels.length }) }}
              </div>
           </v-card-actions>
         </v-card>
@@ -348,17 +348,17 @@
                 <v-icon color="#ffffff" size="small">mdi-wrench-outline</v-icon>
               </div>
             </template>
-            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">Maintenance</v-card-title>
+            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ $t('settings.maintenance') }}</v-card-title>
           </v-card-item>
 
           <v-card-text class="pt-2">
             <v-list lines="two" class="bg-transparent">
               <v-list-item class="px-0">
                 <template v-slot:title>
-                  <span class="font-weight-bold text-zinc-primary">Cleanup Database</span>
+                  <span class="font-weight-bold text-zinc-primary">{{ $t('settings.cleanup_db') }}</span>
                 </template>
                 <template v-slot:subtitle>
-                  <span class="text-zinc-secondary">Optimize storage and remove orphaned entries</span>
+                  <span class="text-zinc-secondary">{{ $t('settings.cleanup_db_desc') }}</span>
                 </template>
                 <template v-slot:append>
                   <v-btn 
@@ -374,7 +374,7 @@
                       <div class="siegu-icon-circle siegu-icon-circle-md mr-3">
                         <v-icon color="#ffffff" size="small">mdi-wrench-outline</v-icon>
                       </div>
-                      <span class="text-white font-weight-bold">Clean</span>
+                      <span class="text-white font-weight-bold">{{ $t('settings.clean') }}</span>
                     </div>
                   </v-btn>
                 </template>
@@ -385,10 +385,10 @@
 
             <!-- Advanced Performance -->
             <div class="mb-6">
-              <div class="text-caption font-weight-bold text-zinc-muted mb-4 tracking-widest uppercase">Advanced Performance</div>
+              <div class="text-caption font-weight-bold text-zinc-muted mb-4 tracking-widest uppercase">{{ $t('settings.advanced') }}</div>
               <div class="pt-2">
                 <div class="d-flex justify-space-between align-center mb-2">
-                  <div class="text-caption font-weight-bold text-zinc-primary">Scanning Threads</div>
+                  <div class="text-caption font-weight-bold text-zinc-primary">{{ $t('settings.scan_threads') }}</div>
                   <v-chip size="x-small" color="#000000" variant="flat" class="font-weight-bold text-white">{{ performance.scanThreads }}</v-chip>
                 </div>
                 <v-slider
@@ -403,7 +403,7 @@
                 ></v-slider>
 
                 <v-list-item class="px-0 mt-4">
-                  <v-list-item-title class="text-caption font-weight-bold text-zinc-primary">Indexing Mode</v-list-item-title>
+                  <v-list-item-title class="text-caption font-weight-bold text-zinc-primary">{{ $t('settings.indexing_mode') }}</v-list-item-title>
                   <template v-slot:append>
                     <v-menu offset-y>
                       <template v-slot:activator="{ props }">
@@ -414,7 +414,7 @@
                       </template>
                       <v-list density="compact" class="siegu-list">
                         <v-list-item v-for="mode in indexingModes" :key="mode.value" @click="setIndexingMode(mode.value)">
-                          <v-list-item-title class="text-caption" :class="{'font-weight-bold': performance.indexingMode === mode.value}">{{ mode.title }}</v-list-item-title>
+                          <v-list-item-title class="text-caption" :class="{'font-weight-bold': performance.indexingMode === mode.value}">{{ $t('settings.mode_' + mode.value) }}</v-list-item-title>
                         </v-list-item>
                       </v-list>
                     </v-menu>
@@ -427,7 +427,7 @@
 
             <!-- Debug Logs -->
             <div v-if="!embedded">
-              <div class="text-caption font-weight-bold text-zinc-muted mb-4 tracking-widest uppercase">System Logs</div>
+              <div class="text-caption font-weight-bold text-zinc-muted mb-4 tracking-widest uppercase">{{ $t('settings.system_logs') }}</div>
               <v-sheet
                 color="#f4f4f5"
                 class="pa-4 rounded-lg overflow-y-auto border-subtle debug-logs-sheet mb-4"
@@ -436,7 +436,7 @@
                 <div v-for="(log, i) in logs" :key="i" :class="log.type === 'error' ? 'text-error' : 'text-zinc-secondary'" class="mb-1" style="font-family: monospace; font-size: 11px;">
                   <span class="text-zinc-muted">[{{ log.time }}]</span> {{ log.message }}
                 </div>
-                <div v-if="logs.length === 0" class="text-zinc-muted text-center py-4 text-caption">No logs recorded yet.</div>
+                <div v-if="logs.length === 0" class="text-zinc-muted text-center py-4 text-caption">{{ $t('settings.no_logs') }}</div>
               </v-sheet>
               
               <div v-if="logs.length > 0" class="d-flex justify-center">
@@ -448,7 +448,7 @@
                   prepend-icon="mdi-trash-can-outline"
                   @click.stop="clearLogs"
                 >
-                  Clear Log History
+                  {{ $t('settings.clear_logs') }}
                 </v-btn>
               </div>
             </div>
@@ -478,8 +478,8 @@
         </v-card-text>
 
         <v-card-actions class="pa-4 bg-zinc-50 border-top-subtle ga-2">
-          <v-btn variant="tonal" color="zinc-muted" @click="downloadDialog.show = false" class="siegu-btn flex-grow-1" height="44">Cancel</v-btn>
-          <v-btn variant="flat" color="black" @click="startConfirmedDownload" class="siegu-btn flex-grow-1" height="44">Download</v-btn>
+          <v-btn variant="tonal" color="zinc-muted" @click="downloadDialog.show = false" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.cancel') }}</v-btn>
+          <v-btn variant="flat" color="black" @click="startConfirmedDownload" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.download') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -492,7 +492,7 @@
               <v-icon color="#ffffff" size="small">mdi-wrench-outline</v-icon>
             </div>
           </template>
-          <v-card-title class="text-h6 text-zinc-primary font-weight-bold">Clear Database?</v-card-title>
+          <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ $t('settings.clear_db_title') }}</v-card-title>
           <template v-slot:append>
             <v-btn icon="mdi-close" variant="text" size="small" @click="cleanupDialog.show = false"></v-btn>
           </template>
@@ -500,13 +500,13 @@
         
         <v-card-text class="py-6 text-center">
           <div class="text-subtitle-1 text-zinc-secondary px-2">
-            This will only delete the indexed information and not the actual photos. Do you want to continue?
+            {{ $t('settings.clear_db_desc') }}
           </div>
         </v-card-text>
 
         <v-card-actions class="pa-4 bg-zinc-50 border-top-subtle ga-2">
-          <v-btn variant="tonal" color="zinc-muted" @click="cleanupDialog.show = false" class="siegu-btn flex-grow-1" height="44">Cancel</v-btn>
-          <v-btn variant="flat" color="black" @click="startConfirmedCleanup" class="siegu-btn flex-grow-1" height="44">Clear</v-btn>
+          <v-btn variant="tonal" color="zinc-muted" @click="cleanupDialog.show = false" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.cancel') }}</v-btn>
+          <v-btn variant="flat" color="black" @click="startConfirmedCleanup" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.clear') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -519,7 +519,7 @@
               <v-icon color="#ffffff" size="small">mdi-folder-remove-outline</v-icon>
             </div>
           </template>
-          <v-card-title class="text-h6 text-zinc-primary font-weight-bold">Wipe & Remove?</v-card-title>
+          <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ $t('settings.wipe_title') }}</v-card-title>
           <template v-slot:append>
             <v-btn icon="mdi-close" variant="text" size="small" @click="removeFolderDialog.show = false"></v-btn>
           </template>
@@ -527,13 +527,13 @@
         
         <v-card-text class="py-6 text-center">
           <div class="text-subtitle-1 text-zinc-secondary px-2">
-            This will remove the folder reference and <strong>permanently delete all indexed AI data</strong> for these files. Your actual photos will not be touched.
+            <span v-html="$t('settings.wipe_desc')"></span>
           </div>
         </v-card-text>
 
         <v-card-actions class="pa-4 bg-zinc-50 border-top-subtle ga-2">
-          <v-btn variant="tonal" color="zinc-muted" @click="removeFolderDialog.show = false" class="siegu-btn flex-grow-1" height="44">Cancel</v-btn>
-          <v-btn variant="flat" color="black" @click="startConfirmedRemoveFolder" class="siegu-btn flex-grow-1" height="44">Wipe Data</v-btn>
+          <v-btn variant="tonal" color="zinc-muted" @click="removeFolderDialog.show = false" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.cancel') }}</v-btn>
+          <v-btn variant="flat" color="black" @click="startConfirmedRemoveFolder" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.wipe_data') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -596,16 +596,16 @@ export default {
     activeModelHoldUntil: 0,
     modelProgress: {}, // { model_id: { pending, total } }
     aiModels: [
-      { id: 'clip', title: 'Smart Search', desc: 'Finds objects and scenes in your photos.', search: "Try searching: 'dog', 'beach', 'sunset'", size: '350MB' },
-      { id: 'ultraface', title: 'Face Grouping', desc: 'Finds faces and groups them by person.', search: "Try searching: 'Mom', 'John'", size: '2MB' },
-      { id: 'ocr', title: 'Text Finder', desc: 'Reads text inside photos like receipts.', search: "Try searching: 'Receipt', 'Invoice', 'Menu'", size: '20MB' },
-      { id: 'nsfw', title: 'Safe Mode', desc: 'Detects and hides sensitive content.', search: "Helps keep your library family-friendly.", size: '328MB' },
-      { id: 'aesthetics', title: 'Quality Scorer', desc: 'Rates photos by how good they look.', search: "Helps you find your best shots quickly.", size: '1.6GB' },
-      { id: 'blip', title: 'Photo Describer', desc: 'Writes sentences about what is in photos.', search: "Try searching: 'Family eating outside'", size: '329MB' },
-      { id: 'yolo', title: 'Object Pro', desc: 'Pinpoint accuracy for finding specific items.', search: "Adds deep tags for 80+ common objects.", size: '15MB' },
-      { id: 'arcface', title: 'Face Pro', desc: 'Advanced recognition for better grouping.', search: "drastically improves face matching accuracy.", size: '166MB' },
-      { id: 'midas', title: 'Depth Vision', desc: 'Analyzes 3D depth in landscapes.', search: "Adds depth-based filters to your library.", size: '508MB' },
-      { id: 'whisper', title: 'Audio Search', desc: 'Transcribes words spoken in videos.', search: "Search for things people said in videos.", size: '31MB' },
+      { id: 'clip', size: '350MB' },
+      { id: 'ultraface', size: '2MB' },
+      { id: 'ocr', size: '20MB' },
+      { id: 'nsfw', size: '328MB' },
+      { id: 'aesthetics', size: '1.6GB' },
+      { id: 'blip', size: '329MB' },
+      { id: 'yolo', size: '15MB' },
+      { id: 'arcface', size: '166MB' },
+      { id: 'midas', size: '508MB' },
+      { id: 'whisper', size: '31MB' },
     ],
     logs: [],
     modelEnabled: {},
@@ -615,9 +615,9 @@ export default {
     },
     maxThreads: 8,
     indexingModes: [
-      { title: "Immediate", value: "immediate" },
-      { title: "Idle Only", value: "idle" },
-      { title: "Manual Only", value: "manual" },
+      { value: "immediate" },
+      { value: "idle" },
+      { value: "manual" },
     ],
     downloadDialog: {
       show: false,
@@ -774,10 +774,10 @@ export default {
     async clearLogs() {
       await invoke("clear_logs");
       this.logs = [];
-      this.showSnackbar("Logs cleared");
+      this.showSnackbar(this.$t('settings.logs_cleared'));
     },
     getModeLabel(val) {
-      return this.indexingModes.find(m => m.value === val)?.title || val;
+      return this.$t('settings.mode_' + val);
     },
     async loadPerformanceConfig() {
       const configStr = await invoke("get_config");
@@ -797,16 +797,16 @@ export default {
     },
     async savePerformanceConfig() {
       await invoke("save_config", { key: "scan_threads", value: this.performance.scanThreads.toString() });
-      this.showSnackbar("Scan threads saved");
+      this.showSnackbar(this.$t('settings.scan_threads_saved'));
     },
     async setIndexingMode(mode) {
       this.performance.indexingMode = mode;
       await invoke("save_config", { key: "indexing_mode", value: mode });
       if (mode === "manual") {
         await invoke("abort_indexing");
-        this.showSnackbar(`Manual mode enabled. Indexing stopped.`);
+        this.showSnackbar(this.$t('settings.manual_enabled'));
       } else {
-        this.showSnackbar(`Indexing mode set to ${this.getModeLabel(mode)}`);
+        this.showSnackbar(this.$t('settings.mode_set', { mode: this.getModeLabel(mode) }));
       }
     },
     async loadModelEnabledStates() {
@@ -822,8 +822,10 @@ export default {
     async toggleModel(modelId) {
       const key = "model_enabled_" + modelId;
       await invoke("save_config", { key, value: this.modelEnabled[modelId] ? "true" : "false" });
-      const label = this.aiModels.find(m => m.id === modelId)?.title || modelId;
-      this.showSnackbar(`${label} ${this.modelEnabled[modelId] ? 'enabled' : 'disabled'}`);
+      const label = this.$t('models.' + modelId + '.title');
+      this.showSnackbar(this.modelEnabled[modelId]
+        ? this.$t('settings.model_enabled', { model: label })
+        : this.$t('settings.model_disabled', { model: label }));
     },
     async checkExistingModels() {
         const downloaded = await invoke("check_models");
@@ -927,7 +929,7 @@ export default {
       };
       try {
         await invoke("analyze_model", { modelId });
-        this.showSnackbar(`${this.aiModels.find(m => m.id === modelId)?.title || modelId} analysis started`);
+        this.showSnackbar(this.$t('settings.analysis_started', { model: this.$t('models.' + modelId + '.title') }));
       } catch (err) {
         this.modelProgress = {
           ...this.modelProgress,
@@ -938,7 +940,7 @@ export default {
             updatedAt: Date.now(),
           }
         };
-        this.showSnackbar(`Failed to start ${this.aiModels.find(m => m.id === modelId)?.title || modelId}`, true);
+        this.showSnackbar(this.$t('settings.analysis_failed', { model: this.$t('models.' + modelId + '.title') }), true);
       }
     },
     isModelProcessing(modelId) {
@@ -968,25 +970,31 @@ export default {
     },
     getModelStatusLabel(modelId) {
       const progress = this.modelProgress[modelId];
-      if (progress?.status === "starting") return "Starting";
-      if (progress?.status === "completed") return "Finished";
-      if (progress?.status === "up_to_date") return "Up to date";
-      if (progress?.status === "unavailable") return "Unavailable";
-      if (progress?.status === "error") return "Error";
-      return "Running";
+      if (progress?.status === "starting") return this.$t('settings.model_status_starting');
+      if (progress?.status === "completed") return this.$t('settings.model_status_finished');
+      if (progress?.status === "up_to_date") return this.$t('settings.model_status_up_to_date');
+      if (progress?.status === "unavailable") return this.$t('settings.model_status_unavailable');
+      if (progress?.status === "error") return this.$t('settings.model_status_error');
+      return this.$t('settings.model_status_running');
     },
     getModelStatusText(modelId) {
       const progress = this.modelProgress[modelId];
       if (this.isModelProcessing(modelId)) return this.getModelProgressText(modelId);
       if (progress?.message) return progress.message;
-      if (progress?.status === "completed") return "Finished";
-      if (progress?.status === "up_to_date") return "Up to date";
-      if (progress?.status === "unavailable") return "Not available";
-      if (progress?.status === "error") return "Error";
-      if (progress?.total > 0 && progress?.pending === 0) return "Finished";
-      if (progress?.total === 0 && progress?.pending === 0) return "Up to date";
-      if (this.downloadedModels.includes(modelId)) return "Ready to run";
-      return "Not downloaded";
+      if (progress?.status === "completed") return this.$t('settings.model_status_finished');
+      if (progress?.status === "up_to_date") return this.$t('settings.model_status_up_to_date');
+      if (progress?.status === "unavailable") return this.$t('settings.model_status_not_available');
+      if (progress?.status === "error") return this.$t('settings.model_status_error');
+      if (progress?.total > 0 && progress?.pending === 0) return this.$t('settings.model_status_finished');
+      if (progress?.total === 0 && progress?.pending === 0) return this.$t('settings.model_status_up_to_date');
+      if (this.downloadedModels.includes(modelId)) return this.$t('settings.model_status_ready_to_run');
+      return this.$t('settings.model_status_not_downloaded');
+    },
+    getModelProgressText(modelId) {
+      const progress = this.modelProgress[modelId];
+      if (!progress || progress.status === "starting") return this.$t('settings.model_status_starting');
+      if (!progress.total) return this.$t('settings.model_n_remaining', { n: progress.pending || 0 });
+      return this.$t('settings.model_n_of_total', { n: Math.max(progress.total - (progress.pending || 0), 0), total: progress.total });
     },
     getModelActivityIcon(modelId) {
       const status = this.modelProgress[modelId]?.status;
@@ -1028,9 +1036,9 @@ export default {
         await new Promise(r => setTimeout(r, 300));
         await invoke("remove_directory_full", { path });
         this.list_directories();
-        this.showSnackbar("Folder removed");
+        this.showSnackbar(this.$t('settings.folder_removed'));
       } catch (err) {
-        this.showSnackbar("Failed to remove folder", true);
+        this.showSnackbar(this.$t('settings.folder_removed_failed'), true);
       }
     },
     async select_directory() {
@@ -1058,13 +1066,13 @@ export default {
     remove_directory(path) {
       invoke("remove_directory", { path }).then(() => {
         this.list_directories();
-        this.showSnackbar("Folder removed from watch list");
+        this.showSnackbar(this.$t('settings.folder_removed_watch'));
       });
     },
     onFolderSelected(path) {
       invoke("add_directory", { path }).then(() => {
         this.list_directories();
-        this.showSnackbar("Folder added");
+        this.showSnackbar(this.$t('settings.folder_added'));
       });
     }
   },

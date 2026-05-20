@@ -5,8 +5,8 @@
       <div class="w-100">
         <div class="d-flex align-center justify-space-between flex-wrap ga-4">
           <div>
-            <h1 class="text-h3 font-weight-black tracking-tight text-zinc-primary mb-2">People</h1>
-            <p class="text-body-1 text-zinc-secondary font-weight-medium">Name and organize the faces detected in your library.</p>
+            <h1 class="text-h3 font-weight-black tracking-tight text-zinc-primary mb-2">{{ $t('people.title') }}</h1>
+            <p class="text-body-1 text-zinc-secondary font-weight-medium">{{ $t('people.desc') }}</p>
           </div>
           <div class="d-flex align-center ga-3 flex-wrap">
             <v-btn
@@ -17,18 +17,18 @@
               prepend-icon="mdi-face-recognition"
               @click="startIndexing"
             >
-              Index Faces
+              {{ $t('people.index_faces') }}
             </v-btn>
             <div v-else class="d-flex align-center bg-white border-subtle rounded-lg px-4 py-2 shadow-sm animate-pulse">
               <v-progress-circular indeterminate size="16" width="2" color="#18181b" class="mr-3"></v-progress-circular>
               <div class="text-caption font-weight-black text-zinc-primary">
-                Indexing: {{ formatIndexingCount(indexingCount) }} remaining
+                {{ $t('people.indexing_remaining', { count: formatIndexingCount(indexingCount) }) }}
               </div>
             </div>
 
             <v-chip class="px-4 py-5 font-weight-bold border-subtle" variant="flat" color="white" rounded="lg">
               <v-icon start size="18" color="#18181b">mdi-account-check</v-icon>
-              {{ people.length }} Named
+              {{ $t('people.named_count', { count: people.length }) }}
             </v-chip>
           </div>
         </div>
@@ -39,7 +39,7 @@
       <!-- Named People Section -->
       <section v-if="people.length > 0" class="mb-12 animate-fade-up">
         <div class="d-flex align-center mb-8 flex-nowrap">
-          <h2 class="text-h5 font-weight-black text-zinc-primary pr-6 flex-shrink-0">Your People</h2>
+          <h2 class="text-h5 font-weight-black text-zinc-primary pr-6 flex-shrink-0">{{ $t('people.your_people') }}</h2>
           <v-divider class="border-subtle border-opacity-100"></v-divider>
         </div>
 
@@ -91,7 +91,7 @@
       <!-- New Identified Faces Section (Anonymous Clusters) -->
       <section v-if="unnamedFaces.length > 0" class="animate-fade-up" :style="{ animationDelay: '0.1s' }">
         <div class="d-flex align-center mb-8 flex-nowrap">
-          <h2 class="text-h5 font-weight-black text-zinc-primary pr-6 flex-shrink-0">New Faces</h2>
+          <h2 class="text-h5 font-weight-black text-zinc-primary pr-6 flex-shrink-0">{{ $t('people.new_faces') }}</h2>
           <v-divider class="border-subtle border-opacity-100"></v-divider>
         </div>
 
@@ -130,7 +130,7 @@
                   class="text-none font-weight-bold rounded-lg py-4 text-zinc-primary border-subtle"
                   @click.stop="promptName(group)"
                 >
-                  Name Group
+                  {{ $t('people.name_group') }}
                 </v-btn>
               </div>
             </v-card>
@@ -143,9 +143,9 @@
         <div class="empty-icon-pulse mb-8">
           <v-icon size="80" color="#d4d4d8">mdi-face-recognition</v-icon>
         </div>
-        <h3 class="text-h5 font-weight-bold text-zinc-primary mb-2">Finding Faces</h3>
+        <h3 class="text-h5 font-weight-bold text-zinc-primary mb-2">{{ $t('people.no_faces') }}</h3>
         <p class="text-zinc-secondary text-center max-w-400">
-          Once detected, people and faces identified across your library will appear here automatically.
+          {{ $t('people.no_faces_desc') }}
         </p>
       </div>
     </div>
@@ -155,7 +155,7 @@
       <v-card class="rounded-xl pa-2 elevation-24 border-subtle" color="#ffffff">
         <div class="pa-6">
           <div class="d-flex align-center justify-space-between mb-8">
-            <h3 class="text-h5 font-weight-black text-zinc-primary">Who is this?</h3>
+            <h3 class="text-h5 font-weight-black text-zinc-primary">{{ $t('people.who_is_this') }}</h3>
             <v-btn icon="mdi-close" variant="text" size="small" @click="nameDialog = false"></v-btn>
           </div>
 
@@ -171,7 +171,7 @@
             item-title="name"
             item-value="name"
             :return-object="false"
-            placeholder="Search existing or type new name..."
+            :placeholder="$t('people.name_placeholder')"
             variant="outlined"
             density="comfortable"
             class="name-field-modern mb-6"
@@ -200,7 +200,7 @@
             :disabled="!newName"
             @click="saveName"
           >
-            Confirm Identity
+            {{ $t('people.confirm_identity') }}
           </v-btn>
         </div>
       </v-card>
@@ -211,18 +211,18 @@
       <v-card class="rounded-xl pa-2 elevation-24 overflow-hidden border-subtle" color="#ffffff">
         <div class="pa-6">
           <div class="d-flex align-center justify-space-between mb-6">
-            <h3 class="text-h5 font-weight-black text-zinc-primary">Profile Actions</h3>
+            <h3 class="text-h5 font-weight-black text-zinc-primary">{{ $t('people.profile_actions') }}</h3>
             <v-btn icon="mdi-close" variant="text" size="small" @click="manageDialog = false"></v-btn>
           </div>
 
           <v-tabs v-model="manageTab" bg-color="#f4f4f5" color="#18181b" grow mandatory class="rounded-xl mb-8 p-1 border-subtle">
-            <v-tab value="rename" class="rounded-lg text-none font-weight-bold">Rename</v-tab>
-            <v-tab value="merge" class="rounded-lg text-none font-weight-bold">Merge</v-tab>
+            <v-tab value="rename" class="rounded-lg text-none font-weight-bold">{{ $t('people.rename') }}</v-tab>
+            <v-tab value="merge" class="rounded-lg text-none font-weight-bold">{{ $t('people.merge') }}</v-tab>
           </v-tabs>
 
           <v-window v-model="manageTab" class="py-2">
             <v-window-item value="rename">
-              <label class="text-caption font-weight-bold text-zinc-muted mb-2 d-block px-1">NEW NAME FOR {{ activePerson?.name }}</label>
+              <label class="text-caption font-weight-bold text-zinc-muted mb-2 d-block px-1">{{ $t('people.new_name_for', { name: activePerson?.name }) }}</label>
               <v-text-field
                 v-model="newName"
                 variant="outlined"
@@ -240,7 +240,7 @@
                 class="rounded-xl text-none font-weight-bold py-7 shadow-lg text-white"
                 @click="renamePerson"
               >
-                Update Name
+                {{ $t('people.update_name') }}
               </v-btn>
             </v-window-item>
 
@@ -248,7 +248,7 @@
               <div class="bg-amber-50 rounded-xl pa-4 mb-8 d-flex align-start ga-3 border-amber-subtle">
                 <v-icon color="#b45309" size="20" class="mt-1">mdi-alert-circle-outline</v-icon>
                 <div class="text-body-2 text-amber-darken-4 font-weight-medium">
-                  Combine all photos of <b>{{ activePerson?.name }}</b> into the profile selected below.
+                  <span v-html="$t('people.merge_desc', { name: activePerson?.name })"></span>
                 </div>
               </div>
 
@@ -257,7 +257,7 @@
                 :items="otherPeople"
                 item-title="name"
                 item-value="id"
-                label="Target Profile"
+                :label="$t('people.target_profile')"
                 variant="outlined"
                 density="comfortable"
                 class="name-field-modern mb-8"
@@ -273,7 +273,7 @@
                 :disabled="!mergeTargetId"
                 @click="mergePerson"
               >
-                Confirm Merge
+                {{ $t('people.confirm_merge') }}
               </v-btn>
             </v-window-item>
           </v-window>
@@ -286,9 +286,9 @@
       <v-card class="rounded-xl border-subtle overflow-hidden" color="#ffffff">
         <v-card-title class="pa-6 bg-zinc-50 border-bottom-subtle d-flex align-center">
           <div>
-            <div class="text-h5 font-weight-black text-zinc-primary">Grouped Faces</div>
+            <div class="text-h5 font-weight-black text-zinc-primary">{{ $t('people.grouped_faces') }}</div>
             <div class="text-caption text-zinc-secondary font-weight-bold uppercase tracking-widest">
-              {{ clusterFaces.length }} APPEARANCES IN THIS CLUSTER
+              {{ $t('people.appearances_in_cluster', { count: clusterFaces.length }) }}
             </div>
           </div>
           <v-spacer></v-spacer>
@@ -324,7 +324,7 @@
             prepend-icon="mdi-pencil"
             @click="promptNameFromCluster"
           >
-            Name This Group
+            {{ $t('people.name_this_group') }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -470,7 +470,7 @@ export default {
       this.promptName(this.activeCluster);
     },
     async removeFromCluster(faceId) {
-      if (!confirm("Are you sure you want to remove this face detection?")) return;
+      if (!confirm(this.$t('people.confirm_remove_face'))) return;
       try {
         await invoke("delete_face", { faceId });
         // Refresh local cluster faces

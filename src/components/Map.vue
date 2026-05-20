@@ -4,8 +4,8 @@
     <div v-if="!loading && mapPoints.length === 0" class="map-empty-state">
       <div class="d-flex flex-column align-center justify-center h-100 px-6 text-center animate-fade-in">
         <v-icon size="48" color="#3f3f46" class="mb-4">mdi-map-marker-off-outline</v-icon>
-        <div class="text-h6 text-zinc-secondary font-weight-bold">No location data found</div>
-        <p class="text-body-2 text-zinc-muted mt-1 max-w-400">Photos with EXIF GPS coordinates will automatically appear on this map after indexing.</p>
+        <div class="text-h6 text-zinc-secondary font-weight-bold">{{ $t('map.no_photos') }}</div>
+        <p class="text-body-2 text-zinc-muted mt-1 max-w-400">{{ $t('map.no_photos_desc') }}</p>
       </div>
     </div>
 

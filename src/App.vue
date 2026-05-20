@@ -29,6 +29,7 @@ export default {
     lastScanTime: 'Never',
     search: '',
     objects: [],
+    recentSearches: [],
     searchDisabledDialog: { show: false },
     faces: [],
     filters: {
@@ -239,6 +240,12 @@ export default {
     searchItems() {
       return this.objects;
     },
+    recentSearchItems() {
+      return this.recentSearches.slice(0, 5).map(s => ({
+        title: s,
+        type: 'recent',
+      }));
+    },
     searchHelpText() {
       if (!this.searchItems.length && !this.filteredPeople.length) {
         return this.$t('search.no_data');
@@ -302,13 +309,25 @@ export default {
       }
     },
     onSearchClick(e) {
-      if (!this.searchItems.length && !this.filteredPeople.length) {
+      if (!this.searchItems.length && !this.filteredPeople.length && !this.recentSearches.length) {
         this.searchDisabledDialog.show = true;
+      }
+    },
+    onSearchSelect(val) {
+      if (val) {
+        this.addRecentSearch(val);
       }
     },
     addPersonToSearch(person) {
       this.search = person.name;
+      this.addRecentSearch(person.name);
       this.current_page = "home";
+    },
+    addRecentSearch(val) {
+      if (!val) return;
+      const arr = this.recentSearches.filter(s => s !== val);
+      arr.unshift(val);
+      this.recentSearches = arr.slice(0, 10);
     },
     async setSyncPath(path) {
       try {
@@ -688,6 +707,7 @@ export default {
               :menu-props="{ contentClass: 'siegu-list', elevation: 4 }"
               :no-data-text="searchHelpText"
               @update:search="onSearchUpdate"
+              @update:model-value="onSearchSelect"
             >
               <template v-slot:item="{ props, item }">
                 <v-list-item v-bind="props" :title="item.raw.title">
@@ -716,6 +736,16 @@ export default {
                 </v-tooltip>
               </template>
               <template v-slot:prepend-item>
+                <div v-if="!search && recentSearches.length > 0">
+                  <v-list-subheader class="text-zinc-muted text-uppercase tracking-widest text-caption py-2">Recent</v-list-subheader>
+                  <div class="pa-2 d-flex flex-column ga-1">
+                    <div v-for="(term, i) in recentSearches.slice(0, 5)" :key="i" class="d-flex align-center cursor-pointer px-2 py-1 rounded-lg recent-item" @click="search = term; addRecentSearch(term); current_page = 'home'">
+                      <v-icon size="16" color="#a1a1aa" class="mr-2">mdi-history</v-icon>
+                      <span class="text-caption text-zinc-primary">{{ term }}</span>
+                    </div>
+                  </div>
+                  <v-divider class="border-subtle my-1"></v-divider>
+                </div>
                 <div v-if="filteredPeople.length > 0">
                   <v-list-subheader class="text-zinc-muted text-uppercase tracking-widest text-caption py-2">{{ $t('search.people_section') }}</v-list-subheader>
                   <div class="pa-2 d-flex flex-nowrap overflow-x-auto ga-2">
@@ -986,5 +1016,8 @@ export default {
 .search-wrapper {
   width: 100%;
   cursor: text;
+}
+.recent-item:hover {
+  background: #f4f4f5;
 }
 </style>

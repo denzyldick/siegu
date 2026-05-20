@@ -6,7 +6,7 @@
         <v-sheet class="bulk-toolbar d-flex align-center px-6 py-3 rounded-pill shadow-xl" color="#18181b">
           <v-btn icon="mdi-close" variant="text" density="comfortable" color="white" @click="clearSelection"></v-btn>
           <div class="ml-4">
-            <div class="text-subtitle-2 font-weight-bold text-white">{{ selectedIds.length }} items selected</div>
+            <div class="text-subtitle-2 font-weight-bold text-white">{{ $t('photos.items_selected', { count: selectedIds.length }) }}</div>
           </div>
           <v-spacer></v-spacer>
           <div class="d-flex ga-2">
@@ -17,7 +17,7 @@
               @click="bulkFavorite"
             >
               <v-icon size="16" class="mr-2">mdi-heart</v-icon>
-              <span>Favorite</span>
+              <span>{{ $t('photos.favorite') }}</span>
             </v-btn>
             <v-btn
               variant="flat"
@@ -26,7 +26,7 @@
               size="small"
               @click="bulkRemove"
             >
-              Remove
+              {{ $t('photos.remove') }}
             </v-btn>
           </div>
         </v-sheet>
@@ -41,7 +41,7 @@
             <h2 class="text-h5 font-weight-bold text-zinc-primary letter-spacing-tight">{{ group.name }}</h2>
             <v-spacer></v-spacer>
             <span class="text-caption text-zinc-muted font-weight-medium bg-zinc-100 px-3 py-1 rounded-pill border-subtle">
-              {{ group.images.length }} items
+              {{ $t('photos.items_count', { count: group.images.length }) }}
             </span>
           </div>
         </div>
@@ -75,14 +75,14 @@
       </div>
 
       <h3 class="text-h5 font-weight-bold text-zinc-primary mb-2">
-        {{ searchQuery ? 'No results found' : (filters.favoritesOnly ? 'No favorites yet' : 'Your library is empty') }}
+        {{ searchQuery ? $t('photos.no_results') : (filters.favoritesOnly ? $t('photos.no_favorites') : $t('photos.your_library_empty')) }}
       </h3>
       <p class="text-body-1 text-zinc-secondary max-w-400 mx-auto mb-8">
-        {{ searchQuery ? `We couldn't find any photos matching "${searchQuery}"` : (filters.favoritesOnly ? 'Tap the heart on any photo to add it to your favorites' : 'Add a folder in settings to start indexing your memories') }}
+        {{ searchQuery ? $t('photos.no_results_for', { query: searchQuery }) : (filters.favoritesOnly ? $t('photos.tap_heart_hint') : $t('photos.add_folder_hint')) }}
       </p>
 
       <v-btn v-if="searchQuery" variant="flat" class="siegu-btn-modern px-8 py-6" @click="$emit('clear-search')">
-        Clear search query
+        {{ $t('photos.clear_search') }}
       </v-btn>
     </div>
 
@@ -93,7 +93,7 @@
       <v-fade-transition>
         <div v-if="loading" class="d-flex flex-column align-center">
           <v-progress-circular indeterminate color="#18181b" size="32" width="3"></v-progress-circular>
-          <span class="mt-4 text-caption text-zinc-muted font-weight-medium tracking-widest text-uppercase">Loading your memories</span>
+          <span class="mt-4 text-caption text-zinc-muted font-weight-medium tracking-widest text-uppercase">{{ $t('photos.loading_memories') }}</span>
         </div>
         <v-btn
           v-else-if="!allLoaded && groups.length > 0"
@@ -101,7 +101,7 @@
           variant="flat"
           class="siegu-btn-outline px-10 py-6"
         >
-          Load more
+          {{ $t('photos.load_more') }}
         </v-btn>
       </v-fade-transition>
     </div>
@@ -277,7 +277,7 @@ export default {
                     }
                 }
                 if (!image._groupKey) {
-                    image._groupKey = "Recent";
+                    image._groupKey = this.$t('photos.recent');
                     image._sortKey = "999999";
                 }
             }
