@@ -49,7 +49,7 @@
             <v-icon size="12" color="#a1a1aa">mdi-auto-fix</v-icon>
           </div>
         </div>
-        <div class="image-caption" v-if="path.caption">
+        <div class="image-caption click-caption" v-if="path.caption" @click.stop="$emit('click')">
           {{ path.caption }}
         </div>
         <div class="image-details" v-if="hasResults">
@@ -87,13 +87,12 @@ export default {
   }),
   async mounted() {
     this.setupObserver();
-    try {
-      this.mediaPort = await invoke("get_media_server_port");
-    } catch (e) {}
-  },
-  beforeUnmount() {
-    if (this.observer) {
-      this.observer.disconnect();
+    this.mediaPort = Image._mediaPort;
+    if (!this.mediaPort) {
+      try {
+        Image._mediaPort = await invoke("get_media_server_port");
+        this.mediaPort = Image._mediaPort;
+      } catch (e) {}
     }
   },
   computed: {
@@ -397,6 +396,15 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.click-caption {
+  cursor: pointer;
+}
+
+.click-caption:hover {
+  color: #18181b;
+  text-decoration: underline;
 }
 
 .image-details {

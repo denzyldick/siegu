@@ -111,6 +111,7 @@
       :photos="images"
       v-model:index="currentPhotoIndex"
       @navigate-to-person="$emit('search-person', $event)"
+      @update:photo="handlePhotoUpdated"
     />
   </div>
 </template>
@@ -142,6 +143,7 @@ export default {
     unlistenDiscovered: null,
     unlistenReceived: null,
     unlistenUpdated: null,
+    unlistenAnalysisResult: null,
     scanBuffer: [],
     scanInterval: null,
     reloadTimer: null
@@ -171,17 +173,20 @@ export default {
     this.scanInterval = setInterval(() => {
         if (this.scanBuffer.length > 0) {
             const batch = this.scanBuffer.splice(0, 100);
+            console.log(`[Photos] flush scanBuffer: ${batch.length} photos (total in grid: ${this.images.length})`);
             this.updateGroups(batch);
         }
     }, 2000);
 
     this.unlistenDiscovered = await listen("photos-discovered", (event) => {
       if (Array.isArray(event.payload)) {
+          console.log(`[Photos] photos-discovered: ${event.payload.length} photos`);
           event.payload.forEach(photo => this.handleIncomingPhoto(photo));
       }
     });
 
     this.unlistenReceived = await listen("photo-received", (event) => {
+      console.log(`[Photos] photo-received: ${event.payload.id}`);
       this.handleIncomingPhoto(event.payload);
     });
 
@@ -189,9 +194,47 @@ export default {
       const updatedPhoto = event.payload;
       const existing = this.imagesMap[updatedPhoto.id];
       if (existing) {
+          // Skip partial updates (Rust emits {id} only) — full data comes via photo-analysis-result
+          const keys = Object.keys(updatedPhoto);
+          if (keys.length <= 1) return;
           Object.assign(existing, updatedPhoto);
       } else {
           this.handleIncomingPhoto(updatedPhoto);
+      }
+    });
+
+    this.unlistenAnalysisResult = await listen("photo-analysis-result", async (event) => {
+      const { id } = event.payload;
+      if (!id) return;
+      try {
+        const raw = await invoke("get_photo_by_id", { id });
+        if (raw && raw !== "null") {
+          const updated = JSON.parse(raw);
+          const existing = this.imagesMap[id];
+          if (existing) {
+            // Copy frontend-only properties
+            updated._groupKey = existing._groupKey;
+            updated._sortKey = existing._sortKey;
+            // Directly assign to imagesMap so the flat lookup works
+            this.imagesMap[id] = updated;
+            // Replace in the flat images array — this triggers Vue 3 v-for reactivity
+            const idx = this.images.findIndex(p => p.id === id);
+            if (idx !== -1) {
+              this.images[idx] = updated;
+            }
+            // Also update in groups
+            for (const g of this.groups) {
+              const gi = g.images.findIndex(p => p.id === id);
+              if (gi !== -1) {
+                g.images[gi] = updated;
+              }
+            }
+          } else {
+            this.handleIncomingPhoto(updated);
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to fetch updated photo after analysis:", e);
       }
     });
   },
@@ -205,6 +248,7 @@ export default {
     if (this.unlistenDiscovered) this.unlistenDiscovered();
     if (this.unlistenReceived) this.unlistenReceived();
     if (this.unlistenUpdated) this.unlistenUpdated();
+    if (this.unlistenAnalysisResult) this.unlistenAnalysisResult();
     if (this.scanInterval) clearInterval(this.scanInterval);
     if (this.reloadTimer) clearTimeout(this.reloadTimer);
   },
@@ -252,6 +296,14 @@ export default {
         affectedGroups.forEach(group => {
             group.images.sort((a, b) => (b.created || '').localeCompare(a.created || ''));
         });
+    },
+    handlePhotoUpdated(updatedPhoto) {
+      const existing = this.imagesMap[updatedPhoto.id];
+      if (existing) {
+        Object.assign(existing, updatedPhoto);
+      } else {
+        this.handleIncomingPhoto(updatedPhoto);
+      }
     },
     handleIncomingPhoto(newPhoto) {
       if (!newPhoto || !newPhoto.location) return;

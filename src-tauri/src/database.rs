@@ -234,13 +234,25 @@ impl Database {
             "CREATE INDEX IF NOT EXISTS idx_photo_indexed ON photo(indexed);",
             (),
         );
-        let _ = conn.execute("CREATE TABLE IF NOT EXISTS directory (name STRING);", ());
         let _ = conn.execute(
-            "CREATE TABLE IF NOT EXISTS object(photo_id STRING, class STRING, probability STRING);",
+            "CREATE INDEX IF NOT EXISTS idx_photo_coords ON photo(latitude, longitude);",
+            (),
+        );
+        let _ = conn.execute("CREATE TABLE IF NOT EXISTS directory (name TEXT);", ());
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS object(photo_id TEXT, class TEXT, probability TEXT);",
             (),
         );
         let _ = conn.execute(
-            "CREATE TABLE IF NOT EXISTS properties (photo_id STRING, key STRING, value STRING);",
+            "CREATE TABLE IF NOT EXISTS properties (photo_id TEXT, key TEXT, value TEXT);",
+            (),
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_object_photo_id ON object(photo_id);",
+            (),
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_properties_photo_id ON properties(photo_id);",
             (),
         );
         let _ = conn.execute(
@@ -349,14 +361,14 @@ impl Database {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
-                    row.get::<_, String>(2)?,
+                    row.get::<_, f64>(2).ok()
+                        .or_else(|| row.get::<_, String>(2).ok().and_then(|s| s.parse().ok()))
+                        .unwrap_or(0.0),
                 ))
             }) {
                 for row in iter.flatten() {
                     if let Some(p) = photos.iter_mut().find(|p| p.id == row.0) {
-                        if let Ok(prob) = row.2.parse::<f64>() {
-                            p.objects.insert(row.1, prob);
-                        }
+                        p.objects.insert(row.1, row.2);
                     }
                 }
             }
@@ -377,7 +389,14 @@ impl Database {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
-                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(2).ok()
+                        .or_else(|| {
+                            row.get::<_, f64>(2).ok().map(|v| v.to_string())
+                        })
+                        .or_else(|| {
+                            row.get::<_, i64>(2).ok().map(|v| v.to_string())
+                        })
+                        .unwrap_or_default(),
                 ))
             }) {
                 for row in iter.flatten() {
@@ -499,13 +518,40 @@ impl Database {
         }
     }
 
-    pub fn get_all_photos_with_location(&self) -> Vec<Photo> {
-        let mut photos = Vec::new();
-        let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, 
-            s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres 
-            FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE (p.latitude != 0.0 OR p.longitude != 0.0)";
+    pub fn get_heatmap_points(&self) -> Vec<MapPoint> {
+        let mut points = Vec::new();
+        let sql = "SELECT id, latitude, longitude FROM photo WHERE (latitude != 0.0 OR longitude != 0.0)";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([], |row| {
+                Ok(MapPoint {
+                    id: row.get(0)?,
+                    latitude: row.get(1).unwrap_or(0.0),
+                    longitude: row.get(2).unwrap_or(0.0),
+                })
+            }) {
+                for p in iter.flatten() {
+                    points.push(p);
+                }
+            }
+        }
+        points
+    }
+
+    pub fn get_photos_by_ids(&self, photo_ids: &[String]) -> Vec<Photo> {
+        if photo_ids.is_empty() {
+            return Vec::new();
+        }
+        let mut photos = Vec::new();
+        let placeholders: Vec<String> = photo_ids.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
+        let sql = format!(
+            "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, \
+             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres \
+             FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE p.id IN ({})",
+            placeholders.join(",")
+        );
+        let params: Vec<&dyn rusqlite::types::ToSql> = photo_ids.iter().map(|id| id as &dyn rusqlite::types::ToSql).collect();
+        if let Ok(mut stmt) = self.connection.prepare(&sql) {
+            if let Ok(iter) = stmt.query_map(params.as_slice(), |row| {
                 Ok(Photo {
                     id: row.get(0)?,
                     location: row.get(1)?,
@@ -544,6 +590,35 @@ impl Database {
         self.enrich_properties(&mut photos);
         photos
     }
+
+    pub fn get_photo_by_id(&self, photo_id: &str) -> Option<Photo> {
+        let mut photos = self.get_photos_by_ids(&[photo_id.to_string()]);
+        photos.pop()
+    }
+
+    pub fn get_photo_encoded_batch(&self, photo_ids: &[String]) -> HashMap<String, String> {
+        let mut result = HashMap::new();
+        if photo_ids.is_empty() {
+            return result;
+        }
+        let placeholders: Vec<String> = photo_ids.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
+        let sql = format!(
+            "SELECT id, encoded FROM photo WHERE id IN ({})",
+            placeholders.join(",")
+        );
+        let params: Vec<&dyn rusqlite::types::ToSql> = photo_ids.iter().map(|id| id as &dyn rusqlite::types::ToSql).collect();
+        if let Ok(mut stmt) = self.connection.prepare(&sql) {
+            if let Ok(iter) = stmt.query_map(params.as_slice(), |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            }) {
+                for row in iter.flatten() {
+                    result.insert(row.0, row.1);
+                }
+            }
+        }
+        result
+    }
+
 
     pub fn store_face(&self, face: Face) {
         let embedding_bytes: Vec<u8> = face
@@ -1100,6 +1175,13 @@ pub struct Photo {
     pub caption: Option<String>,
     pub aesthetics_score: Option<f64>,
     pub ai_status: AiStatus,
+}
+
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+pub struct MapPoint {
+    pub id: String,
+    pub latitude: f64,
+    pub longitude: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -55,9 +55,12 @@ export default {
     }
   },
   async mounted() {
-    try {
-      this.mediaPort = await invoke("get_media_server_port");
-    } catch (e) {}
+    if (!RailItem._mediaPort) {
+      try {
+        RailItem._mediaPort = await invoke("get_media_server_port");
+      } catch (e) {}
+    }
+    this.mediaPort = RailItem._mediaPort;
 
     this.observer = new IntersectionObserver((entries) => {
       this.isVisible = entries[0].isIntersecting;

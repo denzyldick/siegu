@@ -86,9 +86,12 @@
              >
                Analyze Photo
              </v-btn>
-             <div v-if="globalEta" class="text-caption text-zinc-muted mt-2 text-center">
-                Library indexing: {{ formatEta(globalEta) }} remaining
-             </div>
+              <div v-if="isAnalyzing" class="text-caption text-zinc-muted mt-2 text-center">
+                <span class="analyzing-dots">Analyzing</span>
+              </div>
+              <div v-else-if="globalEta" class="text-caption text-zinc-muted mt-2 text-center">
+                 Library indexing: {{ formatEta(globalEta) }} remaining
+              </div>
           </div>
 
           <div class="mb-6 pt-4">
@@ -193,9 +196,44 @@
               ></v-progress-linear>
             </div>
           </div>
+
+          <v-divider class="opacity-5 mb-4" v-if="modelChips.length > 0"></v-divider>
+
+          <div class="mb-6" v-if="modelChips.length > 0">
+            <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">Run Model</div>
+            <div v-if="isAnalyzingModel" class="d-flex align-center mb-3">
+              <v-progress-circular indeterminate size="16" width="2" color="black" class="mr-2"></v-progress-circular>
+              <span class="text-body-2 text-zinc-primary font-weight-bold">
+                Running {{ (modelInfo.find(m => m.id === isAnalyzingModel) || {}).label || isAnalyzingModel }}…
+                <span class="text-caption text-zinc-muted ml-1">({{ formatElapsed(runStartTime, runTimerTick) }})</span>
+              </span>
+            </div>
+            <div class="d-flex flex-wrap ga-2">
+              <v-chip
+                v-for="m in modelChips"
+                :key="m.id"
+                :variant="m.done ? 'tonal' : 'flat'"
+                :color="m.done ? 'success' : 'black'"
+                size="small"
+                :prepend-icon="m.done ? 'mdi-check-circle-outline' : 'mdi-play-circle-outline'"
+                :disabled="m.done || (isAnalyzingModel !== null && isAnalyzingModel !== m.id)"
+                :loading="isAnalyzingModel === m.id"
+                @click="runSingleModel(m.id)"
+                class="font-weight-bold"
+              >
+                {{ m.label }}
+              </v-chip>
+            </div>
+          </div>
         </v-list>
       </v-navigation-drawer>
       </v-layout>
+      <v-snackbar v-model="snackbar.show" :timeout="6000" location="bottom" color="black">
+        <div class="d-flex align-center">
+          <v-icon size="small" class="mr-3" :color="snackbar.error ? 'error' : 'white'">{{ snackbar.error ? 'mdi-alert-circle' : 'mdi-check-circle' }}</v-icon>
+          <span class="text-body-2">{{ snackbar.text }}</span>
+        </div>
+      </v-snackbar>
     </v-card>
   </v-dialog>
 </template>
@@ -218,15 +256,34 @@ export default {
       default: 0
     }
   },
-  emits: ['update:modelValue', 'update:index'],
+  emits: ['update:modelValue', 'update:index', 'update:photo'],
   data: () => ({
     showInfo: false,
     os: '',
     mediaPort: null,
     detectedFaces: [],
     isAnalyzing: false,
+    isAnalyzingModel: null,
+    runStartTime: 0,
+    runTimerTick: 0,
+    runTimer: null,
     globalEta: 0,
     unlistenEta: null,
+    unlistenResult: null,
+    snackbar: { show: false, text: '', error: false },
+    downloadedModels: [],
+    isAnalyzingModel: null,
+    modelInfo: [
+      { id: 'clip', label: 'Smart Search' },
+      { id: 'face', label: 'Face Grouping' },
+      { id: 'ocr', label: 'Text Finder' },
+      { id: 'nsfw', label: 'Safe Mode' },
+      { id: 'aesthetics', label: 'Quality Scorer' },
+      { id: 'yolo', label: 'Object Pro' },
+      { id: 'blip', label: 'Photo Describer' },
+      { id: 'arcface', label: 'Face Pro' },
+      { id: 'midas', label: 'Depth Vision' },
+    ],
   }),
   computed: {
     isMobile() {
@@ -256,6 +313,10 @@ export default {
     },
     currentPhotoSrc() {
       if (!this.currentPhoto || this.isVideo) return '';
+      const ext = this.currentPhoto.location.split('.').pop().toLowerCase();
+      if (['heic', 'heif'].includes(ext)) {
+        return this.currentPhoto.encoded || convertFileSrc(this.currentPhoto.location);
+      }
       return convertFileSrc(this.currentPhoto.location);
     },
     exifData() {
@@ -293,12 +354,26 @@ export default {
       if (!this.detectedFaces) return [];
       const seen = new Set();
       return this.detectedFaces.filter(face => {
-        if (!face.person_id) return true; // Show all if not yet clustered
+        if (!face.person_id) return true;
         if (seen.has(face.person_id)) return false;
         seen.add(face.person_id);
         return true;
       });
-    }
+    },
+    modelChips() {
+      if (!this.currentPhoto) return [];
+      const status = this.currentPhoto.ai_status || {};
+      return this.modelInfo
+        .filter(m => {
+          const downloadId = m.id === 'face' ? 'ultraface' : m.id;
+          return this.downloadedModels.includes(downloadId);
+        })
+        .map(m => ({
+          id: m.id,
+          label: m.label,
+          done: status[m.id] === 1,
+        }));
+    },
   },
   methods: {
     isVideoPhoto(photo) {
@@ -324,19 +399,91 @@ export default {
       this.close();
     },
     async analyzePhoto() {
-      if (!this.currentPhoto || this.isAnalyzing) return;
+      if (!this.currentPhoto || this.isAnalyzing || this.isAnalyzingModel) return;
       this.isAnalyzing = true;
+      const photoId = this.currentPhoto.id;
+      const startTime = Date.now();
       try {
-        await invoke("analyze_photo", { id: this.currentPhoto.id });
-        // The worker will emit photo-received via WebRTC sync logic or we can listen for general updates
-        // For simple local feedback, we poll or wait a bit then refresh faces
-        setTimeout(() => {
-           this.fetchFaces();
-           this.isAnalyzing = false;
-        }, 2000);
+        const { listen } = await import('@tauri-apps/api/event');
+        const unlisten = await listen('photo-analysis-result', (event) => {
+          if (event.payload.id === photoId) {
+            this.isAnalyzing = false;
+            this.fetchFaces();
+            unlisten();
+
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+            const r = event.payload;
+            const parts = [];
+            if (r.object_count > 0) parts.push(`${r.object_count} objects`);
+            if (r.face_count > 0) parts.push(`${r.face_count} faces`);
+            if (r.has_caption) parts.push('caption');
+            if (parts.length === 0) parts.push('nothing detected');
+
+            this.snackbar.text = `AI analysis: ${parts.join(', ')} (${elapsed}s)`;
+            this.snackbar.show = true;
+
+            this.refreshPhoto(photoId);
+            this.showInfo = true;
+          }
+        });
+        await invoke("analyze_photo", { id: photoId });
       } catch (e) {
         console.error("Analysis failed", e);
         this.isAnalyzing = false;
+      }
+    },
+    async runSingleModel(modelId) {
+      if (!this.currentPhoto || this.isAnalyzing || this.isAnalyzingModel) return;
+      console.log('runSingleModel start', modelId, 'photo:', this.currentPhoto.id);
+      this.isAnalyzingModel = modelId;
+      this.runStartTime = Date.now();
+      this.runTimerTick = 0;
+      this.runTimer = window.setInterval(() => {
+        this.runTimerTick += 1;
+      }, 1000);
+      const photoId = this.currentPhoto.id;
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        const unlisten = await listen('photo-analysis-result', (event) => {
+          console.log('runSingleModel got event', event.payload.id, 'expected', photoId, 'model_timings:', event.payload.model_timings);
+          if (event.payload.id === photoId) {
+            this.isAnalyzingModel = null;
+            if (this.runTimer) { clearInterval(this.runTimer); this.runTimer = null; }
+            this.fetchFaces();
+            unlisten();
+            this.refreshPhoto(photoId);
+            this.showInfo = true;
+            const modelTimings = event.payload.model_timings || {};
+            const modelTime = modelTimings[modelId];
+            const elapsed = modelTime ? ` (${modelTime.toFixed(1)}s)` : ` (${((Date.now() - this.runStartTime) / 1000).toFixed(1)}s)`;
+            this.snackbar.text = `${this.modelInfo.find(m => m.id === modelId)?.label || modelId} analysis complete${elapsed}`;
+            this.snackbar.error = false;
+            this.snackbar.show = true;
+          }
+        });
+        await invoke("analyze_photo_model", { id: photoId, modelId });
+        console.log('runSingleModel invoke returned');
+      } catch (e) {
+        console.error("Model analysis failed", e);
+        this.isAnalyzingModel = null;
+        if (this.runTimer) { clearInterval(this.runTimer); this.runTimer = null; }
+        this.snackbar.text = `${this.modelInfo.find(m => m.id === modelId)?.label || modelId} analysis failed`;
+        this.snackbar.error = true;
+        this.snackbar.show = true;
+      }
+    },
+    async refreshPhoto(photoId) {
+      try {
+        const photoJson = await invoke("get_photo_by_id", { id: photoId });
+        if (!photoJson || photoJson === 'null') return;
+        const updated = JSON.parse(photoJson);
+        const idx = this.photos.findIndex(p => p.id === photoId);
+        if (idx !== -1) {
+          this.$emit('update:photo', updated);
+        }
+      } catch (e) {
+        console.error("Failed to refresh photo", e);
       }
     },
     formatEta(ms) {
@@ -355,6 +502,14 @@ export default {
       });
     },
     close() { this.visible = false; },
+    formatElapsed(start, tick) {
+      if (!start) return '0s';
+      void tick;
+      const sec = Math.floor((Date.now() - start) / 1000);
+      if (sec < 60) return `${sec}s`;
+      const m = Math.floor(sec / 60);
+      return `${m}m ${sec % 60}s`;
+    },
     next() {
         if (this.photos.length === 0) return;
         const newIndex = (this.index + 1) % this.photos.length;
@@ -385,6 +540,9 @@ export default {
   },
   watch: {
     index() {
+      this.isAnalyzing = false;
+      this.isAnalyzingModel = null;
+      if (this.runTimer) { clearInterval(this.runTimer); this.runTimer = null; }
       this.fetchFaces();
       this.scrollToActiveThumb();
       if (this.isVideo) this.showInfo = false;
@@ -401,12 +559,14 @@ export default {
   async mounted() {
       window.addEventListener('keydown', this.handleKeydown);
       try { this.os = await invoke("get_os"); } catch (e) {}
-      try { this.mediaPort = await invoke("get_media_server_port"); } catch (e) { console.error("Failed to get media server port", e); }
+      if (!PhotoViewer._mediaPort) { try { PhotoViewer._mediaPort = await invoke("get_media_server_port"); } catch (e) {} } this.mediaPort = PhotoViewer._mediaPort;
       this.listenForEta();
+      try { this.downloadedModels = await invoke("check_models"); } catch (e) {}
   },
   beforeUnmount() {
       window.removeEventListener('keydown', this.handleKeydown);
       if (this.unlistenEta) this.unlistenEta();
+      if (this.unlistenResult) this.unlistenResult();
   }
 }
 </script>
@@ -532,5 +692,18 @@ export default {
 
 .tracking-widest {
   letter-spacing: 0.1em;
+}
+
+.analyzing-dots::after {
+  content: '';
+  animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0%   { content: ''; }
+  25%  { content: '.'; }
+  50%  { content: '..'; }
+  75%  { content: '...'; }
+  100% { content: ''; }
 }
 </style>

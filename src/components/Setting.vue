@@ -181,6 +181,19 @@
                         Ready
                       </v-chip>
                     </v-card-title>
+                    <template v-slot:append>
+                      <v-switch
+                        v-if="downloadedModels.includes(model.id)"
+                        v-model="modelEnabled[model.id]"
+                        hide-details
+                        color="black"
+                        density="compact"
+                        @change="toggleModel(model.id)"
+                        :true-value="true"
+                        :false-value="false"
+                        :title="(modelEnabled[model.id] ? 'Disable' : 'Enable') + ' ' + model.title + ' during analysis'"
+                      ></v-switch>
+                    </template>
                   </v-card-item>
 
                   <v-card-text class="py-0 flex-grow-1">
@@ -313,18 +326,6 @@
 
           <v-card-text class="pt-2">
             <v-list lines="two" class="bg-transparent">
-              <v-list-item class="px-0">
-                <template v-slot:title>
-                  <span class="font-weight-bold text-zinc-primary">Background Sync</span>
-                </template>
-                <template v-slot:subtitle>
-                  <span class="text-zinc-secondary">Allow syncing when app is in background</span>
-                </template>
-                <template v-slot:append>
-                  <v-switch v-model="bgSync" hide-details color="black" inset density="compact"></v-switch>
-                </template>
-              </v-list-item>
-
               <v-list-item class="px-0">
                 <template v-slot:title>
                   <span class="font-weight-bold text-zinc-primary">Cleanup Database</span>
@@ -543,7 +544,6 @@ export default {
     checkResults: "",
     isDownloading: false,
     isCleaning: false,
-    bgSync: false,
     downloadedModels: [],
     selectedModels: [],
     downloadProgress: {},
@@ -574,6 +574,7 @@ export default {
       { id: 'whisper', title: 'Audio Search', desc: 'Transcribes words spoken in videos.', search: "Search for things people said in videos.", size: '31MB' },
     ],
     logs: [],
+    modelEnabled: {},
     performance: {
       scanThreads: 4,
       indexingMode: "immediate",
@@ -698,9 +699,8 @@ export default {
     this.isAndroid = (await platform()) === 'android';
     await this.checkExistingModels();
     await this.loadPerformanceConfig();
+    await this.loadModelEnabledStates();
 
-    const bgSyncVal = await invoke("get_config", { key: "bg_sync" });
-    this.bgSync = bgSyncVal === "true";
     this.fetchLogs();
     this.list_directories();
   },
@@ -750,6 +750,20 @@ export default {
     async setIndexingMode(mode) {
       this.performance.indexingMode = mode;
       await invoke("save_config", { key: "indexing_mode", value: mode });
+    },
+    async loadModelEnabledStates() {
+      const configStr = await invoke("get_config");
+      const config = JSON.parse(configStr);
+      const enabled = {};
+      for (const m of this.aiModels) {
+        const key = "model_enabled_" + m.id;
+        enabled[m.id] = config[key] !== "false";
+      }
+      this.modelEnabled = enabled;
+    },
+    async toggleModel(modelId) {
+      const key = "model_enabled_" + modelId;
+      await invoke("save_config", { key, value: this.modelEnabled[modelId] ? "true" : "false" });
     },
     async checkExistingModels() {
         const downloaded = await invoke("check_models");

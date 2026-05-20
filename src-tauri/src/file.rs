@@ -245,9 +245,6 @@ pub fn scan_folder(
         .unwrap();
 
     use rayon::prelude::*;
-    let tx_clone = app_handle
-        .try_state::<MlContext>()
-        .map(|state| state.tx.clone());
 
     pool.install(|| {
         new_paths_to_process.into_par_iter().for_each(|path_str| {
@@ -371,11 +368,6 @@ pub fn scan_folder(
             }
 
             let _ = batch_tx.send(photo);
-
-            // Signal the background worker that there is work to do
-            if let Some(ref tx) = tx_clone {
-                let _ = tx.send(crate::ml::Job::AnalyzeSingle(id));
-            }
         });
     });
 

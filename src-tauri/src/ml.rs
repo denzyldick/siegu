@@ -6,6 +6,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use tauri::Emitter;
 use tauri::{AppHandle, Manager};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
@@ -20,7 +21,9 @@ use tract_onnx::prelude::*;
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Job {
     ProcessAll,
+    AutoAnalyzeSingle(String),
     AnalyzeSingle(String),
+    AnalyzeSingleWithModel(String, String),
     ProcessModel(String),
 }
 
@@ -49,7 +52,15 @@ fn job_status_model(model_id: &str) -> Option<&'static str> {
     }
 }
 
-fn should_run_model(target_model: Option<&str>, model: &str) -> bool {
+fn should_run_model(target_model: Option<&str>, model: &str, config: Option<&std::collections::HashMap<String, String>>) -> bool {
+    if let Some(config) = config {
+        let key = format!("model_enabled_{}", model);
+        if let Some(val) = config.get(&key) {
+            if val != "true" {
+                return false;
+            }
+        }
+    }
     target_model.is_none_or(|target| target == model)
 }
 
@@ -349,10 +360,29 @@ pub fn start_background_worker(
             .build()
             .unwrap();
         let mut avg_photo_time_ms = 1000f64;
+        let mut last_auto_job: Option<Instant> = None;
 
         while let Some(job) = rx.blocking_recv() {
-            if abort_clone.load(Ordering::SeqCst) && matches!(job, Job::ProcessAll) {
+            if abort_clone.load(Ordering::SeqCst) && !matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_)) {
                 continue;
+            }
+
+            // Check indexing mode for auto-triggered jobs
+            let is_auto = matches!(job, Job::AutoAnalyzeSingle(_) | Job::ProcessAll);
+            if is_auto {
+                let mode = db.lock().unwrap().get_state().get("indexing_mode").cloned().unwrap_or("immediate".to_string());
+                if mode == "manual" {
+                    continue;
+                }
+                if mode == "idle" {
+                    if let Some(last) = last_auto_job {
+                        let elapsed = last.elapsed();
+                        if elapsed < Duration::from_secs(30) {
+                            std::thread::sleep(Duration::from_secs(30) - elapsed);
+                        }
+                    }
+                }
+                last_auto_job = Some(Instant::now());
             }
 
             if !engine_initialized {
@@ -521,8 +551,14 @@ pub fn start_background_worker(
                 emit_log(&app_handle, "ML Worker: Engine Ready.".to_string());
             }
 
+            let is_single = matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _));
             let (photo_ids, target_model, progress_model) = match job {
-                Job::AnalyzeSingle(id) => (vec![id], None, None),
+                Job::AnalyzeSingle(id) | Job::AutoAnalyzeSingle(id) => (vec![id], None, None),
+                Job::AnalyzeSingleWithModel(id, model_id) => {
+                    let status_model = job_status_model(&model_id).unwrap_or(&model_id);
+                    eprintln!("[siegu-bench] AnalyzeSingleWithModel: photo={id} model={model_id} status_model={status_model}");
+                    (vec![id], Some(status_model.to_string()), None)
+                }
                 Job::ProcessModel(model_id) => {
                     if model_id == "whisper" {
                         emit_log(
@@ -577,6 +613,12 @@ pub fn start_background_worker(
                     )
                 }
             };
+
+            // Single-photo jobs should always run — clear the abort flag that
+            // the calling command may have set to interrupt a running batch.
+            if is_single {
+                abort_clone.store(false, std::sync::atomic::Ordering::SeqCst);
+            }
 
             if photo_ids.is_empty() {
                 if let Some(ref model) = progress_model {
@@ -703,13 +745,22 @@ pub fn start_background_worker(
                     let progress_model_inner = progress_model_task.clone();
 
                     pool.spawn(move || {
-                        if abort_task.load(Ordering::SeqCst) { return; }
+                        let mut model_timings = std::collections::HashMap::new();
+                        let config = {
+                            let lock = db_task.lock().unwrap();
+                            lock.get_state()
+                        };
                         let image_res = image::open(&photo_loc_actual);
-                        if let Ok(dynamic_img) = image_res {
-                            let img = dynamic_img.to_rgb8();
+                        if abort_task.load(Ordering::SeqCst) {
+                            // aborted — skip processing, still emit event below
+                        } else {
+                            if let Ok(dynamic_img) = image_res {
+                                let img = dynamic_img.to_rgb8();
 
                             // Tier 2: CLIP Visual
-                            if should_run_model(target_model_inner.as_deref(), "clip") && photo_entry.ai_status.clip == 0 {
+                            if should_run_model(target_model_inner.as_deref(), "clip", Some(&config)) && photo_entry.ai_status.clip == 0 {
+                                if abort_task.load(Ordering::SeqCst) { return; }
+                                let __start = std::time::Instant::now();
                                 if let Some(ref visual_model) = clip_visual_task {
                                     let resized = image::imageops::resize(&img, 224, 224, image::imageops::FilterType::Triangle);
                                     let mut input_img = Array4::<f32>::zeros((1, 3, 224, 224));
@@ -739,6 +790,7 @@ pub fn start_background_worker(
                                             let _ = lock.connection.execute("INSERT INTO object (photo_id, class, probability) VALUES(?1, ?2, ?3)", (&photo_id_task, class_name, &score.to_string()));
                                         }
                                         lock.update_ai_status(&photo_id_task, "clip", 1);
+                                        model_timings.insert("clip".to_string(), __start.elapsed().as_secs_f64());
                                         emit_log(&app_handle_task, format!("ML Worker: CLIP tags for {photo_id_task}: {top_matches}"));
                                     }
                                 } else if progress_model_inner.is_some() {
@@ -747,7 +799,9 @@ pub fn start_background_worker(
                             }
 
                             // Tier 1: Aesthetics
-                            if should_run_model(target_model_inner.as_deref(), "aesthetics") && photo_entry.ai_status.aesthetics == 0 {
+                            if should_run_model(target_model_inner.as_deref(), "aesthetics", Some(&config)) && photo_entry.ai_status.aesthetics == 0 {
+                                if abort_task.load(Ordering::SeqCst) { return; }
+                                let __start = std::time::Instant::now();
                                 if let Some(ref model) = aesthetics_task {
                                     let resized = image::imageops::resize(&img, 224, 224, image::imageops::FilterType::Triangle);
                                     let mut input = Array4::<f32>::zeros((1, 3, 224, 224));
@@ -756,11 +810,12 @@ pub fn start_background_worker(
                                         input[[0, 1, y as usize, x as usize]] = (pixel[1] as f32 / 255.0 - 0.4578275) / 0.2613026;
                                         input[[0, 2, y as usize, x as usize]] = (pixel[2] as f32 / 255.0 - 0.40821073) / 0.2757771;
                                     }
-                                    if let Ok(data) = model.run(input, "pixel_values") {
+                                    if let Ok(data) = model.run(input, "input") {
                                         let score = data[0];
                                         let lock = db_task.lock().unwrap();
                                         let _ = lock.connection.execute("UPDATE photo SET aesthetics_score = ?1 WHERE id = ?2", (score as f64, &photo_id_task));
                                         lock.update_ai_status(&photo_id_task, "aesthetics", 1);
+                                        model_timings.insert("aesthetics".to_string(), __start.elapsed().as_secs_f64());
                                         emit_log(&app_handle_task, format!("ML Worker: Aesthetic score for {photo_id_task}: {score:.2}"));
                                     }
                                 } else if progress_model_inner.is_some() {
@@ -769,7 +824,9 @@ pub fn start_background_worker(
                             }
 
                             // Tier 1: NSFW
-                            if should_run_model(target_model_inner.as_deref(), "nsfw") && photo_entry.ai_status.nsfw == 0 {
+                            if should_run_model(target_model_inner.as_deref(), "nsfw", Some(&config)) && photo_entry.ai_status.nsfw == 0 {
+                                if abort_task.load(Ordering::SeqCst) { return; }
+                                let __start = std::time::Instant::now();
                                 if let Some(ref model) = nsfw_task {
                                     let resized = image::imageops::resize(&img, 224, 224, image::imageops::FilterType::Triangle);
                                     let mut input = Array4::<f32>::zeros((1, 3, 224, 224));
@@ -783,6 +840,7 @@ pub fn start_background_worker(
                                         let lock = db_task.lock().unwrap();
                                         let _ = lock.connection.execute("INSERT INTO properties (photo_id, key, value) VALUES(?1, 'nsfw', ?2)", (&photo_id_task, &nsfw_score.to_string()));
                                         lock.update_ai_status(&photo_id_task, "nsfw", 1);
+                                        model_timings.insert("nsfw".to_string(), __start.elapsed().as_secs_f64());
                                         emit_log(&app_handle_task, format!("ML Worker: NSFW score for {photo_id_task}: {nsfw_score:.2}"));
                                     }
                                 } else if progress_model_inner.is_some() {
@@ -791,7 +849,9 @@ pub fn start_background_worker(
                             }
 
                             // Tier 2: OCR
-                            if should_run_model(target_model_inner.as_deref(), "ocr") && photo_entry.ai_status.ocr == 0 {
+                            if should_run_model(target_model_inner.as_deref(), "ocr", Some(&config)) && photo_entry.ai_status.ocr == 0 {
+                                if abort_task.load(Ordering::SeqCst) { return; }
+                                let __start = std::time::Instant::now();
                                 if let Some(ref _det_model) = ocr_det_task {
                                     if let Some(ref rec_model) = ocr_rec_task {
                                         let rec_h = 48; let rec_w = 320;
@@ -826,6 +886,7 @@ pub fn start_background_worker(
                                         }
                                         let lock = db_task.lock().unwrap();
                                         lock.update_ai_status(&photo_id_task, "ocr", 1);
+                                        model_timings.insert("ocr".to_string(), __start.elapsed().as_secs_f64());
                                     }
                                 } else if progress_model_inner.is_some() {
                                     emit_log(&app_handle_task, "ERROR: OCR model is not loaded. Download or update Text Finder first.".to_string());
@@ -833,7 +894,9 @@ pub fn start_background_worker(
                             }
 
                             // Tier 2: YOLOv8
-                            if should_run_model(target_model_inner.as_deref(), "yolo") && photo_entry.ai_status.yolo == 0 {
+                            if should_run_model(target_model_inner.as_deref(), "yolo", Some(&config)) && photo_entry.ai_status.yolo == 0 {
+                                if abort_task.load(Ordering::SeqCst) { return; }
+                                let __start = std::time::Instant::now();
                                 if let Some(ref model) = yolo_task {
                                     let resized = image::imageops::resize(&img, 640, 640, image::imageops::FilterType::Triangle);
                                     let mut input = Array4::<f32>::zeros((1, 3, 640, 640));
@@ -863,6 +926,7 @@ pub fn start_background_worker(
                                             let _ = lock.connection.execute("INSERT INTO object (photo_id, class, probability) VALUES(?1, ?2, '0.9')", (&photo_id_task, &format!("yolo_{cls_idx}")));
                                         }
                                         lock.update_ai_status(&photo_id_task, "yolo", 1);
+                                        model_timings.insert("yolo".to_string(), __start.elapsed().as_secs_f64());
                                         emit_log(&app_handle_task, format!("ML Worker: YOLO found {found_count} object classes for {photo_id_task}."));
                                     }
                                 } else if progress_model_inner.is_some() {
@@ -871,11 +935,13 @@ pub fn start_background_worker(
                             }
 
                             // Tier 1: Face Detection
-                            let should_run_face = should_run_model(target_model_inner.as_deref(), "face")
+                            let should_run_face = should_run_model(target_model_inner.as_deref(), "face", Some(&config))
                                 && photo_entry.ai_status.face == 0;
-                            let should_run_arcface = should_run_model(target_model_inner.as_deref(), "arcface")
+                            let should_run_arcface = should_run_model(target_model_inner.as_deref(), "arcface", Some(&config))
                                 && photo_entry.ai_status.arcface == 0;
                             if should_run_face || should_run_arcface {
+                                if abort_task.load(Ordering::SeqCst) { return; }
+                                let __start = std::time::Instant::now();
                                 if let Some(ref face_model) = face_detector_task {
                                     let mut face_count = 0usize;
                                     let (orig_w, orig_h) = (img.width() as f32, img.height() as f32);
@@ -922,7 +988,7 @@ pub fn start_background_worker(
                                                                     f_input[[0, 1, y as usize, x as usize]] = (pixel[1] as f32 - 127.5) / 128.0;
                                                                     f_input[[0, 2, y as usize, x as usize]] = (pixel[2] as f32 - 127.5) / 128.0;
                                                                 }
-                                                                if let Ok(emb) = model.run(f_input, "data") {
+                                                                if let Ok(emb) = model.run(f_input, "input.1") {
                                                                     let mut e = emb;
                                                                     let norm: f32 = e.iter().map(|x| x * x).sum::<f32>().sqrt();
                                                                     if norm > 0.0 { for v in e.iter_mut() { *v /= norm; } }
@@ -981,6 +1047,7 @@ pub fn start_background_worker(
                                     if arcface_task.is_some() {
                                         lock.update_ai_status(&photo_id_task, "arcface", 1);
                                     }
+                                    model_timings.insert("face".to_string(), __start.elapsed().as_secs_f64());
                                     emit_log(&app_handle_task, format!("ML Worker: Face analysis found {face_count} faces for {photo_id_task}."));
                                 } else if progress_model_inner.is_some() {
                                     emit_log(&app_handle_task, "ERROR: Face model is not loaded. Download or update Face Grouping first.".to_string());
@@ -988,7 +1055,9 @@ pub fn start_background_worker(
                             }
 
                             // Tier 3: BLIP (Captioning)
-                            if should_run_model(target_model_inner.as_deref(), "blip") && photo_entry.ai_status.blip == 0 {
+                            if should_run_model(target_model_inner.as_deref(), "blip", Some(&config)) && photo_entry.ai_status.blip == 0 {
+                                if abort_task.load(Ordering::SeqCst) { return; }
+                                let __start = std::time::Instant::now();
                                 if let Some(ref model) = blip_task {
                                     let resized = image::imageops::resize(&img, 384, 384, image::imageops::FilterType::Triangle);
                                     let mut input = Array4::<f32>::zeros((1, 3, 384, 384));
@@ -998,12 +1067,10 @@ pub fn start_background_worker(
                                         input[[0, 2, y as usize, x as usize]] = (pixel[2] as f32 / 255.0 - 0.40821073) / 0.2757771;
                                     }
                                     if let Ok(_data) = model.run(input, "pixel_values") {
-                                        // BLIP output decoding is complex (seq2seq), for now we just store a flag that it ran
-                                        // A real impl would use a greedy decoder with the vocab
                                         let lock = db_task.lock().unwrap();
-                                        let _ = lock.connection.execute("UPDATE photo SET caption = 'AI Generated Caption' WHERE id = ?1", [&photo_id_task]);
                                         lock.update_ai_status(&photo_id_task, "blip", 1);
-                                        emit_log(&app_handle_task, format!("ML Worker: BLIP caption placeholder stored for {photo_id_task}."));
+                                        model_timings.insert("blip".to_string(), __start.elapsed().as_secs_f64());
+                                        emit_log(&app_handle_task, format!("ML Worker: BLIP caption model ran for {photo_id_task}."));
                                     }
                                 } else if progress_model_inner.is_some() {
                                     emit_log(&app_handle_task, "ERROR: BLIP model is not loaded. Download or update Photo Describer first.".to_string());
@@ -1011,7 +1078,9 @@ pub fn start_background_worker(
                             }
 
                             // Tier 3: MiDaS (Depth)
-                            if should_run_model(target_model_inner.as_deref(), "midas") && photo_entry.ai_status.midas == 0 {
+                            if should_run_model(target_model_inner.as_deref(), "midas", Some(&config)) && photo_entry.ai_status.midas == 0 {
+                                if abort_task.load(Ordering::SeqCst) { return; }
+                                let __start = std::time::Instant::now();
                                 if let Some(ref model) = midas_task {
                                     let resized = image::imageops::resize(&img, 256, 256, image::imageops::FilterType::Triangle);
                                     let mut input = Array4::<f32>::zeros((1, 3, 256, 256));
@@ -1020,9 +1089,10 @@ pub fn start_background_worker(
                                         input[[0, 1, y as usize, x as usize]] = pixel[1] as f32 / 255.0;
                                         input[[0, 2, y as usize, x as usize]] = pixel[2] as f32 / 255.0;
                                     }
-                                    if let Ok(_data) = model.run(input, "0") {
+                                    if let Ok(_data) = model.run(input, "pixel_values") {
                                         let lock = db_task.lock().unwrap();
                                         lock.update_ai_status(&photo_id_task, "midas", 1);
+                                        model_timings.insert("midas".to_string(), __start.elapsed().as_secs_f64());
                                         emit_log(&app_handle_task, format!("ML Worker: MiDaS depth analysis completed for {photo_id_task}."));
                                     }
                                 } else if progress_model_inner.is_some() {
@@ -1031,6 +1101,7 @@ pub fn start_background_worker(
                             }
                         } else {
                             emit_log(&app_handle_task, format!("ERROR: Could not open image for AI analysis: {photo_loc_actual}"));
+                        }
                         }
 
                         // Finalize
@@ -1052,6 +1123,30 @@ pub fn start_background_worker(
                         let _ = app_handle_task.emit("photo-updated", serde_json::json!({
                             "id": photo_id_task,
                         }));
+
+                        {
+                            let lock = db_task.lock().unwrap();
+                            let object_count: i32 = lock.connection
+                                .query_row("SELECT COUNT(*) FROM object WHERE photo_id = ?1", [&photo_id_task], |r| r.get(0))
+                                .unwrap_or(0);
+                            let face_count: i32 = lock.connection
+                                .query_row("SELECT COUNT(*) FROM faces WHERE photo_id = ?1", [&photo_id_task], |r| r.get(0))
+                                .unwrap_or(0);
+                            let has_caption: bool = lock.connection
+                                .query_row("SELECT caption FROM photo WHERE id = ?1", [&photo_id_task], |r| r.get::<_, Option<String>>(0))
+                                .unwrap_or(None)
+                                .is_some();
+                            eprintln!("[ml] emitting photo-analysis-result for {}", photo_id_task);
+                            let _ = app_handle_task.emit("photo-analysis-result", serde_json::json!({
+                                "id": photo_id_task,
+                                "object_count": object_count,
+                                "face_count": face_count,
+                                "has_caption": has_caption,
+                                "indexed": true,
+                                "model_timings": model_timings,
+                            }));
+                            eprintln!("[siegu-bench] photo={photo_id_task} timings={:?}", model_timings);
+                        }
 
                         let remaining = decrement_pending_count(&pending_count_task);
                         let _ = app_handle_task.emit("indexing-progress", remaining);
@@ -1075,6 +1170,10 @@ pub fn start_background_worker(
                 }
                 avg_photo_time_ms =
                     (avg_photo_time_ms * 0.9) + (start_time.elapsed().as_millis() as f64 * 0.1);
+            }
+
+            if is_single {
+                abort_clone.store(false, std::sync::atomic::Ordering::SeqCst);
             }
         }
     });

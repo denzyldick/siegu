@@ -5,7 +5,7 @@
     --accent: #000000;
     --border: rgba(0,0,0,0.08);
     --shadow-deep: 0 30px 60px -12px rgba(0,0,0,0.12), 0 18px 36px -18px rgba(0,0,0,0.15);
-    --radius: 32px;
+    --radius: 24px;
 }
 
 * {
@@ -427,7 +427,7 @@ body {
     background: white;
     border: 1px solid var(--border);
     padding: 24px 40px;
-    border-radius: 24px;
+    border-radius: 8px;
     text-decoration: none;
     color: var(--text);
     display: flex;
@@ -435,6 +435,8 @@ body {
     gap: 20px;
     transition: all 0.3s ease;
     opacity: 0;
+    font: inherit;
+    cursor: pointer;
 }
 
 .platform-link.active { opacity: 1; }
@@ -460,6 +462,32 @@ body {
 .p-text { text-align: left; }
 .p-text strong { display: block; font-size: 1.1rem; }
 .p-text span { font-size: 0.85rem; opacity: 0.6; }
+
+.mobile-waitlist-panel {
+    margin-top: 48px;
+    padding-top: 40px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 32px;
+    text-align: left;
+}
+
+.mobile-waitlist-panel h3 {
+    font-size: 1.8rem;
+    line-height: 1.1;
+    max-width: 440px;
+}
+
+.platform-row.compact {
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+}
+
+.platform-row.compact .platform-link {
+    padding: 18px 24px;
+}
 
 /* --- Footer --- */
 footer {
@@ -615,4 +643,16 @@ footer {
 @media (max-width: 992px) {
     .grid-layout { grid-template-columns: 1fr; gap: 40px; }
     .hero-split { padding-top: 140px; }
+    .mobile-waitlist-panel {
+        align-items: stretch;
+        flex-direction: column;
+        text-align: center;
+    }
+    .mobile-waitlist-panel h3 {
+        margin: 0 auto;
+    }
+    .platform-row.compact {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
 }

@@ -62,51 +62,61 @@ fn scan_files(app: tauri::AppHandle) {
     let app_handle_for_batch = app.clone();
     let path_for_batch = path.clone();
 
-    tauri::async_runtime::spawn(async move {
-        let mut buffer: Vec<database::Photo> = Vec::new();
-        let mut interval = tokio::time::interval(std::time::Duration::from_millis(1000)); // Slower UI updates
-        let database = Arc::new(std::sync::Mutex::new(database::Database::new(
-            &path_for_batch,
-        )));
+    let database = Arc::new(std::sync::Mutex::new(database::Database::new(
+        &path_for_batch,
+    )));
+    let ui_buffer = Arc::new(tokio::sync::Mutex::new(Vec::new()));
 
-        loop {
-            tokio::select! {
-                _ = interval.tick() => {
-                    if !buffer.is_empty() {
-                        let ui_batch: Vec<database::Photo> = buffer.to_vec();
-                        if !ui_batch.is_empty() {
-                            let _ = app_handle_for_batch.emit("photos-discovered", &ui_batch);
-                        }
-                        let db_to_save = buffer.clone();
-                        let db_arc = Arc::clone(&database);
-                        let _ = tauri::async_runtime::spawn_blocking(move || {
-                            if let Ok(mut db) = db_arc.lock() {
-                                let _ = db.store_photo_batch(&db_to_save);
-                            }
-                        }).await;
-                        buffer.clear();
-                    }
+    {
+        let app = app_handle_for_batch.clone();
+        let ui = Arc::clone(&ui_buffer);
+        tauri::async_runtime::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
+            loop {
+                interval.tick().await;
+                let batch = {
+                    let mut buf = ui.lock().await;
+                    let b = buf.clone();
+                    buf.clear();
+                    b
+                };
+                if !batch.is_empty() {
+                    eprintln!("[ui-buffer] emitting {} photos", batch.len());
+                    let _ = app.emit("photos-discovered", &batch);
                 }
-                Some(photo) = batch_rx.recv() => {
-                    buffer.push(photo);
-                    if buffer.len() >= 200 { // Larger DB batches
-                        let ui_batch: Vec<database::Photo> = buffer.to_vec();
-                        if !ui_batch.is_empty() {
-                            let _ = app_handle_for_batch.emit("photos-discovered", &ui_batch);
-                        }
-                        let db_to_save = buffer.clone();
-                        let db_arc = Arc::clone(&database);
-                        let _ = tauri::async_runtime::spawn_blocking(move || {
-                            if let Ok(mut db) = db_arc.lock() {
-                                let _ = db.store_photo_batch(&db_to_save);
-                            }
-                        }).await;
-                        buffer.clear();
-                    }
+            }
+        });
+    }
+
+    tauri::async_runtime::spawn(async move {
+        while let Some(photo) = batch_rx.recv().await {
+            let db_arc = Arc::clone(&database);
+            let app_clone = app_handle_for_batch.clone();
+            let ui = Arc::clone(&ui_buffer);
+            let photo_for_db = photo.clone();
+            let photo_id = photo.id.clone();
+
+            eprintln!("[batch] saving photo {} to DB", photo_id);
+            let _ = tauri::async_runtime::spawn_blocking(move || {
+                if let Ok(mut db) = db_arc.lock() {
+                    let _ = db.store_photo_batch(&[photo_for_db]);
                 }
-                else => break,
+            }).await;
+
+            eprintln!("[batch] pushing {} to UI buffer (size={})", photo_id, {
+                let buf = ui.lock().await;
+                buf.len()
+            });
+            ui.lock().await.push(photo);
+
+            if let Some(state) = app_clone.try_state::<ml::MlContext>() {
+                eprintln!("[batch] sending AnalyzeSingle({})", photo_id);
+                let _ = state.tx.send(ml::Job::AutoAnalyzeSingle(photo_id));
+            } else {
+                eprintln!("[batch] WARN: MlContext state not available");
             }
         }
+        eprintln!("[batch] receiver exited (all senders dropped)");
     });
 
     let abort_flag = Arc::clone(&state.abort);
@@ -198,13 +208,19 @@ async fn check_models(app: tauri::AppHandle) -> Vec<String> {
         downloaded.push("ultraface".to_string());
     }
 
-    let ocr_files = ["ocr_det.onnx", "ocr_rec.onnx", "en_dict.txt"];
+    let ocr_files = ["ocr_det.onnx", "ocr_rec.onnx"];
     let mut ocr_ok = true;
     for name in ocr_files {
         let p = models_dir.join(name);
         if !p.exists() || p.metadata().map(|m| m.len()).unwrap_or(0) < 1024 {
             ocr_ok = false;
             break;
+        }
+    }
+    if ocr_ok {
+        let dict_path = models_dir.join("en_dict.txt");
+        if !dict_path.exists() {
+            ocr_ok = false;
         }
     }
     if ocr_ok {
@@ -847,7 +863,19 @@ async fn index_faces(
 
 #[tauri::command]
 async fn analyze_photo(state: tauri::State<'_, ml::MlContext>, id: String) -> Result<(), String> {
+    state.abort.store(true, std::sync::atomic::Ordering::SeqCst);
     let _ = state.tx.send(ml::Job::AnalyzeSingle(id));
+    Ok(())
+}
+
+#[tauri::command]
+async fn analyze_photo_model(
+    state: tauri::State<'_, ml::MlContext>,
+    id: String,
+    model_id: String,
+) -> Result<(), String> {
+    state.abort.store(true, std::sync::atomic::Ordering::SeqCst);
+    let _ = state.tx.send(ml::Job::AnalyzeSingleWithModel(id, model_id));
     Ok(())
 }
 
@@ -876,8 +904,42 @@ async fn get_heatmap_data(app: tauri::AppHandle) -> String {
         return "[]".to_string();
     }
     let database = database::Database::new(&path);
-    let photos = database.get_all_photos_with_location();
-    println!("DEBUG: Found {} photos with GPS for heatmap", photos.len());
+    let points = database.get_heatmap_points();
+    println!("DEBUG: Found {} photos with GPS for heatmap", points.len());
+    serde_json::to_string(&points).unwrap_or("[]".to_string())
+}
+
+#[tauri::command]
+async fn get_photo_encoded_batch(app: tauri::AppHandle, ids: Vec<String>) -> std::collections::HashMap<String, String> {
+    let path = get_config_path(&app);
+    if path.is_empty() || ids.is_empty() {
+        return std::collections::HashMap::new();
+    }
+    let database = database::Database::new(&path);
+    database.get_photo_encoded_batch(&ids)
+}
+
+#[tauri::command]
+async fn get_photo_by_id(app: tauri::AppHandle, id: String) -> String {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return "null".to_string();
+    }
+    let database = database::Database::new(&path);
+    match database.get_photo_by_id(&id) {
+        Some(photo) => serde_json::to_string(&photo).unwrap_or("null".to_string()),
+        None => "null".to_string(),
+    }
+}
+
+#[tauri::command]
+async fn get_photos_for_map_click(app: tauri::AppHandle, ids: Vec<String>) -> String {
+    let path = get_config_path(&app);
+    if path.is_empty() || ids.is_empty() {
+        return "[]".to_string();
+    }
+    let database = database::Database::new(&path);
+    let photos = database.get_photos_by_ids(&ids);
     serde_json::to_string(&photos).unwrap_or("[]".to_string())
 }
 
@@ -1123,8 +1185,12 @@ pub fn run() {
             get_config,
             get_indexing_status,
             get_heatmap_data,
+            get_photo_by_id,
+            get_photo_encoded_batch,
+            get_photos_for_map_click,
             initialize_sync_folder,
             analyze_photo,
+            analyze_photo_model,
             analyze_model,
         ])
         .run(tauri::generate_context!())
