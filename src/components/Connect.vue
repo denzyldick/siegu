@@ -291,7 +291,7 @@
   right: 0;
   bottom: 0;
   z-index: 10;
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(4px);
 }
 

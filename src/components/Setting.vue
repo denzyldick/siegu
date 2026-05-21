@@ -13,7 +13,7 @@
         </div>
 
         <!-- Authorized Folders Card -->
-        <v-card v-if="!hideFolderSection" variant="flat" color="#ffffff" rounded="xl" class="mb-6 overflow-hidden border-subtle">
+        <v-card v-if="!hideFolderSection" variant="flat" color="surface" rounded="xl" class="mb-6 overflow-hidden border-subtle">
           <v-card-item class="bg-zinc-100 py-4">
             <template v-slot:prepend>
               <div class="siegu-icon-circle-dark mr-3">
@@ -84,7 +84,7 @@
 
 
         <!-- AI Models Card -->
-        <v-card v-if="!hideAiSection" variant="flat" color="#ffffff" rounded="xl" class="mb-6 overflow-hidden border-subtle">
+        <v-card v-if="!hideAiSection" variant="flat" color="surface" rounded="xl" class="mb-6 overflow-hidden border-subtle">
           <v-card-item class="bg-zinc-100 py-4">
             <template v-slot:prepend>
               <div class="siegu-icon-circle-dark mr-3">
@@ -314,7 +314,7 @@
         </v-card>
 
         <!-- Language Section -->
-        <v-card variant="flat" color="#ffffff" rounded="xl" class="mb-6 border-subtle overflow-hidden">
+        <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
           <v-card-item class="bg-zinc-100 py-4">
             <template v-slot:prepend>
               <div class="siegu-icon-circle-dark mr-3">
@@ -340,8 +340,39 @@
           </v-card-text>
         </v-card>
 
+        <!-- Appearance Section -->
+        <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
+          <v-card-item class="bg-zinc-100 py-4">
+            <template v-slot:prepend>
+              <div class="siegu-icon-circle-dark mr-3">
+                <v-icon color="#ffffff" size="small">mdi-theme-light-dark</v-icon>
+              </div>
+            </template>
+            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ $t('settings.appearance') }}</v-card-title>
+          </v-card-item>
+          <v-card-text class="pt-4">
+            <v-radio-group v-model="currentTheme" @update:model-value="setAppearance" hide-details class="mt-0">
+              <v-radio :label="$t('settings.theme_system')" value="system">
+                <template v-slot:prepend>
+                  <v-icon size="small" color="#71717a" class="mr-2">mdi-theme-light-dark</v-icon>
+                </template>
+              </v-radio>
+              <v-radio :label="$t('settings.theme_light')" value="light">
+                <template v-slot:prepend>
+                  <v-icon size="small" color="#f59e0b" class="mr-2">mdi-white-balance-sunny</v-icon>
+                </template>
+              </v-radio>
+              <v-radio :label="$t('settings.theme_dark')" value="dark">
+                <template v-slot:prepend>
+                  <v-icon size="small" color="#71717a" class="mr-2">mdi-weather-night</v-icon>
+                </template>
+              </v-radio>
+            </v-radio-group>
+          </v-card-text>
+        </v-card>
+
         <!-- Maintenance Section -->
-        <v-card v-if="!embedded" variant="flat" color="#ffffff" rounded="xl" class="mb-6 border-subtle overflow-hidden">
+        <v-card v-if="!embedded" variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
           <v-card-item class="bg-zinc-100 py-4">
             <template v-slot:prepend>
               <div class="siegu-icon-circle-dark mr-3">
@@ -458,7 +489,7 @@
     </v-row>
     <!-- Download Confirmation Dialog -->
     <v-dialog v-model="downloadDialog.show" max-width="400" rounded="xl">
-      <v-card color="#ffffff" border class="border-subtle overflow-hidden">
+      <v-card color="surface" border class="border-subtle overflow-hidden">
         <v-card-item class="bg-zinc-100 py-4">
           <template v-slot:prepend>
             <div class="siegu-icon-circle-dark mr-3">
@@ -485,7 +516,7 @@
     </v-dialog>
 
     <v-dialog v-model="cleanupDialog.show" max-width="400" rounded="xl">
-      <v-card color="#ffffff" border class="border-subtle overflow-hidden">
+      <v-card color="surface" border class="border-subtle overflow-hidden">
         <v-card-item class="bg-zinc-100 py-4">
           <template v-slot:prepend>
             <div class="siegu-icon-circle-dark mr-3">
@@ -512,7 +543,7 @@
     </v-dialog>
 
     <v-dialog v-model="removeFolderDialog.show" max-width="400" rounded="xl">
-      <v-card color="#ffffff" border class="border-subtle overflow-hidden">
+      <v-card color="surface" border class="border-subtle overflow-hidden">
         <v-card-item class="bg-zinc-100 py-4">
           <template v-slot:prepend>
             <div class="siegu-icon-circle-dark mr-3">
@@ -633,6 +664,7 @@ export default {
       path: ""
     },
     currentLang: localStorage.getItem("siegu_language") || "en",
+    currentTheme: localStorage.getItem("siegu_theme") || "system",
   }),
   computed: {
     missingSelectedCount() {
@@ -669,7 +701,7 @@ export default {
       return null;
     },
     availableLanguages() {
-      const codes = ["en", "nl", "fr", "es", "pap"];
+      const codes = ["en", "nl", "fr", "es", "pap", "de", "it", "pt"];
       return codes.map(code => ({
         code,
         label: this.$t(`language.${code}`),
@@ -759,6 +791,11 @@ export default {
       this.currentLang = code;
       localStorage.setItem("siegu_language", code);
       window.location.reload();
+    },
+    setAppearance(val) {
+      this.currentTheme = val;
+      localStorage.setItem("siegu_theme", val);
+      window.dispatchEvent(new CustomEvent('siegu-theme-changed'));
     },
     async fetchLogs() {
       try {
@@ -905,7 +942,7 @@ export default {
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     },
     formatEta(ms) {
-      if (!ms || ms < 0) return 'calculating...';
+      if (!ms || ms < 0) return this.$t('settings.calculating');
       const totalSeconds = Math.floor(ms / 1000);
       const hours = Math.floor(totalSeconds / 3600);
       const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -1090,24 +1127,24 @@ export default {
 
 <style scoped>
 .bg-zinc-100 {
-  background-color: #f4f4f5 !important;
+  background-color: var(--color-bg-zinc-100) !important;
 }
 .siegu-expansion :deep(.v-expansion-panel-title) {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 .border-top-subtle {
-  border-top: 1px solid rgba(0, 0, 0, 0.05) !important;
+  border-top: 1px solid var(--color-border-subtle) !important;
 }
 .ai-model-card {
   transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
 }
 .ai-activity-strip {
-  border-color: rgba(24, 24, 27, 0.18) !important;
+  border-color: var(--color-border-default) !important;
 }
 .ai-model-card-active {
-  border-color: #18181b !important;
-  background-color: #fafafa !important;
-  box-shadow: inset 3px 0 0 #18181b;
+  border-color: var(--color-text-primary) !important;
+  background-color: var(--color-bg-primary) !important;
+  box-shadow: inset 3px 0 0 var(--color-text-primary);
 }
 .model-status-line {
   gap: 12px;

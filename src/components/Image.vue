@@ -87,13 +87,12 @@ export default {
   }),
   async mounted() {
     this.setupObserver();
-    this.mediaPort = Image._mediaPort;
-    if (!this.mediaPort) {
+    if (!window.__img_mediaPort) {
       try {
-        Image._mediaPort = await invoke("get_media_server_port");
-        this.mediaPort = Image._mediaPort;
+        window.__img_mediaPort = await invoke("get_media_server_port");
       } catch (e) {}
     }
+    this.mediaPort = window.__img_mediaPort;
   },
   computed: {
     videoUrl() {
@@ -113,6 +112,10 @@ export default {
         return this.path.encoded;
       }
       if (!this.isVideo) {
+        const ext = this.path.location.split('.').pop().toLowerCase();
+        if (['heic', 'heif'].includes(ext)) {
+          return null;
+        }
         return convertFileSrc(this.path.location);
       }
       return null;
@@ -167,6 +170,10 @@ export default {
         return v.toFixed(2);
       },
       onImageError(e) {
+        const ext = this.path?.location?.split('.').pop().toLowerCase();
+        if (['heic', 'heif'].includes(ext) && !this.path?.encoded) {
+          return;
+        }
         console.error('[Image] Failed to load:', this.path?.location, 'encoded:', this.path?.encoded ? 'yes' : 'no', 'src type:', this.path?.encoded ? 'base64' : 'convertFileSrc');
       },
       handleClick() {

@@ -152,7 +152,7 @@
 
     <!-- Name Dialog -->
     <v-dialog v-model="nameDialog" max-width="440" transition="dialog-bottom-transition">
-      <v-card class="rounded-xl pa-2 elevation-24 border-subtle" color="#ffffff">
+      <v-card class="rounded-xl pa-2 elevation-24 border-subtle" color="surface">
         <div class="pa-6">
           <div class="d-flex align-center justify-space-between mb-8">
             <h3 class="text-h5 font-weight-black text-zinc-primary">{{ $t('people.who_is_this') }}</h3>
@@ -208,7 +208,7 @@
 
     <!-- Manage Dialog -->
     <v-dialog v-model="manageDialog" max-width="480" transition="scale-transition">
-      <v-card class="rounded-xl pa-2 elevation-24 overflow-hidden border-subtle" color="#ffffff">
+      <v-card class="rounded-xl pa-2 elevation-24 overflow-hidden border-subtle" color="surface">
         <div class="pa-6">
           <div class="d-flex align-center justify-space-between mb-6">
             <h3 class="text-h5 font-weight-black text-zinc-primary">{{ $t('people.profile_actions') }}</h3>
@@ -283,8 +283,8 @@
 
     <!-- Cluster View Dialog -->
     <v-dialog v-model="clusterDialog" max-width="800" transition="dialog-bottom-transition" scrollable>
-      <v-card class="rounded-xl border-subtle overflow-hidden" color="#ffffff">
-        <v-card-title class="pa-6 bg-zinc-50 border-bottom-subtle d-flex align-center">
+      <v-card class="rounded-xl border-subtle overflow-hidden" color="surface">
+        <v-card-title class="pa-6 bg-zinc-100 border-bottom-subtle d-flex align-center">
           <div>
             <div class="text-h5 font-weight-black text-zinc-primary">{{ $t('people.grouped_faces') }}</div>
             <div class="text-caption text-zinc-secondary font-weight-bold uppercase tracking-widest">
@@ -489,13 +489,13 @@ export default {
 </script>
 
 <style scoped>
-.bg-siegu-main { background-color: #fafafa !important; }
-.bg-zinc-100 { background-color: #f4f4f5 !important; }
-.text-zinc-primary { color: #18181b !important; }
-.text-zinc-secondary { color: #52525b !important; }
-.text-zinc-muted { color: #71717a !important; }
-.border-subtle { border: 1px solid rgba(0, 0, 0, 0.1) !important; }
-.border-bottom-subtle { border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important; }
+.bg-siegu-main { background-color: var(--color-bg-primary); }
+.bg-zinc-100 { background-color: var(--color-bg-zinc-100); }
+.text-zinc-primary { color: var(--color-text-primary) !important; }
+.text-zinc-secondary { color: var(--color-text-secondary) !important; }
+.text-zinc-muted { color: var(--color-text-muted) !important; }
+.border-subtle { border: 1px solid var(--color-border-default) !important; }
+.border-bottom-subtle { border-bottom: 1px solid var(--color-border-default) !important; }
 .max-w-400 { max-width: 400px !important; }
 
 .header-banner {

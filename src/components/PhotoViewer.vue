@@ -1,17 +1,17 @@
 <template>
   <v-dialog v-model="visible" fullscreen transition="dialog-bottom-transition">
-    <v-card rounded="0" color="#fafafa" class="fill-height" style="overflow: hidden;">
+    <v-card rounded="0" color="background" class="fill-height" style="overflow: hidden;">
       <v-layout class="fill-height">
         <!-- Main Viewer Area -->
-        <v-main class="fill-height position-relative d-flex flex-column align-center justify-center p-0" style="background-color: #fafafa;">
+        <v-main class="fill-height position-relative d-flex flex-column align-center justify-center p-0" style="background-color: rgb(var(--v-theme-background));">
 
           <!-- Top Controls -->
           <v-btn icon="mdi-close" variant="text" color="#18181b" class="viewer-nav-btn top-left" @click="close"></v-btn>
           <v-btn
-            v-if="!isVideo"
+            v-if="!isVideo && !showInfo"
             icon="mdi-information-outline"
             variant="text"
-            :color="showInfo ? '#18181b' : '#71717a'"
+            color="#71717a"
             class="viewer-nav-btn top-right"
             @click="showInfo = !showInfo"
           ></v-btn>
@@ -64,8 +64,9 @@
           v-model="showInfo"
           location="right"
           width="350"
-          color="#ffffff"
+          color="surface"
           class="border-s border-subtle info-drawer"
+          temporary
         >
         <v-toolbar color="transparent" density="compact">
           <v-toolbar-title class="text-zinc-primary text-subtitle-1 font-weight-bold">{{ $t('photo_viewer.metadata') }}</v-toolbar-title>
@@ -92,6 +93,35 @@
               <div v-else-if="globalEta" class="text-caption text-zinc-muted mt-2 text-center">
                  {{ $t('photo_viewer.library_indexing', { time: formatEta(globalEta) }) }}
               </div>
+          </div>
+
+          <v-divider class="opacity-5 mb-4" v-if="modelChips.length > 0"></v-divider>
+
+          <div class="mb-6" v-if="modelChips.length > 0">
+            <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">{{ $t('photo_viewer.run_model') }}</div>
+            <div v-if="isAnalyzingModel" class="d-flex align-center mb-3">
+              <v-progress-circular indeterminate size="16" width="2" color="black" class="mr-2"></v-progress-circular>
+              <span class="text-body-2 text-zinc-primary font-weight-bold">
+                {{ $t('photo_viewer.running_model', { model: $t('models.' + isAnalyzingModel + '.title') }) }}
+                <span class="text-caption text-zinc-muted ml-1">({{ formatElapsed(runStartTime, runTimerTick) }})</span>
+              </span>
+            </div>
+            <div class="d-flex flex-wrap ga-2">
+              <v-chip
+                v-for="m in modelChips"
+                :key="m.id"
+                :variant="m.done ? 'tonal' : 'flat'"
+                :color="m.done ? 'success' : 'black'"
+                size="small"
+                :prepend-icon="m.done ? 'mdi-check-circle-outline' : 'mdi-play-circle-outline'"
+                :disabled="m.done || (isAnalyzingModel !== null && isAnalyzingModel !== m.id)"
+                :loading="isAnalyzingModel === m.id"
+                @click="runSingleModel(m.id)"
+                class="font-weight-bold"
+              >
+                {{ $t('models.' + m.id + '.title') }}
+              </v-chip>
+            </div>
           </div>
 
           <div class="mb-6 pt-4">
@@ -197,34 +227,6 @@
             </div>
           </div>
 
-          <v-divider class="opacity-5 mb-4" v-if="modelChips.length > 0"></v-divider>
-
-          <div class="mb-6" v-if="modelChips.length > 0">
-            <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">{{ $t('photo_viewer.run_model') }}</div>
-            <div v-if="isAnalyzingModel" class="d-flex align-center mb-3">
-              <v-progress-circular indeterminate size="16" width="2" color="black" class="mr-2"></v-progress-circular>
-              <span class="text-body-2 text-zinc-primary font-weight-bold">
-                {{ $t('photo_viewer.running_model', { model: $t('models.' + isAnalyzingModel + '.title') }) }}
-                <span class="text-caption text-zinc-muted ml-1">({{ formatElapsed(runStartTime, runTimerTick) }})</span>
-              </span>
-            </div>
-            <div class="d-flex flex-wrap ga-2">
-              <v-chip
-                v-for="m in modelChips"
-                :key="m.id"
-                :variant="m.done ? 'tonal' : 'flat'"
-                :color="m.done ? 'success' : 'black'"
-                size="small"
-                :prepend-icon="m.done ? 'mdi-check-circle-outline' : 'mdi-play-circle-outline'"
-                :disabled="m.done || (isAnalyzingModel !== null && isAnalyzingModel !== m.id)"
-                :loading="isAnalyzingModel === m.id"
-                @click="runSingleModel(m.id)"
-                class="font-weight-bold"
-              >
-                {{ $t('models.' + m.id + '.title') }}
-              </v-chip>
-            </div>
-          </div>
         </v-list>
       </v-navigation-drawer>
       </v-layout>
@@ -414,10 +416,10 @@ export default {
 
             const r = event.payload;
             const parts = [];
-            if (r.object_count > 0) parts.push(`${r.object_count} objects`);
-            if (r.face_count > 0) parts.push(`${r.face_count} faces`);
-            if (r.has_caption) parts.push('caption');
-            if (parts.length === 0) parts.push('nothing detected');
+            if (r.object_count > 0) parts.push(this.$t('photo_viewer.objects_count', { count: r.object_count }));
+            if (r.face_count > 0) parts.push(this.$t('photo_viewer.faces_count', { count: r.face_count }));
+            if (r.has_caption) parts.push(this.$t('photo_viewer.has_caption'));
+            if (parts.length === 0) parts.push(this.$t('photo_viewer.nothing_detected'));
 
             this.snackbar.text = this.$t('photo_viewer.analysis_complete', { models: parts.join(', '), time: elapsed });
             this.snackbar.show = true;
@@ -558,7 +560,7 @@ export default {
   async mounted() {
       window.addEventListener('keydown', this.handleKeydown);
       try { this.os = await invoke("get_os"); } catch (e) {}
-      if (!PhotoViewer._mediaPort) { try { PhotoViewer._mediaPort = await invoke("get_media_server_port"); } catch (e) {} } this.mediaPort = PhotoViewer._mediaPort;
+      if (!window.__pv_mediaPort) { try { window.__pv_mediaPort = await invoke("get_media_server_port"); } catch (e) {} } this.mediaPort = window.__pv_mediaPort;
       this.listenForEta();
       try { this.downloadedModels = await invoke("check_models"); } catch (e) {}
   },
@@ -632,9 +634,9 @@ export default {
 .thumbnail-rail-container {
   width: 100%;
   height: 100px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--color-bg-rail);
   backdrop-filter: blur(12px);
-  border-top: 1px solid rgba(0,0,0,0.05);
+  border-top: 1px solid var(--color-border-subtle);
   display: flex;
   align-items: center;
   padding: 0 10px;

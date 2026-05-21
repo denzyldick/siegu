@@ -21,6 +21,8 @@ jobs:
     env:
       ORT_STRATEGY: download
       MSVC_RUNTIME_LIBRARY: MultiThreadedDLL
+      CFLAGS: /MD
+      CXXFLAGS: /MD
     
     steps:
       - name: Checkout repository

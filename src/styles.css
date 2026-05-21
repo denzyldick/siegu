@@ -4,9 +4,6 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color: #18181b;
-  background-color: #fafafa;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -14,19 +11,56 @@
   -webkit-text-size-adjust: 100%;
 }
 
+.v-theme--light {
+  --color-bg-primary: #fafafa;
+  --color-bg-surface: #ffffff;
+  --color-bg-zinc-100: #f4f4f5;
+  --color-text-primary: #18181b;
+  --color-text-secondary: #52525b;
+  --color-text-muted: #71717a;
+  --color-border-subtle: rgba(0, 0, 0, 0.05);
+  --color-border-default: rgba(0, 0, 0, 0.1);
+  --color-border-hover: rgba(0, 0, 0, 0.2);
+  --color-bg-hover: #f4f4f5;
+  --color-bg-field: #ffffff;
+  --color-bg-scrollbar: #fafafa;
+  --color-scrollbar-thumb: rgba(0, 0, 0, 0.1);
+  --color-scrollbar-hover: rgba(0, 0, 0, 0.2);
+  --color-bg-list: #ffffff;
+  --color-bg-btn: #ffffff;
+}
+
+.v-theme--dark {
+  --color-bg-primary: #09090b;
+  --color-bg-surface: #18181b;
+  --color-bg-zinc-100: #27272a;
+  --color-text-primary: #fafafa;
+  --color-text-secondary: #a1a1aa;
+  --color-text-muted: #71717a;
+  --color-border-subtle: rgba(255, 255, 255, 0.06);
+  --color-border-default: rgba(255, 255, 255, 0.1);
+  --color-border-hover: rgba(255, 255, 255, 0.18);
+  --color-bg-hover: #27272a;
+  --color-bg-field: #18181b;
+  --color-bg-scrollbar: #09090b;
+  --color-scrollbar-thumb: rgba(255, 255, 255, 0.12);
+  --color-scrollbar-hover: rgba(255, 255, 255, 0.2);
+  --color-bg-list: #18181b;
+  --color-bg-btn: #27272a;
+}
+
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #fafafa;
 }
 
 /* Global Siegu Design System */
 .v-application .siegu-btn, .siegu-btn {
-  background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: var(--color-bg-btn);
+  border: 1px solid var(--color-border-default);
   border-radius: 12px;
-  color: #18181b;
+  color: var(--color-text-primary);
   text-transform: none;
   font-weight: 600;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -34,8 +68,8 @@ body {
 }
 
 .v-application .siegu-btn:hover, .siegu-btn:hover {
-  background: #f4f4f5;
-  border-color: rgba(0, 0, 0, 0.2);
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-hover);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
@@ -45,39 +79,39 @@ body {
 }
 
 .siegu-btn-sm {
-  background: #ffffff !important;
-  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  background: var(--color-bg-btn) !important;
+  border: 1px solid var(--color-border-default) !important;
   border-radius: 10px;
   font-weight: 600;
   font-size: 13px;
   letter-spacing: 0.02em;
-  color: #18181b !important;
+  color: var(--color-text-primary) !important;
   text-transform: none !important;
   height: 40px !important;
 }
 
 .siegu-btn-sm:hover {
-  background: #f4f4f5 !important;
-  border-color: rgba(0, 0, 0, 0.2) !important;
+  background: var(--color-bg-hover) !important;
+  border-color: var(--color-border-hover) !important;
 }
 
 .v-application .siegu-field :deep(.v-field), 
 .v-application .siegu-field.v-field,
 .siegu-field :deep(.v-field), 
 .siegu-field.v-field {
-  background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: var(--color-bg-field);
+  border: 1px solid var(--color-border-default);
   border-radius: 12px;
   transition: all 0.2s ease;
 }
 
 .v-application .v-field--focused, .v-field--focused {
-  border-color: rgba(0, 0, 0, 0.2);
-  background: #ffffff;
+  border-color: var(--color-border-hover);
+  background: var(--color-bg-field);
 }
 
 .border-subtle {
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .bg-success-light {
@@ -93,29 +127,29 @@ body {
 }
 
 .border-bottom-subtle {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .v-application .text-zinc-primary, .text-zinc-primary {
-  color: #18181b;
+  color: var(--color-text-primary);
 }
 
 .v-application .text-zinc-secondary, .text-zinc-secondary {
-  color: #52525b;
+  color: var(--color-text-secondary);
 }
 
 .v-application .text-zinc-muted, .text-zinc-muted {
-  color: #71717a;
+  color: var(--color-text-muted);
 }
 
 /* Standard UI Overrides */
 .v-application .v-card, .v-application .v-sheet, .v-card, .v-sheet {
-  background-color: #ffffff;
+  background-color: var(--color-bg-surface);
 }
 
 .v-application .siegu-list, .siegu-list {
-  background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: var(--color-bg-list);
+  border: 1px solid var(--color-border-default);
   border-radius: 12px;
 }
 
@@ -126,14 +160,55 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #fafafa;
+  background: var(--color-bg-scrollbar);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--color-scrollbar-thumb);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--color-scrollbar-hover);
+}
+
+/* Icon circle */
+.siegu-icon-circle-dark {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-text-primary);
+}
+
+.v-theme--light .bg-zinc-100 {
+  background-color: #f4f4f5;
+}
+
+.v-theme--dark .bg-zinc-100 {
+  background-color: #27272a;
+}
+
+/* Onboarding stepper compatibility */
+.v-theme--dark .v-card-item.bg-zinc-100 {
+  background-color: #27272a !important;
+}
+
+.v-theme--dark .v-card-actions.bg-zinc-50 {
+  background-color: #18181b !important;
+}
+
+/* App background */
+.v-theme--dark .bg-siegu-main {
+  background-color: #09090b !important;
+}
+
+.v-theme--light {
+  --color-bg-rail: rgba(255, 255, 255, 0.8);
+}
+
+.v-theme--dark {
+  --color-bg-rail: rgba(9, 9, 11, 0.85);
 }

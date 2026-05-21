@@ -1,6 +1,7 @@
 {
   "app": {
-    "name": "Siegu"
+    "name": "Siegu",
+    "sync": "Sync"
   },
   "common": {
     "close": "Close",
@@ -197,7 +198,11 @@
     "analysis_complete": "AI analysis: {models} ({time}s)",
     "model_complete": "{model} analysis complete ({time}s)",
     "model_failed": "{model} analysis failed",
-    "calculating": "calculating..."
+    "calculating": "calculating...",
+    "objects_count": "{count} objects",
+    "faces_count": "{count} faces",
+    "has_caption": "caption",
+    "nothing_detected": "nothing detected"
   },
   "folder_picker": {
     "select_folder": "Select Folder",
@@ -275,7 +280,11 @@
     "model_status_ready_to_run": "Ready to run",
     "model_status_not_downloaded": "Not downloaded",
     "model_n_remaining": "{n} left",
-    "model_n_of_total": "{n} of {total}"
+    "model_n_of_total": "{n} of {total}",
+    "appearance": "Appearance",
+    "theme_system": "System",
+    "theme_light": "Light",
+    "theme_dark": "Dark"
   },
   "language": {
     "label": "Language",
@@ -283,7 +292,10 @@
     "nl": "Nederlands",
     "fr": "Français",
     "es": "Español",
-    "pap": "Papiamentu"
+    "pap": "Papiamentu",
+    "de": "Deutsch",
+    "it": "Italiano",
+    "pt": "Português"
   },
   "guided_tour": {
     "welcome_title": "Welcome to Siegu!",

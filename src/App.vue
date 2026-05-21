@@ -73,8 +73,18 @@ export default {
     },
     modelProgress: {},
   }),
+  beforeMount() {
+    this.applyTheme();
+  },
   async mounted() {
     invoke("get_os").then(os => this.os = os);
+
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    mq.addEventListener('change', this.applyTheme);
+    window.addEventListener('siegu-theme-changed', this.applyTheme);
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'siegu_theme') this.applyTheme();
+    });
 
     listen("download-progress", (event) => {
       const { model, downloaded, total } = event.payload;
@@ -385,6 +395,20 @@ export default {
         invoke("scan_files", { scan: true });
       }, 500);
     },
+    applyTheme() {
+      const pref = localStorage.getItem('siegu_theme') || 'system';
+      let theme;
+      if (pref === 'system') {
+        theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      } else {
+        theme = pref;
+      }
+      this.$vuetify.theme.global.name = theme;
+    },
+  },
+  beforeUnmount() {
+    window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', this.applyTheme);
+    window.removeEventListener('siegu-theme-changed', this.applyTheme);
   },
   watch: {
     search(val) {
@@ -577,7 +601,7 @@ export default {
           </v-container>
           </template>
 
-          <v-layout v-else class="bg-siegu-main">      <v-app-bar elevation="0" v-if="current_page === 'home'" color="#ffffff" class="border-bottom-subtle px-2">
+          <v-layout v-else class="bg-siegu-main">      <v-app-bar elevation="0" v-if="current_page === 'home'" color="surface" class="border-bottom-subtle px-2">
         <v-row class="px-2 align-center no-gutters">
           <v-col cols="auto">
             <v-menu offset-y transition="scale-transition">
@@ -592,11 +616,11 @@ export default {
                   </div>
                 </v-btn>
               </template>
-              <v-card min-width="320" border class="mt-2 border-subtle overflow-hidden" color="#ffffff" rounded="xl">
+              <v-card min-width="320" border class="mt-2 border-subtle overflow-hidden" color="surface" rounded="xl">
                 <div class="bg-zinc-50 pa-4 border-bottom-subtle">
                   <div class="text-overline font-weight-black text-zinc-muted mb-1">{{ $t('sync.status_label') }}</div>
                   <div class="d-flex align-center justify-space-between">
-                    <div class="text-subtitle-1 font-weight-bold text-zinc-primary">{{ $t('app.name') }} Sync</div>
+                    <div class="text-subtitle-1 font-weight-bold text-zinc-primary">{{ $t('app.name') }} {{ $t('app.sync') }}</div>
                     <v-chip v-if="isActive" size="x-small" color="black" variant="flat" class="text-white">{{ statusLabel }}</v-chip>
                   </div>
                 </div>
@@ -708,10 +732,11 @@ export default {
               rounded="lg"
               class="search-autocomplete w-100"
               data-tour="search"
-              bg-color="#ffffff"
-              :disabled="!searchItems.length && !filteredPeople.length"
+              bg-color="rgb(var(--v-theme-surface))"
+              :disabled="false"
               :menu-props="{ contentClass: 'siegu-list', elevation: 4 }"
               :no-data-text="searchHelpText"
+              :filter="() => true"
               @update:search="onSearchUpdate"
               @update:model-value="onSearchSelect"
             >
@@ -779,7 +804,7 @@ export default {
                     </v-badge>
                   </v-btn>
                 </template>
-                <v-card min-width="250" border class="mt-2 border-subtle" color="#ffffff" rounded="xl">
+                <v-card min-width="250" border class="mt-2 border-subtle" color="surface" rounded="xl">
                   <v-list bg-color="transparent" density="compact" class="px-2 ga-2">
                     <v-list-item class="px-0">
                       <v-switch v-model="filters.favoritesOnly" :label="$t('filters.favorites_only')" color="#000000" hide-details density="compact" inset class="text-zinc-secondary px-2"></v-switch>
@@ -861,7 +886,7 @@ export default {
         </v-main>
 
       <div class="dock-container" v-if="!clean_install">
-        <v-sheet class="dock d-flex justify-space-around align-center pa-2 rounded-pill mb-8" elevation="0" width="100%" max-width="380" color="rgba(255, 255, 255, 0.8)">
+        <v-sheet class="dock d-flex justify-space-around align-center pa-2 rounded-pill mb-8" elevation="0" width="100%" max-width="380" color="surface">
           <v-btn icon variant="text" @click="current_page = 'home'" size="small" class="siegu-dock-btn" :class="{'siegu-dock-btn--active': current_page === 'home'}" data-tour="dock-home">
             <v-img :src="logoUrl" width="24" height="24" :class="current_page === 'home' ? 'opacity-100' : 'opacity-40'"></v-img>
           </v-btn>
@@ -884,7 +909,7 @@ export default {
     <!-- Persistent Sync Status Banner (Non-blocking) -->
     <v-fade-transition>
       <div v-if="syncStatus.status !== 'idle' && syncStatus.status !== 'Up to date' && !clean_install" class="sync-banner-container">
-        <v-sheet class="sync-banner d-flex align-center px-4 py-2 rounded-pill shadow-xl border-subtle" color="#ffffff">
+        <v-sheet class="sync-banner d-flex align-center px-4 py-2 rounded-pill shadow-xl border-subtle" color="surface">
           <v-progress-circular 
             v-if="syncStatus.progress === 0 || syncStatus.progress === 100" 
             indeterminate 
@@ -920,7 +945,7 @@ export default {
     <GuidedTour :active="showTour" @finish="showTour = false" @skip="showTour = false" />
 
     <v-dialog v-model="searchDisabledDialog.show" max-width="400" rounded="xl">
-      <v-card color="#ffffff" border class="border-subtle overflow-hidden">
+      <v-card color="surface" border class="border-subtle overflow-hidden">
         <v-card-item class="bg-zinc-100 py-4">
           <template v-slot:prepend>
             <div class="siegu-icon-circle-dark mr-3">
@@ -960,7 +985,7 @@ export default {
 .dock {
   pointer-events: auto;
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--color-border-default);
 }
 
 .sync-banner-container {
@@ -979,32 +1004,32 @@ export default {
   min-width: 240px;
   max-width: 90vw;
   box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.15) !important;
-  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid var(--color-border-subtle) !important;
 }
 
 .siegu-dock-btn {
-  color: #71717a !important;
+  color: var(--color-text-muted) !important;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
   border-radius: 50% !important;
 }
 
 .siegu-dock-btn:hover {
-  background: #f4f4f5 !important;
-  color: #18181b !important;
+  background: var(--color-bg-hover) !important;
+  color: var(--color-text-primary) !important;
   transform: translateY(-2px);
 }
 
 .siegu-dock-btn--active {
-  color: #18181b !important;
-  background: rgba(0, 0, 0, 0.05) !important;
+  color: var(--color-text-primary) !important;
+  background: var(--color-bg-hover) !important;
 }
 
 .progress-banner {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: #fafafa;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .progress-banner-inner {
@@ -1024,6 +1049,6 @@ export default {
   cursor: text;
 }
 .recent-item:hover {
-  background: #f4f4f5;
+  background: var(--color-bg-hover);
 }
 </style>

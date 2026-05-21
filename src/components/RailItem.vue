@@ -55,12 +55,12 @@ export default {
     }
   },
   async mounted() {
-    if (!RailItem._mediaPort) {
+    if (!window.__rail_mediaPort) {
       try {
-        RailItem._mediaPort = await invoke("get_media_server_port");
+        window.__rail_mediaPort = await invoke("get_media_server_port");
       } catch (e) {}
     }
-    this.mediaPort = RailItem._mediaPort;
+    this.mediaPort = window.__rail_mediaPort;
 
     this.observer = new IntersectionObserver((entries) => {
       this.isVisible = entries[0].isIntersecting;

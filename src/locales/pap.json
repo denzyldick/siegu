@@ -1,6 +1,7 @@
 {
   "app": {
-    "name": "Siegu"
+    "name": "Siegu",
+    "sync": "Sinkronisashon"
   },
   "onboarding": {
     "add_media_title": "Añadí bo media",
@@ -26,12 +27,12 @@
     "finish_setup": "Terminá Konfigurashon i Sinkronisá",
     "start_scan": "Inisiá Scan Inisial",
     "scan_desc": "Esaki lo haña tur bo fotonan i inisiá prosesamentu di AI.",
-    "greet_desc": "Your private, AI-powered photo library. No cloud, no uploads — just your memories, organized locally.",
-    "setup_local": "Set Up Locally",
-    "setup_local_desc": "Index photos from folders on this computer",
-    "join_library": "Join a Library",
-    "join_library_desc": "Sync with another device on your network",
-    "ai_disclaimer": "AI models run entirely on your device. No data ever leaves your computer."
+    "greet_desc": "Bo biblioteka di foto privá, impulsá pa AI. Sin cloud, sin upload — solamente bo memorianan, organisá lokalmente.",
+    "setup_local": "Konfigurá Lokalmente",
+    "setup_local_desc": "Indeksá fotonan for di karpetanan riba e komputadó aki",
+    "join_library": "Há pa un Biblioteca",
+    "join_library_desc": "Sinkronisá ku otro aparato riba bo red",
+    "ai_disclaimer": "Modelonan di AI ta kore kompletu riba bo aparato. Ningun dato nunca ta sali for di bo komputadó."
   },
   "search": {
     "placeholder": "Búskeda di memorianan...",
@@ -49,7 +50,7 @@
     "disabled_title": "Búskeda No Disponibel",
     "disabled_desc": "Búskeda ta rekerí datu indeksá. Por ehèmpel, añadí un karpeta i permite indeksashon pa kompleta promé ku usa búskeda.",
     "disabled_got_it": "Mi comprendé",
-    "recent": "Recent"
+    "recent": "Resiente"
   },
   "sync": {
     "status_label": "STATUS DI BIBLIOTEKA",
@@ -71,15 +72,15 @@
     "processing_bg": "Prosesando na trasfondo...",
     "discovering": "Deskubriendo: ",
     "jobs_left": "{count} restante",
-    "time_remaining": "~{time} remaining",
-    "received_memory": "Received new memory: {id}",
-    "synced_memory": "Synced memory {id} to device",
+    "time_remaining": "~{time} restante",
+    "received_memory": "Memoria nobo risibí: {id}",
+    "synced_memory": "Memoria {id} sinkronisá na aparato",
     "error_status": "Error",
-    "folder_init_error": "Failed to initialize sync folder: {error}"
+    "folder_init_error": "No por a inisialisa karpeta di sinkronisashon: {error}"
   },
   "filters": {
     "favorites_only": "Solamente faboritonan",
-    "videos_only": "Solamente videanan",
+    "videos_only": "Solamente videonan",
     "date_range": "Rango di Fecha",
     "all": "Tur",
     "month": "Luna",
@@ -102,9 +103,9 @@
     "items_selected": "{count} artíkulo selekshoná",
     "favorite": "Faborito",
     "remove": "Kitá",
-    "recent": "Recent",
-    "label_photos": "Photos:",
-    "label_videos": "Videos:"
+    "recent": "Resiente",
+    "label_photos": "Fotonan:",
+    "label_videos": "Videonan:"
   },
   "people": {
     "title": "Hende & Karnan",
@@ -113,25 +114,25 @@
     "no_faces_desc": "Fotonan ta ser analisá. Karnan lo aparesé aki una bes detectá.",
     "merge": "Fusioná",
     "rename": "Renombrá",
-    "index_faces": "Index Faces",
-    "indexing_remaining": "{count} faces remaining",
-    "named_count": "{count} named",
-    "your_people": "Your People",
-    "new_faces": "New Faces",
-    "name_group": "Name this group",
-    "who_is_this": "Who is this?",
-    "name_placeholder": "Enter a name...",
-    "confirm_identity": "Confirm Identity",
-    "profile_actions": "Profile Actions",
-    "new_name_for": "New name for {name}",
-    "update_name": "Update Name",
-    "merge_desc": "Merge {name} into another profile",
-    "target_profile": "Target profile",
-    "confirm_merge": "Confirm Merge",
-    "grouped_faces": "Grouped Faces",
-    "appearances_in_cluster": "{count} appearances in this group",
-    "name_this_group": "Name this group",
-    "confirm_remove_face": "Remove this face from the group?"
+    "index_faces": "Indeksá karnan",
+    "indexing_remaining": "{count} kara restante",
+    "named_count": "{count} nombrá",
+    "your_people": "Bo hendenan",
+    "new_faces": "Karanan nobo",
+    "name_group": "Poné nomber na e grupo aki",
+    "who_is_this": "Ken ta esaki?",
+    "name_placeholder": "Skirbi un nomber...",
+    "confirm_identity": "Konfirmá identidat",
+    "profile_actions": "Akshonnan di perfil",
+    "new_name_for": "Nomber nobo pa {name}",
+    "update_name": "Aktualisá nomber",
+    "merge_desc": "Fusioná {name} den otro perfil",
+    "target_profile": "Perfil destinashon",
+    "confirm_merge": "Konfirmá fusion",
+    "grouped_faces": "Karanan grupadó",
+    "appearances_in_cluster": "{count} aparishon den e grupo aki",
+    "name_this_group": "Poné nomber na e grupo aki",
+    "confirm_remove_face": "Kitá e kara aki for di e grupo?"
   },
   "map": {
     "title": "Bista di Mapa",
@@ -150,15 +151,15 @@
     "this_device": "E aparato aki",
     "photos_count": "{count} foto",
     "videos_count": "{count} video",
-    "no_devices_desc_alt": "Link a device using the pairing code to sync your library.",
-    "remove_device": "Remove Device",
-    "local_environment": "Local Environment",
-    "connected": "Connected",
-    "system": "System:",
+    "no_devices_desc_alt": "Vinculá un aparato usando e kódigo di pareamentu pa sinkronisá bo biblioteka.",
+    "remove_device": "Kitá Aparato",
+    "local_environment": "Ambiente lokal",
+    "connected": "Konectá",
+    "system": "Sistema:",
     "online": "Online",
-    "remove_device_title": "Remove Device?",
-    "remove_device_confirm": "Are you sure you want to remove {name}? This will stop all synchronization with this device.",
-    "more_info": "more information"
+    "remove_device_title": "Kitá Aparato?",
+    "remove_device_confirm": "Bo ta sigur ku bo ke kitá {name}? Esaki lo stòp tur sinkronisashon ku e aparato aki.",
+    "more_info": "mas informashon"
   },
   "settings": {
     "title": "Ajustenan",
@@ -202,33 +203,37 @@
     "system_logs": "Lognan di Sistema",
     "no_logs": "No a registrá log ainda.",
     "clear_logs": "Limpia Históriko di Log",
-    "update_model": "Update Model",
+    "update_model": "Aktualisá Modelo",
     "eta_label": "ETA: {time}",
-    "indexing_jobs": "Indexing {count} AI jobs",
-    "disable_model": "Disable",
-    "enable_model": "Enable",
-    "logs_cleared": "Logs cleared",
-    "scan_threads_saved": "Scan threads saved",
-    "model_enabled": "{model} enabled",
-    "model_disabled": "{model} disabled",
-    "analysis_started": "{model} analysis started",
-    "analysis_failed": "Failed to start {model}",
-    "folder_removed": "Folder removed",
-    "folder_removed_failed": "Failed to remove folder",
-    "folder_removed_watch": "Folder removed from watch list",
-    "folder_added": "Folder added",
-    "calculating": "calculating...",
-    "model_status_starting": "Starting",
-    "model_status_finished": "Finished",
-    "model_status_up_to_date": "Up to date",
-    "model_status_unavailable": "Unavailable",
+    "indexing_jobs": "Indeksando {count} trabou di AI",
+    "disable_model": "Desaktivá",
+    "enable_model": "Aktivá",
+    "logs_cleared": "Log limpjá",
+    "scan_threads_saved": "Hilunan di scan gardá",
+    "model_enabled": "{model} aktivá",
+    "model_disabled": "{model} desaktivá",
+    "analysis_started": "Analisis di {model} inisiá",
+    "analysis_failed": "No por a inisiá {model}",
+    "folder_removed": "Karpeta kitá",
+    "folder_removed_failed": "No por a kitá karpeta",
+    "folder_removed_watch": "Karpeta kitá for di lista di vigilancia",
+    "folder_added": "Karpeta añadí",
+    "calculating": "kalkulando...",
+    "model_status_starting": "Inisiando",
+    "model_status_finished": "Terminá",
+    "model_status_up_to_date": "Aktualisá",
+    "model_status_unavailable": "No disponibel",
     "model_status_error": "Error",
-    "model_status_running": "Running",
-    "model_status_not_available": "Not available",
-    "model_status_ready_to_run": "Ready to run",
-    "model_status_not_downloaded": "Not downloaded",
-    "model_n_remaining": "{n} left",
-    "model_n_of_total": "{n} of {total}"
+    "model_status_running": "Ehekutando",
+    "model_status_not_available": "No disponibel",
+    "model_status_ready_to_run": "Klá pa ehekuá",
+    "model_status_not_downloaded": "No descargá",
+    "model_n_remaining": "{n} restante",
+    "model_n_of_total": "{n} di {total}",
+    "appearance": "Apariencia",
+    "theme_system": "Sistema",
+    "theme_light": "Klaru",
+    "theme_dark": "Skur"
   },
   "language": {
     "label": "Idioma",
@@ -236,7 +241,10 @@
     "nl": "Nederlands",
     "fr": "Français",
     "es": "Español",
-    "pap": "Papiamentu"
+    "pap": "Papiamentu",
+    "de": "Deutsch",
+    "it": "Italiano",
+    "pt": "Português"
   },
   "guided_tour": {
     "welcome_title": "Bon Bini na Siegu!",
@@ -264,133 +272,137 @@
     "done": "Kla"
   },
   "common": {
-    "close": "Close",
-    "cancel": "Cancel",
-    "confirm": "Confirm",
-    "delete": "Delete",
-    "remove": "Remove",
-    "save": "Save",
-    "loading": "Loading..."
+    "close": "Sera",
+    "cancel": "Kanselá",
+    "confirm": "Konfirmá",
+    "delete": "Eliminá",
+    "remove": "Kitá",
+    "save": "Wardá",
+    "loading": "Kargando..."
   },
   "image": {
-    "alt_photo": "Photo",
-    "aesthetics_score": "Aesthetics score",
-    "faces_detected": "Faces detected",
-    "fully_indexed": "Fully indexed"
+    "alt_photo": "Foto",
+    "aesthetics_score": "Puntuashon estétiko",
+    "faces_detected": "Karanan detectá",
+    "fully_indexed": "Kompletamente indeksá"
   },
   "rail": {
-    "alt_thumb": "Photo thumbnail"
+    "alt_thumb": "Miniatura di foto"
   },
   "connect": {
-    "link_device_title": "Link Device",
-    "link_device_desc": "Sync your library across your own hardware.",
+    "link_device_title": "Vincular Aparato",
+    "link_device_desc": "Sinkronisá bo biblioteka riba bo propio hardware.",
     "host": "Host",
-    "join": "Join",
-    "device_found": "Device Found!",
-    "establishing_link": "Establishing secure link...",
-    "link_established": "Link Established!",
-    "ready_to_sync": "Ready to synchronize.",
-    "manual_phrase": "Manual Phrase",
-    "scan_qr": "Scan QR Code",
-    "scan_qr_desc": "Point your camera at the host's QR code.",
-    "open_camera": "Open Camera",
-    "or_enter_manually": "Or enter manually",
-    "phrase_placeholder": "Enter 4-word phrase",
-    "link_device_button": "Link Device",
-    "disconnected": "Disconnected",
-    "generating_key": "Generating secure pair key...",
-    "pairing_error": "Pairing Error.",
-    "waiting_for_partner": "Waiting for partner device to scan or type phrase...",
-    "awaiting_webrtc": "Signaling channel requested. Awaiting WebRTC connection.",
-    "error_connecting": "Error connecting: {error}",
-    "joining_room": "Joining room...",
-    "error_joining": "Error joining: {error}",
-    "start_syncing": "Start Syncing",
-    "awaiting_webrtc_receiver": "Signaling channel requested. Awaiting WebRTC Receiver connection."
+    "join": "Há pa",
+    "device_found": "Aparato hañá!",
+    "establishing_link": "Establesiendo enlace segur...",
+    "link_established": "Enlace establesé!",
+    "ready_to_sync": "Klá pa sinkronisá.",
+    "manual_phrase": "Frase manual",
+    "scan_qr": "Scan kódigo QR",
+    "scan_qr_desc": "Apuntá bo cámara na e kódigo QR di e host.",
+    "open_camera": "Habri cámara",
+    "or_enter_manually": "Of skirbi manualmente",
+    "phrase_placeholder": "Skirbi un frase di 4 palabra",
+    "link_device_button": "Vincular Aparato",
+    "disconnected": "Deskonectá",
+    "generating_key": "Generando clave di pareamentu segur...",
+    "pairing_error": "Error di pareamentu.",
+    "waiting_for_partner": "Esperando aparato partner pa scan of skirbi frase...",
+    "awaiting_webrtc": "Canal di señalishon solicitá. Esperando conexion WebRTC.",
+    "error_connecting": "Error di conexion: {error}",
+    "joining_room": "Huntando kuarto...",
+    "error_joining": "Error di hunta: {error}",
+    "start_syncing": "Inisiá Sinkronisashon",
+    "awaiting_webrtc_receiver": "Canal di señalishon solicitá. Esperando conexion di receptor WebRTC."
   },
   "photo_viewer": {
-    "metadata": "Metadata",
-    "analyze": "Analyze Photo",
-    "analyzing": "Analyzing",
-    "library_indexing": "Library indexing: {time} remaining",
-    "file_details": "File Details",
-    "ai_caption": "AI Caption",
-    "camera_settings": "Camera Settings",
-    "date_taken": "Date Taken",
-    "resolution": "Resolution",
+    "metadata": "Metadato",
+    "analyze": "Analisá Foto",
+    "analyzing": "Analisando",
+    "library_indexing": "Indeksando biblioteka: {time} restante",
+    "file_details": "Detayenan di Fail",
+    "ai_caption": "Leyenda AI",
+    "camera_settings": "Ajustenan di Cámara",
+    "date_taken": "Fecha tumá",
+    "resolution": "Resolushon",
     "iso": "ISO",
-    "shutter": "Shutter",
-    "aperture": "Aperture",
-    "people_in_photo": "People in this Photo",
-    "no_faces": "No faces detected.",
-    "unnamed": "Unnamed",
-    "ai_insights": "AI Insights",
-    "no_insights": "No AI insights generated yet.",
-    "run_model": "Run Model",
-    "running_model": "Running {model}...",
-    "analysis_complete": "AI analysis: {models} ({time}s)",
-    "model_complete": "{model} analysis complete ({time}s)",
-    "model_failed": "{model} analysis failed",
-    "calculating": "calculating..."
+    "shutter": "Velocidat di obturadó",
+    "aperture": "Apertura",
+    "people_in_photo": "Hende den e foto aki",
+    "no_faces": "No a detectá kara.",
+    "unnamed": "Sin nomber",
+    "ai_insights": "Informashon di AI",
+    "no_insights": "No a generá informashon di AI ainda.",
+    "run_model": "Ehekutá Modelo",
+    "running_model": "Ehekutando {model}...",
+    "analysis_complete": "Analisis AI: {models} ({time}s)",
+    "model_complete": "Analisis di {model} kompletá ({time}s)",
+    "model_failed": "Analisis di {model} a faya",
+    "calculating": "kalkulando...",
+    "objects_count": "{count} opheto",
+    "faces_count": "{count} kara",
+    "has_caption": "leyenda",
+    "nothing_detected": "nada detectá"
   },
   "folder_picker": {
-    "select_folder": "Select Folder",
-    "current_path": "Current Path",
-    "go_up": "Go up one level",
-    "no_subfolders": "No subfolders found",
-    "access_denied": "Access denied or invalid path.",
-    "permission_error": "Failed to access folder. Please ensure you have granted storage permissions."
+    "select_folder": "Selekshoná Karpeta",
+    "current_path": "Camino aktual",
+    "go_up": "Subi un nivel",
+    "no_subfolders": "No a haña supkarpeta",
+    "access_denied": "Acceso nengá of camino inválido.",
+    "permission_error": "No por a acce dé na e karpeta. Asegurá cu bo a otorgá permisonan di almacenamento."
   },
   "models": {
     "clip": {
-      "title": "Smart Search",
-      "desc": "Finds objects and scenes in your photos.",
-      "search": "Try searching: 'dog', 'beach', 'sunset'"
+      "title": "Búskeda Inteligente",
+      "desc": "Ta haña ophetonan i scennan den bo fotonan.",
+      "search": "Try searching: 'kònkòf', 'playa', 'puesta di sol'"
     },
     "ultraface": {
-      "title": "Face Grouping",
-      "desc": "Finds faces and groups them by person.",
-      "search": "Try searching: 'Mom', 'John'"
+      "title": "Agrupashon di Kara",
+      "desc": "Ta haña karanan i ta grupá nan pa persona.",
+      "search": "Try searching: 'Mama', 'Juan'"
     },
     "ocr": {
-      "title": "Text Finder",
-      "desc": "Reads text inside photos like receipts.",
-      "search": "Try searching: 'Receipt', 'Invoice', 'Menu'"
+      "title": "Buscadó di Teksto",
+      "desc": "Ta lesa teksto den fotonan manera resibunan.",
+      "search": "Try searching: 'Resibu', 'Faktura', 'Menu'"
     },
     "nsfw": {
-      "title": "Safe Mode",
-      "desc": "Detects and hides sensitive content.",
-      "search": "Helps keep your library family-friendly."
+      "title": "Modalidad Segur",
+      "desc": "Ta detektá i okultá contenido sensitivo.",
+      "search": "Ta yuda mantené bo biblioteka amigable pa familia."
     },
     "aesthetics": {
-      "title": "Quality Scorer",
-      "desc": "Rates photos by how good they look.",
-      "search": "Helps you find your best shots quickly."
+      "title": "Puntuashon di Calidad",
+      "desc": "Ta puntuá fotonan segun nan aparensja.",
+      "search": "Ta yuda bo haña bo mihó fotonan rápidamente."
     },
     "blip": {
-      "title": "Photo Describer",
-      "desc": "Writes sentences about what is in photos.",
-      "search": "Try searching: 'Family eating outside'"
+      "title": "Deskriptó di Foto",
+      "desc": "Ta skirbi frasenan di loke tin den fotonan.",
+      "search": "Try searching: 'Familia comiendo afuera'"
     },
     "yolo": {
-      "title": "Object Pro",
-      "desc": "Pinpoint accuracy for finding specific items.",
-      "search": "Adds deep tags for 80+ common objects."
+      "title": "Opheto Pro",
+      "desc": "Presishon puntual pa haña ophetonan específico.",
+      "search": "Ta añadí tagnan profundo pa 80+ opheto communal."
     },
     "arcface": {
-      "title": "Face Pro",
-      "desc": "Advanced recognition for better grouping.",
-      "search": "drastically improves face matching accuracy."
+      "title": "Kara Pro",
+      "desc": "Rekonosementu avansá pa mihó agrupashon.",
+      "search": "Ta mehorá drásticamente e presishon di rekonosementu di kara."
     },
     "midas": {
-      "title": "Depth Vision",
-      "desc": "Analyzes 3D depth in landscapes.",
-      "search": "Adds depth-based filters to your library."
+      "title": "Vishon di Profundidat",
+      "desc": "Ta analisá profundidat 3D den paisahanan.",
+      "search": "Ta añadí filtronan basá riba profundidat na bo biblioteka."
     },
     "whisper": {
-      "title": "Audio Search",
-      "desc": "Transcribes words spoken in videos.",
-      "search": "Search for things people said in videos."
+      "title": "Búskeda di Audio",
+      "desc": "Ta transcribí palabranan papia den videonan.",
+      "search": "Buska cosnan cu hende a bisa den video."
     }
   }
 }

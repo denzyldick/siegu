@@ -1,6 +1,7 @@
 {
   "app": {
-    "name": "Siegu"
+    "name": "Siegu",
+    "sync": "Sincronización"
   },
   "onboarding": {
     "add_media_title": "Añade tu contenido",
@@ -26,12 +27,12 @@
     "finish_setup": "Finalizar configuración y sincronizar",
     "start_scan": "Iniciar análisis inicial",
     "scan_desc": "Esto encontrará todas tus fotos e iniciará el procesamiento de IA.",
-    "greet_desc": "Your private, AI-powered photo library. No cloud, no uploads — just your memories, organized locally.",
-    "setup_local": "Set Up Locally",
-    "setup_local_desc": "Index photos from folders on this computer",
-    "join_library": "Join a Library",
-    "join_library_desc": "Sync with another device on your network",
-    "ai_disclaimer": "AI models run entirely on your device. No data ever leaves your computer."
+    "greet_desc": "Tu biblioteca de fotos privada, impulsada por IA. Sin nube, sin cargas — solo tus recuerdos, organizados localmente.",
+    "setup_local": "Configurar localmente",
+    "setup_local_desc": "Indexar fotos desde carpetas en este ordenador",
+    "join_library": "Unirse a una biblioteca",
+    "join_library_desc": "Sincronizar con otro dispositivo en tu red",
+    "ai_disclaimer": "Los modelos de IA se ejecutan completamente en tu dispositivo. Ningún dato sale nunca de tu ordenador."
   },
   "search": {
     "placeholder": "Buscar recuerdos...",
@@ -49,7 +50,7 @@
     "disabled_title": "Búsqueda no disponible",
     "disabled_desc": "La búsqueda requiere datos indexados. Añade una carpeta y permite que la indexación se complete antes de usar la búsqueda.",
     "disabled_got_it": "Entendido",
-    "recent": "Recent"
+    "recent": "Reciente"
   },
   "sync": {
     "status_label": "ESTADO DE LA BIBLIOTECA",
@@ -57,7 +58,7 @@
     "processing_folder": "Procesando carpeta {current}/{total}",
     "switched_ai": "Cambiado a análisis de IA",
     "idle": "Inactivo",
-    "scanning": "Escaneando...",
+    "scanning": "Escanendo...",
     "indexing": "Indexando...",
     "refresh": "Actualizar",
     "ai_intelligence": "Inteligencia Artificial",
@@ -71,11 +72,11 @@
     "processing_bg": "Procesando en segundo plano...",
     "discovering": "Descubriendo: ",
     "jobs_left": "{count} restantes",
-    "time_remaining": "~{time} remaining",
-    "received_memory": "Received new memory: {id}",
-    "synced_memory": "Synced memory {id} to device",
+    "time_remaining": "~{time} restante",
+    "received_memory": "Nuevo recuerdo recibido: {id}",
+    "synced_memory": "Recuerdo {id} sincronizado al dispositivo",
     "error_status": "Error",
-    "folder_init_error": "Failed to initialize sync folder: {error}"
+    "folder_init_error": "Error al inicializar la carpeta de sincronización: {error}"
   },
   "filters": {
     "favorites_only": "Solo favoritos",
@@ -102,9 +103,9 @@
     "items_selected": "{count} elementos seleccionados",
     "favorite": "Favorito",
     "remove": "Eliminar",
-    "recent": "Recent",
-    "label_photos": "Photos:",
-    "label_videos": "Videos:"
+    "recent": "Reciente",
+    "label_photos": "Fotos:",
+    "label_videos": "Vídeos:"
   },
   "people": {
     "title": "Personas y rostros",
@@ -113,25 +114,25 @@
     "no_faces_desc": "Las fotos se están analizando. Los rostros aparecerán aquí una vez detectados.",
     "merge": "Combinar",
     "rename": "Renombrar",
-    "index_faces": "Index Faces",
-    "indexing_remaining": "{count} faces remaining",
-    "named_count": "{count} named",
-    "your_people": "Your People",
-    "new_faces": "New Faces",
-    "name_group": "Name this group",
-    "who_is_this": "Who is this?",
-    "name_placeholder": "Enter a name...",
-    "confirm_identity": "Confirm Identity",
-    "profile_actions": "Profile Actions",
-    "new_name_for": "New name for {name}",
-    "update_name": "Update Name",
-    "merge_desc": "Merge {name} into another profile",
-    "target_profile": "Target profile",
-    "confirm_merge": "Confirm Merge",
-    "grouped_faces": "Grouped Faces",
-    "appearances_in_cluster": "{count} appearances in this group",
-    "name_this_group": "Name this group",
-    "confirm_remove_face": "Remove this face from the group?"
+    "index_faces": "Indexar rostros",
+    "indexing_remaining": "{count} rostros restantes",
+    "named_count": "{count} nombrados",
+    "your_people": "Tus personas",
+    "new_faces": "Nuevos rostros",
+    "name_group": "Nombrar este grupo",
+    "who_is_this": "¿Quién es?",
+    "name_placeholder": "Introduce un nombre...",
+    "confirm_identity": "Confirmar identidad",
+    "profile_actions": "Acciones de perfil",
+    "new_name_for": "Nuevo nombre para {name}",
+    "update_name": "Actualizar nombre",
+    "merge_desc": "Fusionar {name} en otro perfil",
+    "target_profile": "Perfil de destino",
+    "confirm_merge": "Confirmar fusión",
+    "grouped_faces": "Rostros agrupados",
+    "appearances_in_cluster": "{count} apariciones en este grupo",
+    "name_this_group": "Nombrar este grupo",
+    "confirm_remove_face": "¿Eliminar este rostro del grupo?"
   },
   "map": {
     "title": "Vista de mapa",
@@ -150,15 +151,15 @@
     "this_device": "Este dispositivo",
     "photos_count": "{count} fotos",
     "videos_count": "{count} vídeos",
-    "no_devices_desc_alt": "Link a device using the pairing code to sync your library.",
-    "remove_device": "Remove Device",
-    "local_environment": "Local Environment",
-    "connected": "Connected",
-    "system": "System:",
-    "online": "Online",
-    "remove_device_title": "Remove Device?",
-    "remove_device_confirm": "Are you sure you want to remove {name}? This will stop all synchronization with this device.",
-    "more_info": "more information"
+    "no_devices_desc_alt": "Vincula un dispositivo usando el código de emparejamiento para sincronizar tu biblioteca.",
+    "remove_device": "Eliminar dispositivo",
+    "local_environment": "Entorno local",
+    "connected": "Conectado",
+    "system": "Sistema:",
+    "online": "En línea",
+    "remove_device_title": "¿Eliminar dispositivo?",
+    "remove_device_confirm": "¿Estás seguro de que quieres eliminar {name}? Esto detendrá toda sincronización con este dispositivo.",
+    "more_info": "más información"
   },
   "settings": {
     "title": "Ajustes",
@@ -202,33 +203,37 @@
     "system_logs": "Registros del sistema",
     "no_logs": "Aún no hay registros.",
     "clear_logs": "Borrar historial de registros",
-    "update_model": "Update Model",
+    "update_model": "Actualizar modelo",
     "eta_label": "ETA: {time}",
-    "indexing_jobs": "Indexing {count} AI jobs",
-    "disable_model": "Disable",
-    "enable_model": "Enable",
-    "logs_cleared": "Logs cleared",
-    "scan_threads_saved": "Scan threads saved",
-    "model_enabled": "{model} enabled",
-    "model_disabled": "{model} disabled",
-    "analysis_started": "{model} analysis started",
-    "analysis_failed": "Failed to start {model}",
-    "folder_removed": "Folder removed",
-    "folder_removed_failed": "Failed to remove folder",
-    "folder_removed_watch": "Folder removed from watch list",
-    "folder_added": "Folder added",
-    "calculating": "calculating...",
-    "model_status_starting": "Starting",
-    "model_status_finished": "Finished",
-    "model_status_up_to_date": "Up to date",
-    "model_status_unavailable": "Unavailable",
+    "indexing_jobs": "Indexando {count} trabajos de IA",
+    "disable_model": "Desactivar",
+    "enable_model": "Activar",
+    "logs_cleared": "Registros borrados",
+    "scan_threads_saved": "Subprocesos de escaneo guardados",
+    "model_enabled": "{model} activado",
+    "model_disabled": "{model} desactivado",
+    "analysis_started": "Análisis de {model} iniciado",
+    "analysis_failed": "Error al iniciar {model}",
+    "folder_removed": "Carpeta eliminada",
+    "folder_removed_failed": "Error al eliminar la carpeta",
+    "folder_removed_watch": "Carpeta eliminada de la lista de vigilancia",
+    "folder_added": "Carpeta añadida",
+    "calculating": "calculando...",
+    "model_status_starting": "Iniciando",
+    "model_status_finished": "Finalizado",
+    "model_status_up_to_date": "Actualizado",
+    "model_status_unavailable": "No disponible",
     "model_status_error": "Error",
-    "model_status_running": "Running",
-    "model_status_not_available": "Not available",
-    "model_status_ready_to_run": "Ready to run",
-    "model_status_not_downloaded": "Not downloaded",
-    "model_n_remaining": "{n} left",
-    "model_n_of_total": "{n} of {total}"
+    "model_status_running": "Ejecutando",
+    "model_status_not_available": "No disponible",
+    "model_status_ready_to_run": "Listo para ejecutar",
+    "model_status_not_downloaded": "No descargado",
+    "model_n_remaining": "{n} restante",
+    "model_n_of_total": "{n} de {total}",
+    "appearance": "Apariencia",
+    "theme_system": "Sistema",
+    "theme_light": "Claro",
+    "theme_dark": "Oscuro"
   },
   "language": {
     "label": "Idioma",
@@ -236,7 +241,10 @@
     "nl": "Nederlands",
     "fr": "Français",
     "es": "Español",
-    "pap": "Papiamentu"
+    "pap": "Papiamentu",
+    "de": "Deutsch",
+    "it": "Italiano",
+    "pt": "Português"
   },
   "guided_tour": {
     "welcome_title": "¡Bienvenido a Siegu!",
@@ -264,133 +272,137 @@
     "done": "Listo"
   },
   "common": {
-    "close": "Close",
-    "cancel": "Cancel",
-    "confirm": "Confirm",
-    "delete": "Delete",
-    "remove": "Remove",
-    "save": "Save",
-    "loading": "Loading..."
+    "close": "Cerrar",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "delete": "Eliminar",
+    "remove": "Eliminar",
+    "save": "Guardar",
+    "loading": "Cargando..."
   },
   "image": {
-    "alt_photo": "Photo",
-    "aesthetics_score": "Aesthetics score",
-    "faces_detected": "Faces detected",
-    "fully_indexed": "Fully indexed"
+    "alt_photo": "Foto",
+    "aesthetics_score": "Puntuación estética",
+    "faces_detected": "Rostros detectados",
+    "fully_indexed": "Totalmente indexado"
   },
   "rail": {
-    "alt_thumb": "Photo thumbnail"
+    "alt_thumb": "Miniatura de foto"
   },
   "connect": {
-    "link_device_title": "Link Device",
-    "link_device_desc": "Sync your library across your own hardware.",
-    "host": "Host",
-    "join": "Join",
-    "device_found": "Device Found!",
-    "establishing_link": "Establishing secure link...",
-    "link_established": "Link Established!",
-    "ready_to_sync": "Ready to synchronize.",
-    "manual_phrase": "Manual Phrase",
-    "scan_qr": "Scan QR Code",
-    "scan_qr_desc": "Point your camera at the host's QR code.",
-    "open_camera": "Open Camera",
-    "or_enter_manually": "Or enter manually",
-    "phrase_placeholder": "Enter 4-word phrase",
-    "link_device_button": "Link Device",
-    "disconnected": "Disconnected",
-    "generating_key": "Generating secure pair key...",
-    "pairing_error": "Pairing Error.",
-    "waiting_for_partner": "Waiting for partner device to scan or type phrase...",
-    "awaiting_webrtc": "Signaling channel requested. Awaiting WebRTC connection.",
-    "error_connecting": "Error connecting: {error}",
-    "joining_room": "Joining room...",
-    "error_joining": "Error joining: {error}",
-    "start_syncing": "Start Syncing",
-    "awaiting_webrtc_receiver": "Signaling channel requested. Awaiting WebRTC Receiver connection."
+    "link_device_title": "Vincular dispositivo",
+    "link_device_desc": "Sincroniza tu biblioteca en tu propio hardware.",
+    "host": "Anfitrión",
+    "join": "Unirse",
+    "device_found": "¡Dispositivo encontrado!",
+    "establishing_link": "Estableciendo enlace seguro...",
+    "link_established": "¡Enlace establecido!",
+    "ready_to_sync": "Listo para sincronizar.",
+    "manual_phrase": "Frase manual",
+    "scan_qr": "Escanear código QR",
+    "scan_qr_desc": "Apunta tu cámara al código QR del anfitrión.",
+    "open_camera": "Abrir cámara",
+    "or_enter_manually": "O introducir manualmente",
+    "phrase_placeholder": "Introduce frase de 4 palabras",
+    "link_device_button": "Vincular dispositivo",
+    "disconnected": "Desconectado",
+    "generating_key": "Generando clave de emparejamiento segura...",
+    "pairing_error": "Error de emparejamiento.",
+    "waiting_for_partner": "Esperando al dispositivo compañero para escanear o escribir la frase...",
+    "awaiting_webrtc": "Canal de señalización solicitado. Esperando conexión WebRTC.",
+    "error_connecting": "Error al conectar: {error}",
+    "joining_room": "Entrando a la sala...",
+    "error_joining": "Error al entrar: {error}",
+    "start_syncing": "Iniciar sincronización",
+    "awaiting_webrtc_receiver": "Canal de señalización solicitado. Esperando conexión del receptor WebRTC."
   },
   "photo_viewer": {
-    "metadata": "Metadata",
-    "analyze": "Analyze Photo",
-    "analyzing": "Analyzing",
-    "library_indexing": "Library indexing: {time} remaining",
-    "file_details": "File Details",
-    "ai_caption": "AI Caption",
-    "camera_settings": "Camera Settings",
-    "date_taken": "Date Taken",
-    "resolution": "Resolution",
+    "metadata": "Metadatos",
+    "analyze": "Analizar foto",
+    "analyzing": "Analizando",
+    "library_indexing": "Indexando biblioteca: {time} restante",
+    "file_details": "Detalles del archivo",
+    "ai_caption": "Pie de foto IA",
+    "camera_settings": "Configuración de cámara",
+    "date_taken": "Fecha de toma",
+    "resolution": "Resolución",
     "iso": "ISO",
-    "shutter": "Shutter",
-    "aperture": "Aperture",
-    "people_in_photo": "People in this Photo",
-    "no_faces": "No faces detected.",
-    "unnamed": "Unnamed",
-    "ai_insights": "AI Insights",
-    "no_insights": "No AI insights generated yet.",
-    "run_model": "Run Model",
-    "running_model": "Running {model}...",
-    "analysis_complete": "AI analysis: {models} ({time}s)",
-    "model_complete": "{model} analysis complete ({time}s)",
-    "model_failed": "{model} analysis failed",
-    "calculating": "calculating..."
+    "shutter": "Velocidad de obturación",
+    "aperture": "Apertura",
+    "people_in_photo": "Personas en esta foto",
+    "no_faces": "No se detectaron rostros.",
+    "unnamed": "Sin nombre",
+    "ai_insights": "Información de IA",
+    "no_insights": "Aún no se ha generado información de IA.",
+    "run_model": "Ejecutar modelo",
+    "running_model": "Ejecutando {model}...",
+    "analysis_complete": "Análisis IA: {models} ({time}s)",
+    "model_complete": "Análisis de {model} completado ({time}s)",
+    "model_failed": "Análisis de {model} fallido",
+    "calculating": "calculando...",
+    "objects_count": "{count} objetos",
+    "faces_count": "{count} rostros",
+    "has_caption": "pie de foto",
+    "nothing_detected": "nada detectado"
   },
   "folder_picker": {
-    "select_folder": "Select Folder",
-    "current_path": "Current Path",
-    "go_up": "Go up one level",
-    "no_subfolders": "No subfolders found",
-    "access_denied": "Access denied or invalid path.",
-    "permission_error": "Failed to access folder. Please ensure you have granted storage permissions."
+    "select_folder": "Seleccionar carpeta",
+    "current_path": "Ruta actual",
+    "go_up": "Subir un nivel",
+    "no_subfolders": "No se encontraron subcarpetas",
+    "access_denied": "Acceso denegado o ruta no válida.",
+    "permission_error": "Error al acceder a la carpeta. Asegúrate de haber concedido permisos de almacenamiento."
   },
   "models": {
     "clip": {
-      "title": "Smart Search",
-      "desc": "Finds objects and scenes in your photos.",
-      "search": "Try searching: 'dog', 'beach', 'sunset'"
+      "title": "Búsqueda inteligente",
+      "desc": "Encuentra objetos y escenas en tus fotos.",
+      "search": "Prueba a buscar: 'perro', 'playa', 'atardecer'"
     },
     "ultraface": {
-      "title": "Face Grouping",
-      "desc": "Finds faces and groups them by person.",
-      "search": "Try searching: 'Mom', 'John'"
+      "title": "Agrupación de rostros",
+      "desc": "Encuentra rostros y los agrupa por persona.",
+      "search": "Prueba a buscar: 'Mamá', 'Juan'"
     },
     "ocr": {
-      "title": "Text Finder",
-      "desc": "Reads text inside photos like receipts.",
-      "search": "Try searching: 'Receipt', 'Invoice', 'Menu'"
+      "title": "Buscador de texto",
+      "desc": "Lee texto dentro de fotos como recibos.",
+      "search": "Prueba a buscar: 'Recibo', 'Factura', 'Menú'"
     },
     "nsfw": {
-      "title": "Safe Mode",
-      "desc": "Detects and hides sensitive content.",
-      "search": "Helps keep your library family-friendly."
+      "title": "Modo seguro",
+      "desc": "Detecta y oculta contenido sensible.",
+      "search": "Ayuda a mantener tu biblioteca apta para toda la familia."
     },
     "aesthetics": {
-      "title": "Quality Scorer",
-      "desc": "Rates photos by how good they look.",
-      "search": "Helps you find your best shots quickly."
+      "title": "Puntuación de calidad",
+      "desc": "Valora las fotos según su aspecto.",
+      "search": "Te ayuda a encontrar tus mejores fotos rápidamente."
     },
     "blip": {
-      "title": "Photo Describer",
-      "desc": "Writes sentences about what is in photos.",
-      "search": "Try searching: 'Family eating outside'"
+      "title": "Descripción de fotos",
+      "desc": "Escribe frases sobre lo que hay en las fotos.",
+      "search": "Prueba a buscar: 'Familia comiendo fuera'"
     },
     "yolo": {
-      "title": "Object Pro",
-      "desc": "Pinpoint accuracy for finding specific items.",
-      "search": "Adds deep tags for 80+ common objects."
+      "title": "Objeto Pro",
+      "desc": "Precisión milimétrica para encontrar elementos específicos.",
+      "search": "Añade etiquetas profundas para más de 80 objetos comunes."
     },
     "arcface": {
-      "title": "Face Pro",
-      "desc": "Advanced recognition for better grouping.",
-      "search": "drastically improves face matching accuracy."
+      "title": "Rostro Pro",
+      "desc": "Reconocimiento avanzado para mejor agrupación.",
+      "search": "Mejora drásticamente la precisión del reconocimiento facial."
     },
     "midas": {
-      "title": "Depth Vision",
-      "desc": "Analyzes 3D depth in landscapes.",
-      "search": "Adds depth-based filters to your library."
+      "title": "Visión de profundidad",
+      "desc": "Analiza la profundidad 3D en paisajes.",
+      "search": "Añade filtros basados en profundidad a tu biblioteca."
     },
     "whisper": {
-      "title": "Audio Search",
-      "desc": "Transcribes words spoken in videos.",
-      "search": "Search for things people said in videos."
+      "title": "Búsqueda de audio",
+      "desc": "Transcribe palabras habladas en vídeos.",
+      "search": "Busca cosas que la gente dijo en vídeos."
     }
   }
 }

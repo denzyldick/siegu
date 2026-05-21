@@ -20,7 +20,7 @@
 
     <v-row v-else>
       <v-col cols="12" sm="6" md="4" v-for="device in devices" :key="device.title">
-        <v-card variant="flat" height="100%" class="device-card border-subtle ga-2" rounded="xl" color="#ffffff">
+        <v-card variant="flat" height="100%" class="device-card border-subtle ga-2" rounded="xl" color="surface">
           <v-card-item class="py-4">
             <template v-slot:prepend>
               <div class="siegu-icon-circle-dark mr-3">
@@ -141,13 +141,13 @@
 }
 .device-card {
   transition: all 0.2s ease;
-  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid var(--color-border-subtle) !important;
 }
 
 .device-card:hover {
-  background: #ffffff !important;
+  background: var(--color-bg-hover) !important;
   transform: translateY(-2px);
-  border-color: rgba(0, 0, 0, 0.1) !important;
+  border-color: var(--color-border-default) !important;
   box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
 }
 

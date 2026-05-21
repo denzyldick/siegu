@@ -1,8 +1,8 @@
 <template>
   <v-dialog v-model="show" fullscreen transition="dialog-bottom-transition">
-    <v-card rounded="0" color="#fafafa">
-      <v-toolbar color="white" border="bottom">
-        <v-btn icon @click="close" color="#18181b">
+    <v-card rounded="0" color="background">
+      <v-toolbar color="surface" border="bottom">
+        <v-btn icon @click="close" color="primary">
           <v-icon>mdi-close</v-icon>
         </v-btn>
         <v-toolbar-title class="text-zinc-primary font-weight-bold">{{ $t('folder_picker.select_folder') }}</v-toolbar-title>

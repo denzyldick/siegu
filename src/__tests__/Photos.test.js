@@ -52,6 +52,7 @@ describe("Photos.vue — data pipeline", () => {
         },
         mocks: {
           $vuetify: { theme: { current: { dark: false } } },
+          $t: (msg) => msg,
         },
       },
     });

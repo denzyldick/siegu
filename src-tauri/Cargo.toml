@@ -74,3 +74,6 @@ ort = { version = "2.0.0-rc.12", default-features = false, features = ["ndarray"
 
 [target.'cfg(target_os = "android")'.dependencies]
 tract-onnx = "0.21.0"
+
+[patch.crates-io]
+esaxx-rs = { path = "vendor/esaxx-rs" }

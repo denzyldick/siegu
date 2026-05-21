@@ -488,7 +488,7 @@ export default {
 }
 
 .bg-zinc-100 {
-  background-color: #f4f4f5;
+  background-color: var(--color-bg-zinc-100);
 }
 
 .bulk-toolbar-container {
@@ -518,9 +518,9 @@ export default {
 }
 
 .siegu-btn-outline {
-  background: #ffffff;
-  color: #18181b;
-  border: 1px solid #e4e4e7;
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-default);
   border-radius: 12px;
   text-transform: none;
   font-weight: 600;
