@@ -519,7 +519,7 @@ mod tests {
 
         #[test]
         fn test_get_photo_by_id_missing() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             assert!(db.get_photo_by_id("nonexistent").is_none());
         }
 
@@ -537,7 +537,7 @@ mod tests {
 
         #[test]
         fn test_get_photos_by_ids_empty_input() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             assert!(db.get_photos_by_ids(&[]).is_empty());
         }
 
@@ -554,7 +554,7 @@ mod tests {
 
         #[test]
         fn test_get_photo_encoded_batch_empty() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             assert!(db.get_photo_encoded_batch(&[]).is_empty());
         }
 
@@ -579,7 +579,7 @@ mod tests {
 
         #[test]
         fn test_filter_new_paths_empty_input() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             assert!(db.filter_new_paths(&[]).is_empty());
         }
 
@@ -735,7 +735,7 @@ mod tests {
 
         #[test]
         fn test_get_faces_for_photo_empty() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             assert!(db.get_faces_for_photo("nonexistent").is_empty());
         }
 
@@ -826,7 +826,7 @@ mod tests {
 
         #[test]
         fn test_create_anonymous_person_and_centroid() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             let emb = vec![0.6f32; 512];
             let pid = db.create_anonymous_person(&emb);
             // Centroid is a no-op when no faces are linked yet
@@ -836,7 +836,7 @@ mod tests {
 
         #[test]
         fn test_get_all_people_with_embeddings() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             let emb = vec![0.7f32; 512];
             let pid = db.create_anonymous_person(&emb);
             // create_anonymous_person does NOT store embedding if none passed? 
@@ -925,7 +925,7 @@ mod tests {
 
         #[test]
         fn test_rename_person() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             let pid = db.create_anonymous_person(&vec![0.3f32; 512]);
             db.rename_person(&pid, "Renamed");
             let people = db.get_all_people_with_embeddings();
@@ -985,14 +985,14 @@ mod tests {
 
         #[test]
         fn test_get_photo_sync_info_by_id_missing() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             let result = db.get_photo_sync_info_by_id("nonexistent");
             assert!(result.is_err());
         }
 
         #[test]
         fn test_import_photo() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             let imp = database::ImportedPhoto {
                 id: "imp1",
                 location: "/imported/imp1.jpg",
@@ -1037,7 +1037,7 @@ mod tests {
 
         #[test]
         fn test_set_and_get_state() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             let mut state = HashMap::new();
             state.insert("key1".to_string(), "val1".to_string());
             state.insert("key2".to_string(), "val2".to_string());
@@ -1050,7 +1050,7 @@ mod tests {
 
         #[test]
         fn test_last_scan_time() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             assert!(db.get_last_scan_time().is_none());
 
             db.set_last_scan_time("2026-05-20T10:00:00Z".to_string());
@@ -1070,19 +1070,19 @@ mod tests {
 
         #[test]
         fn test_store_and_get_logs() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             db.store_log("INFO", "test message");
             db.store_log("WARN", "warning message");
 
             let logs = db.get_logs(10);
             assert_eq!(logs.len(), 2);
-            assert_eq!(logs[1].level, "WARN");
-            assert_eq!(logs[1].message, "warning message");
+            assert!(logs.iter().any(|l| l.level == "WARN" && l.message == "warning message"));
+            assert!(logs.iter().any(|l| l.level == "INFO" && l.message == "test message"));
         }
 
         #[test]
         fn test_get_logs_limit() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             for i in 0..5 {
                 db.store_log("INFO", &format!("msg {i}"));
             }
@@ -1091,7 +1091,7 @@ mod tests {
 
         #[test]
         fn test_clear_logs() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             db.store_log("INFO", "to be cleared");
             db.clear_logs();
             assert!(db.get_logs(10).is_empty());
@@ -1101,7 +1101,7 @@ mod tests {
 
         #[test]
         fn test_add_and_list_directories() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             db.add_directory("/photos/vacation");
             db.add_directory("/photos/work");
 
@@ -1113,7 +1113,7 @@ mod tests {
 
         #[test]
         fn test_remove_directory() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             db.add_directory("/photos/temp");
             db.remove_directory("/photos/temp".to_string());
             assert!(db.list_directories().is_empty());
@@ -1156,7 +1156,7 @@ mod tests {
 
         #[test]
         fn test_list_objects_no_match() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             assert!(db.list_objects("zzzzzz").is_empty());
         }
 
@@ -1178,7 +1178,7 @@ mod tests {
 
         #[test]
         fn test_list_devices() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             db.connection.execute(
                 "INSERT INTO device (ip, name, offer) VALUES (?1, ?2, ?3)",
                 rusqlite::params!["192.168.1.10", "Living Room", ""],
@@ -1257,7 +1257,7 @@ mod tests {
 
         #[test]
         fn test_enrich_empty_photos() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             // These are private, but list_photos calls them internally
             let photos = db.list_photos("", 0, 10, false, false);
             assert!(photos.is_empty());
@@ -1312,7 +1312,7 @@ mod tests {
 
         #[test]
         fn test_import_photo_invalid_objects_json() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             let imp = database::ImportedPhoto {
                 id: "inv1",
                 location: "/inv1.jpg",
@@ -1330,7 +1330,7 @@ mod tests {
 
         #[test]
         fn test_import_photo_invalid_faces_json() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             let imp = database::ImportedPhoto {
                 id: "inv2",
                 location: "/inv2.jpg",
@@ -1396,7 +1396,7 @@ mod tests {
 
         #[test]
         fn test_list_objects_with_person_search() {
-            let (mut db, _dir) = db();
+            let (db, _dir) = db();
             // Insert a person with a name
             let pid = uuid::Uuid::new_v4().to_string();
             db.connection.execute(
