@@ -452,6 +452,996 @@ mod tests {
         }
     }
 
+    // ---------------------------------------------------------------------------
+    // Database characterization tests — every public method on `Database`
+    // ---------------------------------------------------------------------------
+    mod database {
+        use crate::database;
+        use std::collections::HashMap;
+        use tempfile::tempdir;
+
+        fn db() -> (database::Database, tempfile::TempDir) {
+            let dir = tempdir().expect("tempdir");
+            let db = database::Database::new(&dir.path().display().to_string());
+            (db, dir)
+        }
+
+        fn make_photo(id: &str, location: &str) -> database::Photo {
+            database::Photo {
+                id: id.to_string(),
+                location: location.to_string(),
+                encoded: String::new(),
+                created: "2026-01-01 12:00:00".to_string(),
+                objects: HashMap::new(),
+                properties: HashMap::new(),
+                latitude: 52.3702,
+                longitude: 4.8952,
+                favorite: false,
+                indexed: 0,
+                caption: None,
+                aesthetics_score: None,
+                ai_status: database::AiStatus::default(),
+            }
+        }
+
+        // -- Photo CRUD -------------------------------------------------------
+
+        #[test]
+        fn test_new_creates_tables() {
+            let dir = tempdir().expect("tempdir");
+            let d = database::Database::new(&dir.path().display().to_string());
+
+            // Tables should exist; calling list_photos on empty DB returns nothing
+            assert!(d.list_photos("", 0, 10, false, false).is_empty());
+            assert!(d.get_unindexed_photos().is_empty());
+            assert!(d.list_directories().is_empty());
+            assert!(d.get_state().is_empty());
+            assert!(d.list_devices().is_empty());
+        }
+
+        #[test]
+        fn test_store_photo_batch_and_get_by_id() {
+            let (mut db, _dir) = db();
+            let photo = make_photo("p1", "/path/p1.jpg");
+
+            db.store_photo_batch(&[photo]).expect("store");
+
+            let loaded = db.get_photo_by_id("p1").expect("exists");
+            assert_eq!(loaded.id, "p1");
+            assert_eq!(loaded.location, "/path/p1.jpg");
+            assert_eq!(loaded.latitude, 52.3702);
+            assert_eq!(loaded.longitude, 4.8952);
+            assert_eq!(loaded.indexed, 1); // store_photo_batch sets indexed=1
+            assert!(loaded.favorite == false);
+            assert!(loaded.caption.is_none());
+            assert!(loaded.aesthetics_score.is_none());
+        }
+
+        #[test]
+        fn test_get_photo_by_id_missing() {
+            let (mut db, _dir) = db();
+            assert!(db.get_photo_by_id("nonexistent").is_none());
+        }
+
+        #[test]
+        fn test_get_photos_by_ids() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("a", "/a.jpg"), make_photo("b", "/b.jpg")])
+                .expect("store");
+
+            let photos = db.get_photos_by_ids(&["a".into(), "b".into(), "c".into()]);
+            assert_eq!(photos.len(), 2);
+            assert!(photos.iter().any(|p| p.id == "a"));
+            assert!(photos.iter().any(|p| p.id == "b"));
+        }
+
+        #[test]
+        fn test_get_photos_by_ids_empty_input() {
+            let (mut db, _dir) = db();
+            assert!(db.get_photos_by_ids(&[]).is_empty());
+        }
+
+        #[test]
+        fn test_get_photo_encoded_batch() {
+            let (mut db, _dir) = db();
+            let mut p = make_photo("e1", "/e.jpg");
+            p.encoded = "base64data".to_string();
+            db.store_photo_batch(&[p]).expect("store");
+
+            let map = db.get_photo_encoded_batch(&["e1".into()]);
+            assert_eq!(map.get("e1").map(|s| s.as_str()), Some("base64data"));
+        }
+
+        #[test]
+        fn test_get_photo_encoded_batch_empty() {
+            let (mut db, _dir) = db();
+            assert!(db.get_photo_encoded_batch(&[]).is_empty());
+        }
+
+        #[test]
+        fn test_update_photo_indexed() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("u1", "/u.jpg")]).expect("store");
+
+            db.update_photo_indexed("u1", 2);
+            let loaded = db.get_photo_by_id("u1").expect("exists");
+            assert_eq!(loaded.indexed, 2);
+        }
+
+        #[test]
+        fn test_filter_new_paths() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("f1", "/existing.jpg")]).expect("store");
+
+            let new = db.filter_new_paths(&["/new.jpg".into(), "/existing.jpg".into()]);
+            assert_eq!(new, vec!["/new.jpg".to_string()]);
+        }
+
+        #[test]
+        fn test_filter_new_paths_empty_input() {
+            let (mut db, _dir) = db();
+            assert!(db.filter_new_paths(&[]).is_empty());
+        }
+
+        #[test]
+        fn test_filter_new_paths_chunk_boundary() {
+            let (mut db, _dir) = db();
+            // Insert 1 photo, then filter 101 paths (1 exists + 100 new) to exercise chunking
+            db.store_photo_batch(&[make_photo("chunk", "/exists.jpg")]).expect("store");
+
+            let mut paths: Vec<String> = (0..101).map(|i| format!("/p{i}.jpg")).collect();
+            paths.push("/exists.jpg".into());
+
+            let new = db.filter_new_paths(&paths);
+            assert_eq!(new.len(), 101);
+            assert!(!new.contains(&"/exists.jpg".to_string()));
+        }
+
+        // -- Photo queries ----------------------------------------------------
+
+        #[test]
+        fn test_list_photos_all() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("l1", "/a.jpg"), make_photo("l2", "/b.jpg")])
+                .expect("store");
+
+            let photos = db.list_photos("", 0, 10, false, false);
+            assert_eq!(photos.len(), 2);
+        }
+
+        #[test]
+        fn test_list_photos_pagination() {
+            let (mut db, _dir) = db();
+            let batch: Vec<_> = (0..5).map(|i| make_photo(&format!("p{i}"), &format!("/p{i}.jpg"))).collect();
+            db.store_photo_batch(&batch).expect("store");
+
+            assert_eq!(db.list_photos("", 0, 2, false, false).len(), 2);
+            assert_eq!(db.list_photos("", 2, 10, false, false).len(), 3);
+            assert_eq!(db.list_photos("", 10, 10, false, false).len(), 0);
+        }
+
+        #[test]
+        fn test_list_photos_query_by_location() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("q1", "/vacation/beach.jpg"), make_photo("q2", "/work/doc.jpg")])
+                .expect("store");
+
+            let results = db.list_photos("beach", 0, 10, false, false);
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].id, "q1");
+        }
+
+        #[test]
+        fn test_list_photos_favorites_only() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("f1", "/f.jpg"), make_photo("f2", "/g.jpg")])
+                .expect("store");
+            db.toggle_favorite("f1");
+
+            let favs = db.list_photos("", 0, 10, true, false);
+            assert_eq!(favs.len(), 1);
+            assert_eq!(favs[0].id, "f1");
+        }
+
+        #[test]
+        fn test_toggle_favorite_add_remove() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("t1", "/t.jpg")]).expect("store");
+
+            assert_eq!(db.toggle_favorite("t1"), true);   // added
+            let p = db.get_photo_by_id("t1").expect("exists");
+            assert!(p.favorite);
+
+            assert_eq!(db.toggle_favorite("t1"), false);  // removed
+            let p = db.get_photo_by_id("t1").expect("exists");
+            assert!(!p.favorite);
+        }
+
+        #[test]
+        fn test_get_heatmap_points() {
+            let (mut db, _dir) = db();
+            let mut p1 = make_photo("h1", "/h1.jpg");
+            p1.latitude = 0.0;
+            p1.longitude = 0.0;
+            let mut p2 = make_photo("h2", "/h2.jpg");
+            p2.latitude = 48.8566;
+            p2.longitude = 2.3522;
+            db.store_photo_batch(&[p1, p2]).expect("store");
+
+            let points = db.get_heatmap_points();
+            assert_eq!(points.len(), 1);
+            assert_eq!(points[0].id, "h2");
+        }
+
+        // -- AI status --------------------------------------------------------
+
+        #[test]
+        fn test_update_ai_status_and_missing_model() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("a1", "/a.jpg")]).expect("store");
+
+            let missing = db.get_photos_missing_model("clip");
+            assert_eq!(missing.len(), 1);
+            assert_eq!(missing[0], "a1");
+
+            db.update_ai_status("a1", "clip", 1);
+            let missing = db.get_photos_missing_model("clip");
+            assert!(missing.is_empty());
+        }
+
+        #[test]
+        fn test_get_unindexed_photos() {
+            let (mut db, _dir) = db();
+            let mut p1 = make_photo("i1", "/i1.jpg");
+            p1.indexed = 0;
+            let mut p2 = make_photo("i2", "/i2.jpg");
+            p2.indexed = 2;
+            db.store_photo_batch(&[p1, p2]).expect("store");
+
+            // store_photo_batch sets indexed=1, so we need to set it differently
+            db.update_photo_indexed("i1", 0);
+            db.update_photo_indexed("i2", 2);
+
+            let unindexed = db.get_unindexed_photos();
+            assert_eq!(unindexed.len(), 1);
+            assert_eq!(unindexed[0].id, "i1");
+        }
+
+        // -- People / Faces ---------------------------------------------------
+
+        #[test]
+        fn test_store_face_and_get_faces_for_photo() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("fp1", "/fp.jpg")]).expect("store");
+
+            let embedding = vec![0.1f32; 512];
+            let person_id = db.create_anonymous_person(&embedding);
+
+            let face = database::Face {
+                photo_id: "fp1".to_string(),
+                face_id: "face-001".to_string(),
+                crop_path: "/crops/face-001.jpg".to_string(),
+                encoded: "enc".to_string(),
+                embedding: embedding.clone(),
+                person_id: Some(person_id.clone()),
+            };
+            db.store_face(face);
+
+            let faces = db.get_faces_for_photo("fp1");
+            assert_eq!(faces.len(), 1);
+            assert_eq!(faces[0].face_id, "face-001");
+            assert_eq!(faces[0].person_id.as_deref(), Some(person_id.as_str()));
+        }
+
+        #[test]
+        fn test_get_faces_for_photo_empty() {
+            let (mut db, _dir) = db();
+            assert!(db.get_faces_for_photo("nonexistent").is_empty());
+        }
+
+        #[test]
+        fn test_get_people_and_anonymous_groups() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("pep1", "/pep.jpg")]).expect("store");
+
+            let embedding = vec![0.2f32; 512];
+            let pid = db.create_anonymous_person(&embedding);
+            db.store_face(database::Face {
+                photo_id: "pep1".to_string(),
+                face_id: "f1".to_string(),
+                crop_path: "/crops/f1.jpg".to_string(),
+                encoded: "enc".to_string(),
+                embedding: embedding.clone(),
+                person_id: Some(pid.clone()),
+            });
+
+            let people = db.get_people();
+            assert_eq!(people.len(), 0); // name IS NULL, excluded by WHERE name IS NOT NULL
+
+            let anon = db.get_anonymous_people_groups();
+            assert_eq!(anon.len(), 1);
+            assert_eq!(anon[0].id, pid);
+            assert_eq!(anon[0].face_count, 1);
+        }
+
+        #[test]
+        fn test_assign_name_to_face_new_person() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("an1", "/an.jpg")]).expect("store");
+
+            let pid = db.create_anonymous_person(&vec![0.3f32; 512]);
+            db.store_face(database::Face {
+                photo_id: "an1".to_string(),
+                face_id: "fa1".to_string(),
+                crop_path: "/crops/fa1.jpg".to_string(),
+                encoded: "enc".to_string(),
+                embedding: vec![0.3f32; 512],
+                person_id: Some(pid.clone()),
+            });
+
+            let _result_id = db.assign_name_to_face("fa1", "Alice");
+            // Should create a new named person
+            let people = db.get_people();
+            assert_eq!(people.len(), 1);
+            assert_eq!(people[0].name, "Alice");
+            assert_eq!(people[0].face_count, 1);
+        }
+
+        #[test]
+        fn test_assign_name_to_face_existing_person() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("an2", "/an2.jpg")]).expect("store");
+
+            // Create two anonymous people, assign the same name to both faces
+            let pid1 = db.create_anonymous_person(&vec![0.4f32; 512]);
+            let pid2 = db.create_anonymous_person(&vec![0.5f32; 512]);
+
+            db.store_face(database::Face {
+                photo_id: "an2".to_string(),
+                face_id: "fa2".to_string(),
+                crop_path: "/crops/fa2.jpg".to_string(),
+                encoded: "enc".to_string(),
+                embedding: vec![0.4f32; 512],
+                person_id: Some(pid1.clone()),
+            });
+            db.store_face(database::Face {
+                photo_id: "an2".to_string(),
+                face_id: "fa3".to_string(),
+                crop_path: "/crops/fa3.jpg".to_string(),
+                encoded: "enc".to_string(),
+                embedding: vec![0.5f32; 512],
+                person_id: Some(pid2.clone()),
+            });
+
+            // Assign name to first face — creates named person
+            db.assign_name_to_face("fa2", "Bob");
+            // Assign same name to second face — should merge
+            db.assign_name_to_face("fa3", "Bob");
+
+            let people = db.get_people();
+            assert_eq!(people.len(), 1);
+            assert_eq!(people[0].name, "Bob");
+            assert_eq!(people[0].face_count, 2);
+        }
+
+        #[test]
+        fn test_create_anonymous_person_and_centroid() {
+            let (mut db, _dir) = db();
+            let emb = vec![0.6f32; 512];
+            let pid = db.create_anonymous_person(&emb);
+            // Centroid is a no-op when no faces are linked yet
+            db.update_person_centroid(&pid);
+            // Should not panic
+        }
+
+        #[test]
+        fn test_get_all_people_with_embeddings() {
+            let (mut db, _dir) = db();
+            let emb = vec![0.7f32; 512];
+            let pid = db.create_anonymous_person(&emb);
+            // create_anonymous_person does NOT store embedding if none passed? 
+            // Actually looking at the code: create_anonymous_person does INSERT with embedding.
+            // But get_all_people_with_embeddings requires embedding IS NOT NULL.
+            // We passed embedding, so it should show up.
+            let results = db.get_all_people_with_embeddings();
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].0, pid);
+            assert_eq!(results[0].1.len(), 512);
+        }
+
+        #[test]
+        fn test_get_person_faces() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("pf1", "/pf.jpg")]).expect("store");
+
+            let pid = db.create_anonymous_person(&vec![0.8f32; 512]);
+            db.store_face(database::Face {
+                photo_id: "pf1".to_string(),
+                face_id: "f-pf".to_string(),
+                crop_path: "/crops/f-pf.jpg".to_string(),
+                encoded: "enc".to_string(),
+                embedding: vec![0.8f32; 512],
+                person_id: Some(pid.clone()),
+            });
+
+            let faces = db.get_person_faces(&pid);
+            assert_eq!(faces.len(), 1);
+            assert_eq!(faces[0].face_id, "f-pf");
+        }
+
+        #[test]
+        fn test_get_photos_for_person() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("pp1", "/pp.jpg")]).expect("store");
+
+            let pid = db.create_anonymous_person(&vec![0.9f32; 512]);
+            db.store_face(database::Face {
+                photo_id: "pp1".to_string(),
+                face_id: "f-pp".to_string(),
+                crop_path: "/crops/f-pp.jpg".to_string(),
+                encoded: "enc".to_string(),
+                embedding: vec![0.9f32; 512],
+                person_id: Some(pid.clone()),
+            });
+
+            let photos = db.get_photos_for_person(&pid);
+            assert_eq!(photos.len(), 1);
+            assert_eq!(photos[0].id, "pp1");
+        }
+
+        #[test]
+        fn test_merge_people() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("mp1", "/mp.jpg")]).expect("store");
+
+            let pid_a = db.create_anonymous_person(&vec![0.1f32; 512]);
+            let pid_b = db.create_anonymous_person(&vec![0.2f32; 512]);
+
+            db.store_face(database::Face {
+                photo_id: "mp1".to_string(),
+                face_id: "fa".to_string(),
+                crop_path: "/crops/fa.jpg".to_string(),
+                encoded: "enc".to_string(),
+                embedding: vec![0.1f32; 512],
+                person_id: Some(pid_a.clone()),
+            });
+            db.store_face(database::Face {
+                photo_id: "mp1".to_string(),
+                face_id: "fb".to_string(),
+                crop_path: "/crops/fb.jpg".to_string(),
+                encoded: "enc".to_string(),
+                embedding: vec![0.2f32; 512],
+                person_id: Some(pid_b.clone()),
+            });
+
+            db.merge_people(&pid_a, &pid_b);
+
+            // pid_a should be gone, all faces point to pid_b
+            let faces = db.get_person_faces(&pid_b);
+            assert_eq!(faces.len(), 2);
+            let faces_a = db.get_person_faces(&pid_a);
+            assert!(faces_a.is_empty());
+        }
+
+        #[test]
+        fn test_rename_person() {
+            let (mut db, _dir) = db();
+            let pid = db.create_anonymous_person(&vec![0.3f32; 512]);
+            db.rename_person(&pid, "Renamed");
+            let people = db.get_all_people_with_embeddings();
+            // rename_person sets name, but get_all_people_with_embeddings only returns people with embeddings
+            // The person still has embedding, so it should appear
+            assert_eq!(people.len(), 1);
+            // We can't check the name directly via get_all_people_with_embeddings since it only returns (id, embedding)
+            // Let's verify via get_people which returns name
+            // But get_people requires name IS NOT NULL, which it now is
+            // Wait, get_people also does a LEFT JOIN faces, GROUP BY p.id
+            // Since there are no faces linked, the face_count would be 0 but the person should still appear
+            let people_list = db.get_people();
+            assert_eq!(people_list.len(), 1);
+            assert_eq!(people_list[0].name, "Renamed");
+        }
+
+        // -- Sync -------------------------------------------------------------
+
+        #[test]
+        fn test_get_photo_sync_info() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("sync1", "/path/sync1.jpg")]).expect("store");
+
+            // sync info requires entries in object or faces table
+            db.connection.execute(
+                "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
+                rusqlite::params!["sync1", "cat", "0.95"],
+            ).unwrap();
+
+            let info = db.get_photo_sync_info();
+            assert_eq!(info.len(), 1);
+            assert_eq!(info[0].id, "sync1");
+        }
+
+        #[test]
+        fn test_get_photo_sync_info_excludes_siegu_folder() {
+            let (mut db, _dir) = db();
+            let mut photo = make_photo("sync2", "/siegu/sync2.jpg");
+            photo.indexed = 1;
+            db.store_photo_batch(&[photo]).expect("store");
+            db.update_ai_status("sync2", "clip", 1);
+
+            let info = db.get_photo_sync_info();
+            assert!(info.is_empty());
+        }
+
+        #[test]
+        fn test_get_photo_sync_info_by_id() {
+            let (mut db, _dir) = db();
+            let mut photo = make_photo("sync3", "/path/sync3.jpg");
+            photo.indexed = 1;
+            db.store_photo_batch(&[photo]).expect("store");
+
+            let info = db.get_photo_sync_info_by_id("sync3").expect("exists");
+            assert_eq!(info.id, "sync3");
+        }
+
+        #[test]
+        fn test_get_photo_sync_info_by_id_missing() {
+            let (mut db, _dir) = db();
+            let result = db.get_photo_sync_info_by_id("nonexistent");
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_import_photo() {
+            let (mut db, _dir) = db();
+            let imp = database::ImportedPhoto {
+                id: "imp1",
+                location: "/imported/imp1.jpg",
+                created: "2026-06-01",
+                latitude: Some(40.7128),
+                longitude: Some(-74.0060),
+                objects_json: r#"[{"class":"cat","probability":"0.95"}]"#,
+                faces_json: r#"[{"face_id":"imp-face-1","crop_path":"/crops/imp-face-1.jpg","encoded":"enc","person_id":null}]"#,
+                encoded: "base64enc",
+            };
+            db.import_photo(imp);
+
+            let photo = db.get_photo_by_id("imp1").expect("exists");
+            assert_eq!(photo.location, "/imported/imp1.jpg");
+            // Objects should be loaded
+            let result = db.get_photo_by_id("imp1").expect("exists");
+            assert_eq!(result.properties.len(), 0); // no properties imported
+        }
+
+        #[test]
+        fn test_import_photo_updates_existing() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("imp2", "/old/imp2.jpg")]).expect("store");
+
+            let imp = database::ImportedPhoto {
+                id: "imp2",
+                location: "/new/imp2.jpg",
+                created: "2026-06-02",
+                latitude: None,
+                longitude: None,
+                objects_json: "[]",
+                faces_json: "[]",
+                encoded: "",
+            };
+            db.import_photo(imp);
+
+            let photo = db.get_photo_by_id("imp2").expect("exists");
+            assert_eq!(photo.location, "/new/imp2.jpg");
+        }
+
+        // -- Config / State ---------------------------------------------------
+
+        #[test]
+        fn test_set_and_get_state() {
+            let (mut db, _dir) = db();
+            let mut state = HashMap::new();
+            state.insert("key1".to_string(), "val1".to_string());
+            state.insert("key2".to_string(), "val2".to_string());
+            db.set_state(state);
+
+            let loaded = db.get_state();
+            assert_eq!(loaded.get("key1").map(|s| s.as_str()), Some("val1"));
+            assert_eq!(loaded.get("key2").map(|s| s.as_str()), Some("val2"));
+        }
+
+        #[test]
+        fn test_last_scan_time() {
+            let (mut db, _dir) = db();
+            assert!(db.get_last_scan_time().is_none());
+
+            db.set_last_scan_time("2026-05-20T10:00:00Z".to_string());
+            assert_eq!(
+                db.get_last_scan_time().as_deref(),
+                Some("2026-05-20T10:00:00Z")
+            );
+
+            db.set_last_scan_time("2026-05-21T10:00:00Z".to_string());
+            assert_eq!(
+                db.get_last_scan_time().as_deref(),
+                Some("2026-05-21T10:00:00Z")
+            );
+        }
+
+        // -- Logs -------------------------------------------------------------
+
+        #[test]
+        fn test_store_and_get_logs() {
+            let (mut db, _dir) = db();
+            db.store_log("INFO", "test message");
+            db.store_log("WARN", "warning message");
+
+            let logs = db.get_logs(10);
+            assert_eq!(logs.len(), 2);
+            assert_eq!(logs[1].level, "WARN");
+            assert_eq!(logs[1].message, "warning message");
+        }
+
+        #[test]
+        fn test_get_logs_limit() {
+            let (mut db, _dir) = db();
+            for i in 0..5 {
+                db.store_log("INFO", &format!("msg {i}"));
+            }
+            assert_eq!(db.get_logs(3).len(), 3);
+        }
+
+        #[test]
+        fn test_clear_logs() {
+            let (mut db, _dir) = db();
+            db.store_log("INFO", "to be cleared");
+            db.clear_logs();
+            assert!(db.get_logs(10).is_empty());
+        }
+
+        // -- Directories ------------------------------------------------------
+
+        #[test]
+        fn test_add_and_list_directories() {
+            let (mut db, _dir) = db();
+            db.add_directory("/photos/vacation");
+            db.add_directory("/photos/work");
+
+            let dirs = db.list_directories();
+            assert_eq!(dirs.len(), 2);
+            assert!(dirs.contains(&"/photos/vacation".to_string()));
+            assert!(dirs.contains(&"/photos/work".to_string()));
+        }
+
+        #[test]
+        fn test_remove_directory() {
+            let (mut db, _dir) = db();
+            db.add_directory("/photos/temp");
+            db.remove_directory("/photos/temp".to_string());
+            assert!(db.list_directories().is_empty());
+        }
+
+        #[test]
+        fn test_remove_directory_full() {
+            let (mut db, _dir) = db();
+            db.add_directory("/photos/obsolete");
+            db.store_photo_batch(&[make_photo("rd1", "/photos/obsolete/rd1.jpg")]).expect("store");
+            db.store_photo_batch(&[make_photo("rd2", "/photos/obsolete/sub/rd2.jpg")]).expect("store");
+
+            db.remove_directory_full("/photos/obsolete");
+
+            assert!(db.get_photo_by_id("rd1").is_none());
+            assert!(db.get_photo_by_id("rd2").is_none());
+            assert!(db.list_directories().is_empty());
+        }
+
+        // -- Search -----------------------------------------------------------
+
+        #[test]
+        fn test_list_objects() {
+            let (mut db, _dir) = db();
+            let mut photo = make_photo("so1", "/so.jpg");
+            photo.indexed = 1;
+            db.store_photo_batch(&[photo]).expect("store");
+
+            // Directly insert an object for search via raw SQL
+            db.connection.execute(
+                "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
+                rusqlite::params!["so1", "cat", "0.95"],
+            ).unwrap();
+
+            let suggestions = db.list_objects("ca");
+            assert_eq!(suggestions.len(), 1);
+            assert_eq!(suggestions[0].title, "cat");
+            assert_eq!(suggestions[0].suggestion_type, "tag");
+        }
+
+        #[test]
+        fn test_list_objects_no_match() {
+            let (mut db, _dir) = db();
+            assert!(db.list_objects("zzzzzz").is_empty());
+        }
+
+        // -- Devices & counts -------------------------------------------------
+
+        #[test]
+        fn test_get_media_counts() {
+            let (mut db, _dir) = db();
+            let photo = make_photo("mc1", "/mc1.jpg");
+            db.store_photo_batch(&[photo]).expect("store");
+
+            let video = make_photo("mc2", "/mc2.mp4");
+            db.store_photo_batch(&[video]).expect("store");
+
+            let (photos, videos) = db.get_media_counts();
+            assert_eq!(photos, 1);
+            assert_eq!(videos, 1);
+        }
+
+        #[test]
+        fn test_list_devices() {
+            let (mut db, _dir) = db();
+            db.connection.execute(
+                "INSERT INTO device (ip, name, offer) VALUES (?1, ?2, ?3)",
+                rusqlite::params!["192.168.1.10", "Living Room", ""],
+            ).unwrap();
+
+            let devices = db.list_devices();
+            assert_eq!(devices.len(), 1);
+            assert_eq!(devices[0].id, "192.168.1.10");
+            assert_eq!(devices[0].title, "Living Room");
+        }
+
+        // -- Objects & properties enrichment (indirect via list_photos) -------
+
+        #[test]
+        fn test_list_photos_with_objects_and_properties() {
+            let (mut db, _dir) = db();
+            let mut photo = make_photo("enr1", "/enr1.jpg");
+            photo.indexed = 1;
+            db.store_photo_batch(&[photo]).expect("store");
+
+            // Insert object and property directly (as the ML worker would)
+            db.connection.execute(
+                "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
+                rusqlite::params!["enr1", "dog", "0.88"],
+            ).unwrap();
+            db.connection.execute(
+                "INSERT INTO properties (photo_id, key, value) VALUES (?1, ?2, ?3)",
+                rusqlite::params!["enr1", "location_name", "Amsterdam"],
+            ).unwrap();
+
+            let photos = db.list_photos("", 0, 10, false, false);
+            assert_eq!(photos.len(), 1);
+            assert!((photos[0].objects["dog"] - 0.88).abs() < 0.001);
+            assert_eq!(photos[0].properties.get("location_name").map(|s| s.as_str()), Some("Amsterdam"));
+        }
+
+        #[test]
+        fn test_list_photos_with_caption_search() {
+            let (mut db, _dir) = db();
+            let mut photo = make_photo("cap1", "/cap1.jpg");
+            photo.indexed = 1;
+            db.store_photo_batch(&[photo]).expect("store");
+            db.connection.execute(
+                "UPDATE photo SET caption = ?1 WHERE id = ?2",
+                rusqlite::params!["a beautiful sunset", "cap1"],
+            ).unwrap();
+
+            let results = db.list_photos("sunset", 0, 10, false, false);
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].caption.as_deref(), Some("a beautiful sunset"));
+        }
+
+        #[test]
+        fn test_list_photos_uuid_query() {
+            let (mut db, _dir) = db();
+            let uuid = "550e8400-e29b-41d4-a716-446655440000";
+            let mut photo = make_photo(uuid, "/uuid.jpg");
+            photo.indexed = 1;
+            db.store_photo_batch(&[photo]).expect("store");
+
+            // Query by UUID (exact match)
+            let results = db.list_photos(uuid, 0, 10, false, false);
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].id, uuid);
+        }
+
+        // -- store_photo_batch error case -------------------------------------
+
+        #[test]
+        fn test_store_photo_batch_empty() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[]).expect("empty batch should succeed");
+        }
+
+        // -- enrich_objects / enrich_properties with no matching rows ---------
+
+        #[test]
+        fn test_enrich_empty_photos() {
+            let (mut db, _dir) = db();
+            // These are private, but list_photos calls them internally
+            let photos = db.list_photos("", 0, 10, false, false);
+            assert!(photos.is_empty());
+        }
+
+        // -- Edge cases ------------------------------------------------------
+
+        #[test]
+        fn test_assign_name_to_face_same_person() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("same", "/same.jpg")]).expect("store");
+            let pid = db.create_anonymous_person(&vec![0.1f32; 512]);
+            db.store_face(database::Face {
+                photo_id: "same".to_string(),
+                face_id: "f-same".to_string(),
+                crop_path: "/crops/f-same.jpg".to_string(),
+                encoded: "enc".to_string(),
+                embedding: vec![0.1f32; 512],
+                person_id: Some(pid.clone()),
+            });
+            // Assign name -> creates named person
+            let named = db.assign_name_to_face("f-same", "Same");
+            // Assign same name again -> should return same person
+            let again = db.assign_name_to_face("f-same", "Same");
+            assert_eq!(named, again);
+        }
+
+        #[test]
+        fn test_update_person_centroid_empty() {
+            let (db, _dir) = db();
+            // No faces linked; centroid update should be a no-op
+            db.update_person_centroid("nonexistent");
+            // Should not panic
+        }
+
+        #[test]
+        fn test_list_photos_videos_only() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("vid1", "/video.mp4"), make_photo("img1", "/image.jpg")]).expect("store");
+
+            let videos = db.list_photos("", 0, 10, false, true);
+            assert_eq!(videos.len(), 1);
+            assert_eq!(videos[0].id, "vid1");
+        }
+
+        #[test]
+        fn test_remove_directory_full_no_match() {
+            let (db, _dir) = db();
+            // Non-existent path should not error
+            db.remove_directory_full("/nonexistent");
+        }
+
+        #[test]
+        fn test_import_photo_invalid_objects_json() {
+            let (mut db, _dir) = db();
+            let imp = database::ImportedPhoto {
+                id: "inv1",
+                location: "/inv1.jpg",
+                created: "2026-01-01",
+                latitude: None,
+                longitude: None,
+                objects_json: "not valid json",
+                faces_json: "[]",
+                encoded: "",
+            };
+            db.import_photo(imp);
+            let photo = db.get_photo_by_id("inv1").expect("exists");
+            assert!(photo.objects.is_empty()); // invalid JSON -> no objects imported
+        }
+
+        #[test]
+        fn test_import_photo_invalid_faces_json() {
+            let (mut db, _dir) = db();
+            let imp = database::ImportedPhoto {
+                id: "inv2",
+                location: "/inv2.jpg",
+                created: "2026-01-01",
+                latitude: None,
+                longitude: None,
+                objects_json: "[]",
+                faces_json: "{bad}",
+                encoded: "",
+            };
+            db.import_photo(imp);
+            let faces = db.get_faces_for_photo("inv2");
+            assert!(faces.is_empty());
+        }
+
+        #[test]
+        fn test_assign_name_to_face_no_prior_person() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("noprior", "/noprior.jpg")]).expect("store");
+            // Create a face with NO person_id (person_id is None)
+            db.store_face(database::Face {
+                photo_id: "noprior".to_string(),
+                face_id: "f-noprior".to_string(),
+                crop_path: "/crops/f-noprior.jpg".to_string(),
+                encoded: "enc".to_string(),
+                embedding: vec![0.5f32; 512],
+                person_id: None,
+            });
+            // Assign name -> should create new person entry
+            let new_id = db.assign_name_to_face("f-noprior", "NewPerson");
+            let faces = db.get_person_faces(&new_id);
+            assert_eq!(faces.len(), 1);
+            assert_eq!(faces[0].face_id, "f-noprior");
+        }
+
+        #[test]
+        fn test_list_photos_with_object_query() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("oq1", "/oq1.jpg")]).expect("store");
+            db.connection.execute(
+                "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
+                rusqlite::params!["oq1", "cat", "0.95"],
+            ).unwrap();
+
+            let photos = db.list_photos("cat", 0, 10, false, false);
+            assert_eq!(photos.len(), 1);
+            assert_eq!(photos[0].id, "oq1");
+        }
+
+        #[test]
+        fn test_list_photos_with_object_query_case_insensitive() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("oq2", "/oq2.jpg")]).expect("store");
+            db.connection.execute(
+                "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
+                rusqlite::params!["oq2", "Cat", "0.90"],
+            ).unwrap();
+
+            // LIKE is case-insensitive by default in SQLite for ASCII
+            let photos = db.list_photos("cat", 0, 10, false, false);
+            assert_eq!(photos.len(), 1);
+        }
+
+        #[test]
+        fn test_list_objects_with_person_search() {
+            let (mut db, _dir) = db();
+            // Insert a person with a name
+            let pid = uuid::Uuid::new_v4().to_string();
+            db.connection.execute(
+                "INSERT INTO people (id, name) VALUES (?1, ?2)",
+                rusqlite::params![pid, "Alice Johnson"],
+            ).unwrap();
+
+            let suggestions = db.list_objects("Alice");
+            assert!(suggestions.iter().any(|s| s.suggestion_type == "person"));
+        }
+
+        #[test]
+        fn test_assign_name_to_face_merge_existing() {
+            let (mut db, _dir) = db();
+            db.store_photo_batch(&[make_photo("merge_ex", "/merge_ex.jpg")]).expect("store");
+
+            // Create face linked to an anonymous person
+            let anon_pid = db.create_anonymous_person(&vec![0.7f32; 512]);
+            db.store_face(database::Face {
+                photo_id: "merge_ex".to_string(),
+                face_id: "f-merge1".to_string(),
+                crop_path: "/crops/f-merge1.jpg".to_string(),
+                encoded: "enc".to_string(),
+                embedding: vec![0.7f32; 512],
+                person_id: Some(anon_pid.clone()),
+            });
+
+            // Create a second face also linked to the same anon person
+            db.store_face(database::Face {
+                photo_id: "merge_ex".to_string(),
+                face_id: "f-merge2".to_string(),
+                crop_path: "/crops/f-merge2.jpg".to_string(),
+                encoded: "enc".to_string(),
+                embedding: vec![0.7f32; 512],
+                person_id: Some(anon_pid.clone()),
+            });
+
+            // Assign name to first face
+            let named_id = db.assign_name_to_face("f-merge1", "MergedPerson");
+            // Both faces should now be under the named person
+            let faces = db.get_person_faces(&named_id);
+            assert_eq!(faces.len(), 2);
+        }
+    }
+
     #[test]
     fn test_get_photo_by_id_serialization() {
         #[cfg(not(target_os = "android"))]
