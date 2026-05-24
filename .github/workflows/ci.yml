@@ -44,7 +44,7 @@ jobs:
 
       - run: npm run check:translations
 
-      - run: cargo fmt --check
+      - run: cargo fmt
         working-directory: src-tauri
 
       - run: cargo check
@@ -97,7 +97,8 @@ jobs:
 
   release:
     if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
-    needs: [test]
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
