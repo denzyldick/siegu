@@ -16,6 +16,23 @@ pub struct SearchSuggestion {
 pub struct Database {
     pub connection: Connection,
 }
+
+const MONTH_NAMES: &[(u8, &str, &str)] = &[
+    (1, "january", "jan"), (2, "february", "feb"), (3, "march", "mar"),
+    (4, "april", "apr"), (5, "may", "may"), (6, "june", "jun"),
+    (7, "july", "jul"), (8, "august", "aug"), (9, "september", "sep"),
+    (10, "october", "oct"), (11, "november", "nov"), (12, "december", "dec"),
+];
+
+fn month_name_to_like(query: &str) -> Option<String> {
+    let q_lower = query.to_lowercase();
+    for &(num, full, abbr) in MONTH_NAMES {
+        if q_lower.contains(full) || q_lower.contains(abbr) {
+            return Some(format!("%-{:02}-%", num));
+        }
+    }
+    None
+}
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct PhotoSyncInfo {
     pub id: String,
@@ -359,6 +376,38 @@ impl Database {
                 }
             }
         }
+
+        let q = query.trim();
+        if q.len() >= 2 {
+            let q_lower = q.to_lowercase();
+            for &(num, full, abbr) in MONTH_NAMES {
+                if full.starts_with(&q_lower) || abbr.starts_with(&q_lower) {
+                    objects.push(SearchSuggestion {
+                        title: full.to_string(),
+                        suggestion_type: "date".to_string(),
+                    });
+                }
+
+                if q_lower.contains(full) || q_lower.contains(abbr) {
+                    let ym_sql = "SELECT DISTINCT substr(created, 1, 7) FROM photo WHERE created LIKE ?1 ORDER BY 1 DESC LIMIT 5";
+                    if let Ok(mut stmt) = self.connection.prepare(ym_sql) {
+                        let pat = format!("%-{:02}-%", num);
+                        if let Ok(iter) = stmt.query_map([&pat], |row| row.get::<_, String>(0)) {
+                            for ym in iter.flatten() {
+                                if let Some((year, _)) = ym.split_once('-') {
+                                    objects.push(SearchSuggestion {
+                                        title: format!("{} {}", full, year),
+                                        suggestion_type: "date".to_string(),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
         objects
     }
 
@@ -445,19 +494,25 @@ impl Database {
 
         let is_uuid = query.len() == 36 && query.chars().all(|c| c.is_alphanumeric() || c == '-');
 
+        let month_like = month_name_to_like(query);
+        let month_clause = month_like
+            .as_ref()
+            .map(|p| format!(" OR p.created LIKE '{}'", p))
+            .unwrap_or_default();
+
         let q_filter = if !query.is_empty() {
             if is_uuid {
-                "AND (p.id = ?3 OR EXISTS(SELECT 1 FROM faces WHERE photo_id=p.id AND person_id = ?3))"
+                "AND (p.id = ?3 OR EXISTS(SELECT 1 FROM faces WHERE photo_id=p.id AND person_id = ?3))".to_string()
             } else {
-                "AND (p.location LIKE ?3 OR p.id LIKE ?3 OR p.caption LIKE ?3 \
+                format!("AND (p.location LIKE ?3 OR p.id LIKE ?3 OR p.caption LIKE ?3 \
                     OR EXISTS(SELECT 1 FROM object WHERE photo_id=p.id AND class LIKE ?3) \
                     OR EXISTS(SELECT 1 FROM ocr WHERE photo_id=p.id AND text LIKE ?3) \
                     OR EXISTS(SELECT 1 FROM faces f JOIN people p_name ON f.person_id = p_name.id WHERE f.photo_id=p.id AND p_name.name LIKE ?3) \
                     OR EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='location_name' AND value LIKE ?3) \
-                    OR p.created LIKE ?3)"
+                    OR p.created LIKE ?3{})", month_clause)
             }
         } else {
-            ""
+            String::new()
         };
 
         let sql = format!("SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, 

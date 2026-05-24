@@ -312,11 +312,13 @@ export default {
     iconForType(type) {
       if (type === 'person') return 'mdi-account';
       if (type === 'location') return 'mdi-map-marker';
+      if (type === 'date') return 'mdi-calendar-month';
       return 'mdi-tag';
     },
     iconColor(type) {
       if (type === 'person') return '#0ea5e9';
       if (type === 'location') return '#f59e0b';
+      if (type === 'date') return '#8b5cf6';
       return '#10b981';
     },
     onSearchUpdate(val) {
