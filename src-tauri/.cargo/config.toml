@@ -2,4 +2,8 @@
 ORT_STRATEGY = "download"
 
 [target.x86_64-pc-windows-msvc]
-rustflags = ["-C", "target-feature=-crt-static", "-C", "link-arg=/NODEFAULTLIB:libcmt", "-C", "link-arg=/NODEFAULTLIB:libcmtd", "-C", "link-arg=/NODEFAULTLIB:libcpmt", "-C", "link-arg=/NODEFAULTLIB:libcpmtd"]
+# Dynamic CRT is the default on MSVC; removed manual /NODEFAULTLIB flags
+# that were causing LNK2001 (unresolved CRT symbols like mainCRTStartup).
+# If LNK2005 resurfaces, fix the CRT mismatch at the source (dependency level)
+# rather than excluding libraries wholesale.
+rustflags = []
