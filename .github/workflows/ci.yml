@@ -138,6 +138,8 @@ jobs:
 
   release-android:
     if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
     runs-on: ubuntu-24.04
     env:
       ORT_STRATEGY: download
@@ -183,6 +185,8 @@ jobs:
 
   release-arch:
     if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
     runs-on: ubuntu-24.04
     env:
       ORT_STRATEGY: download
@@ -216,6 +220,8 @@ jobs:
 
   release-ios:
     if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
