@@ -27,7 +27,9 @@
   --color-scrollbar-thumb: rgba(0, 0, 0, 0.1);
   --color-scrollbar-hover: rgba(0, 0, 0, 0.2);
   --color-bg-list: #ffffff;
-  --color-bg-btn: #ffffff;
+  --color-bg-btn: #000000;
+  --color-text-btn: #ffffff;
+  --color-bg-glass: rgba(255, 255, 255, 0.6);
 }
 
 .v-theme--dark {
@@ -46,7 +48,9 @@
   --color-scrollbar-thumb: rgba(255, 255, 255, 0.12);
   --color-scrollbar-hover: rgba(255, 255, 255, 0.2);
   --color-bg-list: #18181b;
-  --color-bg-btn: #27272a;
+  --color-bg-btn: #ffffff;
+  --color-text-btn: #000000;
+  --color-bg-glass: rgba(24, 24, 27, 0.6);
 }
 
 body {
@@ -57,10 +61,10 @@ body {
 
 /* Global Siegu Design System */
 .v-application .siegu-btn, .siegu-btn {
-  background: var(--color-bg-btn);
-  border: 1px solid var(--color-border-default);
-  border-radius: 12px;
-  color: var(--color-text-primary);
+  background: var(--color-bg-btn) !important;
+  border: none;
+  border-radius: 16px;
+  color: var(--color-text-btn) !important;
   text-transform: none;
   font-weight: 600;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -68,9 +72,7 @@ body {
 }
 
 .v-application .siegu-btn:hover, .siegu-btn:hover {
-  background: var(--color-bg-hover);
-  border-color: var(--color-border-hover);
-  transform: translateY(-1px);
+  transform: scale(1.02) translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
@@ -80,19 +82,18 @@ body {
 
 .siegu-btn-sm {
   background: var(--color-bg-btn) !important;
-  border: 1px solid var(--color-border-default) !important;
-  border-radius: 10px;
+  border: none;
+  border-radius: 16px;
   font-weight: 600;
   font-size: 13px;
   letter-spacing: 0.02em;
-  color: var(--color-text-primary) !important;
+  color: var(--color-text-btn) !important;
   text-transform: none !important;
   height: 40px !important;
 }
 
 .siegu-btn-sm:hover {
-  background: var(--color-bg-hover) !important;
-  border-color: var(--color-border-hover) !important;
+  transform: scale(1.02) translateY(-1px);
 }
 
 .v-application .siegu-field :deep(.v-field), 
@@ -200,7 +201,18 @@ body {
   background-color: #18181b !important;
 }
 
+/* Glass panels (dialogs, menus) */
+.glass-panel {
+  background: var(--color-bg-glass) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
 /* App background */
+.v-theme--light .bg-siegu-main {
+  background-color: #fafafa !important;
+}
+
 .v-theme--dark .bg-siegu-main {
   background-color: #09090b !important;
 }
