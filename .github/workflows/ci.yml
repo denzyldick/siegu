@@ -209,7 +209,7 @@ jobs:
           su builder -c "
             rustup default stable
             npm install
-            npm run tauri build -- --bundles appimage
+            APPIMAGE_EXTRACT_AND_RUN=1 npm run tauri build -- --bundles appimage
           "
 
       - name: Upload Arch AppImage
