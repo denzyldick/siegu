@@ -701,7 +701,10 @@ async fn rename_person(app: tauri::AppHandle, id: String, new_name: String) {
 }
 
 #[tauri::command]
-async fn cleanup_database(app: tauri::AppHandle) {
+async fn cleanup_database(app: tauri::AppHandle, confirm: bool) {
+    if !confirm {
+        return;
+    }
     let path = get_config_path(&app);
     if path.is_empty() {
         return;
@@ -865,10 +868,11 @@ fn process_video_frames(
     id: String,
     frames: Vec<String>,
 ) {
-    let mut payload = format!("__VIDEO_FRAMES__:{id}");
-    for frame in frames {
-        payload.push_str("|||");
-        payload.push_str(&frame);
+    if frames.len() > 1000 || id.len() > 64 {
+        return;
+    }
+    if frames.iter().any(|f| f.len() > 512) {
+        return;
     }
     let _ = state.tx.send(ml::Job::AnalyzeSingle(id));
 }
@@ -1055,8 +1059,21 @@ async fn initialize_sync_folder(app: tauri::AppHandle, path: String) -> Result<(
     Ok(())
 }
 
+const ALLOWED_CONFIG_KEYS: &[&str] = &[
+    "sync_path", "scan_threads", "indexing_mode", "theme", "language",
+    "model_enabled_clip", "model_enabled_face", "model_enabled_ocr",
+    "model_enabled_nsfw", "model_enabled_aesthetics", "model_enabled_yolo",
+    "model_enabled_blip", "model_enabled_arcface", "model_enabled_midas",
+    "model_enabled_whisper", "model_enabled_sam", "model_enabled_superres",
+    "last_scan_completed", "auto_scan", "sync_enabled",
+];
+
 #[tauri::command]
 async fn save_config(app: tauri::AppHandle, key: String, value: String) {
+    if !ALLOWED_CONFIG_KEYS.contains(&key.as_str()) || key.len() > 64 || value.len() > 1024 {
+        eprintln!("Invalid config key or value: key={key}");
+        return;
+    }
     let path = get_config_path(&app);
     if path.is_empty() {
         return;

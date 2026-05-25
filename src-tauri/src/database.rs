@@ -415,13 +415,14 @@ impl Database {
         if photos.is_empty() {
             return;
         }
-        let ids: Vec<String> = photos.iter().map(|p| format!("'{}'", p.id)).collect();
+        let placeholders: Vec<String> = photos.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
         let sql = format!(
             "SELECT photo_id, class, probability FROM object WHERE photo_id IN ({})",
-            ids.join(",")
+            placeholders.join(",")
         );
+        let params: Vec<&dyn rusqlite::types::ToSql> = photos.iter().map(|p| &p.id as &dyn rusqlite::types::ToSql).collect();
         if let Ok(mut stmt) = self.connection.prepare(&sql) {
-            if let Ok(iter) = stmt.query_map([], |row| {
+            if let Ok(iter) = stmt.query_map(params.as_slice(), |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
@@ -443,13 +444,14 @@ impl Database {
         if photos.is_empty() {
             return;
         }
-        let ids: Vec<String> = photos.iter().map(|p| format!("'{}'", p.id)).collect();
+        let placeholders: Vec<String> = photos.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
         let sql = format!(
             "SELECT photo_id, key, value FROM properties WHERE photo_id IN ({})",
-            ids.join(",")
+            placeholders.join(",")
         );
+        let params: Vec<&dyn rusqlite::types::ToSql> = photos.iter().map(|p| &p.id as &dyn rusqlite::types::ToSql).collect();
         if let Ok(mut stmt) = self.connection.prepare(&sql) {
-            if let Ok(iter) = stmt.query_map([], |row| {
+            if let Ok(iter) = stmt.query_map(params.as_slice(), |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
@@ -1157,6 +1159,10 @@ impl Database {
     }
 
     pub fn update_ai_status(&self, photo_id: &str, model: &str, status: i32) {
+        match model {
+            "clip" | "face" | "ocr" | "nsfw" | "aesthetics" | "yolo" | "blip" | "arcface" | "midas" | "whisper" | "sam" | "superres" => {}
+            _ => { eprintln!("Invalid model name: {model}"); return; }
+        }
         let sql = format!("INSERT INTO ai_status (photo_id, {model}) VALUES (?1, ?2) ON CONFLICT(photo_id) DO UPDATE SET {model} = ?2");
         let _ = self.connection.execute(&sql, (photo_id, status));
     }
@@ -1207,6 +1213,10 @@ impl Database {
 
     pub fn get_photos_missing_model(&self, model: &str) -> Vec<String> {
         let mut ids = Vec::new();
+        match model {
+            "clip" | "face" | "ocr" | "nsfw" | "aesthetics" | "yolo" | "blip" | "arcface" | "midas" | "whisper" | "sam" | "superres" => {}
+            _ => { eprintln!("Invalid model name: {model}"); return ids; }
+        }
         let sql = format!("SELECT p.id FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE s.{model} = 0 OR s.{model} IS NULL");
         if let Ok(mut stmt) = self.connection.prepare(&sql) {
             if let Ok(iter) = stmt.query_map([], |row| row.get::<_, String>(0)) {

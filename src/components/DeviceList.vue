@@ -113,7 +113,7 @@
         </div>
         <v-card-title class="text-h5 font-weight-bold text-zinc-primary px-0 pb-2">{{ $t('devices.remove_device_title') }}</v-card-title>
         <v-card-text class="text-zinc-secondary px-0 pb-6">
-          <span v-html="$t('devices.remove_device_confirm', { name: deviceToDelete })"></span>
+          <span>{{ $t('devices.remove_device_confirm', { name: deviceToDelete }) }}</span>
         </v-card-text>
         <v-card-actions class="px-0 ga-3">
           <v-btn variant="flat" color="#f4f4f5" class="siegu-btn flex-grow-1 text-zinc-primary" height="44" @click="deleteDialog = false">
@@ -186,19 +186,20 @@ export default {
   },
   data: () => ({
       devices: [],
-      syncStates: {},
       deleteDialog: false,
       deviceToDelete: "",
       deleting: false,
+      unlistenRefresh: null,
+      unlistenSync: null,
   }),
   async mounted() {
       await this.list_devices();
 
-      listen("refresh-devices", () => {
+      this.unlistenRefresh = (await listen("refresh-devices", () => {
           this.list_devices();
-      });
+      }));
 
-      listen("sync-progress", (event) => {
+      this.unlistenSync = (await listen("sync-progress", (event) => {
           const payload = event.payload;
           // We assume 'peer' refers to any connected device for now 
           // (multi-device support would need device_id mapping)
@@ -211,7 +212,11 @@ export default {
               d.items_total = payload.items_total;
             }
           });
-      });
+      }));
+  },
+  beforeUnmount() {
+      if (this.unlistenRefresh) this.unlistenRefresh();
+      if (this.unlistenSync) this.unlistenSync();
   },
   methods: {
     async list_devices() {

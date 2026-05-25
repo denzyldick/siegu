@@ -375,6 +375,19 @@ pub fn scan_folder(
 }
 
 pub fn read_file_base64(path: String) -> String {
+    let canonical = std::fs::canonicalize(&path).unwrap_or_default();
+    let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")).unwrap_or_default();
+    let config = std::env::var("XDG_CONFIG_HOME")
+        .or_else(|_| std::env::var("APPDATA"))
+        .unwrap_or_default();
+    let temp = std::env::temp_dir();
+    let allowed = [home.as_str(), config.as_str(), temp.to_str().unwrap_or("")];
+    let is_allowed = canonical.as_os_str().is_empty()
+        || allowed.iter().any(|dir| !dir.is_empty() && canonical.starts_with(dir));
+    if !is_allowed {
+        eprintln!("Access denied: {path} is outside allowed directories");
+        return String::new();
+    }
     match fs::read(&path) {
         Ok(bytes) => {
             println!("Reading original file: {} ({} bytes)", path, bytes.len());

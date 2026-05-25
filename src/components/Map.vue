@@ -149,7 +149,7 @@ export default {
                     }).openPopup();
                     invoke("get_photo_encoded_batch", { ids: [p.id] }).then(thumbnails => {
                         const encoded = thumbnails[p.id];
-                        if (encoded) {
+                        if (encoded && encoded.startsWith('data:image/')) {
                             thumbnailDiv.innerHTML = `<img src="${encoded}" class="thumb-img">`;
                             marker.setRadius(7);
                             marker.setStyle({ fillOpacity: 0.8 });

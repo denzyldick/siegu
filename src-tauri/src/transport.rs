@@ -540,11 +540,12 @@ impl WebRtcClient {
                                     }
                                 }
                                 SyncMessage::FileHeader { id, filename, size, created, latitude, longitude, objects, faces } => {
-                                    let save_path = Path::new(&config_path).join("sync_temp").join(&filename);
+                                    let sanitized = filename.replace("..", "").replace(['/', '\\'], "_");
+                                    let save_path = Path::new(&config_path).join("sync_temp").join(&sanitized);
                                     if let Some(parent) = save_path.parent() { let _ = tokio::fs::create_dir_all(parent).await; }
                                     if let Ok(file) = tokio::fs::File::create(&save_path).await {
                                         let mut incoming = incoming_files.lock().await;
-                                        incoming.insert(id.clone(), IncomingFile { id, filename, size, received: 0, created, latitude, longitude, objects, faces, file });
+                                        incoming.insert(id.clone(), IncomingFile { id, filename: sanitized.clone(), size, received: 0, created, latitude, longitude, objects, faces, file });
                                     }
                                 }
                                 SyncMessage::FileChunk { id, data } => {
@@ -884,11 +885,12 @@ impl WebRtcClient {
                                     }
                                 }
                                 SyncMessage::FileHeader { id, filename, size, created, latitude, longitude, objects, faces } => {
-                                    let save_path = Path::new(&config_path).join("sync_temp").join(&filename);
+                                    let sanitized = filename.replace("..", "").replace(['/', '\\'], "_");
+                                    let save_path = Path::new(&config_path).join("sync_temp").join(&sanitized);
                                     if let Some(parent) = save_path.parent() { let _ = tokio::fs::create_dir_all(parent).await; }
                                     if let Ok(file) = tokio::fs::File::create(&save_path).await {
                                         let mut incoming = incoming_files.lock().await;
-                                        incoming.insert(id.clone(), IncomingFile { id, filename, size, received: 0, created, latitude, longitude, objects, faces, file });
+                                        incoming.insert(id.clone(), IncomingFile { id, filename: sanitized.clone(), size, received: 0, created, latitude, longitude, objects, faces, file });
                                     }
                                 }
                                 SyncMessage::FileChunk { id, data } => {

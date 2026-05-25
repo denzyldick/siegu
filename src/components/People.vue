@@ -248,7 +248,7 @@
               <div class="bg-amber-50 rounded-xl pa-4 mb-8 d-flex align-start ga-3 border-amber-subtle">
                 <v-icon color="#b45309" size="20" class="mt-1">mdi-alert-circle-outline</v-icon>
                 <div class="text-body-2 text-amber-darken-4 font-weight-medium">
-                  <span v-html="$t('people.merge_desc', { name: activePerson?.name })"></span>
+                  <span>{{ $t('people.merge_desc', { name: activePerson?.name }) }}</span>
                 </div>
               </div>
 

@@ -75,7 +75,11 @@ app.post('/api/download-intent', express.text({ type: '*/*' }), (req, res) => {
 });
 
 function csvEscape(value) {
-    const str = String(value);
+    let str = String(value);
+    // Strip CSV formula injection characters (=, +, -, @, %)
+    if (/^[=+\-@%\t]/.test(str)) {
+        str = "'" + str;
+    }
     if (/[",\n\r]/.test(str)) {
         return `"${str.replace(/"/g, '""')}"`;
     }

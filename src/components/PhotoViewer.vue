@@ -61,6 +61,7 @@
 
         <!-- Info Drawer -->
         <v-navigation-drawer
+          v-if="showInfo"
           v-model="showInfo"
           location="right"
           width="350"

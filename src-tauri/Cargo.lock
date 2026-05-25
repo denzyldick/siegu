@@ -6452,7 +6452,6 @@ dependencies = [
  "rayon",
  "reqwest 0.12.28",
  "rusqlite",
- "rustc-serialize",
  "serde",
  "serde_json",
  "sha2",
