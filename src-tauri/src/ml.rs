@@ -1105,13 +1105,18 @@ pub fn start_background_worker(
                             }
 
                             // Generate a lightweight thumbnail from the already-decoded image
+                            emit_log(&app_handle_task, format!("ML Worker: generating thumbnail for {photo_id_task}..."));
                             let thumb = image::imageops::resize(&img, 320, 320, image::imageops::FilterType::Triangle);
+                            emit_log(&app_handle_task, format!("ML Worker: thumbnail resized for {photo_id_task}"));
                             let mut buffer = std::io::Cursor::new(Vec::new());
                             if thumb.write_to(&mut buffer, image::ImageOutputFormat::Jpeg(60)).is_ok() {
                                 let encoded = format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(buffer.get_ref()));
+                                emit_log(&app_handle_task, format!("ML Worker: thumbnail encoded for {photo_id_task}"));
                                 let lock = db_task.lock().unwrap();
                                 let _ = lock.connection.execute("UPDATE photo SET encoded = ?1 WHERE id = ?2", rusqlite::params![encoded, photo_id_task]);
+                                emit_log(&app_handle_task, format!("ML Worker: thumbnail saved for {photo_id_task}"));
                             }
+                            emit_log(&app_handle_task, format!("ML Worker: thumbnail done for {photo_id_task}"));
                         } else {
                             emit_log(&app_handle_task, format!("ERROR: Could not open image for AI analysis: {photo_loc_actual}"));
                         }
