@@ -21,6 +21,7 @@ use webrtc::{
 };
 
 use crate::database::{Database, ImportedPhoto, PhotoSyncInfo};
+use crate::emit_log;
 use std::collections::HashMap;
 use tauri::Emitter;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -263,7 +264,9 @@ impl WebRtcClient {
         )
         .await
         {
-            println!("Error sending FileEnd: {e}");
+            if let Some(app) = &self.app_handle {
+                emit_log(app, format!("Error sending FileEnd: {e}"));
+            }
             return Err(e);
         }
 
@@ -291,15 +294,16 @@ impl WebRtcClient {
 
         if self_arc.room_id.is_empty() {
             let err_msg = "Room ID is missing".to_string();
-            println!("{err_msg}");
+            if let Some(app) = &self_arc.app_handle {
+                emit_log(app, err_msg.clone());
+            }
             self_arc.emit("webrtc-state", err_msg.clone());
             return Err(err_msg.into());
         }
 
-        println!(
-            "Attempting to connect to signaling at {} for room {}",
-            self_arc.signaling_url, self_arc.room_id
-        );
+        if let Some(app) = &self_arc.app_handle {
+            emit_log(app, format!("Attempting to connect to signaling at {} for room {}", self_arc.signaling_url, self_arc.room_id));
+        }
         self_arc.emit("webrtc-state", "Connecting to signaling...");
 
         let base_url = self_arc.signaling_url.trim_end_matches('/');
@@ -308,12 +312,16 @@ impl WebRtcClient {
         let req = url_str.into_client_request()?;
         let (ws_stream, _) = match connect_async(req).await {
             Ok(s) => {
-                println!("Successfully connected to signaling server!");
+                if let Some(app) = &self_arc.app_handle {
+                    emit_log(app, "Successfully connected to signaling server!".to_string());
+                }
                 s
             }
             Err(e) => {
                 let err_msg = format!("Signaling connection failed: {e}");
-                println!("{err_msg}");
+                if let Some(app) = &self_arc.app_handle {
+                    emit_log(app, err_msg.clone());
+                }
                 self_arc.emit("webrtc-state", err_msg);
                 return Err(e.into());
             }
@@ -374,7 +382,9 @@ impl WebRtcClient {
                 let config_path = config_path_state.clone();
                 let room_id = room_id_state.clone();
                 Box::pin(async move {
-                    println!("Peer Connection State changed to: {s:?}");
+                    if let Some(app) = &app_handle {
+                        emit_log(app, format!("Peer Connection State changed to: {s:?}"));
+                    }
                     let status = match s {
                         RTCPeerConnectionState::Connected => "Connected",
                         RTCPeerConnectionState::Connecting => "Connecting WebRTC...",

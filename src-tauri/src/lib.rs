@@ -30,15 +30,15 @@ fn get_config_path(app: &tauri::AppHandle) -> String {
 
 #[tauri::command]
 fn scan_files(app: tauri::AppHandle) {
-    println!("Starting media scan...");
+    emit_log(&app, "Starting media scan...".to_string());
     let path = get_config_path(&app);
     if path.is_empty() {
-        println!("Error: Config path is empty, cannot scan.");
+        emit_log(&app, "Error: Config path is empty, cannot scan.".to_string());
         return;
     }
     let database = database::Database::new(&path);
     let folders = database.list_directories();
-    println!("Found {} folders to scan in database.", folders.len());
+    emit_log(&app, format!("Found {} folders to scan in database.", folders.len()));
 
     if !folders.is_empty() {
         use tauri_plugin_notification::NotificationExt;
@@ -82,42 +82,79 @@ fn scan_files(app: tauri::AppHandle) {
                     b
                 };
                 if !batch.is_empty() {
-                    eprintln!("[ui-buffer] emitting {} photos", batch.len());
-                    let _ = app.emit("photos-discovered", &batch);
+                    emit_log(&app, format!("[ui-buffer] emitting {} photos", batch.len()));
+                    if let Err(e) = app.emit("photos-discovered", &batch) {
+                        emit_log(&app, format!("[ui-buffer] ERROR emitting photos: {e}"));
+                    }
                 }
             }
         });
     }
 
-    tauri::async_runtime::spawn(async move {
-        while let Some(photo) = batch_rx.recv().await {
-            let db_arc = Arc::clone(&database);
-            let app_clone = app_handle_for_batch.clone();
-            let ui = Arc::clone(&ui_buffer);
-            let photo_for_db = photo.clone();
-            let photo_id = photo.id.clone();
+    // Helper to flush a batch: store in DB, push to UI buffer, send AI jobs
+    async fn flush_batch_to_db_and_ui(
+        database: &Arc<std::sync::Mutex<database::Database>>,
+        app_handle: &tauri::AppHandle,
+        ui_buffer: &Arc<tokio::sync::Mutex<Vec<database::Photo>>>,
+        batch: Vec<database::Photo>,
+    ) {
+        emit_log(app_handle, format!("[batch] flushing {} photos to DB", batch.len()));
 
-            eprintln!("[batch] saving photo {} to DB", photo_id);
-            let _ = tauri::async_runtime::spawn_blocking(move || {
-                if let Ok(mut db) = db_arc.lock() {
-                    let _ = db.store_photo_batch(&[photo_for_db]);
+        // Clone for DB insert (spawn_blocking needs owned data)
+        let db_clone = Arc::clone(database);
+        let batch_for_db = batch.clone();
+        let app_for_blocking = app_handle.clone();
+        let _ = tauri::async_runtime::spawn_blocking(move || {
+            if let Ok(mut db) = db_clone.lock() {
+                if let Err(e) = db.store_photo_batch(&batch_for_db) {
+                    emit_log(&app_for_blocking, format!("[batch] ERROR storing photo batch: {e}"));
+                } else {
+                    emit_log(&app_for_blocking, format!("[batch] stored {} photos in DB", batch_for_db.len()));
                 }
-            }).await;
-
-            eprintln!("[batch] pushing {} to UI buffer (size={})", photo_id, {
-                let buf = ui.lock().await;
-                buf.len()
-            });
-            ui.lock().await.push(photo);
-
-            if let Some(state) = app_clone.try_state::<ml::MlContext>() {
-                eprintln!("[batch] sending AnalyzeSingle({})", photo_id);
-                let _ = state.tx.send(ml::Job::AutoAnalyzeSingle(photo_id));
             } else {
-                eprintln!("[batch] WARN: MlContext state not available");
+                emit_log(&app_for_blocking, "[batch] ERROR: could not lock DB mutex".to_string());
+            }
+        }).await;
+
+        // Push all to UI buffer
+        {
+            let mut buf = ui_buffer.lock().await;
+            for p in &batch {
+                emit_log(app_handle, format!("[batch] pushing {} to UI buffer", p.id));
+                buf.push(p.clone());
             }
         }
-        eprintln!("[batch] receiver exited (all senders dropped)");
+
+        // Send AutoAnalyzeSingle for each
+        for p in &batch {
+            if let Some(state) = app_handle.try_state::<ml::MlContext>() {
+                emit_log(app_handle, format!("[batch] sending AutoAnalyzeSingle({})", p.id));
+                if let Err(e) = state.tx.send(ml::Job::AutoAnalyzeSingle(p.id.clone())) {
+                    emit_log(app_handle, format!("[batch] ERROR sending AutoAnalyzeSingle: {e}"));
+                }
+            } else {
+                emit_log(app_handle, "[batch] WARN: MlContext state not available".to_string());
+            }
+        }
+    }
+
+    tauri::async_runtime::spawn(async move {
+        let mut batch_accum: Vec<database::Photo> = Vec::new();
+        while let Some(photo) = batch_rx.recv().await {
+            batch_accum.push(photo);
+
+            if batch_accum.len() >= 50 {
+                let batch = std::mem::take(&mut batch_accum);
+                flush_batch_to_db_and_ui(&database, &app_handle_for_batch, &ui_buffer, batch).await;
+            }
+        }
+
+        if !batch_accum.is_empty() {
+            let batch = std::mem::take(&mut batch_accum);
+            flush_batch_to_db_and_ui(&database, &app_handle_for_batch, &ui_buffer, batch).await;
+        }
+
+        emit_log(&app_handle_for_batch, "[batch] receiver exited (all senders dropped)".to_string());
     });
 
     let abort_flag = Arc::clone(&state.abort);
@@ -126,22 +163,24 @@ fn scan_files(app: tauri::AppHandle) {
     std::thread::spawn(move || {
         let total = folders.len();
         if total == 0 {
-            println!("No folders to scan. Skipping scan thread.");
+            emit_log(&app, "No folders to scan. Skipping scan thread.".to_string());
             return;
         }
 
         for (i, folder) in folders.iter().enumerate() {
             if abort_flag.load(std::sync::atomic::Ordering::SeqCst) {
-                println!("Scan aborted by user.");
+                emit_log(&app, "Scan aborted by user.".to_string());
                 return;
             }
             let progress = (i as f32 / total as f32 * 100.0) as u32;
             let _ = app.emit("scan-progress", serde_json::json!({ "status": "discovering", "progress": progress, "current": i + 1, "total": total, "current_directory": folder }));
-            println!("Scanning folder {} of {}: {}", i + 1, total, folder);
+            emit_log(&app, format!("Scanning folder {} of {}: {}", i + 1, total, folder));
+            emit_log(&app, format!("[scan_files] Calling scan_folder for: {folder}"));
             file::scan_folder(&app, folder.clone(), &path, &batch_tx_shared);
+            emit_log(&app, format!("[scan_files] scan_folder completed for: {folder}"));
         }
 
-        println!("Finished scanning all folders. Updating last scan time...");
+        emit_log(&app, "Finished scanning all folders. Updating last scan time...".to_string());
         let _ = app.emit(
             "scan-progress",
             serde_json::json!({ "status": "indexing", "progress": 100, "message": "Analyzing photos with AI..." }),
@@ -511,13 +550,13 @@ async fn remove_directory(app: tauri::AppHandle, path: String) {
 }
 
 #[tauri::command]
-async fn read_file_base64(path: String) -> String {
-    file::read_file_base64(path)
+async fn read_file_base64(app: tauri::AppHandle, path: String) -> String {
+    file::read_file_base64(&app, path)
 }
 
 #[tauri::command]
-async fn get_raw_photo(path: String) -> String {
-    file::read_file_base64(path)
+async fn get_raw_photo(app: tauri::AppHandle, path: String) -> String {
+    file::read_file_base64(&app, path)
 }
 
 #[tauri::command]
@@ -743,7 +782,7 @@ async fn start_webrtc_session(
     // Abort existing session if any
     if let Ok(mut session) = state.active_session.lock() {
         if let Some(handle) = session.take() {
-            println!("Aborting previous WebRTC session");
+            emit_log(&app, "Aborting previous WebRTC session".to_string());
             handle.abort();
         }
 
@@ -768,10 +807,10 @@ async fn start_webrtc_session(
 }
 
 #[tauri::command]
-async fn stop_webrtc_session(state: tauri::State<'_, WebRtcState>) -> Result<(), String> {
+async fn stop_webrtc_session(app: tauri::AppHandle, state: tauri::State<'_, WebRtcState>) -> Result<(), String> {
     if let Ok(mut session) = state.active_session.lock() {
         if let Some(handle) = session.take() {
-            println!("Stopping WebRTC session");
+            emit_log(&app, "Stopping WebRTC session".to_string());
             handle.abort();
         }
     }
@@ -796,7 +835,7 @@ fn get_indexing_status(state: tauri::State<'_, ml::MlContext>) -> usize {
 
 #[tauri::command]
 async fn join_network(app: tauri::AppHandle, ip: String, name: String) {
-    println!("Adding new device: {name} at {ip}");
+    emit_log(&app, format!("Adding new device: {name} at {ip}"));
     let path = get_config_path(&app);
     if path.is_empty() {
         return;
@@ -887,7 +926,7 @@ async fn index_faces(
     app: tauri::AppHandle,
     state: tauri::State<'_, ml::MlContext>,
 ) -> Result<(), String> {
-    println!("Face indexing requested...");
+    emit_log(&app, "Face indexing requested...".to_string());
     let path = get_config_path(&app);
     if path.is_empty() {
         return Err("Config error".to_string());
@@ -949,7 +988,7 @@ async fn get_heatmap_data(app: tauri::AppHandle) -> String {
     }
     let database = database::Database::new(&path);
     let points = database.get_heatmap_points();
-    println!("DEBUG: Found {} photos with GPS for heatmap", points.len());
+    emit_log(&app, format!("DEBUG: Found {} photos with GPS for heatmap", points.len()));
     serde_json::to_string(&points).unwrap_or("[]".to_string())
 }
 
@@ -1022,7 +1061,7 @@ async fn resolve_photo_locations(app: tauri::AppHandle) -> Result<(), String> {
             }
         }
     }
-    println!("Resolved {} photo locations", resolved);
+    emit_log(&app, format!("Resolved {} photo locations", resolved));
     Ok(())
 }
 
@@ -1071,7 +1110,7 @@ const ALLOWED_CONFIG_KEYS: &[&str] = &[
 #[tauri::command]
 async fn save_config(app: tauri::AppHandle, key: String, value: String) {
     if !ALLOWED_CONFIG_KEYS.contains(&key.as_str()) || key.len() > 64 || value.len() > 1024 {
-        eprintln!("Invalid config key or value: key={key}");
+        emit_log(&app, format!("Invalid config key or value: key={key}"));
         return;
     }
     let path = get_config_path(&app);
@@ -1192,7 +1231,7 @@ pub fn run() {
                     .build(app)?;
             }
 
-            println!("App is setting up background tasks...");
+            emit_log(app.handle(), "App is setting up background tasks...".to_string());
             use tauri_plugin_notification::NotificationExt;
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -1228,7 +1267,7 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600)); // 1 hour
                 loop {
-                    println!("Interval tick: checking for media updates...");
+                    emit_log(&app_handle_for_interval, "Interval tick: checking for media updates...".to_string());
                     interval.tick().await;
                     scan_files(app_handle_for_interval.clone());
                 }

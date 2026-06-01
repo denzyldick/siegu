@@ -254,15 +254,16 @@
                     </v-btn>
                     <div v-else-if="!embedded" class="d-flex ga-2">
                        <v-btn
-                        variant="tonal"
-                        size="small"
-                        color="zinc-muted"
-                        icon="mdi-refresh"
-                        :loading="isModelDownloading(model.id)"
-                        :disabled="isAnyModelProcessing"
-                        @click="downloadModels(true, [model.id])"
-                        :title="$t('settings.update_model')"
-                      ></v-btn>
+                         variant="tonal"
+                         size="small"
+                         color="zinc-muted"
+                         prepend-icon="mdi-refresh"
+                         :loading="isModelDownloading(model.id)"
+                         :disabled="isAnyModelProcessing"
+                         @click="downloadModels(true, [model.id])"
+                       >
+                         {{ $t('settings.update_model') }}
+                       </v-btn>
                       <v-btn
                         variant="tonal"
                         size="small"
@@ -1053,7 +1054,7 @@ export default {
         await invoke("abort_indexing");
         // Short delay to let threads exit
         await new Promise(r => setTimeout(r, 500));
-        await invoke("cleanup_database");
+        await invoke("cleanup_database", { confirm: true });
         window.location.reload();
       } catch (err) {
         console.error("Failed to cleanup database:", err);

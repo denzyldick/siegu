@@ -556,7 +556,7 @@ pub fn start_background_worker(
                 Job::AnalyzeSingle(id) | Job::AutoAnalyzeSingle(id) => (vec![id], None, None),
                 Job::AnalyzeSingleWithModel(id, model_id) => {
                     let status_model = job_status_model(&model_id).unwrap_or(&model_id);
-                    eprintln!("[siegu-bench] AnalyzeSingleWithModel: photo={id} model={model_id} status_model={status_model}");
+                    emit_log(&app_handle, format!("[siegu-bench] AnalyzeSingleWithModel: photo={id} model={model_id} status_model={status_model}"));
                     (vec![id], Some(status_model.to_string()), None)
                 }
                 Job::ProcessModel(model_id) => {
@@ -1103,6 +1103,15 @@ pub fn start_background_worker(
                                     emit_log(&app_handle_task, "ERROR: MiDaS model is not loaded. Download or update Depth Vision first.".to_string());
                                 }
                             }
+
+                            // Generate a lightweight thumbnail from the already-decoded image
+                            let thumb = image::imageops::resize(&img, 320, 320, image::imageops::FilterType::Triangle);
+                            let mut buffer = std::io::Cursor::new(Vec::new());
+                            if thumb.write_to(&mut buffer, image::ImageOutputFormat::Jpeg(60)).is_ok() {
+                                let encoded = format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(buffer.get_ref()));
+                                let lock = db_task.lock().unwrap();
+                                let _ = lock.connection.execute("UPDATE photo SET encoded = ?1 WHERE id = ?2", rusqlite::params![encoded, photo_id_task]);
+                            }
                         } else {
                             emit_log(&app_handle_task, format!("ERROR: Could not open image for AI analysis: {photo_loc_actual}"));
                         }
@@ -1140,7 +1149,7 @@ pub fn start_background_worker(
                                 .query_row("SELECT caption FROM photo WHERE id = ?1", [&photo_id_task], |r| r.get::<_, Option<String>>(0))
                                 .unwrap_or(None)
                                 .is_some();
-                            eprintln!("[ml] emitting photo-analysis-result for {}", photo_id_task);
+                            emit_log(&app_handle_task, format!("[ml] emitting photo-analysis-result for {}", photo_id_task));
                             let _ = app_handle_task.emit("photo-analysis-result", serde_json::json!({
                                 "id": photo_id_task,
                                 "object_count": object_count,
@@ -1149,7 +1158,7 @@ pub fn start_background_worker(
                                 "indexed": true,
                                 "model_timings": model_timings,
                             }));
-                            eprintln!("[siegu-bench] photo={photo_id_task} timings={:?}", model_timings);
+                            emit_log(&app_handle_task, format!("[siegu-bench] photo={photo_id_task} timings={:?}", model_timings));
                         }
 
                         let remaining = decrement_pending_count(&pending_count_task);

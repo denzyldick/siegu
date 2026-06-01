@@ -1,7 +1,8 @@
 use crate::database;
+use crate::emit_log;
 use base64::{engine::general_purpose, Engine as _};
 use exif::Reader;
-use jwalk::WalkDir;
+
 use notify::event::{CreateKind, ModifyKind};
 use notify::{EventKind, RecursiveMode, Watcher};
 use rand::{distributions::Alphanumeric, Rng};
@@ -11,9 +12,9 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::path::Path;
+use std::sync::Arc;
 
 use std::io::BufReader;
-use std::io::Cursor;
 use std::string::String;
 
 use crate::ml::MlContext;
@@ -53,7 +54,7 @@ pub async fn start_watcher(app: tauri::AppHandle) {
         let mut last_scan = tokio::time::Instant::now();
 
         while let Some(event) = rx.recv().await {
-            println!("Watcher received event: {event:?}");
+            emit_log(&app_clone, format!("Watcher received event: {event:?}"));
             match event.kind {
                 EventKind::Create(CreateKind::File)
                 | EventKind::Modify(ModifyKind::Name(_))
@@ -86,76 +87,10 @@ pub async fn start_watcher(app: tauri::AppHandle) {
     });
 }
 
-fn emit_log(app: &tauri::AppHandle, message: String) {
-    println!("{message}");
-    let _ = app.emit("log-message", message);
-}
-
-fn decode_heic_image(path: &Path) -> Option<image::DynamicImage> {
-    use heic::{DecoderConfig, PixelLayout};
-    let data = std::fs::read(path).ok()?;
-    let output = DecoderConfig::new()
-        .decode(&data, PixelLayout::Rgba8)
-        .ok()?;
-    let img = image::DynamicImage::ImageRgba8(image::RgbaImage::from_raw(
-        output.width,
-        output.height,
-        output.data,
-    )?);
-    Some(img)
-}
-
-fn build_thumbnail_data_uri(path: &Path, ext: &str) -> String {
-    if ["mp4", "mkv", "mov", "avi", "webm"].contains(&ext) {
-        return String::new();
-    }
-
-    let img = match image::open(path) {
-        Ok(img) => img,
-        Err(e) => {
-            if ext == "heic" || ext == "heif" {
-                match decode_heic_image(path) {
-                    Some(img) => img,
-                    None => {
-                        eprintln!(
-                            "[siegu] Failed to decode HEIC for thumbnail: {} - {e}",
-                            path.display()
-                        );
-                        return String::new();
-                    }
-                }
-            } else {
-                eprintln!(
-                    "[siegu] Failed to open image for thumbnail ({}): {} - {e}",
-                    ext,
-                    path.display()
-                );
-                return String::new();
-            }
-        }
-    };
-
-    let thumbnail = img.thumbnail(640, 640);
-    let mut buffer = Cursor::new(Vec::new());
-    if thumbnail
-        .write_to(&mut buffer, image::ImageOutputFormat::Jpeg(72))
-        .is_ok()
-    {
-        let encoded = general_purpose::STANDARD.encode(buffer.get_ref());
-        format!("data:image/jpeg;base64,{encoded}")
-    } else {
-        eprintln!(
-            "[siegu] Failed to encode thumbnail as JPEG: {}",
-            path.display()
-        );
-        String::new()
-    }
-}
-
 /// Recursively discovers supported media files, stores new rows in batches, and queues AI work.
 ///
-/// Discovery intentionally records metadata and thumbnails first. The heavier model inference runs
-/// on the ML worker so folder scans stay responsive and progress events remain regular.
+/// Discovery intentionally records metadata first. The heavier model inference and thumbnail
+/// generation run on the ML worker so folder scans stay responsive and progress events remain regular.
 pub fn scan_folder(
     app: &tauri::AppHandle,
     directory: String,
@@ -164,121 +99,91 @@ pub fn scan_folder(
 ) {
     let db_instance = database::Database::new(path);
 
-    // Load thread config
-    let config = db_instance.get_state();
-    let num_threads: usize = config
-        .get("scan_threads")
-        .and_then(|s| s.parse().ok())
-        .unwrap_or({
-            if cfg!(any(target_os = "android", target_os = "ios")) {
-                2
-            } else {
-                num_cpus::get().min(4)
-            }
-        });
+    // Preload existing paths into a HashSet for O(1) lookups during the walk
+    let existing_paths: std::collections::HashSet<String> = {
+        let mut stmt = db_instance
+            .connection
+            .prepare("SELECT location FROM photo")
+            .expect("Failed to prepare existing-path query");
+        stmt.query_map([], |row| row.get::<_, String>(0))
+            .expect("Failed to query existing paths")
+            .flatten()
+            .collect()
+    };
+            emit_log(app, format!("[scan_folder] Loaded {} existing paths from DB", existing_paths.len()));
 
-    emit_log(
-        app,
-        format!("Starting Discovery Pass with {num_threads} threads in: {directory}"),
-    );
+    emit_log(app, format!("Starting Discovery Pass in: {directory}"));
 
-    // Collect all valid image and video paths first
-    let mut image_paths = Vec::new();
     let video_extensions = ["mp4", "mkv", "mov", "avi", "webm"];
     let image_extensions = ["png", "jpg", "jpeg", "webp", "heic", "avif"];
 
-    use std::sync::atomic::{AtomicBool, Ordering};
     let abort_flag = app
         .try_state::<MlContext>()
         .map(|s| s.abort.clone())
-        .unwrap_or_else(|| Arc::new(AtomicBool::new(false)));
-
-    for entry in WalkDir::new(directory).follow_links(false) {
-        if abort_flag.load(Ordering::SeqCst) {
-            return;
-        }
-        if let Ok(entry) = entry {
-            let path = entry.path();
-            if let Some(extension) = path.extension() {
-                let ext = extension.to_string_lossy().to_lowercase();
-                if image_extensions.contains(&ext.as_str())
-                    || video_extensions.contains(&ext.as_str())
-                {
-                    if let Ok(path) = fs::canonicalize(path) {
-                        image_paths.push(path);
-                    }
-                }
-            }
-        }
-    }
-
-    use std::sync::{Arc, Mutex};
-    let database_arc = Arc::new(Mutex::new(db_instance));
-
-    // 1. Filter out already indexed paths in a single pass
-    let all_paths: Vec<String> = image_paths
-        .iter()
-        .map(|p| p.display().to_string())
-        .collect();
-    let new_paths_to_process = {
-        let db = database_arc.lock().unwrap();
-        db.filter_new_paths(&all_paths)
-    };
-
-    if new_paths_to_process.is_empty() {
-        emit_log(app, "No new photos found.".to_string());
-        return;
-    }
-
-    let total_files = new_paths_to_process.len();
-    emit_log(app, format!("Processing {total_files} new photos..."));
+        .unwrap_or_else(|| Arc::new(std::sync::atomic::AtomicBool::new(false)));
 
     let app_handle = Arc::new(app.clone());
     let abort_flag_task = Arc::clone(&abort_flag);
     let files_processed = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let scan_start = Arc::new(std::time::Instant::now());
-
-    // Create a local thread pool for this scan to avoid blocking the global one
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(num_threads)
-        .build()
-        .unwrap();
+    let existing = Arc::new(existing_paths);
 
     use rayon::prelude::*;
 
-    pool.install(|| {
-        new_paths_to_process.into_par_iter().for_each(|path_str| {
-            if abort_flag_task.load(Ordering::SeqCst) {
-                return;
+    let total_new = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let total_new_clone = Arc::clone(&total_new);
+
+    // Parallel directory walk using jwalk's parallel iterator.
+    // Files stream to the batch channel immediately as they're discovered.
+    let result: Result<(), ()> = jwalk::WalkDir::new(&directory)
+        .follow_links(false)
+        .into_iter()
+        .par_bridge()
+        .try_for_each(|entry_result| {
+            if abort_flag_task.load(std::sync::atomic::Ordering::SeqCst) {
+                return Err(());
             }
-            let path = Path::new(&path_str);
+            let entry = match entry_result {
+                Ok(e) => e,
+                Err(_) => return Ok(()),
+            };
+            let file_path = entry.path();
+            if let Some(ext) = file_path.extension() {
+                let ext = ext.to_string_lossy().to_lowercase();
+                if !image_extensions.contains(&ext.as_str())
+                    && !video_extensions.contains(&ext.as_str())
+                {
+                    return Ok(());
+                }
+            } else {
+                return Ok(());
+            }
+
+            let path_str = file_path.display().to_string();
+
+            // Skip if already in DB
+            if existing.contains(&path_str) {
+                return Ok(());
+            }
+
+            total_new_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
             let id: String = rand::thread_rng()
                 .sample_iter(&Alphanumeric)
                 .take(7)
                 .map(char::from)
                 .collect();
-
-            let ext = path
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("")
-                .to_lowercase();
-            let is_video = ["mp4", "mkv", "mov", "avi", "webm"].contains(&ext.as_str());
-
             let mut latitude = 0.0;
             let mut longitude = 0.0;
             let mut created = String::new();
-            let encoded = if is_video {
-                String::new()
-            } else {
-                build_thumbnail_data_uri(path, &ext)
-            };
+            // Thumbnail generation is deferred — the UI uses convertFileSrc(location)
+            // to load images directly from disk, so we skip it here for faster scans.
+            let encoded = String::new();
 
-            if let Ok(file) = File::open(path) {
+            if let Ok(file) = File::open(&file_path) {
                 let mut buff = BufReader::new(&file);
 
                 if let Ok(exif) = Reader::new().read_from_container(&mut buff) {
-                    // Extract Created Date
                     if let (Some(date_field), _) = (
                         exif.get_field(exif::Tag::DateTimeOriginal, exif::In::PRIMARY)
                             .or_else(|| exif.get_field(exif::Tag::DateTime, exif::In::PRIMARY)),
@@ -287,7 +192,6 @@ pub fn scan_folder(
                         created = format!("{}", date_field.display_value());
                     }
 
-                    // Extract GPS Coordinates
                     if let (Some(lat_field), Some(lat_ref)) = (
                         exif.get_field(exif::Tag::GPSLatitude, exif::In::PRIMARY),
                         exif.get_field(exif::Tag::GPSLatitudeRef, exif::In::PRIMARY),
@@ -343,16 +247,18 @@ pub fn scan_folder(
             };
 
             let processed = files_processed.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-            if processed.is_multiple_of(25) || processed == total_files {
-                let filename = Path::new(&path_str)
+            if processed.is_multiple_of(25) {
+                let filename = file_path
                     .file_name()
                     .and_then(|n| n.to_str())
                     .unwrap_or("")
                     .to_string();
                 let elapsed = scan_start.elapsed().as_secs_f64();
+                let total_sofar = total_new.load(std::sync::atomic::Ordering::SeqCst);
                 let rate = processed as f64 / elapsed.max(0.001);
                 let eta_secs = if rate > 0.0 {
-                    ((total_files - processed) as f64 / rate) as u64
+                    let remaining = total_sofar.saturating_sub(processed) as f64;
+                    (remaining / rate) as u64
                 } else {
                     0
                 };
@@ -360,7 +266,7 @@ pub fn scan_folder(
                     "file-scan-progress",
                     serde_json::json!({
                         "current": processed,
-                        "total": total_files,
+                        "total": total_sofar,
                         "filename": filename,
                         "eta_secs": eta_secs,
                     }),
@@ -368,13 +274,34 @@ pub fn scan_folder(
             }
 
             let _ = batch_tx.send(photo);
-        });
-    });
 
+            Ok(())
+        });
+
+    let total = total_new.load(std::sync::atomic::Ordering::SeqCst);
+    if result.is_err() {
+        emit_log(app, format!("[scan_folder] Scan aborted for: {directory}"));
+        return;
+    }
+    if total == 0 {
+        emit_log(app, "No new photos found.".to_string());
+        return;
+    }
+    // Final progress update
+    let _ = app_handle.emit(
+        "file-scan-progress",
+        serde_json::json!({
+            "current": total,
+            "total": total,
+            "filename": "",
+            "eta_secs": 0,
+        }),
+    );
+    emit_log(app, format!("[scan_folder] Sent {} photos to batch channel for: {directory}", total));
     emit_log(app, "Done with Discovery Pass".to_string());
 }
 
-pub fn read_file_base64(path: String) -> String {
+pub fn read_file_base64(app: &tauri::AppHandle, path: String) -> String {
     let canonical = std::fs::canonicalize(&path).unwrap_or_default();
     let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")).unwrap_or_default();
     let config = std::env::var("XDG_CONFIG_HOME")
@@ -385,12 +312,12 @@ pub fn read_file_base64(path: String) -> String {
     let is_allowed = canonical.as_os_str().is_empty()
         || allowed.iter().any(|dir| !dir.is_empty() && canonical.starts_with(dir));
     if !is_allowed {
-        eprintln!("Access denied: {path} is outside allowed directories");
+        emit_log(app, format!("Access denied: {path} is outside allowed directories"));
         return String::new();
     }
     match fs::read(&path) {
         Ok(bytes) => {
-            println!("Reading original file: {} ({} bytes)", path, bytes.len());
+            emit_log(app, format!("Reading original file: {} ({} bytes)", path, bytes.len()));
             let encoded = general_purpose::STANDARD.encode(bytes);
             let ext = Path::new(&path)
                 .extension()
@@ -409,7 +336,7 @@ pub fn read_file_base64(path: String) -> String {
             format!("data:{mime};base64,{encoded}")
         }
         Err(e) => {
-            eprintln!("Failed to read file {path}: {e}");
+            emit_log(app, format!("Failed to read file {path}: {e}"));
             String::new()
         }
     }
