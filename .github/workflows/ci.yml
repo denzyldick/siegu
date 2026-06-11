@@ -106,6 +106,8 @@ jobs:
     runs-on: ${{ matrix.platform }}
     env:
       ORT_STRATEGY: download
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
 
     steps:
       - uses: actions/checkout@v4
@@ -125,7 +127,7 @@ jobs:
       - run: npm install
 
       - name: Build Tauri App
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
