@@ -615,7 +615,7 @@ impl WebRtcClient {
 
                                             tokio::task::spawn_blocking(move || {
                                                 let thumb = String::new();
-                                                let db = Database::new(&config_path_thumb);
+                                                let mut db = Database::new(&config_path_thumb);
 
                                                 // Now import with thumbnail included - only now it becomes visible in library
                                                 db.import_photo(ImportedPhoto {
@@ -960,7 +960,7 @@ impl WebRtcClient {
 
                                             tokio::task::spawn_blocking(move || {
                                                 let thumb = String::new();
-                                                let db = Database::new(&config_path_thumb);
+                                                let mut db = Database::new(&config_path_thumb);
 
                                                 // Now import with thumbnail included - only now it becomes visible in library
                                                 db.import_photo(ImportedPhoto {

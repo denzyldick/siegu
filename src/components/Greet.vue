@@ -21,7 +21,7 @@ export default {
             <v-img :src="logoUrl"></v-img>
           </v-avatar>
 
-          <h1 class="text-h2 font-weight-black mb-4 tracking-tighter text-black-pure">
+          <h1 class="text-h2 font-weight-black mb-4 tracking-tighter text-zinc-primary">
             Siegu
           </h1>
           <p class="text-subtitle-1 text-zinc-secondary mb-10 max-w-500 mx-auto">
@@ -36,11 +36,11 @@ export default {
             >
               <div class="d-flex align-center">
                 <div class="siegu-icon-circle mr-4">
-                  <v-icon color="white">mdi-folder-plus</v-icon>
+                  <v-icon>mdi-folder-plus</v-icon>
                 </div>
                 <div class="text-left">
-                  <div class="font-weight-bold text-white">{{ $t('onboarding.setup_local') }}</div>
-                  <div class="text-caption text-white-muted">{{ $t('onboarding.setup_local_desc') }}</div>
+                  <div class="font-weight-bold">{{ $t('onboarding.setup_local') }}</div>
+                  <div class="text-caption text-zinc-muted">{{ $t('onboarding.setup_local_desc') }}</div>
                 </div>
               </div>
             </v-card>
@@ -52,11 +52,11 @@ export default {
             >
               <div class="d-flex align-center">
                 <div class="siegu-icon-circle mr-4">
-                  <v-icon color="white">mdi-sync</v-icon>
+                  <v-icon>mdi-sync</v-icon>
                 </div>
                 <div class="text-left">
-                  <div class="font-weight-bold text-white">{{ $t('onboarding.join_library') }}</div>
-                  <div class="text-caption text-white-muted">{{ $t('onboarding.join_library_desc') }}</div>
+                  <div class="font-weight-bold">{{ $t('onboarding.join_library') }}</div>
+                  <div class="text-caption text-zinc-muted">{{ $t('onboarding.join_library_desc') }}</div>
                 </div>
               </div>
             </v-card>

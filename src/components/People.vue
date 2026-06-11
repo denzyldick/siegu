@@ -12,8 +12,7 @@
             <v-btn
               v-if="indexingCount === 0"
               variant="flat"
-              color="#18181b"
-              class="text-none font-weight-bold rounded-lg px-6 text-white h-100 py-3"
+              class="siegu-btn text-none font-weight-bold rounded-lg px-6 h-100 py-3"
               prepend-icon="mdi-face-recognition"
               @click="startIndexing"
             >
@@ -194,9 +193,8 @@
           <v-btn
             block
             size="x-large"
-            color="#18181b"
             variant="flat"
-            class="rounded-xl text-none font-weight-bold text-white shadow-lg py-7"
+            class="siegu-btn rounded-xl text-none font-weight-bold shadow-lg py-7"
             :disabled="!newName"
             @click="saveName"
           >
@@ -235,9 +233,8 @@
               <v-btn
                 block
                 size="x-large"
-                color="#18181b"
                 variant="flat"
-                class="rounded-xl text-none font-weight-bold py-7 shadow-lg text-white"
+                class="siegu-btn rounded-xl text-none font-weight-bold py-7 shadow-lg"
                 @click="renamePerson"
               >
                 {{ $t('people.update_name') }}
@@ -267,9 +264,8 @@
               <v-btn
                 block
                 size="x-large"
-                color="#18181b"
                 variant="flat"
-                class="rounded-xl text-none font-weight-bold py-7 shadow-sm text-white"
+                class="siegu-btn rounded-xl text-none font-weight-bold py-7 shadow-sm"
                 :disabled="!mergeTargetId"
                 @click="mergePerson"
               >

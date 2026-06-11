@@ -438,7 +438,7 @@ export default {
       ></Greet>
       
       <!-- Step 2: Folders -->
-      <v-container v-else-if="onboardingStep === 'folders'" class="fill-height bg-siegu-white" fluid>
+      <v-container v-else-if="onboardingStep === 'folders'" class="fill-height" fluid>
         <v-row justify="center">
           <v-col cols="12" sm="10" md="8" lg="6">
             <v-card variant="flat" rounded="xl" class="pa-8 border-subtle">
@@ -461,7 +461,7 @@ export default {
       </v-container>
 
       <!-- Step 3: Models -->
-      <v-container v-else-if="onboardingStep === 'models'" class="fill-height bg-siegu-white" fluid>
+      <v-container v-else-if="onboardingStep === 'models'" class="fill-height" fluid>
         <v-row justify="center">
           <v-col cols="12" sm="10" md="8" lg="6">
             <v-card variant="flat" rounded="xl" class="pa-8 border-subtle">
@@ -496,7 +496,7 @@ export default {
       </v-container>
 
       <!-- Step 4: Sync & Devices (Skippable) -->
-      <v-container v-else-if="onboardingStep === 'sync'" class="fill-height bg-siegu-white" fluid>
+      <v-container v-else-if="onboardingStep === 'sync'" class="fill-height" fluid>
         <v-row justify="center">
           <v-col cols="12" sm="10" md="8" lg="6">
             <v-card variant="flat" rounded="xl" class="pa-8 border-subtle">
@@ -557,7 +557,7 @@ export default {
                     <v-icon start class="mr-2">mdi-link-variant</v-icon>
                     {{ $t('onboarding.link_device') }}
                   </v-btn>
-                  <v-btn block variant="text" color="zinc-muted" @click="onboardingStep = 'finalize'">
+                  <v-btn block color="black" height="56" class="siegu-btn" @click="onboardingStep = 'finalize'">
                     {{ $t('onboarding.skip') }}
                   </v-btn>
                 </template>
@@ -566,7 +566,7 @@ export default {
                     <v-icon start class="mr-2">mdi-sync</v-icon>
                     {{ $t('onboarding.start_syncing') }}
                   </v-btn>
-                  <v-btn v-else block variant="text" color="zinc-muted" @click="onboardingStep = 'finalize'">
+                  <v-btn v-else block color="black" height="56" class="siegu-btn" @click="onboardingStep = 'finalize'">
                     {{ $t('onboarding.skip') }}
                   </v-btn>
                 </template>
@@ -577,7 +577,7 @@ export default {
       </v-container>
 
       <!-- Step 5: Finalize & Scan -->
-      <v-container v-else-if="onboardingStep === 'finalize'" class="fill-height bg-siegu-white" fluid>
+      <v-container v-else-if="onboardingStep === 'finalize'" class="fill-height" fluid>
         <v-row justify="center">
           <v-col cols="12" sm="10" md="8" lg="6">
             <v-card variant="flat" rounded="xl" class="pa-8 border-subtle text-center">
@@ -701,10 +701,10 @@ export default {
                   >
                     <div class="d-flex align-center">
                       <div class="siegu-icon-circle mr-3">
-                        <v-icon color="white">mdi-sync</v-icon>
+                        <v-icon>mdi-sync</v-icon>
                       </div>
                       <div class="text-left">
-                        <div class="font-weight-bold text-white">{{ $t('sync.sync_library') }}</div>
+                        <div class="font-weight-bold">{{ $t('sync.sync_library') }}</div>
                         <div class="text-caption text-zinc-muted" style="font-size: 10px; opacity: 0.7;">{{ $t('sync.refresh_files') }}</div>
                       </div>
                     </div>
@@ -833,9 +833,9 @@ export default {
                     <v-btn variant="flat" class="siegu-btn w-100 py-4" @click="resetFilters">
                        <div class="d-flex align-center">
                          <div class="siegu-icon-circle siegu-icon-circle-sm mr-2">
-                           <v-icon size="12" color="white">mdi-refresh</v-icon>
+                           <v-icon size="12">mdi-refresh</v-icon>
                          </div>
-                         <span class="text-white">{{ $t('filters.reset') }}</span>
+                         <span>{{ $t('filters.reset') }}</span>
                        </div>
                     </v-btn>
                   </v-card-actions>

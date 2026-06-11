@@ -568,35 +568,6 @@ mod tests {
             assert_eq!(loaded.indexed, 2);
         }
 
-        #[test]
-        fn test_filter_new_paths() {
-            let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("f1", "/existing.jpg")]).expect("store");
-
-            let new = db.filter_new_paths(&["/new.jpg".into(), "/existing.jpg".into()]);
-            assert_eq!(new, vec!["/new.jpg".to_string()]);
-        }
-
-        #[test]
-        fn test_filter_new_paths_empty_input() {
-            let (db, _dir) = db();
-            assert!(db.filter_new_paths(&[]).is_empty());
-        }
-
-        #[test]
-        fn test_filter_new_paths_chunk_boundary() {
-            let (mut db, _dir) = db();
-            // Insert 1 photo, then filter 101 paths (1 exists + 100 new) to exercise chunking
-            db.store_photo_batch(&[make_photo("chunk", "/exists.jpg")]).expect("store");
-
-            let mut paths: Vec<String> = (0..101).map(|i| format!("/p{i}.jpg")).collect();
-            paths.push("/exists.jpg".into());
-
-            let new = db.filter_new_paths(&paths);
-            assert_eq!(new.len(), 101);
-            assert!(!new.contains(&"/exists.jpg".to_string()));
-        }
-
         // -- Photo queries ----------------------------------------------------
 
         #[test]
@@ -992,7 +963,7 @@ mod tests {
 
         #[test]
         fn test_import_photo() {
-            let (db, _dir) = db();
+            let (mut db, _dir) = db();
             let imp = database::ImportedPhoto {
                 id: "imp1",
                 location: "/imported/imp1.jpg",
@@ -1312,7 +1283,7 @@ mod tests {
 
         #[test]
         fn test_import_photo_invalid_objects_json() {
-            let (db, _dir) = db();
+            let (mut db, _dir) = db();
             let imp = database::ImportedPhoto {
                 id: "inv1",
                 location: "/inv1.jpg",
@@ -1330,7 +1301,7 @@ mod tests {
 
         #[test]
         fn test_import_photo_invalid_faces_json() {
-            let (db, _dir) = db();
+            let (mut db, _dir) = db();
             let imp = database::ImportedPhoto {
                 id: "inv2",
                 location: "/inv2.jpg",

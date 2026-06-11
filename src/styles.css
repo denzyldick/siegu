@@ -22,7 +22,7 @@
   --color-border-default: rgba(0, 0, 0, 0.1);
   --color-border-hover: rgba(0, 0, 0, 0.2);
   --color-bg-hover: #f4f4f5;
-  --color-bg-field: #ffffff;
+  --color-bg-field: #000000;
   --color-bg-scrollbar: #fafafa;
   --color-scrollbar-thumb: rgba(0, 0, 0, 0.1);
   --color-scrollbar-hover: rgba(0, 0, 0, 0.2);
@@ -43,13 +43,13 @@
   --color-border-default: rgba(255, 255, 255, 0.1);
   --color-border-hover: rgba(255, 255, 255, 0.18);
   --color-bg-hover: #27272a;
-  --color-bg-field: #18181b;
+  --color-bg-field: #000000;
   --color-bg-scrollbar: #09090b;
   --color-scrollbar-thumb: rgba(255, 255, 255, 0.12);
   --color-scrollbar-hover: rgba(255, 255, 255, 0.2);
   --color-bg-list: #18181b;
-  --color-bg-btn: #ffffff;
-  --color-text-btn: #000000;
+  --color-bg-btn: #000000;
+  --color-text-btn: #ffffff;
   --color-bg-glass: rgba(24, 24, 27, 0.6);
 }
 

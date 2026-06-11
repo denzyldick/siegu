@@ -13,9 +13,9 @@
         >
           <div class="d-flex align-center">
             <div class="siegu-icon-circle siegu-icon-circle-md mr-3">
-              <v-icon size="14" color="white">mdi-plus</v-icon>
+              <v-icon size="14">mdi-plus</v-icon>
             </div>
-            <span class="text-white font-weight-bold">{{ $t('devices.add_device') }}</span>
+            <span class="font-weight-bold">{{ $t('devices.add_device') }}</span>
           </div>
         </v-btn>
       </template>
@@ -109,18 +109,18 @@
             <v-btn v-if="!isConnected" variant="flat" @click="joinWebRTC" class="siegu-btn py-6" block :loading="loading" :disabled="!joinPassphrase">
               <div class="d-flex align-center">
                 <div class="siegu-icon-circle mr-3">
-                  <v-icon size="14" color="white">mdi-link-variant</v-icon>
+                  <v-icon size="14">mdi-link-variant</v-icon>
                 </div>
-                <span class="text-white">{{ $t('connect.link_device_button') }}</span>
+                <span>{{ $t('connect.link_device_button') }}</span>
               </div>
             </v-btn>
 
             <v-btn v-else variant="flat" color="success" @click="triggerSync" class="siegu-btn py-6" block :loading="syncing">
               <div class="d-flex align-center">
                 <div class="siegu-icon-circle mr-3">
-                  <v-icon size="14" color="white">mdi-sync</v-icon>
+                  <v-icon size="14">mdi-sync</v-icon>
                 </div>
-                <span class="text-white">{{ $t('connect.start_syncing') }}</span>
+                <span>{{ $t('connect.start_syncing') }}</span>
               </div>
             </v-btn>
         </div>
@@ -129,9 +129,9 @@
             <v-btn variant="flat" color="success" @click="triggerSync" class="siegu-btn py-6" block :loading="syncing">
               <div class="d-flex align-center">
                 <div class="siegu-icon-circle mr-3">
-                  <v-icon size="14" color="white">mdi-sync</v-icon>
+                  <v-icon size="14">mdi-sync</v-icon>
                 </div>
-                <span class="text-white">{{ $t('connect.start_syncing') }}</span>
+                <span>{{ $t('connect.start_syncing') }}</span>
               </div>
             </v-btn>
         </div>
@@ -165,7 +165,7 @@
         </div>
 
         <v-btn v-if="isConnected || (connectionStatus && connectionStatus !== 'Disconnected')" 
-               variant="text" color="error" size="small" class="mt-4 text-none" 
+               variant="flat" color="black" size="small" class="siegu-btn mt-4" 
                @click="disconnectSession" :loading="disconnecting">
           {{ $t('devices.disconnect') }}
         </v-btn>
@@ -176,9 +176,9 @@
           <v-btn variant="flat" color="#18181b" class="siegu-btn px-6" @click="dialog = false">
               <div class="d-flex align-center">
                 <div class="siegu-icon-circle siegu-icon-circle-sm mr-2">
-                  <v-icon size="12" color="white">mdi-close</v-icon>
+                  <v-icon size="12">mdi-close</v-icon>
                 </div>
-                <span class="text-white font-weight-bold">{{ $t('common.close') }}</span>
+                <span class="font-weight-bold">{{ $t('common.close') }}</span>
               </div>
           </v-btn>
         </v-card-actions>
@@ -260,9 +260,9 @@
           <v-btn variant="flat" @click="joinWebRTC" class="siegu-btn py-6" block :loading="loading" :disabled="!joinPassphrase || isConnected">
             <div class="d-flex align-center">
               <div class="siegu-icon-circle mr-3">
-                <v-icon size="14" color="white">mdi-link-variant</v-icon>
+                <v-icon size="14">mdi-link-variant</v-icon>
               </div>
-              <span class="text-white">{{ $t('connect.link_device_button') }}</span>
+              <span>{{ $t('connect.link_device_button') }}</span>
             </div>
           </v-btn>
       </div>

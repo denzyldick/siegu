@@ -309,10 +309,12 @@ impl Database {
     }
 
     pub fn store_log(&self, level: &str, message: &str) {
-        let _ = self.connection.execute(
+        if let Err(e) = self.connection.execute(
             "INSERT INTO logs (level, message) VALUES (?1, ?2)",
             (level, message),
-        );
+        ) {
+            eprintln!("store_log: failed to insert log entry: {e}");
+        }
     }
 
     pub fn get_logs(&self, limit: usize) -> Vec<LogEntry> {
@@ -335,7 +337,9 @@ impl Database {
     }
 
     pub fn clear_logs(&self) {
-        let _ = self.connection.execute("DELETE FROM logs", ());
+        if let Err(e) = self.connection.execute("DELETE FROM logs", ()) {
+            eprintln!("clear_logs: {e}");
+        }
     }
 
     pub fn set_state(&self, state: HashMap<String, String>) {
@@ -497,21 +501,25 @@ impl Database {
         let is_uuid = query.len() == 36 && query.chars().all(|c| c.is_alphanumeric() || c == '-');
 
         let month_like = month_name_to_like(query);
-        let month_clause = month_like
-            .as_ref()
-            .map(|p| format!(" OR p.created LIKE '{}'", p))
-            .unwrap_or_default();
+        let month_param = month_like.as_ref().map(|p| p.to_string());
 
         let q_filter = if !query.is_empty() {
             if is_uuid {
                 "AND (p.id = ?3 OR EXISTS(SELECT 1 FROM faces WHERE photo_id=p.id AND person_id = ?3))".to_string()
-            } else {
-                format!("AND (p.location LIKE ?3 OR p.id LIKE ?3 OR p.caption LIKE ?3 \
+            } else if month_param.is_some() {
+                "AND (p.location LIKE ?3 OR p.id LIKE ?3 OR p.caption LIKE ?3 \
                     OR EXISTS(SELECT 1 FROM object WHERE photo_id=p.id AND class LIKE ?3) \
                     OR EXISTS(SELECT 1 FROM ocr WHERE photo_id=p.id AND text LIKE ?3) \
                     OR EXISTS(SELECT 1 FROM faces f JOIN people p_name ON f.person_id = p_name.id WHERE f.photo_id=p.id AND p_name.name LIKE ?3) \
                     OR EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='location_name' AND value LIKE ?3) \
-                    OR p.created LIKE ?3{})", month_clause)
+                    OR p.created LIKE ?3 OR p.created LIKE ?4)".to_string()
+            } else {
+                "AND (p.location LIKE ?3 OR p.id LIKE ?3 OR p.caption LIKE ?3 \
+                    OR EXISTS(SELECT 1 FROM object WHERE photo_id=p.id AND class LIKE ?3) \
+                    OR EXISTS(SELECT 1 FROM ocr WHERE photo_id=p.id AND text LIKE ?3) \
+                    OR EXISTS(SELECT 1 FROM faces f JOIN people p_name ON f.person_id = p_name.id WHERE f.photo_id=p.id AND p_name.name LIKE ?3) \
+                    OR EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='location_name' AND value LIKE ?3) \
+                    OR p.created LIKE ?3)".to_string()
             }
         } else {
             String::new()
@@ -526,12 +534,15 @@ impl Database {
             } else {
                 format!("%{query}%")
             };
-            let params: Vec<&dyn rusqlite::ToSql> = if !query.is_empty() {
-                vec![&offset, &limit, &q_param]
-            } else {
-                vec![&offset, &limit]
-            };
-            if let Ok(iter) = stmt.query_map(params.as_slice(), |row| {
+            let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(offset), Box::new(limit)];
+            if !query.is_empty() {
+                params.push(Box::new(q_param));
+                if let Some(ref mp) = month_param {
+                    params.push(Box::new(mp.clone()));
+                }
+            }
+            let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+            if let Ok(iter) = stmt.query_map(param_refs.as_slice(), |row| {
                 Ok(Photo {
                     id: row.get(0)?,
                     location: row.get(1)?,
@@ -669,8 +680,44 @@ impl Database {
     }
 
     pub fn get_photo_by_id(&self, photo_id: &str) -> Option<Photo> {
-        let mut photos = self.get_photos_by_ids(&[photo_id.to_string()]);
-        photos.pop()
+        let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, \
+             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres \
+             FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE p.id = ?1";
+        let mut stmt = self.connection.prepare(&sql).ok()?;
+        let mut rows = stmt.query_map([photo_id], |row| {
+            Ok(Photo {
+                id: row.get(0)?,
+                location: row.get(1)?,
+                encoded: row.get(2)?,
+                created: row.get(5).unwrap_or_default(),
+                objects: HashMap::new(),
+                properties: HashMap::new(),
+                latitude: row.get(3).unwrap_or(0.0),
+                longitude: row.get(4).unwrap_or(0.0),
+                favorite: row.get(6).unwrap_or(false),
+                indexed: row.get(7).unwrap_or(0),
+                caption: row.get(8).ok(),
+                aesthetics_score: row.get(9).ok(),
+                ai_status: AiStatus {
+                    clip: row.get(10).unwrap_or(0),
+                    face: row.get(11).unwrap_or(0),
+                    ocr: row.get(12).unwrap_or(0),
+                    nsfw: row.get(13).unwrap_or(0),
+                    aesthetics: row.get(14).unwrap_or(0),
+                    yolo: row.get(15).unwrap_or(0),
+                    blip: row.get(16).unwrap_or(0),
+                    arcface: row.get(17).unwrap_or(0),
+                    midas: row.get(18).unwrap_or(0),
+                    whisper: row.get(19).unwrap_or(0),
+                    sam: row.get(20).unwrap_or(0),
+                    superres: row.get(21).unwrap_or(0),
+                },
+            })
+        }).ok()?;
+        let mut photo = rows.next()?.ok()?;
+        self.enrich_objects(std::slice::from_mut(&mut photo));
+        self.enrich_properties(std::slice::from_mut(&mut photo));
+        Some(photo)
     }
 
     pub fn get_photo_encoded_batch(&self, photo_ids: &[String]) -> HashMap<String, String> {
@@ -703,7 +750,9 @@ impl Database {
             .iter()
             .flat_map(|f| f.to_le_bytes())
             .collect();
-        let _ = self.connection.execute("INSERT OR REPLACE INTO faces(photo_id, face_id, crop_path, encoded, embedding, person_id) VALUES(?1, ?2, ?3, ?4, ?5, ?6)", (&face.photo_id, &face.face_id, &face.crop_path, &face.encoded, &embedding_bytes, &face.person_id));
+        if let Err(e) = self.connection.execute("INSERT OR REPLACE INTO faces(photo_id, face_id, crop_path, encoded, embedding, person_id) VALUES(?1, ?2, ?3, ?4, ?5, ?6)", (&face.photo_id, &face.face_id, &face.crop_path, &face.encoded, &embedding_bytes, &face.person_id)) {
+            eprintln!("store_face: failed to store face {}: {e}", face.face_id);
+        }
     }
 
     pub fn get_people(&self) -> Vec<PersonWithFace> {
@@ -957,32 +1006,48 @@ impl Database {
     }
 
     pub fn remove_directory(&self, path: String) {
-        let _ = self
+        if let Err(e) = self
             .connection
-            .execute("DELETE FROM directory WHERE name = ?1", [&path]);
+            .execute("DELETE FROM directory WHERE name = ?1", [&path])
+        {
+            eprintln!("remove_directory: failed to remove '{path}': {e}");
+        }
     }
 
     pub fn add_directory(&self, path: &str) {
-        let _ = self
+        if let Err(e) = self
             .connection
-            .execute("INSERT INTO directory (name) VALUES(?1)", [&path]);
+            .execute("INSERT INTO directory (name) VALUES(?1)", [&path])
+        {
+            eprintln!("add_directory: failed to add '{path}': {e}");
+        }
     }
 
     pub fn merge_people(&self, from_id: &str, to_id: &str) {
-        let _ = self.connection.execute(
+        if let Err(e) = self.connection.execute(
             "UPDATE faces SET person_id = ?1 WHERE person_id = ?2",
             (to_id, from_id),
-        );
-        let _ = self
+        ) {
+            eprintln!("merge_people: failed to update faces from {from_id} to {to_id}: {e}");
+            return;
+        }
+        if let Err(e) = self
             .connection
-            .execute("DELETE FROM people WHERE id = ?1", [from_id]);
+            .execute("DELETE FROM people WHERE id = ?1", [from_id])
+        {
+            eprintln!("merge_people: failed to delete {from_id}: {e}");
+            return;
+        }
         self.update_person_centroid(to_id);
     }
 
     pub fn rename_person(&self, id: &str, new_name: &str) {
-        let _ = self
+        if let Err(e) = self
             .connection
-            .execute("UPDATE people SET name = ?1 WHERE id = ?2", (new_name, id));
+            .execute("UPDATE people SET name = ?1 WHERE id = ?2", (new_name, id))
+        {
+            eprintln!("rename_person: failed to rename {id} to {new_name}: {e}");
+        }
     }
 
     pub fn remove_directory_full(&self, path: &str) {
@@ -998,63 +1063,69 @@ impl Database {
             }
         }
         for id in photo_ids {
-            let _ = self
-                .connection
-                .execute("DELETE FROM object WHERE photo_id = ?1", [&id]);
-            let _ = self
-                .connection
-                .execute("DELETE FROM faces WHERE photo_id = ?1", [&id]);
-            let _ = self
-                .connection
-                .execute("DELETE FROM properties WHERE photo_id = ?1", [&id]);
-            let _ = self
-                .connection
-                .execute("DELETE FROM photo WHERE id = ?1", [&id]);
+            if let Err(e) = self.connection.execute("DELETE FROM object WHERE photo_id = ?1", [&id]) {
+                eprintln!("remove_directory_full: failed to delete objects for {id}: {e}");
+            }
+            if let Err(e) = self.connection.execute("DELETE FROM faces WHERE photo_id = ?1", [&id]) {
+                eprintln!("remove_directory_full: failed to delete faces for {id}: {e}");
+            }
+            if let Err(e) = self.connection.execute("DELETE FROM properties WHERE photo_id = ?1", [&id]) {
+                eprintln!("remove_directory_full: failed to delete properties for {id}: {e}");
+            }
+            if let Err(e) = self.connection.execute("DELETE FROM photo WHERE id = ?1", [&id]) {
+                eprintln!("remove_directory_full: failed to delete photo {id}: {e}");
+            }
         }
         let _ = self
             .connection
             .execute("DELETE FROM directory WHERE name = ?1", [path]);
     }
 
-    pub fn import_photo(&self, photo: ImportedPhoto<'_>) {
-        let _ = self.connection.execute(
+    pub fn import_photo(&mut self, photo: ImportedPhoto<'_>) {
+        let tx = match self.connection.transaction() {
+            Ok(t) => t,
+            Err(e) => { eprintln!("import_photo: failed to start transaction: {e}"); return; }
+        };
+
+        if let Err(e) = tx.execute(
             "INSERT OR REPLACE INTO photo (id, location, created, latitude, longitude, encoded) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            (
-                photo.id,
-                photo.location,
-                photo.created,
-                photo.latitude,
-                photo.longitude,
-                photo.encoded,
-            ),
-        );
+            (photo.id, photo.location, photo.created, photo.latitude, photo.longitude, photo.encoded),
+        ) {
+            eprintln!("import_photo: failed to upsert photo {}: {e}", photo.id);
+            return;
+        }
 
-        // Clear existing metadata to avoid duplicates
-        let _ = self
-            .connection
-            .execute("DELETE FROM object WHERE photo_id = ?1", [photo.id]);
-        let _ = self
-            .connection
-            .execute("DELETE FROM faces WHERE photo_id = ?1", [photo.id]);
+        if let Err(e) = tx.execute("DELETE FROM object WHERE photo_id = ?1", [photo.id]) {
+            eprintln!("import_photo: failed to clear objects for {}: {e}", photo.id);
+        }
+        if let Err(e) = tx.execute("DELETE FROM faces WHERE photo_id = ?1", [photo.id]) {
+            eprintln!("import_photo: failed to clear faces for {}: {e}", photo.id);
+        }
 
-        // Import objects
         if let Ok(objects) = serde_json::from_str::<Vec<SyncObject>>(photo.objects_json) {
-            for obj in objects {
-                let _ = self.connection.execute(
+            for obj in &objects {
+                if let Err(e) = tx.execute(
                     "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
-                    (photo.id, obj.class, obj.probability),
-                );
+                    (photo.id, &obj.class, &obj.probability),
+                ) {
+                    eprintln!("import_photo: failed to insert object for {}: {e}", photo.id);
+                }
             }
         }
 
-        // Import faces
         if let Ok(faces) = serde_json::from_str::<Vec<SyncFace>>(photo.faces_json) {
-            for face in faces {
-                let _ = self.connection.execute(
+            for face in &faces {
+                if let Err(e) = tx.execute(
                     "INSERT OR REPLACE INTO faces (photo_id, face_id, crop_path, encoded, person_id) VALUES (?1, ?2, ?3, ?4, ?5)",
-                    (photo.id, face.face_id, face.crop_path, face.encoded, face.person_id),
-                );
+                    (photo.id, &face.face_id, &face.crop_path, &face.encoded, &face.person_id),
+                ) {
+                    eprintln!("import_photo: failed to insert face for {}: {e}", photo.id);
+                }
             }
+        }
+
+        if let Err(e) = tx.commit() {
+            eprintln!("import_photo: failed to commit transaction for {}: {e}", photo.id);
         }
     }
 
@@ -1128,34 +1199,13 @@ impl Database {
         tx.commit().map_err(|e| e.to_string())
     }
 
-    pub fn filter_new_paths(&self, paths: &[String]) -> Vec<String> {
-        let mut new_paths = Vec::new();
-        // Check in batches of 100 to avoid SQL variable limits
-        for chunk in paths.chunks(100) {
-            let placeholders = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-            let sql = format!("SELECT location FROM photo WHERE location IN ({placeholders})");
-            let mut existing = std::collections::HashSet::new();
-            if let Ok(mut stmt) = self.connection.prepare(&sql) {
-                let params = rusqlite::params_from_iter(chunk);
-                if let Ok(rows) = stmt.query_map(params, |row| row.get::<_, String>(0)) {
-                    for row in rows.flatten() {
-                        existing.insert(row);
-                    }
-                }
-            }
-            for path in chunk {
-                if !existing.contains(path) {
-                    new_paths.push(path.clone());
-                }
-            }
-        }
-        new_paths
-    }
-
     pub fn update_photo_indexed(&self, id: &str, indexed: i32) {
-        let _ = self
+        if let Err(e) = self
             .connection
-            .execute("UPDATE photo SET indexed = ?1 WHERE id = ?2", (indexed, id));
+            .execute("UPDATE photo SET indexed = ?1 WHERE id = ?2", (indexed, id))
+        {
+            eprintln!("update_photo_indexed: failed for {id}: {e}");
+        }
     }
 
     pub fn update_ai_status(&self, photo_id: &str, model: &str, status: i32) {

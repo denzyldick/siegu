@@ -76,7 +76,7 @@
                 <div class="siegu-icon-circle siegu-icon-circle-sm mr-2">
                   <v-icon size="14" color="white">mdi-folder-plus</v-icon>
                 </div>
-                <span class="text-white font-weight-bold">{{ $t('settings.add_folder') }}</span>
+                <span class="font-weight-bold">{{ $t('settings.add_folder') }}</span>
               </div>
             </v-btn>
           </v-card-actions>
@@ -94,10 +94,10 @@
             <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ $t('settings.ai_models') }}</v-card-title>
             <template v-slot:append v-if="activeModelSummary || pendingCount > 0">
                <div class="text-right">
-                  <div v-if="activeModelSummary" class="text-caption font-weight-bold text-black">
+                  <div v-if="activeModelSummary" class="text-caption font-weight-bold text-zinc-primary">
                     {{ activeModelSummary }}
                   </div>
-                  <div v-else class="text-caption font-weight-bold text-black">{{ $t('settings.indexing_jobs', { count: formatIndexingCount(pendingCount) }) }}</div>
+                  <div v-else class="text-caption font-weight-bold text-zinc-primary">{{ $t('settings.indexing_jobs', { count: formatIndexingCount(pendingCount) }) }}</div>
                   <div v-if="pendingCount > 0" class="text-caption text-zinc-muted" style="font-size: 10px;">{{ $t('settings.eta_label', { time: formatEta(globalEta) }) }}</div>
                </div>
             </template>
@@ -202,8 +202,9 @@
                     <div class="d-flex align-center justify-space-between mt-2 model-status-line">
                       <span class="text-caption text-zinc-muted">{{ $t('settings.file_size', { size: model.size }) }}</span>
                       <span
+                        v-if="getModelStatusText(model.id)"
                         class="text-caption font-weight-bold model-status-text"
-                        :class="isModelActive(model.id) ? 'text-black' : 'text-zinc-muted'"
+                        :class="isModelActive(model.id) ? 'text-zinc-primary' : 'text-zinc-muted'"
                         :title="getModelStatusText(model.id)"
                       >
                         {{ getModelStatusText(model.id) }}
@@ -213,7 +214,7 @@
                     <!-- Progress Area -->
                     <div v-if="isModelProcessing(model.id)" class="mt-4">
                       <div class="d-flex justify-space-between text-caption mb-1">
-                        <span class="font-weight-bold text-black">{{ getModelStatusLabel(model.id) }}</span>
+                        <span class="font-weight-bold text-zinc-primary">{{ getModelStatusLabel(model.id) }}</span>
                         <span>{{ getModelProgressText(model.id) }}</span>
                       </div>
                       <v-progress-linear
@@ -308,14 +309,31 @@
               {{ $t('settings.all_selected_ready') }}
             </v-btn>
              <v-spacer></v-spacer>
-             <div class="text-caption text-zinc-muted">
-                {{ $t('settings.models_ready', { count: downloadedModels.length, total: aiModels.length }) }}
+             <div class="d-flex ga-2">
+               <v-btn
+                 variant="tonal"
+                 color="black"
+                 size="small"
+                 class="font-weight-bold"
+                 @click="enableAllModels"
+               >
+                 {{ $t('settings.enable_all') }}
+               </v-btn>
+               <v-btn
+                 variant="tonal"
+                 color="error"
+                 size="small"
+                 class="font-weight-bold"
+                 @click="disableAllModels"
+               >
+                 {{ $t('settings.disable_all') }}
+               </v-btn>
              </div>
           </v-card-actions>
         </v-card>
 
         <!-- Language Section -->
-        <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
+        <v-card v-if="!embedded" variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
           <v-card-item class="bg-zinc-100 py-4">
             <template v-slot:prepend>
               <div class="siegu-icon-circle-dark mr-3">
@@ -342,7 +360,7 @@
         </v-card>
 
         <!-- Appearance Section -->
-        <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
+        <v-card v-if="!embedded" variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
           <v-card-item class="bg-zinc-100 py-4">
             <template v-slot:prepend>
               <div class="siegu-icon-circle-dark mr-3">
@@ -406,7 +424,7 @@
                       <div class="siegu-icon-circle siegu-icon-circle-md mr-3">
                         <v-icon color="#ffffff" size="small">mdi-wrench-outline</v-icon>
                       </div>
-                      <span class="text-white font-weight-bold">{{ $t('settings.clean') }}</span>
+                      <span class="font-weight-bold">{{ $t('settings.clean') }}</span>
                     </div>
                   </v-btn>
                 </template>
@@ -510,7 +528,7 @@
         </v-card-text>
 
         <v-card-actions class="pa-4 bg-zinc-50 border-top-subtle ga-2">
-          <v-btn variant="tonal" color="zinc-muted" @click="downloadDialog.show = false" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.cancel') }}</v-btn>
+          <v-btn variant="flat" color="black" @click="downloadDialog.show = false" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.cancel') }}</v-btn>
           <v-btn variant="flat" color="black" @click="startConfirmedDownload" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.download') }}</v-btn>
         </v-card-actions>
       </v-card>
@@ -537,7 +555,7 @@
         </v-card-text>
 
         <v-card-actions class="pa-4 bg-zinc-50 border-top-subtle ga-2">
-          <v-btn variant="tonal" color="zinc-muted" @click="cleanupDialog.show = false" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.cancel') }}</v-btn>
+          <v-btn variant="flat" color="black" @click="cleanupDialog.show = false" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.cancel') }}</v-btn>
           <v-btn variant="flat" color="black" @click="startConfirmedCleanup" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.clear') }}</v-btn>
         </v-card-actions>
       </v-card>
@@ -564,7 +582,7 @@
         </v-card-text>
 
         <v-card-actions class="pa-4 bg-zinc-50 border-top-subtle ga-2">
-          <v-btn variant="tonal" color="zinc-muted" @click="removeFolderDialog.show = false" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.cancel') }}</v-btn>
+          <v-btn variant="flat" color="black" @click="removeFolderDialog.show = false" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.cancel') }}</v-btn>
           <v-btn variant="flat" color="black" @click="startConfirmedRemoveFolder" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.wipe_data') }}</v-btn>
         </v-card-actions>
       </v-card>
@@ -857,13 +875,28 @@ export default {
       }
       this.modelEnabled = enabled;
     },
+    configKeyForModel(modelId) {
+      return "model_enabled_" + (modelId === "ultraface" ? "face" : modelId);
+    },
     async toggleModel(modelId) {
-      const key = "model_enabled_" + modelId;
+      const key = this.configKeyForModel(modelId);
       await invoke("save_config", { key, value: this.modelEnabled[modelId] ? "true" : "false" });
       const label = this.$t('models.' + modelId + '.title');
       this.showSnackbar(this.modelEnabled[modelId]
         ? this.$t('settings.model_enabled', { model: label })
         : this.$t('settings.model_disabled', { model: label }));
+    },
+    async enableAllModels() {
+      for (const m of this.downloadedModels) {
+        this.modelEnabled[m] = true;
+        await invoke("save_config", { key: this.configKeyForModel(m), value: "true" });
+      }
+    },
+    async disableAllModels() {
+      for (const m of this.downloadedModels) {
+        this.modelEnabled[m] = false;
+        await invoke("save_config", { key: this.configKeyForModel(m), value: "false" });
+      }
     },
     async checkExistingModels() {
         const downloaded = await invoke("check_models");
@@ -1025,7 +1058,7 @@ export default {
       if (progress?.status === "error") return this.$t('settings.model_status_error');
       if (progress?.total > 0 && progress?.pending === 0) return this.$t('settings.model_status_finished');
       if (progress?.total === 0 && progress?.pending === 0) return this.$t('settings.model_status_up_to_date');
-      if (this.downloadedModels.includes(modelId)) return this.$t('settings.model_status_ready_to_run');
+      if (this.downloadedModels.includes(modelId)) return "";
       return this.$t('settings.model_status_not_downloaded');
     },
     getModelProgressText(modelId) {
