@@ -18,10 +18,18 @@ pub struct Database {
 }
 
 const MONTH_NAMES: &[(u8, &str, &str)] = &[
-    (1, "january", "jan"), (2, "february", "feb"), (3, "march", "mar"),
-    (4, "april", "apr"), (5, "may", "may"), (6, "june", "jun"),
-    (7, "july", "jul"), (8, "august", "aug"), (9, "september", "sep"),
-    (10, "october", "oct"), (11, "november", "nov"), (12, "december", "dec"),
+    (1, "january", "jan"),
+    (2, "february", "feb"),
+    (3, "march", "mar"),
+    (4, "april", "apr"),
+    (5, "may", "may"),
+    (6, "june", "jun"),
+    (7, "july", "jul"),
+    (8, "august", "aug"),
+    (9, "september", "sep"),
+    (10, "october", "oct"),
+    (11, "november", "nov"),
+    (12, "december", "dec"),
 ];
 
 fn month_name_to_like(query: &str) -> Option<String> {
@@ -321,7 +329,7 @@ impl Database {
         let mut logs = Vec::new();
         let sql = "SELECT timestamp, level, message FROM logs ORDER BY timestamp DESC LIMIT ?1";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
-            if let Ok(iter) = stmt.query_map([limit], |row| {
+            if let Ok(iter) = stmt.query_map([limit as i64], |row| {
                 Ok(LogEntry {
                     timestamp: row.get(0)?,
                     level: row.get(1)?,
@@ -419,18 +427,26 @@ impl Database {
         if photos.is_empty() {
             return;
         }
-        let placeholders: Vec<String> = photos.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
+        let placeholders: Vec<String> = photos
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect();
         let sql = format!(
             "SELECT photo_id, class, probability FROM object WHERE photo_id IN ({})",
             placeholders.join(",")
         );
-        let params: Vec<&dyn rusqlite::types::ToSql> = photos.iter().map(|p| &p.id as &dyn rusqlite::types::ToSql).collect();
+        let params: Vec<&dyn rusqlite::types::ToSql> = photos
+            .iter()
+            .map(|p| &p.id as &dyn rusqlite::types::ToSql)
+            .collect();
         if let Ok(mut stmt) = self.connection.prepare(&sql) {
             if let Ok(iter) = stmt.query_map(params.as_slice(), |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
-                    row.get::<_, f64>(2).ok()
+                    row.get::<_, f64>(2)
+                        .ok()
                         .or_else(|| row.get::<_, String>(2).ok().and_then(|s| s.parse().ok()))
                         .unwrap_or(0.0),
                 ))
@@ -448,24 +464,28 @@ impl Database {
         if photos.is_empty() {
             return;
         }
-        let placeholders: Vec<String> = photos.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
+        let placeholders: Vec<String> = photos
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect();
         let sql = format!(
             "SELECT photo_id, key, value FROM properties WHERE photo_id IN ({})",
             placeholders.join(",")
         );
-        let params: Vec<&dyn rusqlite::types::ToSql> = photos.iter().map(|p| &p.id as &dyn rusqlite::types::ToSql).collect();
+        let params: Vec<&dyn rusqlite::types::ToSql> = photos
+            .iter()
+            .map(|p| &p.id as &dyn rusqlite::types::ToSql)
+            .collect();
         if let Ok(mut stmt) = self.connection.prepare(&sql) {
             if let Ok(iter) = stmt.query_map(params.as_slice(), |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
-                    row.get::<_, String>(2).ok()
-                        .or_else(|| {
-                            row.get::<_, f64>(2).ok().map(|v| v.to_string())
-                        })
-                        .or_else(|| {
-                            row.get::<_, i64>(2).ok().map(|v| v.to_string())
-                        })
+                    row.get::<_, String>(2)
+                        .ok()
+                        .or_else(|| row.get::<_, f64>(2).ok().map(|v| v.to_string()))
+                        .or_else(|| row.get::<_, i64>(2).ok().map(|v| v.to_string()))
                         .unwrap_or_default(),
                 ))
             }) {
@@ -534,7 +554,8 @@ impl Database {
             } else {
                 format!("%{query}%")
             };
-            let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(offset), Box::new(limit)];
+            let mut params: Vec<Box<dyn rusqlite::ToSql>> =
+                vec![Box::new(offset as i64), Box::new(limit as i64)];
             if !query.is_empty() {
                 params.push(Box::new(q_param));
                 if let Some(ref mp) = month_param {
@@ -608,7 +629,8 @@ impl Database {
 
     pub fn get_heatmap_points(&self) -> Vec<MapPoint> {
         let mut points = Vec::new();
-        let sql = "SELECT id, latitude, longitude FROM photo WHERE (latitude != 0.0 OR longitude != 0.0)";
+        let sql =
+            "SELECT id, latitude, longitude FROM photo WHERE (latitude != 0.0 OR longitude != 0.0)";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([], |row| {
                 Ok(MapPoint {
@@ -630,14 +652,21 @@ impl Database {
             return Vec::new();
         }
         let mut photos = Vec::new();
-        let placeholders: Vec<String> = photo_ids.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
+        let placeholders: Vec<String> = photo_ids
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect();
         let sql = format!(
             "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, \
              s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres \
              FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE p.id IN ({})",
             placeholders.join(",")
         );
-        let params: Vec<&dyn rusqlite::types::ToSql> = photo_ids.iter().map(|id| id as &dyn rusqlite::types::ToSql).collect();
+        let params: Vec<&dyn rusqlite::types::ToSql> = photo_ids
+            .iter()
+            .map(|id| id as &dyn rusqlite::types::ToSql)
+            .collect();
         if let Ok(mut stmt) = self.connection.prepare(&sql) {
             if let Ok(iter) = stmt.query_map(params.as_slice(), |row| {
                 Ok(Photo {
@@ -684,36 +713,38 @@ impl Database {
              s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres \
              FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE p.id = ?1";
         let mut stmt = self.connection.prepare(&sql).ok()?;
-        let mut rows = stmt.query_map([photo_id], |row| {
-            Ok(Photo {
-                id: row.get(0)?,
-                location: row.get(1)?,
-                encoded: row.get(2)?,
-                created: row.get(5).unwrap_or_default(),
-                objects: HashMap::new(),
-                properties: HashMap::new(),
-                latitude: row.get(3).unwrap_or(0.0),
-                longitude: row.get(4).unwrap_or(0.0),
-                favorite: row.get(6).unwrap_or(false),
-                indexed: row.get(7).unwrap_or(0),
-                caption: row.get(8).ok(),
-                aesthetics_score: row.get(9).ok(),
-                ai_status: AiStatus {
-                    clip: row.get(10).unwrap_or(0),
-                    face: row.get(11).unwrap_or(0),
-                    ocr: row.get(12).unwrap_or(0),
-                    nsfw: row.get(13).unwrap_or(0),
-                    aesthetics: row.get(14).unwrap_or(0),
-                    yolo: row.get(15).unwrap_or(0),
-                    blip: row.get(16).unwrap_or(0),
-                    arcface: row.get(17).unwrap_or(0),
-                    midas: row.get(18).unwrap_or(0),
-                    whisper: row.get(19).unwrap_or(0),
-                    sam: row.get(20).unwrap_or(0),
-                    superres: row.get(21).unwrap_or(0),
-                },
+        let mut rows = stmt
+            .query_map([photo_id], |row| {
+                Ok(Photo {
+                    id: row.get(0)?,
+                    location: row.get(1)?,
+                    encoded: row.get(2)?,
+                    created: row.get(5).unwrap_or_default(),
+                    objects: HashMap::new(),
+                    properties: HashMap::new(),
+                    latitude: row.get(3).unwrap_or(0.0),
+                    longitude: row.get(4).unwrap_or(0.0),
+                    favorite: row.get(6).unwrap_or(false),
+                    indexed: row.get(7).unwrap_or(0),
+                    caption: row.get(8).ok(),
+                    aesthetics_score: row.get(9).ok(),
+                    ai_status: AiStatus {
+                        clip: row.get(10).unwrap_or(0),
+                        face: row.get(11).unwrap_or(0),
+                        ocr: row.get(12).unwrap_or(0),
+                        nsfw: row.get(13).unwrap_or(0),
+                        aesthetics: row.get(14).unwrap_or(0),
+                        yolo: row.get(15).unwrap_or(0),
+                        blip: row.get(16).unwrap_or(0),
+                        arcface: row.get(17).unwrap_or(0),
+                        midas: row.get(18).unwrap_or(0),
+                        whisper: row.get(19).unwrap_or(0),
+                        sam: row.get(20).unwrap_or(0),
+                        superres: row.get(21).unwrap_or(0),
+                    },
+                })
             })
-        }).ok()?;
+            .ok()?;
         let mut photo = rows.next()?.ok()?;
         self.enrich_objects(std::slice::from_mut(&mut photo));
         self.enrich_properties(std::slice::from_mut(&mut photo));
@@ -725,12 +756,19 @@ impl Database {
         if photo_ids.is_empty() {
             return result;
         }
-        let placeholders: Vec<String> = photo_ids.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
+        let placeholders: Vec<String> = photo_ids
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect();
         let sql = format!(
             "SELECT id, encoded FROM photo WHERE id IN ({})",
             placeholders.join(",")
         );
-        let params: Vec<&dyn rusqlite::types::ToSql> = photo_ids.iter().map(|id| id as &dyn rusqlite::types::ToSql).collect();
+        let params: Vec<&dyn rusqlite::types::ToSql> = photo_ids
+            .iter()
+            .map(|id| id as &dyn rusqlite::types::ToSql)
+            .collect();
         if let Ok(mut stmt) = self.connection.prepare(&sql) {
             if let Ok(iter) = stmt.query_map(params.as_slice(), |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
@@ -742,7 +780,6 @@ impl Database {
         }
         result
     }
-
 
     pub fn store_face(&self, face: Face) {
         let embedding_bytes: Vec<u8> = face
@@ -1063,16 +1100,28 @@ impl Database {
             }
         }
         for id in photo_ids {
-            if let Err(e) = self.connection.execute("DELETE FROM object WHERE photo_id = ?1", [&id]) {
+            if let Err(e) = self
+                .connection
+                .execute("DELETE FROM object WHERE photo_id = ?1", [&id])
+            {
                 eprintln!("remove_directory_full: failed to delete objects for {id}: {e}");
             }
-            if let Err(e) = self.connection.execute("DELETE FROM faces WHERE photo_id = ?1", [&id]) {
+            if let Err(e) = self
+                .connection
+                .execute("DELETE FROM faces WHERE photo_id = ?1", [&id])
+            {
                 eprintln!("remove_directory_full: failed to delete faces for {id}: {e}");
             }
-            if let Err(e) = self.connection.execute("DELETE FROM properties WHERE photo_id = ?1", [&id]) {
+            if let Err(e) = self
+                .connection
+                .execute("DELETE FROM properties WHERE photo_id = ?1", [&id])
+            {
                 eprintln!("remove_directory_full: failed to delete properties for {id}: {e}");
             }
-            if let Err(e) = self.connection.execute("DELETE FROM photo WHERE id = ?1", [&id]) {
+            if let Err(e) = self
+                .connection
+                .execute("DELETE FROM photo WHERE id = ?1", [&id])
+            {
                 eprintln!("remove_directory_full: failed to delete photo {id}: {e}");
             }
         }
@@ -1084,7 +1133,10 @@ impl Database {
     pub fn import_photo(&mut self, photo: ImportedPhoto<'_>) {
         let tx = match self.connection.transaction() {
             Ok(t) => t,
-            Err(e) => { eprintln!("import_photo: failed to start transaction: {e}"); return; }
+            Err(e) => {
+                eprintln!("import_photo: failed to start transaction: {e}");
+                return;
+            }
         };
 
         if let Err(e) = tx.execute(
@@ -1096,7 +1148,10 @@ impl Database {
         }
 
         if let Err(e) = tx.execute("DELETE FROM object WHERE photo_id = ?1", [photo.id]) {
-            eprintln!("import_photo: failed to clear objects for {}: {e}", photo.id);
+            eprintln!(
+                "import_photo: failed to clear objects for {}: {e}",
+                photo.id
+            );
         }
         if let Err(e) = tx.execute("DELETE FROM faces WHERE photo_id = ?1", [photo.id]) {
             eprintln!("import_photo: failed to clear faces for {}: {e}", photo.id);
@@ -1108,7 +1163,10 @@ impl Database {
                     "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
                     (photo.id, &obj.class, &obj.probability),
                 ) {
-                    eprintln!("import_photo: failed to insert object for {}: {e}", photo.id);
+                    eprintln!(
+                        "import_photo: failed to insert object for {}: {e}",
+                        photo.id
+                    );
                 }
             }
         }
@@ -1125,7 +1183,10 @@ impl Database {
         }
 
         if let Err(e) = tx.commit() {
-            eprintln!("import_photo: failed to commit transaction for {}: {e}", photo.id);
+            eprintln!(
+                "import_photo: failed to commit transaction for {}: {e}",
+                photo.id
+            );
         }
     }
 
@@ -1210,8 +1271,12 @@ impl Database {
 
     pub fn update_ai_status(&self, photo_id: &str, model: &str, status: i32) {
         match model {
-            "clip" | "face" | "ocr" | "nsfw" | "aesthetics" | "yolo" | "blip" | "arcface" | "midas" | "whisper" | "sam" | "superres" => {}
-            _ => { eprintln!("Invalid model name: {model}"); return; }
+            "clip" | "face" | "ocr" | "nsfw" | "aesthetics" | "yolo" | "blip" | "arcface"
+            | "midas" | "whisper" | "sam" | "superres" => {}
+            _ => {
+                eprintln!("Invalid model name: {model}");
+                return;
+            }
         }
         let sql = format!("INSERT INTO ai_status (photo_id, {model}) VALUES (?1, ?2) ON CONFLICT(photo_id) DO UPDATE SET {model} = ?2");
         let _ = self.connection.execute(&sql, (photo_id, status));
@@ -1264,8 +1329,12 @@ impl Database {
     pub fn get_photos_missing_model(&self, model: &str) -> Vec<String> {
         let mut ids = Vec::new();
         match model {
-            "clip" | "face" | "ocr" | "nsfw" | "aesthetics" | "yolo" | "blip" | "arcface" | "midas" | "whisper" | "sam" | "superres" => {}
-            _ => { eprintln!("Invalid model name: {model}"); return ids; }
+            "clip" | "face" | "ocr" | "nsfw" | "aesthetics" | "yolo" | "blip" | "arcface"
+            | "midas" | "whisper" | "sam" | "superres" => {}
+            _ => {
+                eprintln!("Invalid model name: {model}");
+                return ids;
+            }
         }
         let sql = format!("SELECT p.id FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE s.{model} = 0 OR s.{model} IS NULL");
         if let Ok(mut stmt) = self.connection.prepare(&sql) {

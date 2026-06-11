@@ -18,7 +18,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' tauri: localhost; img-src 'self' data: tauri: asset: http://asset.localhost http://127.0.0.1:*; media-src 'self' tauri: asset: http://asset.localhost http://127.0.0.1:*; frame-src 'self' tauri: localhost; connect-src 'self' tauri: localhost http://127.0.0.1:*;",
+      "csp": "default-src 'self' tauri: localhost; img-src 'self' data: tauri: asset: http://asset.localhost http://127.0.0.1:*; media-src 'self' tauri: asset: http://asset.localhost http://127.0.0.1:*; frame-src 'self' tauri: localhost; connect-src 'self' tauri: localhost http://127.0.0.1:* https://github.com;",
       "assetProtocol": {
         "enable": true,
         "scope": [
@@ -29,11 +29,18 @@
     }
   },
   "plugins": {
+    "updater": {
+      "pubkey": "untrusted comment: minisign public key: F47C9C3C0262F6B8\nRWS49mICPJx89EDOsGP6TsksXNE+j5T+P7JWZFfKWItN/huO3g8HcRek",
+      "endpoints": [
+        "https://github.com/denzyldick/siegu/releases/latest/download/latest.json"
+      ]
+    },
     "notification": null
   },
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "shortDescription": "Privacy-first local media management.",
     "longDescription": "Siegu is a cross-platform, privacy-first media backup and synchronization application.",
     "icon": [

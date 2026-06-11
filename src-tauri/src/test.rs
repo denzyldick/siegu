@@ -35,7 +35,9 @@ mod tests {
 
         let candidates = [
             std::env::var("XDG_CONFIG_HOME").ok().map(PathBuf::from),
-            std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".config")),
+            std::env::var("HOME")
+                .ok()
+                .map(|h| PathBuf::from(h).join(".config")),
             std::env::var("HOME")
                 .ok()
                 .map(|h| PathBuf::from(h).join("Library/Application Support")),
@@ -89,48 +91,93 @@ mod tests {
 
     #[test]
     fn test_analyze_single_bypasses_abort_flag() {
+        use crate::ml::Job;
         use std::sync::atomic::{AtomicBool, Ordering};
         use std::sync::Arc;
-        use crate::ml::Job;
 
         let abort = Arc::new(AtomicBool::new(true));
 
         // AnalyzeSingle should NOT be skipped when abort is set
         let job = Job::AnalyzeSingle("test".to_string());
         let should_skip = abort.load(Ordering::SeqCst)
-            && !matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _));
-        assert!(!should_skip, "AnalyzeSingle must process even when abort is set");
+            && !matches!(
+                job,
+                Job::AnalyzeSingle(_)
+                    | Job::AutoAnalyzeSingle(_)
+                    | Job::AnalyzeSingleWithModel(_, _)
+            );
+        assert!(
+            !should_skip,
+            "AnalyzeSingle must process even when abort is set"
+        );
 
         // AnalyzeSingleWithModel should NOT be skipped when abort is set
         let job = Job::AnalyzeSingleWithModel("test".to_string(), "clip".to_string());
         let should_skip = abort.load(Ordering::SeqCst)
-            && !matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _));
-        assert!(!should_skip, "AnalyzeSingleWithModel must process even when abort is set");
+            && !matches!(
+                job,
+                Job::AnalyzeSingle(_)
+                    | Job::AutoAnalyzeSingle(_)
+                    | Job::AnalyzeSingleWithModel(_, _)
+            );
+        assert!(
+            !should_skip,
+            "AnalyzeSingleWithModel must process even when abort is set"
+        );
 
         // ProcessAll SHOULD be skipped when abort is set
         let job = Job::ProcessAll;
         let should_skip = abort.load(Ordering::SeqCst)
-            && !matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _));
+            && !matches!(
+                job,
+                Job::AnalyzeSingle(_)
+                    | Job::AutoAnalyzeSingle(_)
+                    | Job::AnalyzeSingleWithModel(_, _)
+            );
         assert!(should_skip, "ProcessAll must be blocked when abort is set");
 
         // ProcessModel SHOULD be skipped when abort is set
         let job = Job::ProcessModel("clip".to_string());
         let should_skip = abort.load(Ordering::SeqCst)
-            && !matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _));
-        assert!(should_skip, "ProcessModel must be blocked when abort is set");
+            && !matches!(
+                job,
+                Job::AnalyzeSingle(_)
+                    | Job::AutoAnalyzeSingle(_)
+                    | Job::AnalyzeSingleWithModel(_, _)
+            );
+        assert!(
+            should_skip,
+            "ProcessModel must be blocked when abort is set"
+        );
 
         // AutoAnalyzeSingle should NOT be skipped
         let job = Job::AutoAnalyzeSingle("test".to_string());
         let should_skip = abort.load(Ordering::SeqCst)
-            && !matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _));
-        assert!(!should_skip, "AutoAnalyzeSingle must process even when abort is set");
+            && !matches!(
+                job,
+                Job::AnalyzeSingle(_)
+                    | Job::AutoAnalyzeSingle(_)
+                    | Job::AnalyzeSingleWithModel(_, _)
+            );
+        assert!(
+            !should_skip,
+            "AutoAnalyzeSingle must process even when abort is set"
+        );
 
         // When abort is false, nothing should be skipped
         abort.store(false, Ordering::SeqCst);
         let job = Job::ProcessAll;
         let should_skip = abort.load(Ordering::SeqCst)
-            && !matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _));
-        assert!(!should_skip, "Nothing should be skipped when abort is false");
+            && !matches!(
+                job,
+                Job::AnalyzeSingle(_)
+                    | Job::AutoAnalyzeSingle(_)
+                    | Job::AnalyzeSingleWithModel(_, _)
+            );
+        assert!(
+            !should_skip,
+            "Nothing should be skipped when abort is false"
+        );
     }
 
     #[cfg(not(target_os = "android"))]
@@ -246,13 +293,12 @@ mod tests {
             let len = output.len();
             let sum: f64 = output.iter().map(|&v| v.abs() as f64).sum();
             let mean = sum / len as f64;
-            let (min, max) =
-                output
-                    .iter()
-                    .cloned()
-                    .fold((f32::MAX, f32::MIN), |(min, max), v| {
-                        (min.min(v), max.max(v))
-                    });
+            let (min, max) = output
+                .iter()
+                .cloned()
+                .fold((f32::MAX, f32::MIN), |(min, max), v| {
+                    (min.min(v), max.max(v))
+                });
 
             eprintln!(
                 "  [OK] {}: {} values, min={:.4}, max={:.4}, mean={:.4}",
@@ -379,11 +425,20 @@ mod tests {
             run_model_tests(&models_dir, &ALL_MODEL_CASES);
 
             eprintln!("  [OK] ocr_det.onnx exists");
-            assert!(models_dir.join("ocr_det.onnx").exists(), "missing ocr_det.onnx");
+            assert!(
+                models_dir.join("ocr_det.onnx").exists(),
+                "missing ocr_det.onnx"
+            );
             eprintln!("  [OK] whisper.onnx exists");
-            assert!(models_dir.join("whisper.onnx").exists(), "missing whisper.onnx");
+            assert!(
+                models_dir.join("whisper.onnx").exists(),
+                "missing whisper.onnx"
+            );
             eprintln!("  [OK] en_dict.txt exists");
-            assert!(models_dir.join("en_dict.txt").exists(), "missing en_dict.txt");
+            assert!(
+                models_dir.join("en_dict.txt").exists(),
+                "missing en_dict.txt"
+            );
 
             eprintln!("--- All inference smoke tests passed ---");
         }
@@ -427,12 +482,22 @@ mod tests {
                 caption: None,
                 aesthetics_score: None,
                 ai_status: database::AiStatus {
-                    clip: 0, face: 0, ocr: 0, nsfw: 0, aesthetics: 0,
-                    yolo: 0, blip: 0, arcface: 0, midas: 0, whisper: 0,
-                    sam: 0, superres: 0,
+                    clip: 0,
+                    face: 0,
+                    ocr: 0,
+                    nsfw: 0,
+                    aesthetics: 0,
+                    yolo: 0,
+                    blip: 0,
+                    arcface: 0,
+                    midas: 0,
+                    whisper: 0,
+                    sam: 0,
+                    superres: 0,
                 },
             };
-            db.store_photo_batch(&[photo]).expect("failed to store photo");
+            db.store_photo_batch(&[photo])
+                .expect("failed to store photo");
 
             let db_arc = Arc::new(Mutex::new(Database::new(&db_path_str)));
 
@@ -561,7 +626,8 @@ mod tests {
         #[test]
         fn test_update_photo_indexed() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("u1", "/u.jpg")]).expect("store");
+            db.store_photo_batch(&[make_photo("u1", "/u.jpg")])
+                .expect("store");
 
             db.update_photo_indexed("u1", 2);
             let loaded = db.get_photo_by_id("u1").expect("exists");
@@ -583,7 +649,9 @@ mod tests {
         #[test]
         fn test_list_photos_pagination() {
             let (mut db, _dir) = db();
-            let batch: Vec<_> = (0..5).map(|i| make_photo(&format!("p{i}"), &format!("/p{i}.jpg"))).collect();
+            let batch: Vec<_> = (0..5)
+                .map(|i| make_photo(&format!("p{i}"), &format!("/p{i}.jpg")))
+                .collect();
             db.store_photo_batch(&batch).expect("store");
 
             assert_eq!(db.list_photos("", 0, 2, false, false).len(), 2);
@@ -594,8 +662,11 @@ mod tests {
         #[test]
         fn test_list_photos_query_by_location() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("q1", "/vacation/beach.jpg"), make_photo("q2", "/work/doc.jpg")])
-                .expect("store");
+            db.store_photo_batch(&[
+                make_photo("q1", "/vacation/beach.jpg"),
+                make_photo("q2", "/work/doc.jpg"),
+            ])
+            .expect("store");
 
             let results = db.list_photos("beach", 0, 10, false, false);
             assert_eq!(results.len(), 1);
@@ -617,13 +688,14 @@ mod tests {
         #[test]
         fn test_toggle_favorite_add_remove() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("t1", "/t.jpg")]).expect("store");
+            db.store_photo_batch(&[make_photo("t1", "/t.jpg")])
+                .expect("store");
 
-            assert_eq!(db.toggle_favorite("t1"), true);   // added
+            assert_eq!(db.toggle_favorite("t1"), true); // added
             let p = db.get_photo_by_id("t1").expect("exists");
             assert!(p.favorite);
 
-            assert_eq!(db.toggle_favorite("t1"), false);  // removed
+            assert_eq!(db.toggle_favorite("t1"), false); // removed
             let p = db.get_photo_by_id("t1").expect("exists");
             assert!(!p.favorite);
         }
@@ -649,7 +721,8 @@ mod tests {
         #[test]
         fn test_update_ai_status_and_missing_model() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("a1", "/a.jpg")]).expect("store");
+            db.store_photo_batch(&[make_photo("a1", "/a.jpg")])
+                .expect("store");
 
             let missing = db.get_photos_missing_model("clip");
             assert_eq!(missing.len(), 1);
@@ -683,7 +756,8 @@ mod tests {
         #[test]
         fn test_store_face_and_get_faces_for_photo() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("fp1", "/fp.jpg")]).expect("store");
+            db.store_photo_batch(&[make_photo("fp1", "/fp.jpg")])
+                .expect("store");
 
             let embedding = vec![0.1f32; 512];
             let person_id = db.create_anonymous_person(&embedding);
@@ -713,7 +787,8 @@ mod tests {
         #[test]
         fn test_get_people_and_anonymous_groups() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("pep1", "/pep.jpg")]).expect("store");
+            db.store_photo_batch(&[make_photo("pep1", "/pep.jpg")])
+                .expect("store");
 
             let embedding = vec![0.2f32; 512];
             let pid = db.create_anonymous_person(&embedding);
@@ -738,7 +813,8 @@ mod tests {
         #[test]
         fn test_assign_name_to_face_new_person() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("an1", "/an.jpg")]).expect("store");
+            db.store_photo_batch(&[make_photo("an1", "/an.jpg")])
+                .expect("store");
 
             let pid = db.create_anonymous_person(&vec![0.3f32; 512]);
             db.store_face(database::Face {
@@ -761,7 +837,8 @@ mod tests {
         #[test]
         fn test_assign_name_to_face_existing_person() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("an2", "/an2.jpg")]).expect("store");
+            db.store_photo_batch(&[make_photo("an2", "/an2.jpg")])
+                .expect("store");
 
             // Create two anonymous people, assign the same name to both faces
             let pid1 = db.create_anonymous_person(&vec![0.4f32; 512]);
@@ -810,7 +887,7 @@ mod tests {
             let (db, _dir) = db();
             let emb = vec![0.7f32; 512];
             let pid = db.create_anonymous_person(&emb);
-            // create_anonymous_person does NOT store embedding if none passed? 
+            // create_anonymous_person does NOT store embedding if none passed?
             // Actually looking at the code: create_anonymous_person does INSERT with embedding.
             // But get_all_people_with_embeddings requires embedding IS NOT NULL.
             // We passed embedding, so it should show up.
@@ -823,7 +900,8 @@ mod tests {
         #[test]
         fn test_get_person_faces() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("pf1", "/pf.jpg")]).expect("store");
+            db.store_photo_batch(&[make_photo("pf1", "/pf.jpg")])
+                .expect("store");
 
             let pid = db.create_anonymous_person(&vec![0.8f32; 512]);
             db.store_face(database::Face {
@@ -843,7 +921,8 @@ mod tests {
         #[test]
         fn test_get_photos_for_person() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("pp1", "/pp.jpg")]).expect("store");
+            db.store_photo_batch(&[make_photo("pp1", "/pp.jpg")])
+                .expect("store");
 
             let pid = db.create_anonymous_person(&vec![0.9f32; 512]);
             db.store_face(database::Face {
@@ -863,7 +942,8 @@ mod tests {
         #[test]
         fn test_merge_people() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("mp1", "/mp.jpg")]).expect("store");
+            db.store_photo_batch(&[make_photo("mp1", "/mp.jpg")])
+                .expect("store");
 
             let pid_a = db.create_anonymous_person(&vec![0.1f32; 512]);
             let pid_b = db.create_anonymous_person(&vec![0.2f32; 512]);
@@ -918,13 +998,16 @@ mod tests {
         #[test]
         fn test_get_photo_sync_info() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("sync1", "/path/sync1.jpg")]).expect("store");
+            db.store_photo_batch(&[make_photo("sync1", "/path/sync1.jpg")])
+                .expect("store");
 
             // sync info requires entries in object or faces table
-            db.connection.execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
-                rusqlite::params!["sync1", "cat", "0.95"],
-            ).unwrap();
+            db.connection
+                .execute(
+                    "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
+                    rusqlite::params!["sync1", "cat", "0.95"],
+                )
+                .unwrap();
 
             let info = db.get_photo_sync_info();
             assert_eq!(info.len(), 1);
@@ -986,7 +1069,8 @@ mod tests {
         #[test]
         fn test_import_photo_updates_existing() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("imp2", "/old/imp2.jpg")]).expect("store");
+            db.store_photo_batch(&[make_photo("imp2", "/old/imp2.jpg")])
+                .expect("store");
 
             let imp = database::ImportedPhoto {
                 id: "imp2",
@@ -1047,8 +1131,12 @@ mod tests {
 
             let logs = db.get_logs(10);
             assert_eq!(logs.len(), 2);
-            assert!(logs.iter().any(|l| l.level == "WARN" && l.message == "warning message"));
-            assert!(logs.iter().any(|l| l.level == "INFO" && l.message == "test message"));
+            assert!(logs
+                .iter()
+                .any(|l| l.level == "WARN" && l.message == "warning message"));
+            assert!(logs
+                .iter()
+                .any(|l| l.level == "INFO" && l.message == "test message"));
         }
 
         #[test]
@@ -1094,8 +1182,10 @@ mod tests {
         fn test_remove_directory_full() {
             let (mut db, _dir) = db();
             db.add_directory("/photos/obsolete");
-            db.store_photo_batch(&[make_photo("rd1", "/photos/obsolete/rd1.jpg")]).expect("store");
-            db.store_photo_batch(&[make_photo("rd2", "/photos/obsolete/sub/rd2.jpg")]).expect("store");
+            db.store_photo_batch(&[make_photo("rd1", "/photos/obsolete/rd1.jpg")])
+                .expect("store");
+            db.store_photo_batch(&[make_photo("rd2", "/photos/obsolete/sub/rd2.jpg")])
+                .expect("store");
 
             db.remove_directory_full("/photos/obsolete");
 
@@ -1114,10 +1204,12 @@ mod tests {
             db.store_photo_batch(&[photo]).expect("store");
 
             // Directly insert an object for search via raw SQL
-            db.connection.execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
-                rusqlite::params!["so1", "cat", "0.95"],
-            ).unwrap();
+            db.connection
+                .execute(
+                    "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
+                    rusqlite::params!["so1", "cat", "0.95"],
+                )
+                .unwrap();
 
             let suggestions = db.list_objects("ca");
             assert_eq!(suggestions.len(), 1);
@@ -1150,10 +1242,12 @@ mod tests {
         #[test]
         fn test_list_devices() {
             let (db, _dir) = db();
-            db.connection.execute(
-                "INSERT INTO device (ip, name, offer) VALUES (?1, ?2, ?3)",
-                rusqlite::params!["192.168.1.10", "Living Room", ""],
-            ).unwrap();
+            db.connection
+                .execute(
+                    "INSERT INTO device (ip, name, offer) VALUES (?1, ?2, ?3)",
+                    rusqlite::params!["192.168.1.10", "Living Room", ""],
+                )
+                .unwrap();
 
             let devices = db.list_devices();
             assert_eq!(devices.len(), 1);
@@ -1171,19 +1265,29 @@ mod tests {
             db.store_photo_batch(&[photo]).expect("store");
 
             // Insert object and property directly (as the ML worker would)
-            db.connection.execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
-                rusqlite::params!["enr1", "dog", "0.88"],
-            ).unwrap();
-            db.connection.execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES (?1, ?2, ?3)",
-                rusqlite::params!["enr1", "location_name", "Amsterdam"],
-            ).unwrap();
+            db.connection
+                .execute(
+                    "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
+                    rusqlite::params!["enr1", "dog", "0.88"],
+                )
+                .unwrap();
+            db.connection
+                .execute(
+                    "INSERT INTO properties (photo_id, key, value) VALUES (?1, ?2, ?3)",
+                    rusqlite::params!["enr1", "location_name", "Amsterdam"],
+                )
+                .unwrap();
 
             let photos = db.list_photos("", 0, 10, false, false);
             assert_eq!(photos.len(), 1);
             assert!((photos[0].objects["dog"] - 0.88).abs() < 0.001);
-            assert_eq!(photos[0].properties.get("location_name").map(|s| s.as_str()), Some("Amsterdam"));
+            assert_eq!(
+                photos[0]
+                    .properties
+                    .get("location_name")
+                    .map(|s| s.as_str()),
+                Some("Amsterdam")
+            );
         }
 
         #[test]
@@ -1192,10 +1296,12 @@ mod tests {
             let mut photo = make_photo("cap1", "/cap1.jpg");
             photo.indexed = 1;
             db.store_photo_batch(&[photo]).expect("store");
-            db.connection.execute(
-                "UPDATE photo SET caption = ?1 WHERE id = ?2",
-                rusqlite::params!["a beautiful sunset", "cap1"],
-            ).unwrap();
+            db.connection
+                .execute(
+                    "UPDATE photo SET caption = ?1 WHERE id = ?2",
+                    rusqlite::params!["a beautiful sunset", "cap1"],
+                )
+                .unwrap();
 
             let results = db.list_photos("sunset", 0, 10, false, false);
             assert_eq!(results.len(), 1);
@@ -1221,7 +1327,8 @@ mod tests {
         #[test]
         fn test_store_photo_batch_empty() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[]).expect("empty batch should succeed");
+            db.store_photo_batch(&[])
+                .expect("empty batch should succeed");
         }
 
         // -- enrich_objects / enrich_properties with no matching rows ---------
@@ -1239,7 +1346,8 @@ mod tests {
         #[test]
         fn test_assign_name_to_face_same_person() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("same", "/same.jpg")]).expect("store");
+            db.store_photo_batch(&[make_photo("same", "/same.jpg")])
+                .expect("store");
             let pid = db.create_anonymous_person(&vec![0.1f32; 512]);
             db.store_face(database::Face {
                 photo_id: "same".to_string(),
@@ -1267,7 +1375,11 @@ mod tests {
         #[test]
         fn test_list_photos_videos_only() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("vid1", "/video.mp4"), make_photo("img1", "/image.jpg")]).expect("store");
+            db.store_photo_batch(&[
+                make_photo("vid1", "/video.mp4"),
+                make_photo("img1", "/image.jpg"),
+            ])
+            .expect("store");
 
             let videos = db.list_photos("", 0, 10, false, true);
             assert_eq!(videos.len(), 1);
@@ -1320,7 +1432,8 @@ mod tests {
         #[test]
         fn test_assign_name_to_face_no_prior_person() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("noprior", "/noprior.jpg")]).expect("store");
+            db.store_photo_batch(&[make_photo("noprior", "/noprior.jpg")])
+                .expect("store");
             // Create a face with NO person_id (person_id is None)
             db.store_face(database::Face {
                 photo_id: "noprior".to_string(),
@@ -1340,11 +1453,14 @@ mod tests {
         #[test]
         fn test_list_photos_with_object_query() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("oq1", "/oq1.jpg")]).expect("store");
-            db.connection.execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
-                rusqlite::params!["oq1", "cat", "0.95"],
-            ).unwrap();
+            db.store_photo_batch(&[make_photo("oq1", "/oq1.jpg")])
+                .expect("store");
+            db.connection
+                .execute(
+                    "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
+                    rusqlite::params!["oq1", "cat", "0.95"],
+                )
+                .unwrap();
 
             let photos = db.list_photos("cat", 0, 10, false, false);
             assert_eq!(photos.len(), 1);
@@ -1354,11 +1470,14 @@ mod tests {
         #[test]
         fn test_list_photos_with_object_query_case_insensitive() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("oq2", "/oq2.jpg")]).expect("store");
-            db.connection.execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
-                rusqlite::params!["oq2", "Cat", "0.90"],
-            ).unwrap();
+            db.store_photo_batch(&[make_photo("oq2", "/oq2.jpg")])
+                .expect("store");
+            db.connection
+                .execute(
+                    "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
+                    rusqlite::params!["oq2", "Cat", "0.90"],
+                )
+                .unwrap();
 
             // LIKE is case-insensitive by default in SQLite for ASCII
             let photos = db.list_photos("cat", 0, 10, false, false);
@@ -1370,10 +1489,12 @@ mod tests {
             let (db, _dir) = db();
             // Insert a person with a name
             let pid = uuid::Uuid::new_v4().to_string();
-            db.connection.execute(
-                "INSERT INTO people (id, name) VALUES (?1, ?2)",
-                rusqlite::params![pid, "Alice Johnson"],
-            ).unwrap();
+            db.connection
+                .execute(
+                    "INSERT INTO people (id, name) VALUES (?1, ?2)",
+                    rusqlite::params![pid, "Alice Johnson"],
+                )
+                .unwrap();
 
             let suggestions = db.list_objects("Alice");
             assert!(suggestions.iter().any(|s| s.suggestion_type == "person"));
@@ -1382,7 +1503,8 @@ mod tests {
         #[test]
         fn test_assign_name_to_face_merge_existing() {
             let (mut db, _dir) = db();
-            db.store_photo_batch(&[make_photo("merge_ex", "/merge_ex.jpg")]).expect("store");
+            db.store_photo_batch(&[make_photo("merge_ex", "/merge_ex.jpg")])
+                .expect("store");
 
             // Create face linked to an anonymous person
             let anon_pid = db.create_anonymous_person(&vec![0.7f32; 512]);
@@ -1441,9 +1563,18 @@ mod tests {
                 caption: None,
                 aesthetics_score: None,
                 ai_status: crate::database::AiStatus {
-                    clip: 0, face: 0, ocr: 0, nsfw: 0, aesthetics: 0,
-                    yolo: 0, blip: 0, arcface: 0, midas: 0, whisper: 0,
-                    sam: 0, superres: 0,
+                    clip: 0,
+                    face: 0,
+                    ocr: 0,
+                    nsfw: 0,
+                    aesthetics: 0,
+                    yolo: 0,
+                    blip: 0,
+                    arcface: 0,
+                    midas: 0,
+                    whisper: 0,
+                    sam: 0,
+                    superres: 0,
                 },
             };
             db.store_photo_batch(&[photo]).expect("store photo");
@@ -1516,27 +1647,45 @@ mod tests {
             eprintln!("  [OK] Simulated ML worker storing all analysis results");
 
             // Step 3: Call get_photo_by_id and verify
-            let result = db.get_photo_by_id(photo_id)
+            let result = db
+                .get_photo_by_id(photo_id)
                 .expect("get_photo_by_id should return Some after analysis");
 
             assert_eq!(result.id, photo_id);
             assert_eq!(result.indexed, 2, "photo should be marked indexed=2");
-            assert_eq!(result.caption.as_deref(), Some("a photo of a cat and a dog"));
+            assert_eq!(
+                result.caption.as_deref(),
+                Some("a photo of a cat and a dog")
+            );
             assert_eq!(result.aesthetics_score, Some(0.85));
             assert_eq!(result.latitude, 37.7749);
             assert_eq!(result.longitude, -122.4194);
 
             // Objects
-            assert_eq!(result.objects.len(), 4, "should have 4 objects (3 CLIP + 1 YOLO)");
+            assert_eq!(
+                result.objects.len(),
+                4,
+                "should have 4 objects (3 CLIP + 1 YOLO)"
+            );
             assert!((result.objects["cat"] - 0.95).abs() < 0.001);
             assert!((result.objects["dog"] - 0.80).abs() < 0.001);
             assert!((result.objects["person"] - 0.60).abs() < 0.001);
             assert!((result.objects["yolo_0"] - 0.9).abs() < 0.001);
 
             // Properties
-            assert_eq!(result.properties.len(), 2, "should have 2 properties (nsfw, face_count)");
-            assert_eq!(result.properties.get("nsfw").map(|s| s.as_str()), Some("0.001"));
-            assert_eq!(result.properties.get("face_count").map(|s| s.as_str()), Some("2"));
+            assert_eq!(
+                result.properties.len(),
+                2,
+                "should have 2 properties (nsfw, face_count)"
+            );
+            assert_eq!(
+                result.properties.get("nsfw").map(|s| s.as_str()),
+                Some("0.001")
+            );
+            assert_eq!(
+                result.properties.get("face_count").map(|s| s.as_str()),
+                Some("2")
+            );
 
             // AI status
             assert_eq!(result.ai_status.clip, 1);
@@ -1549,10 +1698,8 @@ mod tests {
             eprintln!("  [OK] All analysis fields verified in Photo struct");
 
             // Step 4: Verify JSON serialization (what get_photo_by_id returns as a string)
-            let json = serde_json::to_string(&result)
-                .expect("serialize Photo to JSON");
-            let parsed: serde_json::Value = serde_json::from_str(&json)
-                .expect("parse JSON back");
+            let json = serde_json::to_string(&result).expect("serialize Photo to JSON");
+            let parsed: serde_json::Value = serde_json::from_str(&json).expect("parse JSON back");
 
             assert_eq!(parsed["id"], photo_id);
             assert_eq!(parsed["indexed"], 2);
@@ -1564,7 +1711,10 @@ mod tests {
             assert_eq!(parsed["properties"]["face_count"], "2");
             assert_eq!(parsed["ai_status"]["clip"], 1);
             assert_eq!(parsed["ai_status"]["aesthetics"], 1);
-            assert!(parsed["location"].as_str().unwrap_or("").contains("test/photo.jpg"));
+            assert!(parsed["location"]
+                .as_str()
+                .unwrap_or("")
+                .contains("test/photo.jpg"));
             assert!(parsed["encoded"].as_str().unwrap_or("").len() > 0);
 
             eprintln!("  [OK] JSON serialization verified — all fields present and correct");
@@ -1586,7 +1736,10 @@ mod tests {
             std::fs::remove_file(&db_path).expect("remove db file");
         }
 
-        assert!(!db_path.exists(), "Database file must be deleted when confirm=true");
+        assert!(
+            !db_path.exists(),
+            "Database file must be deleted when confirm=true"
+        );
     }
 
     #[test]
@@ -1604,7 +1757,10 @@ mod tests {
             // early return — file should still exist
         }
 
-        assert!(db_path.exists(), "Database file must NOT be deleted when confirm=false");
+        assert!(
+            db_path.exists(),
+            "Database file must NOT be deleted when confirm=false"
+        );
     }
 
     #[test]

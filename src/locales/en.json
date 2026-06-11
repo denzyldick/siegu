@@ -406,5 +406,14 @@
       "desc": "Transcribes words spoken in videos.",
       "search": "Search for things people said in videos."
     }
-  }
+  },
+  "update_title": "Update",
+  "update_desc": "Check for new version of Siegu",
+  "check_for_updates": "Check for Updates",
+  "checking": "Checking...",
+  "up_to_date": "Siegu is up to date",
+  "update_available": "Update {version} available",
+  "download_update": "Download & Install",
+  "update_error": "Update check failed",
+  "update_progress": "Downloading update..."
 }

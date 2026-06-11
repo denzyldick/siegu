@@ -208,6 +208,8 @@
     "indexing_jobs": "Indexation de {count} tâches IA",
     "disable_model": "Désactiver",
     "enable_model": "Activer",
+    "enable_all": "Activer tout",
+    "disable_all": "Désactiver tout",
     "logs_cleared": "Journaux effacés",
     "scan_threads_saved": "Threads d'analyse enregistrés",
     "model_enabled": "{model} activé",
@@ -404,5 +406,14 @@
       "desc": "Transcrit les mots prononcés dans les vidéos.",
       "search": "Recherchez des choses que les gens ont dites dans les vidéos."
     }
-  }
+  },
+  "update_title": "Mise à jour",
+  "update_desc": "Vérifier les mises à jour",
+  "check_for_updates": "Vérifier les mises à jour",
+  "checking": "Vérification...",
+  "up_to_date": "Siegu est à jour",
+  "update_available": "Mise à jour {version} disponible",
+  "download_update": "Télécharger et installer",
+  "update_error": "Erreur de mise à jour",
+  "update_progress": "Téléchargement de la mise à jour..."
 }

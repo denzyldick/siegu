@@ -52,7 +52,11 @@ fn job_status_model(model_id: &str) -> Option<&'static str> {
     }
 }
 
-fn should_run_model(target_model: Option<&str>, model: &str, config: Option<&std::collections::HashMap<String, String>>) -> bool {
+fn should_run_model(
+    target_model: Option<&str>,
+    model: &str,
+    config: Option<&std::collections::HashMap<String, String>>,
+) -> bool {
     if let Some(config) = config {
         let key = format!("model_enabled_{}", model);
         if let Some(val) = config.get(&key) {
@@ -363,14 +367,27 @@ pub fn start_background_worker(
         let mut last_auto_job: Option<Instant> = None;
 
         while let Some(job) = rx.blocking_recv() {
-            if abort_clone.load(Ordering::SeqCst) && !matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _)) {
+            if abort_clone.load(Ordering::SeqCst)
+                && !matches!(
+                    job,
+                    Job::AnalyzeSingle(_)
+                        | Job::AutoAnalyzeSingle(_)
+                        | Job::AnalyzeSingleWithModel(_, _)
+                )
+            {
                 continue;
             }
 
             // Check indexing mode for auto-triggered jobs
             let is_auto = matches!(job, Job::AutoAnalyzeSingle(_) | Job::ProcessAll);
             if is_auto {
-                let mode = db.lock().unwrap().get_state().get("indexing_mode").cloned().unwrap_or("immediate".to_string());
+                let mode = db
+                    .lock()
+                    .unwrap()
+                    .get_state()
+                    .get("indexing_mode")
+                    .cloned()
+                    .unwrap_or("immediate".to_string());
                 if mode == "manual" {
                     continue;
                 }
@@ -551,7 +568,12 @@ pub fn start_background_worker(
                 emit_log(&app_handle, "ML Worker: Engine Ready.".to_string());
             }
 
-            let is_single = matches!(job, Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _));
+            let is_single = matches!(
+                job,
+                Job::AnalyzeSingle(_)
+                    | Job::AutoAnalyzeSingle(_)
+                    | Job::AnalyzeSingleWithModel(_, _)
+            );
             let (photo_ids, target_model, progress_model) = match job {
                 Job::AnalyzeSingle(id) | Job::AutoAnalyzeSingle(id) => (vec![id], None, None),
                 Job::AnalyzeSingleWithModel(id, model_id) => {
@@ -1034,7 +1056,7 @@ pub fn start_background_worker(
                                                                 assigned_person_id = Some(new_id);
                                                             }
                                                             let mut buffer = std::io::Cursor::new(Vec::new());
-                                                            let _ = face_crop.write_to(&mut buffer, image::ImageOutputFormat::Jpeg(80));
+                                                            let _ = face_crop.write_to(&mut buffer, image::ImageFormat::Jpeg);
                                                             let encoded = format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(buffer.get_ref()));
                                                             let lock = db_task.lock().unwrap();
                                                             lock.store_face(Face { photo_id: photo_id_task.clone(), face_id: face_id.clone(), crop_path, encoded, embedding: face_embedding, person_id: assigned_person_id });

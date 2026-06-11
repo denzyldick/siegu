@@ -208,6 +208,8 @@
     "indexing_jobs": "Indiziere {count} KI-Aufgaben",
     "disable_model": "Deaktivieren",
     "enable_model": "Aktivieren",
+    "enable_all": "Alle aktivieren",
+    "disable_all": "Alle deaktivieren",
     "logs_cleared": "Protokolle gelöscht",
     "scan_threads_saved": "Scan-Threads gespeichert",
     "model_enabled": "{model} aktiviert",
@@ -404,5 +406,14 @@
       "desc": "Transkribiert gesprochene Wörter in Videos.",
       "search": "Suche nach Dingen, die Leute in Videos gesagt haben."
     }
-  }
+  },
+  "update_title": "Update",
+  "update_desc": "Nach neuer Version suchen",
+  "check_for_updates": "Nach Updates suchen",
+  "checking": "Suche läuft...",
+  "up_to_date": "Siegu ist aktuell",
+  "update_available": "Update {version} verfügbar",
+  "download_update": "Herunterladen & Installieren",
+  "update_error": "Update-Fehler",
+  "update_progress": "Update wird heruntergeladen..."
 }

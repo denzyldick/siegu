@@ -208,6 +208,8 @@
     "indexing_jobs": "Indexando {count} trabajos de IA",
     "disable_model": "Desactivar",
     "enable_model": "Activar",
+    "enable_all": "Activar todas",
+    "disable_all": "Desactivar todas",
     "logs_cleared": "Registros borrados",
     "scan_threads_saved": "Subprocesos de escaneo guardados",
     "model_enabled": "{model} activado",
@@ -404,5 +406,14 @@
       "desc": "Transcribe palabras habladas en vídeos.",
       "search": "Busca cosas que la gente dijo en vídeos."
     }
-  }
+  },
+  "update_title": "Actualización",
+  "update_desc": "Buscar nueva versión de Siegu",
+  "check_for_updates": "Buscar actualizaciones",
+  "checking": "Buscando...",
+  "up_to_date": "Siegu está actualizado",
+  "update_available": "Actualización {version} disponible",
+  "download_update": "Descargar e instalar",
+  "update_error": "Error de actualización",
+  "update_progress": "Descargando actualización..."
 }

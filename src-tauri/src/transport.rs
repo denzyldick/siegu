@@ -151,11 +151,12 @@ pub fn start_media_server(config_path: String) -> u16 {
             let images = warp::path("images").and(warp::fs::dir(config_path_clone));
 
             let routes = images;
-            let (addr, server) = warp::serve(routes).bind_ephemeral(([127, 0, 0, 1], 0));
-
+            let addr: std::net::SocketAddr = ([127, 0, 0, 1], 0).into();
+            let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+            let addr = listener.local_addr().unwrap();
             let port = addr.port();
             let _ = tx.send(port);
-            server.await;
+            warp::serve(routes).incoming(listener).run().await;
         });
     });
 
@@ -302,7 +303,13 @@ impl WebRtcClient {
         }
 
         if let Some(app) = &self_arc.app_handle {
-            emit_log(app, format!("Attempting to connect to signaling at {} for room {}", self_arc.signaling_url, self_arc.room_id));
+            emit_log(
+                app,
+                format!(
+                    "Attempting to connect to signaling at {} for room {}",
+                    self_arc.signaling_url, self_arc.room_id
+                ),
+            );
         }
         self_arc.emit("webrtc-state", "Connecting to signaling...");
 
@@ -313,7 +320,10 @@ impl WebRtcClient {
         let (ws_stream, _) = match connect_async(req).await {
             Ok(s) => {
                 if let Some(app) = &self_arc.app_handle {
-                    emit_log(app, "Successfully connected to signaling server!".to_string());
+                    emit_log(
+                        app,
+                        "Successfully connected to signaling server!".to_string(),
+                    );
                 }
                 s
             }

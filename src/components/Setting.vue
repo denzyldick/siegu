@@ -504,6 +504,49 @@
             </div>
           </v-card-text>
         </v-card>
+
+        <!-- Update Card -->
+        <v-card variant="flat" color="surface" rounded="xl" class="mb-6 overflow-hidden border-subtle">
+          <v-card-item class="bg-zinc-100 py-4">
+            <template v-slot:prepend>
+              <div class="siegu-icon-circle-dark mr-3">
+                <v-icon color="#ffffff" size="small">mdi-update</v-icon>
+              </div>
+            </template>
+            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ $t('update_title') }}</v-card-title>
+          </v-card-item>
+          <v-card-text class="pt-2">
+            <v-list lines="two" class="bg-transparent">
+              <v-list-item class="px-0">
+                <template v-slot:title>
+                  <span class="font-weight-bold text-zinc-primary">{{ $t('update_desc') }}</span>
+                </template>
+                <template v-slot:subtitle>
+                  <span class="text-zinc-secondary">{{ updateStatusText }}</span>
+                </template>
+                <template v-slot:append>
+                  <v-btn
+                    size="small"
+                    variant="flat"
+                    color="#000000"
+                    theme="dark"
+                    :loading="updateStatus === 'checking'"
+                    :disabled="updateStatus === 'downloading'"
+                    @click="updateStatus === 'available' ? downloadUpdate() : checkUpdate()"
+                    class="siegu-btn px-4"
+                  >
+                    <div class="d-flex align-center">
+                      <div class="siegu-icon-circle siegu-icon-circle-md mr-3">
+                        <v-icon color="#ffffff" size="small">{{ updateBtnIcon }}</v-icon>
+                      </div>
+                      <span class="font-weight-bold">{{ updateBtnText }}</span>
+                    </div>
+                  </v-btn>
+                </template>
+              </v-list-item>
+            </v-list>
+          </v-card-text>
+        </v-card>
       </v-col>
     </v-row>
     <!-- Download Confirmation Dialog -->
@@ -607,6 +650,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { homeDir } from "@tauri-apps/api/path";
 import { platform } from "@tauri-apps/plugin-os";
 import { listen } from "@tauri-apps/api/event";
+import { check } from "@tauri-apps/plugin-updater";
 import FolderPicker from "./FolderPicker.vue";
 
 export default {
@@ -675,6 +719,8 @@ export default {
       message: "",
       models: []
     },
+    updateStatus: 'idle', // 'idle' | 'checking' | 'available' | 'uptodate' | 'downloading' | 'error'
+    updateInfo: null,
     cleanupDialog: {
       show: false
     },
@@ -725,6 +771,24 @@ export default {
         code,
         label: this.$t(`language.${code}`),
       }));
+    },
+    updateStatusText() {
+      switch (this.updateStatus) {
+        case 'checking': return this.$t('checking');
+        case 'available': return this.$t('update_available', { version: this.updateInfo?.version });
+        case 'uptodate': return this.$t('up_to_date');
+        case 'downloading': return this.$t('update_progress');
+        case 'error': return this.$t('update_error');
+        default: return '';
+      }
+    },
+    updateBtnText() {
+      if (this.updateStatus === 'available') return this.$t('download_update');
+      return this.$t('check_for_updates');
+    },
+    updateBtnIcon() {
+      if (this.updateStatus === 'available') return 'mdi-download';
+      return 'mdi-update';
     }
   },
   async mounted() {
@@ -798,6 +862,32 @@ export default {
     this.list_directories();
   },
   methods: {
+    async checkUpdate() {
+      this.updateStatus = 'checking';
+      try {
+        const update = await check();
+        if (update) {
+          this.updateInfo = update;
+          this.updateStatus = 'available';
+        } else {
+          this.updateStatus = 'uptodate';
+        }
+      } catch (e) {
+        console.error('Update check failed:', e);
+        this.updateStatus = 'error';
+      }
+    },
+    async downloadUpdate() {
+      if (!this.updateInfo) return;
+      this.updateStatus = 'downloading';
+      try {
+        await this.updateInfo.downloadAndInstall();
+        this.updateStatus = 'uptodate';
+      } catch (e) {
+        console.error('Update download failed:', e);
+        this.updateStatus = 'error';
+      }
+    },
     normalizeIndexingCount(value) {
       const count = Number(value);
       if (!Number.isSafeInteger(count) || count < 0 || count > 1000000) return 0;

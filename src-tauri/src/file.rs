@@ -110,7 +110,13 @@ pub fn scan_folder(
             .flatten()
             .collect()
     };
-            emit_log(app, format!("[scan_folder] Loaded {} existing paths from DB", existing_paths.len()));
+    emit_log(
+        app,
+        format!(
+            "[scan_folder] Loaded {} existing paths from DB",
+            existing_paths.len()
+        ),
+    );
 
     emit_log(app, format!("Starting Discovery Pass in: {directory}"));
 
@@ -297,27 +303,43 @@ pub fn scan_folder(
             "eta_secs": 0,
         }),
     );
-    emit_log(app, format!("[scan_folder] Sent {} photos to batch channel for: {directory}", total));
+    emit_log(
+        app,
+        format!(
+            "[scan_folder] Sent {} photos to batch channel for: {directory}",
+            total
+        ),
+    );
     emit_log(app, "Done with Discovery Pass".to_string());
 }
 
 pub fn read_file_base64(app: &tauri::AppHandle, path: String) -> String {
     let canonical = std::fs::canonicalize(&path).unwrap_or_default();
-    let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")).unwrap_or_default();
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_default();
     let config = std::env::var("XDG_CONFIG_HOME")
         .or_else(|_| std::env::var("APPDATA"))
         .unwrap_or_default();
     let temp = std::env::temp_dir();
     let allowed = [home.as_str(), config.as_str(), temp.to_str().unwrap_or("")];
     let is_allowed = canonical.as_os_str().is_empty()
-        || allowed.iter().any(|dir| !dir.is_empty() && canonical.starts_with(dir));
+        || allowed
+            .iter()
+            .any(|dir| !dir.is_empty() && canonical.starts_with(dir));
     if !is_allowed {
-        emit_log(app, format!("Access denied: {path} is outside allowed directories"));
+        emit_log(
+            app,
+            format!("Access denied: {path} is outside allowed directories"),
+        );
         return String::new();
     }
     match fs::read(&path) {
         Ok(bytes) => {
-            emit_log(app, format!("Reading original file: {} ({} bytes)", path, bytes.len()));
+            emit_log(
+                app,
+                format!("Reading original file: {} ({} bytes)", path, bytes.len()),
+            );
             let encoded = general_purpose::STANDARD.encode(bytes);
             let ext = Path::new(&path)
                 .extension()

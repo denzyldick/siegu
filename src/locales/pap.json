@@ -208,6 +208,8 @@
     "indexing_jobs": "Indeksando {count} trabou di AI",
     "disable_model": "Desaktivá",
     "enable_model": "Aktivá",
+    "enable_all": "Aktivá tur",
+    "disable_all": "Desaktivá tur",
     "logs_cleared": "Log limpjá",
     "scan_threads_saved": "Hilunan di scan gardá",
     "model_enabled": "{model} aktivá",
@@ -404,5 +406,14 @@
       "desc": "Ta transcribí palabranan papia den videonan.",
       "search": "Buska cosnan cu hende a bisa den video."
     }
-  }
+  },
+  "update_title": "Update",
+  "update_desc": "Buska un vershon nobo di Siegu",
+  "check_for_updates": "Buska update",
+  "checking": "Buskan...",
+  "up_to_date": "Siegu ta aktual",
+  "update_available": "Update {version} disponibel",
+  "download_update": "Descargá i Instalá",
+  "update_error": "Error di update",
+  "update_progress": "Deskargando update..."
 }

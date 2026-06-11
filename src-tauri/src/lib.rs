@@ -33,12 +33,18 @@ fn scan_files(app: tauri::AppHandle) {
     emit_log(&app, "Starting media scan...".to_string());
     let path = get_config_path(&app);
     if path.is_empty() {
-        emit_log(&app, "Error: Config path is empty, cannot scan.".to_string());
+        emit_log(
+            &app,
+            "Error: Config path is empty, cannot scan.".to_string(),
+        );
         return;
     }
     let database = database::Database::new(&path);
     let folders = database.list_directories();
-    emit_log(&app, format!("Found {} folders to scan in database.", folders.len()));
+    emit_log(
+        &app,
+        format!("Found {} folders to scan in database.", folders.len()),
+    );
 
     if !folders.is_empty() {
         use tauri_plugin_notification::NotificationExt;
@@ -98,7 +104,10 @@ fn scan_files(app: tauri::AppHandle) {
         ui_buffer: &Arc<tokio::sync::Mutex<Vec<database::Photo>>>,
         batch: Vec<database::Photo>,
     ) {
-        emit_log(app_handle, format!("[batch] flushing {} photos to DB", batch.len()));
+        emit_log(
+            app_handle,
+            format!("[batch] flushing {} photos to DB", batch.len()),
+        );
 
         // Clone for DB insert (spawn_blocking needs owned data)
         let db_clone = Arc::clone(database);
@@ -107,14 +116,24 @@ fn scan_files(app: tauri::AppHandle) {
         let _ = tauri::async_runtime::spawn_blocking(move || {
             if let Ok(mut db) = db_clone.lock() {
                 if let Err(e) = db.store_photo_batch(&batch_for_db) {
-                    emit_log(&app_for_blocking, format!("[batch] ERROR storing photo batch: {e}"));
+                    emit_log(
+                        &app_for_blocking,
+                        format!("[batch] ERROR storing photo batch: {e}"),
+                    );
                 } else {
-                    emit_log(&app_for_blocking, format!("[batch] stored {} photos in DB", batch_for_db.len()));
+                    emit_log(
+                        &app_for_blocking,
+                        format!("[batch] stored {} photos in DB", batch_for_db.len()),
+                    );
                 }
             } else {
-                emit_log(&app_for_blocking, "[batch] ERROR: could not lock DB mutex".to_string());
+                emit_log(
+                    &app_for_blocking,
+                    "[batch] ERROR: could not lock DB mutex".to_string(),
+                );
             }
-        }).await;
+        })
+        .await;
 
         // Push all to UI buffer
         {
@@ -128,12 +147,21 @@ fn scan_files(app: tauri::AppHandle) {
         // Send AutoAnalyzeSingle for each
         for p in &batch {
             if let Some(state) = app_handle.try_state::<ml::MlContext>() {
-                emit_log(app_handle, format!("[batch] sending AutoAnalyzeSingle({})", p.id));
+                emit_log(
+                    app_handle,
+                    format!("[batch] sending AutoAnalyzeSingle({})", p.id),
+                );
                 if let Err(e) = state.tx.send(ml::Job::AutoAnalyzeSingle(p.id.clone())) {
-                    emit_log(app_handle, format!("[batch] ERROR sending AutoAnalyzeSingle: {e}"));
+                    emit_log(
+                        app_handle,
+                        format!("[batch] ERROR sending AutoAnalyzeSingle: {e}"),
+                    );
                 }
             } else {
-                emit_log(app_handle, "[batch] WARN: MlContext state not available".to_string());
+                emit_log(
+                    app_handle,
+                    "[batch] WARN: MlContext state not available".to_string(),
+                );
             }
         }
     }
@@ -154,7 +182,10 @@ fn scan_files(app: tauri::AppHandle) {
             flush_batch_to_db_and_ui(&database, &app_handle_for_batch, &ui_buffer, batch).await;
         }
 
-        emit_log(&app_handle_for_batch, "[batch] receiver exited (all senders dropped)".to_string());
+        emit_log(
+            &app_handle_for_batch,
+            "[batch] receiver exited (all senders dropped)".to_string(),
+        );
     });
 
     let abort_flag = Arc::clone(&state.abort);
@@ -163,7 +194,10 @@ fn scan_files(app: tauri::AppHandle) {
     std::thread::spawn(move || {
         let total = folders.len();
         if total == 0 {
-            emit_log(&app, "No folders to scan. Skipping scan thread.".to_string());
+            emit_log(
+                &app,
+                "No folders to scan. Skipping scan thread.".to_string(),
+            );
             return;
         }
 
@@ -174,13 +208,25 @@ fn scan_files(app: tauri::AppHandle) {
             }
             let progress = (i as f32 / total as f32 * 100.0) as u32;
             let _ = app.emit("scan-progress", serde_json::json!({ "status": "discovering", "progress": progress, "current": i + 1, "total": total, "current_directory": folder }));
-            emit_log(&app, format!("Scanning folder {} of {}: {}", i + 1, total, folder));
-            emit_log(&app, format!("[scan_files] Calling scan_folder for: {folder}"));
+            emit_log(
+                &app,
+                format!("Scanning folder {} of {}: {}", i + 1, total, folder),
+            );
+            emit_log(
+                &app,
+                format!("[scan_files] Calling scan_folder for: {folder}"),
+            );
             file::scan_folder(&app, folder.clone(), &path, &batch_tx_shared);
-            emit_log(&app, format!("[scan_files] scan_folder completed for: {folder}"));
+            emit_log(
+                &app,
+                format!("[scan_files] scan_folder completed for: {folder}"),
+            );
         }
 
-        emit_log(&app, "Finished scanning all folders. Updating last scan time...".to_string());
+        emit_log(
+            &app,
+            "Finished scanning all folders. Updating last scan time...".to_string(),
+        );
         let _ = app.emit(
             "scan-progress",
             serde_json::json!({ "status": "indexing", "progress": 100, "message": "Analyzing photos with AI..." }),
@@ -807,7 +853,10 @@ async fn start_webrtc_session(
 }
 
 #[tauri::command]
-async fn stop_webrtc_session(app: tauri::AppHandle, state: tauri::State<'_, WebRtcState>) -> Result<(), String> {
+async fn stop_webrtc_session(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, WebRtcState>,
+) -> Result<(), String> {
     if let Ok(mut session) = state.active_session.lock() {
         if let Some(handle) = session.take() {
             emit_log(&app, "Stopping WebRTC session".to_string());
@@ -988,12 +1037,18 @@ async fn get_heatmap_data(app: tauri::AppHandle) -> String {
     }
     let database = database::Database::new(&path);
     let points = database.get_heatmap_points();
-    emit_log(&app, format!("DEBUG: Found {} photos with GPS for heatmap", points.len()));
+    emit_log(
+        &app,
+        format!("DEBUG: Found {} photos with GPS for heatmap", points.len()),
+    );
     serde_json::to_string(&points).unwrap_or("[]".to_string())
 }
 
 #[tauri::command]
-async fn get_photo_encoded_batch(app: tauri::AppHandle, ids: Vec<String>) -> std::collections::HashMap<String, String> {
+async fn get_photo_encoded_batch(
+    app: tauri::AppHandle,
+    ids: Vec<String>,
+) -> std::collections::HashMap<String, String> {
     let path = get_config_path(&app);
     if path.is_empty() || ids.is_empty() {
         return std::collections::HashMap::new();
@@ -1099,12 +1154,26 @@ async fn initialize_sync_folder(app: tauri::AppHandle, path: String) -> Result<(
 }
 
 const ALLOWED_CONFIG_KEYS: &[&str] = &[
-    "sync_path", "scan_threads", "indexing_mode", "theme", "language",
-    "model_enabled_clip", "model_enabled_face", "model_enabled_ocr",
-    "model_enabled_nsfw", "model_enabled_aesthetics", "model_enabled_yolo",
-    "model_enabled_blip", "model_enabled_arcface", "model_enabled_midas",
-    "model_enabled_whisper", "model_enabled_sam", "model_enabled_superres",
-    "last_scan_completed", "auto_scan", "sync_enabled",
+    "sync_path",
+    "scan_threads",
+    "indexing_mode",
+    "theme",
+    "language",
+    "model_enabled_clip",
+    "model_enabled_face",
+    "model_enabled_ocr",
+    "model_enabled_nsfw",
+    "model_enabled_aesthetics",
+    "model_enabled_yolo",
+    "model_enabled_blip",
+    "model_enabled_arcface",
+    "model_enabled_midas",
+    "model_enabled_whisper",
+    "model_enabled_sam",
+    "model_enabled_superres",
+    "last_scan_completed",
+    "auto_scan",
+    "sync_enabled",
 ];
 
 #[tauri::command]
@@ -1187,6 +1256,7 @@ use tauri::{
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_fs::init())
@@ -1231,7 +1301,10 @@ pub fn run() {
                     .build(app)?;
             }
 
-            emit_log(app.handle(), "App is setting up background tasks...".to_string());
+            emit_log(
+                app.handle(),
+                "App is setting up background tasks...".to_string(),
+            );
             use tauri_plugin_notification::NotificationExt;
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -1267,7 +1340,10 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600)); // 1 hour
                 loop {
-                    emit_log(&app_handle_for_interval, "Interval tick: checking for media updates...".to_string());
+                    emit_log(
+                        &app_handle_for_interval,
+                        "Interval tick: checking for media updates...".to_string(),
+                    );
                     interval.tick().await;
                     scan_files(app_handle_for_interval.clone());
                 }

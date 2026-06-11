@@ -208,6 +208,8 @@
     "indexing_jobs": "{count} AI-taken indexeren",
     "disable_model": "Uitschakelen",
     "enable_model": "Inschakelen",
+    "enable_all": "Alles inschakelen",
+    "disable_all": "Alles uitschakelen",
     "logs_cleared": "Logboeken gewist",
     "scan_threads_saved": "Scan threads opgeslagen",
     "model_enabled": "{model} ingeschakeld",
@@ -404,5 +406,14 @@
       "desc": "Transcribeert woorden die in video's worden gesproken.",
       "search": "Zoek naar dingen die mensen zeiden in video's."
     }
-  }
+  },
+  "update_title": "Update",
+  "update_desc": "Zoek naar nieuwe versie van Siegu",
+  "check_for_updates": "Zoek naar updates",
+  "checking": "Zoeken...",
+  "up_to_date": "Siegu is up-to-date",
+  "update_available": "Update {version} beschikbaar",
+  "download_update": "Download en installeer",
+  "update_error": "Update fout",
+  "update_progress": "Update wordt gedownload..."
 }
