@@ -15,6 +15,7 @@ permissions:
 
 jobs:
   test:
+    if: github.event_name != 'release'
     strategy:
       fail-fast: false
       matrix:
