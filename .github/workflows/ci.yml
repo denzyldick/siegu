@@ -106,7 +106,6 @@ jobs:
     runs-on: ${{ matrix.platform }}
     env:
       ORT_STRATEGY: download
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
 
     steps:
@@ -125,6 +124,12 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev libjs-mathjax build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
       - run: npm install
+
+      - name: Write signing key
+        run: |
+          mkdir -p ~/.tauri
+          echo "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" | base64 -d > ~/.tauri/siegu.key
+          echo "TAURI_SIGNING_PRIVATE_KEY=$HOME/.tauri/siegu.key" >> $GITHUB_ENV
 
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
