@@ -130,7 +130,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p ~/.tauri
-          printf '%s' "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" | base64 -d > ~/.tauri/siegu.key
+          printf '%s' "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" > ~/.tauri/siegu.key
           echo "TAURI_SIGNING_PRIVATE_KEY=$HOME/.tauri/siegu.key" >> $GITHUB_ENV
 
       - name: Build Tauri App
