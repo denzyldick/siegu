@@ -52,10 +52,11 @@ jobs:
           curl -L https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip -o ffmpeg.zip
           unzip ffmpeg.zip
           FFMPEG_DIR=$(pwd)/ffmpeg-master-latest-win64-gpl-shared
-          echo "FFMPEG_DIR=$FFMPEG_DIR" >> $GITHUB_ENV
-          echo "FFMPEG_INCLUDE_DIR=$FFMPEG_DIR/include" >> $GITHUB_ENV
-          echo "FFMPEG_LIB_DIR=$FFMPEG_DIR/lib" >> $GITHUB_ENV
-          echo "$FFMPEG_DIR/lib" >> $GITHUB_PATH
+          FFMPEG_DIR_WIN=$(cygpath -w "$FFMPEG_DIR")
+          echo "FFMPEG_DIR=$FFMPEG_DIR_WIN" >> $GITHUB_ENV
+          echo "FFMPEG_INCLUDE_DIR=$FFMPEG_DIR_WIN\include" >> $GITHUB_ENV
+          echo "FFMPEG_LIB_DIR=$FFMPEG_DIR_WIN\lib" >> $GITHUB_ENV
+          echo "$FFMPEG_DIR_WIN\lib" >> $GITHUB_PATH
 
       - run: npm install
 
@@ -151,10 +152,11 @@ jobs:
           curl -L https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip -o ffmpeg.zip
           unzip ffmpeg.zip
           FFMPEG_DIR=$(pwd)/ffmpeg-master-latest-win64-gpl-shared
-          echo "FFMPEG_DIR=$FFMPEG_DIR" >> $GITHUB_ENV
-          echo "FFMPEG_INCLUDE_DIR=$FFMPEG_DIR/include" >> $GITHUB_ENV
-          echo "FFMPEG_LIB_DIR=$FFMPEG_DIR/lib" >> $GITHUB_ENV
-          echo "$FFMPEG_DIR/lib" >> $GITHUB_PATH
+          FFMPEG_DIR_WIN=$(cygpath -w "$FFMPEG_DIR")
+          echo "FFMPEG_DIR=$FFMPEG_DIR_WIN" >> $GITHUB_ENV
+          echo "FFMPEG_INCLUDE_DIR=$FFMPEG_DIR_WIN\include" >> $GITHUB_ENV
+          echo "FFMPEG_LIB_DIR=$FFMPEG_DIR_WIN\lib" >> $GITHUB_ENV
+          echo "$FFMPEG_DIR_WIN\lib" >> $GITHUB_PATH
 
       - run: npm install
 
