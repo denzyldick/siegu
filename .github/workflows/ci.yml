@@ -64,8 +64,9 @@ jobs:
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
-          $msvcDir = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC" -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1
-          $includePath = Join-Path $msvcDir.FullName "include"
+          $msvcBase = (Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Tools\MSVC" -Directory -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
+          $msvcVer = Get-ChildItem $msvcBase -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1
+          $includePath = Join-Path $msvcVer.FullName "include"
           "BINDGEN_EXTRA_CLANG_ARGS=-I`"$includePath`"" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - run: npm install
@@ -174,8 +175,9 @@ jobs:
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
-          $msvcDir = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC" -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1
-          $includePath = Join-Path $msvcDir.FullName "include"
+          $msvcBase = (Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Tools\MSVC" -Directory -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
+          $msvcVer = Get-ChildItem $msvcBase -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1
+          $includePath = Join-Path $msvcVer.FullName "include"
           "BINDGEN_EXTRA_CLANG_ARGS=-I`"$includePath`"" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - run: npm install
