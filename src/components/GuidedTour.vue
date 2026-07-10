@@ -7,14 +7,39 @@
         <h3 class="text-h6 font-weight-bold text-zinc-primary mb-1">{{ currentTitle }}</h3>
         <p class="text-body-2 text-zinc-secondary mb-6">{{ currentDescription }}</p>
         <div class="d-flex align-center justify-space-between">
-          <v-btn variant="text" size="small" class="text-zinc-muted font-weight-bold" @click="skip">{{ $t('guided_tour.skip') }}</v-btn>
+          <v-btn
+            variant="text"
+            size="small"
+            class="text-zinc-muted font-weight-bold"
+            @click="skip"
+            >{{ $t('guided_tour.skip') }}</v-btn
+          >
           <div class="d-flex align-center ga-1">
-            <span v-for="(s, i) in steps" :key="i" class="tour-dot" :class="{ 'tour-dot--active': i === step }"></span>
+            <span
+              v-for="(s, i) in steps"
+              :key="i"
+              class="tour-dot"
+              :class="{ 'tour-dot--active': i === step }"
+            ></span>
           </div>
-          <v-btn v-if="step < steps.length - 1" color="black" variant="flat" size="small" class="font-weight-bold px-6" @click="next">
+          <v-btn
+            v-if="step < steps.length - 1"
+            color="black"
+            variant="flat"
+            size="small"
+            class="font-weight-bold px-6"
+            @click="next"
+          >
             {{ $t('guided_tour.next') }}
           </v-btn>
-          <v-btn v-else color="black" variant="flat" size="small" class="font-weight-bold px-6" @click="finish">
+          <v-btn
+            v-else
+            color="black"
+            variant="flat"
+            size="small"
+            class="font-weight-bold px-6"
+            @click="finish"
+          >
             {{ $t('guided_tour.done') }}
           </v-btn>
         </div>
@@ -25,86 +50,86 @@
 
 <script>
 export default {
-  name: "GuidedTour",
+  name: 'GuidedTour',
   props: {
     active: Boolean,
     target: String,
   },
-  emits: ["finish", "skip", "update:target"],
+  emits: ['finish', 'skip', 'update:target'],
   data: () => ({
     step: 0,
     targetRects: {},
     observer: null,
     steps: [
       {
-        icon: "mdi-walk",
-        titleKey: "guided_tour.welcome_title",
-        descKey: "guided_tour.welcome_desc",
+        icon: 'mdi-walk',
+        titleKey: 'guided_tour.welcome_title',
+        descKey: 'guided_tour.welcome_desc',
         target: null,
-        position: "bottom",
+        position: 'bottom',
       },
       {
-        icon: "mdi-magnify",
-        titleKey: "guided_tour.search_title",
-        descKey: "guided_tour.search_desc",
+        icon: 'mdi-magnify',
+        titleKey: 'guided_tour.search_title',
+        descKey: 'guided_tour.search_desc',
         target: "[data-tour='search']",
-        position: "top",
+        position: 'top',
       },
       {
-        icon: "mdi-image-multiple-outline",
-        titleKey: "guided_tour.library_title",
-        descKey: "guided_tour.library_desc",
+        icon: 'mdi-image-multiple-outline',
+        titleKey: 'guided_tour.library_title',
+        descKey: 'guided_tour.library_desc',
         target: "[data-tour='photos']",
-        position: "bottom",
+        position: 'bottom',
       },
       {
-        icon: "mdi-magnify-scan",
-        titleKey: "guided_tour.scan_button_title",
-        descKey: "guided_tour.scan_button_desc",
+        icon: 'mdi-magnify-scan',
+        titleKey: 'guided_tour.scan_button_title',
+        descKey: 'guided_tour.scan_button_desc',
         target: "[data-tour='scan-button']",
-        position: "bottom",
+        position: 'bottom',
       },
       {
-        icon: "mdi-progress-check",
-        titleKey: "guided_tour.scan_progress_title",
-        descKey: "guided_tour.scan_progress_desc",
+        icon: 'mdi-progress-check',
+        titleKey: 'guided_tour.scan_progress_title',
+        descKey: 'guided_tour.scan_progress_desc',
         target: "[data-tour='scan-progress']",
-        position: "bottom",
+        position: 'bottom',
       },
       {
-        icon: "mdi-account-group-outline",
-        titleKey: "guided_tour.people_title",
-        descKey: "guided_tour.people_desc",
+        icon: 'mdi-account-group-outline',
+        titleKey: 'guided_tour.people_title',
+        descKey: 'guided_tour.people_desc',
         target: "[data-tour='dock-people']",
-        position: "top",
+        position: 'top',
       },
       {
-        icon: "mdi-map-outline",
-        titleKey: "guided_tour.map_title",
-        descKey: "guided_tour.map_desc",
+        icon: 'mdi-map-outline',
+        titleKey: 'guided_tour.map_title',
+        descKey: 'guided_tour.map_desc',
         target: "[data-tour='dock-map']",
-        position: "top",
+        position: 'top',
       },
       {
-        icon: "mdi-laptop",
-        titleKey: "guided_tour.devices_title",
-        descKey: "guided_tour.devices_desc",
+        icon: 'mdi-laptop',
+        titleKey: 'guided_tour.devices_title',
+        descKey: 'guided_tour.devices_desc',
         target: "[data-tour='dock-devices']",
-        position: "top",
+        position: 'top',
       },
       {
-        icon: "mdi-cog-outline",
-        titleKey: "guided_tour.settings_title",
-        descKey: "guided_tour.settings_desc",
+        icon: 'mdi-cog-outline',
+        titleKey: 'guided_tour.settings_title',
+        descKey: 'guided_tour.settings_desc',
         target: "[data-tour='dock-settings']",
-        position: "top",
+        position: 'top',
       },
       {
-        icon: "mdi-check-decagram",
-        titleKey: "guided_tour.done_title",
-        descKey: "guided_tour.done_desc",
+        icon: 'mdi-check-decagram',
+        titleKey: 'guided_tour.done_title',
+        descKey: 'guided_tour.done_desc',
         target: null,
-        position: "bottom",
+        position: 'bottom',
       },
     ],
   }),
@@ -126,18 +151,18 @@ export default {
       return 8;
     },
     spotlightStyle() {
-      if (!this.targetRect) return { display: "none" };
+      if (!this.targetRect) return { display: 'none' };
       const r = this.targetRect;
       const p = this.pad;
       return {
-        left: r.left - p + "px",
-        top: r.top - p + "px",
-        width: r.width + p * 2 + "px",
-        height: r.height + p * 2 + "px",
+        left: r.left - p + 'px',
+        top: r.top - p + 'px',
+        width: r.width + p * 2 + 'px',
+        height: r.height + p * 2 + 'px',
       };
     },
     cardPosition() {
-      return this.currentStep.position === "top" ? "tour-card--top" : "tour-card--bottom";
+      return this.currentStep.position === 'top' ? 'tour-card--top' : 'tour-card--bottom';
     },
   },
   watch: {
@@ -184,11 +209,11 @@ export default {
     },
     finish() {
       this.stopObserver();
-      this.$emit("finish");
+      this.$emit('finish');
     },
     skip() {
       this.stopObserver();
-      this.$emit("skip");
+      this.$emit('skip');
     },
   },
 };
@@ -261,7 +286,13 @@ export default {
   transform: scale(1.3);
 }
 @keyframes tourSlideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

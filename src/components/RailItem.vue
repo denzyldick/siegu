@@ -1,12 +1,13 @@
 <template>
-  <div
-    class="rail-item"
-    ref="container"
-    :class="{ 'active': active }"
-    @click="$emit('click')"
-  >
+  <div class="rail-item" ref="container" :class="{ active: active }" @click="$emit('click')">
     <template v-if="isVisible">
-      <video v-if="isVideo" :src="videoUrl + '#t=0.5'" :alt="$t('rail.alt_thumb')" muted preload="metadata" />
+      <video
+        v-if="isVideo"
+        :src="videoUrl + '#t=0.5'"
+        :alt="$t('rail.alt_thumb')"
+        muted
+        preload="metadata"
+      />
       <img v-else :src="imageSrc" :alt="$t('rail.alt_thumb')" />
       <div v-if="isVideo" class="rail-video-icon">
         <v-icon size="12" color="white">mdi-play</v-icon>
@@ -20,30 +21,30 @@
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 
 export default {
-  name: "RailItem",
+  name: 'RailItem',
   props: {
     photo: Object,
-    active: Boolean
+    active: Boolean,
   },
   emits: ['click'],
   data: () => ({
     isVisible: false,
     observer: null,
-    mediaPort: null
+    mediaPort: null,
   }),
   computed: {
     isVideo() {
       if (!this.photo || !this.photo.location) return false;
       const ext = this.photo.location.split('.').pop().toLowerCase();
-      return ["mp4", "mkv", "mov", "avi", "webm"].includes(ext);
+      return ['mp4', 'mkv', 'mov', 'avi', 'webm'].includes(ext);
     },
     videoUrl() {
       if (!this.photo || !this.isVideo || !this.mediaPort) return '';
       let path = this.photo.location.replace(/\\/g, '/');
       if (path.match(/^[a-zA-Z]:\//)) {
-          path = path.substring(3);
+        path = path.substring(3);
       } else if (path.startsWith('/')) {
-          path = path.substring(1);
+        path = path.substring(1);
       }
       const encoded = path.split('/').map(encodeURIComponent).join('/');
       return `http://127.0.0.1:${this.mediaPort}/media/${encoded}`;
@@ -52,22 +53,25 @@ export default {
       if (!this.photo || !this.photo.location) return '';
       if (this.photo.encoded && !this.isVideo) return this.photo.encoded;
       return convertFileSrc(this.photo.location);
-    }
+    },
   },
   async mounted() {
     if (!window.__rail_mediaPort) {
       try {
-        window.__rail_mediaPort = await invoke("get_media_server_port");
+        window.__rail_mediaPort = await invoke('get_media_server_port');
       } catch (e) {}
     }
     this.mediaPort = window.__rail_mediaPort;
 
-    this.observer = new IntersectionObserver((entries) => {
-      this.isVisible = entries[0].isIntersecting;
-    }, {
-      rootMargin: '100px',
-      threshold: 0.01
-    });
+    this.observer = new IntersectionObserver(
+      (entries) => {
+        this.isVisible = entries[0].isIntersecting;
+      },
+      {
+        rootMargin: '100px',
+        threshold: 0.01,
+      },
+    );
     if (this.$refs.container) {
       this.observer.observe(this.$refs.container);
     }
@@ -76,8 +80,8 @@ export default {
     if (this.observer) {
       this.observer.disconnect();
     }
-  }
-}
+  },
+};
 </script>
 
 <style scoped>
@@ -100,7 +104,8 @@ export default {
   transform: scale(1.1);
 }
 
-.rail-item img, .rail-item video {
+.rail-item img,
+.rail-item video {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -118,6 +123,6 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0,0,0,0.2);
+  background: rgba(0, 0, 0, 0.2);
 }
 </style>

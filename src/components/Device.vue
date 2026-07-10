@@ -24,7 +24,7 @@
   </v-card>
 </template>
 <script>
-import QrcodeVue, { QrcodeCanvas, QrcodeSvg } from "qrcode.vue";
+import QrcodeVue, { QrcodeCanvas, QrcodeSvg } from 'qrcode.vue';
 export default {
   components: {
     QrcodeVue,
@@ -37,14 +37,14 @@ export default {
     deviceName: '',
   }),
   async created() {
-    let port = "9489";
-    let ip = "192.168.68.115";
+    let port = '9489';
+    let ip = '192.168.68.115';
 
-    let path = "/new-device";
-    let message = "http://" + ip + ":" + port + path;
+    let path = '/new-device';
+    let message = 'http://' + ip + ':' + port + path;
     this.value = message;
     try {
-      const os = await (await import('@tauri-apps/api/core')).invoke("get_os");
+      const os = await (await import('@tauri-apps/api/core')).invoke('get_os');
       this.deviceName = os.charAt(0).toUpperCase() + os.slice(1);
     } catch (e) {
       this.deviceName = navigator.platform || 'Unknown';

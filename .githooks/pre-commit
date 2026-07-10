@@ -1,2 +1,24 @@
 #!/bin/sh
+
+# Format Rust code
+if command -v rustfmt &> /dev/null; then
+  CHANGED_RUST=$(git diff --cached --name-only --diff-filter=ACM -- '*.rs')
+  if [ -n "$CHANGED_RUST" ]; then
+    echo "Formatting Rust files..."
+    echo "$CHANGED_RUST" | xargs rustfmt --edition 2021
+    git add $CHANGED_RUST
+  fi
+fi
+
+# Format JS/Vue files
+if command -v npx &> /dev/null; then
+  CHANGED_JS=$(git diff --cached --name-only --diff-filter=ACM -- '*.{js,vue,ts,css,json}')
+  if [ -n "$CHANGED_JS" ]; then
+    echo "Formatting JS/Vue files..."
+    echo "$CHANGED_JS" | xargs npx prettier --write
+    git add $CHANGED_JS
+  fi
+fi
+
+# Check translations
 node scripts/check-translations.js

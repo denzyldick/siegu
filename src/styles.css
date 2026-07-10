@@ -60,7 +60,8 @@ body {
 }
 
 /* Global Siegu Design System */
-.v-application .siegu-btn, .siegu-btn {
+.v-application .siegu-btn,
+.siegu-btn {
   background: var(--color-bg-btn) !important;
   border: none;
   border-radius: 16px;
@@ -71,12 +72,14 @@ body {
   box-shadow: none;
 }
 
-.v-application .siegu-btn:hover, .siegu-btn:hover {
+.v-application .siegu-btn:hover,
+.siegu-btn:hover {
   transform: scale(1.02) translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
-.v-application .siegu-btn:active, .siegu-btn:active {
+.v-application .siegu-btn:active,
+.siegu-btn:active {
   transform: scale(0.98);
 }
 
@@ -96,9 +99,9 @@ body {
   transform: scale(1.02) translateY(-1px);
 }
 
-.v-application .siegu-field :deep(.v-field), 
+.v-application .siegu-field :deep(.v-field),
 .v-application .siegu-field.v-field,
-.siegu-field :deep(.v-field), 
+.siegu-field :deep(.v-field),
 .siegu-field.v-field {
   background: var(--color-bg-field);
   border: 1px solid var(--color-border-default);
@@ -106,7 +109,8 @@ body {
   transition: all 0.2s ease;
 }
 
-.v-application .v-field--focused, .v-field--focused {
+.v-application .v-field--focused,
+.v-field--focused {
   border-color: var(--color-border-hover);
   background: var(--color-bg-field);
 }
@@ -131,24 +135,31 @@ body {
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
-.v-application .text-zinc-primary, .text-zinc-primary {
+.v-application .text-zinc-primary,
+.text-zinc-primary {
   color: var(--color-text-primary);
 }
 
-.v-application .text-zinc-secondary, .text-zinc-secondary {
+.v-application .text-zinc-secondary,
+.text-zinc-secondary {
   color: var(--color-text-secondary);
 }
 
-.v-application .text-zinc-muted, .text-zinc-muted {
+.v-application .text-zinc-muted,
+.text-zinc-muted {
   color: var(--color-text-muted);
 }
 
 /* Standard UI Overrides */
-.v-application .v-card, .v-application .v-sheet, .v-card, .v-sheet {
+.v-application .v-card,
+.v-application .v-sheet,
+.v-card,
+.v-sheet {
   background-color: var(--color-bg-surface);
 }
 
-.v-application .siegu-list, .siegu-list {
+.v-application .siegu-list,
+.siegu-list {
   background: var(--color-bg-list);
   border: 1px solid var(--color-border-default);
   border-radius: 12px;

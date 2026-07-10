@@ -1,95 +1,111 @@
 <template>
-    <div
-      class="image-item-container"
-      ref="container"
-      :class="{ 'is-selected': selected, 'selection-active': selectionMode }"
-      @click="handleClick"
-    >
-      <div class="image-wrapper shadow-sm">
-        <template v-if="isVisible">
-          <video v-if="isVideo" :src="videoUrl + '#t=0.5'" class="photo-img" muted preload="metadata"></video>
-          <img v-else :src="imageSrc" loading="lazy" :alt="$t('image.alt_photo')" class="photo-img" @error="onImageError" />
-          
-          <div class="scrim-overlay"></div>
+  <div
+    class="image-item-container"
+    ref="container"
+    :class="{ 'is-selected': selected, 'selection-active': selectionMode }"
+    @click="handleClick"
+  >
+    <div class="image-wrapper shadow-sm">
+      <template v-if="isVisible">
+        <video
+          v-if="isVideo"
+          :src="videoUrl + '#t=0.5'"
+          class="photo-img"
+          muted
+          preload="metadata"
+        ></video>
+        <img
+          v-else
+          :src="imageSrc"
+          loading="lazy"
+          :alt="$t('image.alt_photo')"
+          class="photo-img"
+          @error="onImageError"
+        />
 
-          <!-- Video Indicator -->
-          <div v-if="isVideo" class="video-indicator">
-            <v-icon color="white" size="20">mdi-play</v-icon>
+        <div class="scrim-overlay"></div>
+
+        <!-- Video Indicator -->
+        <div v-if="isVideo" class="video-indicator">
+          <v-icon color="white" size="20">mdi-play</v-icon>
+        </div>
+
+        <!-- Selection Mode UI -->
+        <div v-if="selectionMode" class="selection-indicator">
+          <div class="check-circle" :class="{ checked: selected }">
+            <v-icon v-if="selected" color="white" size="16">mdi-check</v-icon>
           </div>
+        </div>
 
-          <!-- Selection Mode UI -->
-          <div v-if="selectionMode" class="selection-indicator">
-            <div class="check-circle" :class="{ 'checked': selected }">
-              <v-icon v-if="selected" color="white" size="16">mdi-check</v-icon>
-            </div>
-          </div>
-
-          <!-- Favorite Button -->
-          <button
-            v-if="!selectionMode"
-            class="action-btn favorite-action"
-            :class="{ 'is-fav': isFavorite }"
-            @click.stop="toggleFavorite"
-          >
-            <v-icon size="18" :color="isFavorite ? '#ef4444' : 'white'">
-              {{ isFavorite ? 'mdi-heart' : 'mdi-heart-outline' }}
-            </v-icon>
-          </button>
-        </template>
-        <div v-else class="viewport-placeholder h-100 w-100 d-flex align-center justify-center">
+        <!-- Favorite Button -->
+        <button
+          v-if="!selectionMode"
+          class="action-btn favorite-action"
+          :class="{ 'is-fav': isFavorite }"
+          @click.stop="toggleFavorite"
+        >
+          <v-icon size="18" :color="isFavorite ? '#ef4444' : 'white'">
+            {{ isFavorite ? 'mdi-heart' : 'mdi-heart-outline' }}
+          </v-icon>
+        </button>
+      </template>
+      <div v-else class="viewport-placeholder h-100 w-100 d-flex align-center justify-center"></div>
+    </div>
+    <!-- Image Info Footer -->
+    <div v-if="!selectionMode" class="image-info">
+      <div class="image-info-top">
+        <div class="image-tags" v-if="tags.length > 0">
+          <span v-for="tag in tags" :key="tag" class="info-tag">{{ tag }}</span>
+        </div>
+        <div class="image-meta" v-if="hasResults">
+          <v-icon size="12" color="#a1a1aa">mdi-auto-fix</v-icon>
         </div>
       </div>
-      <!-- Image Info Footer -->
-      <div v-if="!selectionMode" class="image-info">
-        <div class="image-info-top">
-          <div class="image-tags" v-if="tags.length > 0">
-            <span v-for="tag in tags" :key="tag" class="info-tag">{{ tag }}</span>
-          </div>
-          <div class="image-meta" v-if="hasResults">
-            <v-icon size="12" color="#a1a1aa">mdi-auto-fix</v-icon>
-          </div>
-        </div>
-        <div class="image-caption click-caption" v-if="path.caption" @click.stop="$emit('click')">
-          {{ path.caption }}
-        </div>
-        <div class="image-details" v-if="hasResults">
-          <span v-if="path.aesthetics_score != null" class="detail-item" :title="$t('image.aesthetics_score')">
-            <v-icon size="10" color="#a1a1aa">mdi-star</v-icon>
-            {{ formatScore(path.aesthetics_score) }}
-          </span>
-          <span v-if="faceCount > 0" class="detail-item" :title="$t('image.faces_detected')">
-            <v-icon size="10" color="#a1a1aa">mdi-face</v-icon>
-            {{ faceCount }}
-          </span>
-          <span v-if="path.indexed === 2" class="detail-item" :title="$t('image.fully_indexed')">
-            <v-icon size="10" color="#22c55e">mdi-check-circle</v-icon>
-          </span>
-        </div>
+      <div class="image-caption click-caption" v-if="path.caption" @click.stop="$emit('click')">
+        {{ path.caption }}
+      </div>
+      <div class="image-details" v-if="hasResults">
+        <span
+          v-if="path.aesthetics_score != null"
+          class="detail-item"
+          :title="$t('image.aesthetics_score')"
+        >
+          <v-icon size="10" color="#a1a1aa">mdi-star</v-icon>
+          {{ formatScore(path.aesthetics_score) }}
+        </span>
+        <span v-if="faceCount > 0" class="detail-item" :title="$t('image.faces_detected')">
+          <v-icon size="10" color="#a1a1aa">mdi-face</v-icon>
+          {{ faceCount }}
+        </span>
+        <span v-if="path.indexed === 2" class="detail-item" :title="$t('image.fully_indexed')">
+          <v-icon size="10" color="#22c55e">mdi-check-circle</v-icon>
+        </span>
       </div>
     </div>
+  </div>
 </template>
 
 <script>
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 
 export default {
-  name: "Image",
+  name: 'Image',
   props: {
     path: Object,
     selected: Boolean,
-    selectionMode: Boolean
+    selectionMode: Boolean,
   },
   emits: ['toggle-favorite', 'click', 'select'],
   data: () => ({
     mediaPort: null,
     isVisible: false,
-    observer: null
+    observer: null,
   }),
   async mounted() {
     this.setupObserver();
     if (!window.__img_mediaPort) {
       try {
-        window.__img_mediaPort = await invoke("get_media_server_port");
+        window.__img_mediaPort = await invoke('get_media_server_port');
       } catch (e) {}
     }
     this.mediaPort = window.__img_mediaPort;
@@ -99,9 +115,9 @@ export default {
       if (!this.path || !this.isVideo || !this.mediaPort) return '';
       let path = this.path.location.replace(/\\/g, '/');
       if (path.match(/^[a-zA-Z]:\//)) {
-          path = path.substring(3);
+        path = path.substring(3);
       } else if (path.startsWith('/')) {
-          path = path.substring(1);
+        path = path.substring(1);
       }
       const encoded = path.split('/').map(encodeURIComponent).join('/');
       return `http://127.0.0.1:${this.mediaPort}/media/${encoded}`;
@@ -121,19 +137,19 @@ export default {
       return null;
     },
     isFavorite() {
-        return this.path.favorite === true;
+      return this.path.favorite === true;
     },
     isVideo() {
       if (!this.path || !this.path.location) return false;
       const ext = this.path.location.split('.').pop().toLowerCase();
-      return ["mp4", "mkv", "mov", "avi", "webm"].includes(ext);
+      return ['mp4', 'mkv', 'mov', 'avi', 'webm'].includes(ext);
     },
     tags() {
       if (!this.path || !this.path.objects) return [];
       return Object.entries(this.path.objects)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 3)
-        .map(entry => entry[0]);
+        .map((entry) => entry[0]);
     },
     faceCount() {
       if (!this.path || !this.path.properties) return 0;
@@ -142,48 +158,60 @@ export default {
     },
     hasResults() {
       if (!this.path) return false;
-      return (this.path.objects && Object.keys(this.path.objects).length > 0)
-        || this.path.aesthetics_score != null
-        || this.path.caption
-        || this.path.indexed >= 2;
-    }
+      return (
+        (this.path.objects && Object.keys(this.path.objects).length > 0) ||
+        this.path.aesthetics_score != null ||
+        this.path.caption ||
+        this.path.indexed >= 2
+      );
+    },
   },
   methods: {
-      setupObserver() {
-        this.observer = new IntersectionObserver((entries) => {
+    setupObserver() {
+      this.observer = new IntersectionObserver(
+        (entries) => {
           this.isVisible = entries[0].isIntersecting;
-        }, {
+        },
+        {
           rootMargin: '200px',
-          threshold: 0.01
-        });
-        
-        if (this.$refs.container) {
-          this.observer.observe(this.$refs.container);
-        }
-      },
-      toggleFavorite() {
-          this.$emit('toggle-favorite', this.path.id);
-      },
-      formatScore(score) {
-        if (score == null) return '';
-        const v = typeof score === 'string' ? parseFloat(score) : score;
-        return v.toFixed(2);
-      },
-      onImageError(e) {
-        const ext = this.path?.location?.split('.').pop().toLowerCase();
-        if (['heic', 'heif'].includes(ext) && !this.path?.encoded) {
-          return;
-        }
-        console.error('[Image] Failed to load:', this.path?.location, 'encoded:', this.path?.encoded ? 'yes' : 'no', 'src type:', this.path?.encoded ? 'base64' : 'convertFileSrc');
-      },
-      handleClick() {
-        if (this.selectionMode) {
-          this.$emit('select', this.path.id);
-        } else {
-          this.$emit('click');
-        }
+          threshold: 0.01,
+        },
+      );
+
+      if (this.$refs.container) {
+        this.observer.observe(this.$refs.container);
       }
-  }
+    },
+    toggleFavorite() {
+      this.$emit('toggle-favorite', this.path.id);
+    },
+    formatScore(score) {
+      if (score == null) return '';
+      const v = typeof score === 'string' ? parseFloat(score) : score;
+      return v.toFixed(2);
+    },
+    onImageError(e) {
+      const ext = this.path?.location?.split('.').pop().toLowerCase();
+      if (['heic', 'heif'].includes(ext) && !this.path?.encoded) {
+        return;
+      }
+      console.error(
+        '[Image] Failed to load:',
+        this.path?.location,
+        'encoded:',
+        this.path?.encoded ? 'yes' : 'no',
+        'src type:',
+        this.path?.encoded ? 'base64' : 'convertFileSrc',
+      );
+    },
+    handleClick() {
+      if (this.selectionMode) {
+        this.$emit('select', this.path.id);
+      } else {
+        this.$emit('click');
+      }
+    },
+  },
 };
 </script>
 
@@ -203,7 +231,7 @@ export default {
   border-radius: 16px;
   position: relative;
   background-color: #f4f4f5;
-  border: 1px solid rgba(0,0,0,0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .viewport-placeholder {
@@ -226,7 +254,13 @@ export default {
 .scrim-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.3) 100%);
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.2) 0%,
+    transparent 30%,
+    transparent 70%,
+    rgba(0, 0, 0, 0.3) 100%
+  );
   opacity: 0;
   transition: opacity 0.3s ease;
   z-index: 1;
@@ -266,7 +300,7 @@ export default {
   height: 24px;
   border-radius: 50%;
   border: 2px solid white;
-  background: rgba(0,0,0,0.2);
+  background: rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -286,7 +320,7 @@ export default {
   right: 12px;
   width: 32px;
   height: 32px;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(8px);
   border-radius: 50%;
   display: flex;
@@ -303,7 +337,7 @@ export default {
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  background: rgba(255,255,255,0.2);
+  background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
@@ -348,7 +382,7 @@ export default {
   font-size: 10px;
   font-weight: 700;
   color: white;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
   padding: 2px 8px;
   border-radius: 6px;
