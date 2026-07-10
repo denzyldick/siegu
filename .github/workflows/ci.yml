@@ -54,9 +54,11 @@ jobs:
           FFMPEG_DIR=$(pwd)/ffmpeg-master-latest-win64-gpl-shared
           FFMPEG_DIR_WIN=$(cygpath -w "$FFMPEG_DIR")
           echo "FFMPEG_DIR=$FFMPEG_DIR_WIN" >> $GITHUB_ENV
-          echo "FFMPEG_INCLUDE_DIR=$FFMPEG_DIR_WIN\include" >> $GITHUB_ENV
-          echo "FFMPEG_LIB_DIR=$FFMPEG_DIR_WIN\lib" >> $GITHUB_ENV
-          echo "$FFMPEG_DIR_WIN\lib" >> $GITHUB_PATH
+          echo "FFMPEG_INCLUDE_DIR=$FFMPEG_DIR_WIN\\include" >> $GITHUB_ENV
+          echo "FFMPEG_LIB_DIR=$FFMPEG_DIR_WIN\\lib" >> $GITHUB_ENV
+          echo "INCLUDE=$FFMPEG_DIR_WIN\\include" >> $GITHUB_ENV
+          echo "LIB=$FFMPEG_DIR_WIN\\lib" >> $GITHUB_ENV
+          echo "$FFMPEG_DIR_WIN\\lib" >> $GITHUB_PATH
 
       - run: npm install
 
@@ -154,9 +156,11 @@ jobs:
           FFMPEG_DIR=$(pwd)/ffmpeg-master-latest-win64-gpl-shared
           FFMPEG_DIR_WIN=$(cygpath -w "$FFMPEG_DIR")
           echo "FFMPEG_DIR=$FFMPEG_DIR_WIN" >> $GITHUB_ENV
-          echo "FFMPEG_INCLUDE_DIR=$FFMPEG_DIR_WIN\include" >> $GITHUB_ENV
-          echo "FFMPEG_LIB_DIR=$FFMPEG_DIR_WIN\lib" >> $GITHUB_ENV
-          echo "$FFMPEG_DIR_WIN\lib" >> $GITHUB_PATH
+          echo "FFMPEG_INCLUDE_DIR=$FFMPEG_DIR_WIN\\include" >> $GITHUB_ENV
+          echo "FFMPEG_LIB_DIR=$FFMPEG_DIR_WIN\\lib" >> $GITHUB_ENV
+          echo "INCLUDE=$FFMPEG_DIR_WIN\\include" >> $GITHUB_ENV
+          echo "LIB=$FFMPEG_DIR_WIN\\lib" >> $GITHUB_ENV
+          echo "$FFMPEG_DIR_WIN\\lib" >> $GITHUB_PATH
 
       - run: npm install
 
