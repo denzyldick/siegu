@@ -448,6 +448,11 @@ export default {
              }, 2000);
           }
         });
+        this.unlistenRoomCode = await listen("room-code", (event) => {
+          const code = event.payload;
+          this.passphrase = [code];
+          this.uuid = code;
+        });
         this.initialize();
       } else {
         if (this.unlisten) {

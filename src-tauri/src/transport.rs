@@ -111,6 +111,20 @@ pub enum SignalMessage {
     PeerJoined { device_id: String },
     #[serde(rename = "error")]
     Error { message: String },
+
+    // Go server relay protocol
+    #[serde(rename = "create_room")]
+    CreateRoom,
+    #[serde(rename = "room_created")]
+    RoomCreated { code: String },
+    #[serde(rename = "join_room")]
+    JoinRoom { code: String },
+    #[serde(rename = "room_joined")]
+    RoomJoined,
+    #[serde(rename = "relay")]
+    Relay { from: Option<String>, payload: serde_json::Value },
+    #[serde(rename = "room_closed")]
+    RoomClosed,
 }
 
 pub struct WebRtcClient {
@@ -344,6 +358,38 @@ impl WebRtcClient {
             );
         }
         self_arc.emit("webrtc-state", "Connecting to signaling...");
+
+        let is_remote = self_arc.signaling_url.contains("wss://")
+            || (self_arc.signaling_url.contains("ws://")
+                && !self_arc.signaling_url.contains("127.0.0.1")
+                && !self_arc.signaling_url.contains("localhost"));
+
+        if is_remote {
+            let base_url = self_arc.signaling_url.trim_end_matches('/');
+            let url_str = base_url.to_string();
+            let req = url_str.into_client_request()?;
+            let (ws_stream, _) = match connect_async(req).await {
+                Ok(s) => {
+                    if let Some(app) = &self_arc.app_handle {
+                        emit_log(app, "Connected to signaling server!".to_string());
+                    }
+                    s
+                }
+                Err(e) => {
+                    let err_msg = format!("Signaling connection failed: {e}");
+                    if let Some(app) = &self_arc.app_handle {
+                        emit_log(app, err_msg.clone());
+                    }
+                    self_arc.emit("webrtc-state", err_msg);
+                    return Err(e.into());
+                }
+            };
+
+            let (relay_write, relay_read) = ws_stream.split();
+            let relay_write = Arc::new(Mutex::new(relay_write));
+
+            return Self::start_remote(&self_arc, relay_write, relay_read).await;
+        }
 
         let base_url = self_arc.signaling_url.trim_end_matches('/');
         let url_str = format!("{}/{}", base_url, self_arc.room_id);
@@ -1173,6 +1219,270 @@ impl WebRtcClient {
             }
         }
         Ok(())
+    }
+
+    async fn start_remote(
+        self_arc: &Arc<Self>,
+        relay_write: Arc<Mutex< futures_util::stream::SplitSink<
+            tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
+            Message,
+        >>>,
+        mut relay_read: futures_util::stream::SplitStream<
+            tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
+        >,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let pending_ice = Arc::new(Mutex::new(Vec::new()));
+        let pc = Self::setup_peer_connection_remote(self_arc, &pending_ice, Arc::clone(&relay_write)).await?;
+
+        let write = Arc::clone(&relay_write);
+        let pc_write = Arc::clone(&pc);
+        let pending_write = Arc::clone(&pending_ice);
+        let self_write = Arc::clone(self_arc);
+
+        if self_write.is_initiator {
+            write.lock().await.send(Message::Text(Utf8Bytes::from(
+                serde_json::to_string(&SignalMessage::CreateRoom)?,
+            ))).await?;
+
+            while let Some(msg) = relay_read.next().await {
+                if let Ok(Message::Text(text)) = msg {
+                    if let Ok(signal) = serde_json::from_str::<SignalMessage>(&text) {
+                        match signal {
+                            SignalMessage::RoomCreated { code } => {
+                                if let Some(app) = &self_write.app_handle {
+                                    let _ = app.emit("room-code", &code);
+                                    let _ = app.emit("webrtc-state", "Waiting for peer to join...");
+                                }
+                            }
+                            SignalMessage::PeerJoined { .. } => {
+                                if let Some(app) = &self_write.app_handle {
+                                    let _ = app.emit("webrtc-state", "Peer Joined");
+                                }
+                                let offer = pc_write.create_offer(None).await?;
+                                pc_write.set_local_description(offer.clone()).await?;
+                                write.lock().await.send(Message::Text(Utf8Bytes::from(
+                                    serde_json::to_string(&SignalMessage::Relay {
+                                        from: None,
+                                        payload: serde_json::json!({"type": "offer", "payload": serde_json::to_string(&offer)?, "target": "peer"}),
+                                    })?,
+                                ))).await?;
+                            }
+                            SignalMessage::Relay { payload, .. } => {
+                                Self::handle_relay_payload(&pc_write, &write, &pending_write, &self_write, &payload).await?;
+                            }
+                            SignalMessage::PeerDisconnected { .. } => {
+                                if let Some(app) = &self_write.app_handle {
+                                    let _ = app.emit("webrtc-state", "Peer disconnected");
+                                }
+                            }
+                            SignalMessage::Error { message } => {
+                                if let Some(app) = &self_write.app_handle {
+                                    let _ = app.emit("webrtc-state", format!("Signaling error: {message}"));
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        } else {
+            let room_code = &self_arc.room_id;
+            write.lock().await.send(Message::Text(Utf8Bytes::from(
+                serde_json::to_string(&SignalMessage::JoinRoom { code: room_code.clone() })?,
+            ))).await?;
+
+            let self_joiner = Arc::clone(self_arc);
+            let write_j = Arc::clone(&relay_write);
+            let pc_j = Arc::clone(&pc);
+            let pending_j = Arc::clone(&pending_ice);
+
+            while let Some(msg) = relay_read.next().await {
+                if let Ok(Message::Text(text)) = msg {
+                    if let Ok(signal) = serde_json::from_str::<SignalMessage>(&text) {
+                        match signal {
+                            SignalMessage::RoomJoined => {
+                                if let Some(app) = &self_joiner.app_handle {
+                                    let _ = app.emit("webrtc-state", "Room joined. Waiting for peer...");
+                                }
+                            }
+                            SignalMessage::Relay { payload, .. } => {
+                                Self::handle_relay_payload(&pc_j, &write_j, &pending_j, &self_joiner, &payload).await?;
+                            }
+                            SignalMessage::PeerDisconnected { .. } => {
+                                if let Some(app) = &self_joiner.app_handle {
+                                    let _ = app.emit("webrtc-state", "Peer disconnected");
+                                }
+                            }
+                            SignalMessage::RoomClosed => {
+                                if let Some(app) = &self_joiner.app_handle {
+                                    let _ = app.emit("webrtc-state", "Room closed");
+                                }
+                            }
+                            SignalMessage::Error { message } => {
+                                if let Some(app) = &self_joiner.app_handle {
+                                    let _ = app.emit("webrtc-state", format!("Signaling error: {message}"));
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn handle_relay_payload(
+        pc: &Arc<webrtc::peer_connection::RTCPeerConnection>,
+        write: &Arc<Mutex<futures_util::stream::SplitSink<
+            tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
+            Message,
+        >>>,
+        pending_ice: &Arc<Mutex<Vec<RTCIceCandidateInit>>>,
+        _self_arc: &Arc<Self>,
+        payload: &serde_json::Value,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(msg_type) = payload.get("type").and_then(|v| v.as_str()) {
+            match msg_type {
+                "offer" => {
+                    if let Some(sdp_str) = payload.get("payload").and_then(|v| v.as_str()) {
+                        let sdp: RTCSessionDescription = serde_json::from_str(sdp_str)?;
+                        pc.set_remote_description(sdp).await?;
+                        let mut pending = pending_ice.lock().await;
+                        for c in pending.drain(..) {
+                            let _ = pc.add_ice_candidate(c).await;
+                        }
+                        let answer = pc.create_answer(None).await?;
+                        pc.set_local_description(answer.clone()).await?;
+                        write.lock().await.send(Message::Text(Utf8Bytes::from(
+                            serde_json::to_string(&SignalMessage::Relay {
+                                from: None,
+                                payload: serde_json::json!({"type": "answer", "payload": serde_json::to_string(&answer)?, "target": "peer"}),
+                            })?,
+                        ))).await?;
+                    }
+                }
+                "answer" => {
+                    if let Some(sdp_str) = payload.get("payload").and_then(|v| v.as_str()) {
+                        let sdp: RTCSessionDescription = serde_json::from_str(sdp_str)?;
+                        pc.set_remote_description(sdp).await?;
+                        let mut pending = pending_ice.lock().await;
+                        for c in pending.drain(..) {
+                            let _ = pc.add_ice_candidate(c).await;
+                        }
+                    }
+                }
+                "ice_candidate" => {
+                    if let Some(sdp_str) = payload.get("payload").and_then(|v| v.as_str()) {
+                        let candidate: RTCIceCandidateInit = serde_json::from_str(sdp_str)?;
+                        if pc.remote_description().await.is_none() {
+                            pending_ice.lock().await.push(candidate);
+                        } else {
+                            let _ = pc.add_ice_candidate(candidate).await;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    async fn setup_peer_connection_remote(
+        self_arc: &Arc<Self>,
+        _pending_ice: &Arc<Mutex<Vec<RTCIceCandidateInit>>>,
+        relay_write: Arc<Mutex<futures_util::stream::SplitSink<
+            tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
+            Message,
+        >>>,
+    ) -> Result<Arc<webrtc::peer_connection::RTCPeerConnection>, Box<dyn std::error::Error>> {
+        let config = RTCConfiguration {
+            ice_servers: vec![RTCIceServer {
+                urls: vec!["stun:stun.l.google.com:19302".to_owned()],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        let mut m = MediaEngine::default();
+        m.register_default_codecs()?;
+        let mut registry = Registry::new();
+        registry = register_default_interceptors(registry, &mut m)?;
+
+        let api = APIBuilder::new()
+            .with_media_engine(m)
+            .with_interceptor_registry(registry)
+            .build();
+
+        let peer_connection = Arc::new(api.new_peer_connection(config).await?);
+
+        let app_handle_pcs = self_arc.app_handle.clone();
+        let config_path_pcs = self_arc.config_path.clone();
+        let room_id_pcs = self_arc.room_id.clone();
+
+        peer_connection.on_peer_connection_state_change(Box::new(
+            move |s: RTCPeerConnectionState| {
+                let app_handle = app_handle_pcs.clone();
+                let config_path = config_path_pcs.clone();
+                let room_id = room_id_pcs.clone();
+                Box::pin(async move {
+                    if let Some(app) = &app_handle {
+                        emit_log(app, format!("Peer Connection State changed to: {s:?}"));
+                    }
+                    let status = match s {
+                        RTCPeerConnectionState::Connected => "Connected",
+                        RTCPeerConnectionState::Connecting => "Connecting WebRTC...",
+                        RTCPeerConnectionState::Disconnected => "Peer Disconnected",
+                        RTCPeerConnectionState::Failed => "Connection Failed",
+                        RTCPeerConnectionState::New => "Waiting for peer...",
+                        _ => "Awaiting connection...",
+                    };
+
+                    if let Some(app) = &app_handle {
+                        let _ = app.emit("webrtc-state", status);
+
+                        if s == RTCPeerConnectionState::Connected {
+                            let db = Database::new(&config_path);
+                            let peer_name = format!("Peer ({})", &room_id[..8.min(room_id.len())]);
+                            let _ = db.connection.execute(
+                                "INSERT OR REPLACE INTO device(ip, name) VALUES(?1, ?2)",
+                                (&room_id, &peer_name),
+                            );
+                            let _ = app.emit("refresh-devices", ());
+                        }
+                    }
+                })
+            },
+        ));
+
+        peer_connection.on_ice_candidate(Box::new({
+            let _peer_connection = Arc::clone(&peer_connection);
+            let relay_write = Arc::clone(&relay_write);
+            move |c: Option<webrtc::ice_transport::ice_candidate::RTCIceCandidate>| {
+                let relay_write = Arc::clone(&relay_write);
+                Box::pin(async move {
+                    if let Some(c) = c {
+                        if let Ok(json) = c.to_json() {
+                            if let Ok(payload) = serde_json::to_string(&json) {
+                                let relay_msg = SignalMessage::Relay {
+                                    from: None,
+                                    payload: serde_json::json!({"type": "ice_candidate", "payload": payload, "target": "peer"}),
+                                };
+                                if let Ok(msg_str) = serde_json::to_string(&relay_msg) {
+                                    let _ = relay_write
+                                        .lock()
+                                        .await
+                                        .send(Message::Text(Utf8Bytes::from(msg_str)))
+                                        .await;
+                                }
+                            }
+                        }
+                    }
+                })
+            }
+        }));
+
+        Ok(peer_connection)
     }
 }
 
