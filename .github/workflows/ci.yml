@@ -53,6 +53,8 @@ jobs:
           unzip ffmpeg.zip
           FFMPEG_DIR=$(pwd)/ffmpeg-master-latest-win64-gpl-shared
           echo "FFMPEG_DIR=$FFMPEG_DIR" >> $GITHUB_ENV
+          echo "FFMPEG_INCLUDE_DIR=$FFMPEG_DIR/include" >> $GITHUB_ENV
+          echo "FFMPEG_LIB_DIR=$FFMPEG_DIR/lib" >> $GITHUB_ENV
           echo "$FFMPEG_DIR/lib" >> $GITHUB_PATH
 
       - run: npm install
@@ -150,6 +152,8 @@ jobs:
           unzip ffmpeg.zip
           FFMPEG_DIR=$(pwd)/ffmpeg-master-latest-win64-gpl-shared
           echo "FFMPEG_DIR=$FFMPEG_DIR" >> $GITHUB_ENV
+          echo "FFMPEG_INCLUDE_DIR=$FFMPEG_DIR/include" >> $GITHUB_ENV
+          echo "FFMPEG_LIB_DIR=$FFMPEG_DIR/lib" >> $GITHUB_ENV
           echo "$FFMPEG_DIR/lib" >> $GITHUB_PATH
 
       - run: npm install
