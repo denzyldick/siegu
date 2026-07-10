@@ -60,6 +60,14 @@ jobs:
           echo "LIB=$FFMPEG_DIR_WIN\\lib" >> $GITHUB_ENV
           echo "$FFMPEG_DIR_WIN\\lib" >> $GITHUB_PATH
 
+      - name: Set MSVC include path for bindgen (Windows only)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $msvcDir = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC" -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1
+          $includePath = Join-Path $msvcDir.FullName "include"
+          "BINDGEN_EXTRA_CLANG_ARGS=-I`"$includePath`"" | Out-File -FilePath $env:GITHUB_ENV -Append
+
       - run: npm install
 
       - run: npm run check:translations
@@ -161,6 +169,14 @@ jobs:
           echo "INCLUDE=$FFMPEG_DIR_WIN\\include" >> $GITHUB_ENV
           echo "LIB=$FFMPEG_DIR_WIN\\lib" >> $GITHUB_ENV
           echo "$FFMPEG_DIR_WIN\\lib" >> $GITHUB_PATH
+
+      - name: Set MSVC include path for bindgen (Windows only)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $msvcDir = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC" -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1
+          $includePath = Join-Path $msvcDir.FullName "include"
+          "BINDGEN_EXTRA_CLANG_ARGS=-I`"$includePath`"" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - run: npm install
 
