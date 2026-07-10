@@ -182,8 +182,6 @@ pub fn scan_folder(
             let mut latitude = 0.0;
             let mut longitude = 0.0;
             let mut created = String::new();
-            // Thumbnail generation is deferred — the UI uses convertFileSrc(location)
-            // to load images directly from disk, so we skip it here for faster scans.
             let encoded = String::new();
 
             if let Ok(file) = File::open(&file_path) {
@@ -253,7 +251,7 @@ pub fn scan_folder(
             };
 
             let processed = files_processed.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-            if processed.is_multiple_of(25) {
+            if processed.is_multiple_of(500) {
                 let filename = file_path
                     .file_name()
                     .and_then(|n| n.to_str())
@@ -279,7 +277,8 @@ pub fn scan_folder(
                 );
             }
 
-            let _ = batch_tx.send(photo);
+            let send_result = batch_tx.send(photo);
+            dbg!("[file] sent photo to batch_tx", &send_result.is_ok());
 
             Ok(())
         });

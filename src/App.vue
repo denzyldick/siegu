@@ -79,6 +79,22 @@ export default {
   async mounted() {
     invoke("get_os").then(os => this.os = os);
 
+    // Debug helpers — call from DevTools console:
+    //   $scan()       — manually start scan
+    //   $photos()     — list first 20 photos in DB
+    //   $status()     — show current scan/DB state
+    window.$scan = () => invoke("scan_files").then(() => console.log("scan_files invoked")).catch(e => console.error("scan_files ERROR:", e));
+    window.$photos = async () => {
+      const r = await invoke("list_files", { offset: 0, limit: 20, query: "", scan: false, favoritesOnly: false, videosOnly: false });
+      const data = JSON.parse(r);
+      console.log(`📸 ${data.length} photos in DB (first 20):`, data);
+      return data;
+    };
+    window.$status = async () => {
+      const p = await window.$photos();
+      console.log("scanStatus:", this.scanStatus, "scanning:", this.scanning, "isActive:", this.isActive);
+    };
+
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     mq.addEventListener('change', this.applyTheme);
     window.addEventListener('siegu-theme-changed', this.applyTheme);
@@ -128,7 +144,12 @@ export default {
       }
     });
     
+    listen("log-message", (event) => {
+      console.log("[rust]", event.payload);
+    });
+
     listen("scan-progress", (event) => {
+      console.log("scan-progress", event.payload);
       const data = event.payload;
       this.scanStatus = data.status;
       if (data.status === 'discovering') {
@@ -382,19 +403,17 @@ export default {
       this.onboardingStep = 'complete';
       this.current_page = 'home';
       
-      // If we linked a device during onboarding, we are a Guest
-      // We don't need to scan local folders, we are receiving from host
       if (this.deviceConnected) {
         console.log("Device linked during onboarding, skipping local scan.");
         return;
       }
 
-      // Show guided tour after a brief delay (UI needs to settle)
-      setTimeout(() => { this.showTour = true; }, 800);
+      // Show guided tour after scan starts
+      setTimeout(() => { this.showTour = true; }, 1500);
 
-      // Give UI time to switch before starting heavy scan
+      // Start scan and show progress immediately
       setTimeout(() => {
-        invoke("scan_files", { scan: true });
+        this.scan();
       }, 500);
     },
     applyTheme() {

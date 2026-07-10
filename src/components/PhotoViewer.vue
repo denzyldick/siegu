@@ -7,6 +7,28 @@
 
           <!-- Top Controls -->
           <v-btn icon="mdi-close" variant="text" color="#18181b" class="viewer-nav-btn top-left" @click="close"></v-btn>
+          <v-menu close-on-content-click>
+            <template v-slot:activator="{ props }">
+              <v-btn
+                v-bind="props"
+                icon="mdi-dots-vertical"
+                variant="text"
+                color="#71717a"
+                class="viewer-nav-btn top-left-more"
+              ></v-btn>
+            </template>
+            <v-list density="compact" class="siegu-list">
+              <v-list-item v-if="os !== 'ios'" @click="handleSetWallpaper" prepend-icon="mdi-wallpaper">
+                <v-list-item-title>{{ $t('photo_viewer.set_wallpaper') }}</v-list-item-title>
+              </v-list-item>
+              <v-list-item v-if="!isMobile" @click="handleShowInExplorer" prepend-icon="mdi-folder-open-outline">
+                <v-list-item-title>{{ $t('photo_viewer.show_in_explorer') }}</v-list-item-title>
+              </v-list-item>
+              <v-list-item @click="handleOpenWith" prepend-icon="mdi-open-in-new">
+                <v-list-item-title>{{ $t('photo_viewer.open_with_app') }}</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
           <v-btn
             v-if="!isVideo && !showInfo"
             icon="mdi-information-outline"
@@ -243,6 +265,7 @@
 
 <script>
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
+import { revealItemInDir, openPath } from '@tauri-apps/plugin-opener';
 import RailItem from './RailItem.vue';
 
 export default {
@@ -504,6 +527,40 @@ export default {
       });
     },
     close() { this.visible = false; },
+    async handleSetWallpaper() {
+      if (!this.currentPhoto) return;
+      try {
+        await invoke("set_wallpaper", { path: this.currentPhoto.location });
+        this.snackbar.text = this.$t('photo_viewer.wallpaper_set');
+        this.snackbar.error = false;
+        this.snackbar.show = true;
+      } catch (e) {
+        this.snackbar.text = this.$t('photo_viewer.wallpaper_error');
+        this.snackbar.error = true;
+        this.snackbar.show = true;
+      }
+    },
+    async handleShowInExplorer() {
+      if (!this.currentPhoto) return;
+      try {
+        await revealItemInDir(this.currentPhoto.location);
+        this.snackbar.text = this.$t('photo_viewer.opened_in_explorer');
+        this.snackbar.error = false;
+        this.snackbar.show = true;
+      } catch (e) {
+        this.snackbar.text = this.$t('photo_viewer.explorer_error');
+        this.snackbar.error = true;
+        this.snackbar.show = true;
+      }
+    },
+    async handleOpenWith() {
+      if (!this.currentPhoto) return;
+      try {
+        await openPath(this.currentPhoto.location);
+      } catch (e) {
+        console.error("Failed to open with default app", e);
+      }
+    },
     formatElapsed(start, tick) {
       if (!start) return '0s';
       void tick;
@@ -617,6 +674,7 @@ export default {
   z-index: 2000;
 }
 .top-left { top: 20px; left: 20px; }
+.top-left-more { top: 20px; left: 68px; }
 .top-right { top: 20px; right: 20px; }
 
 .side-nav-btn {

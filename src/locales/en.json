@@ -202,7 +202,14 @@
     "objects_count": "{count} objects",
     "faces_count": "{count} faces",
     "has_caption": "caption",
-    "nothing_detected": "nothing detected"
+    "nothing_detected": "nothing detected",
+    "set_wallpaper": "Set as Wallpaper",
+    "show_in_explorer": "Show in File Explorer",
+    "open_with_app": "Open with Default App",
+    "wallpaper_set": "Wallpaper set successfully",
+    "wallpaper_error": "Failed to set wallpaper",
+    "opened_in_explorer": "Opened in file explorer",
+    "explorer_error": "Failed to open in file explorer"
   },
   "folder_picker": {
     "select_folder": "Select Folder",

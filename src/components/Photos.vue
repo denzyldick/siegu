@@ -33,32 +33,40 @@
       </div>
     </v-fade-transition>
 
-    <!-- Monthly Grouped View -->
-    <div v-if="groups.length > 0" class="animate-fade-in">
-      <div v-for="group in groups" :key="group.name" class="month-group mb-12">
-        <div class="sticky-header mb-6">
+    <!-- Virtual Scroller Grouped View -->
+    <DynamicScroller
+      v-if="groups.length > 0"
+      class="animate-fade-in"
+      :items="virtualItems"
+      :min-item-size="280"
+      key-field="key"
+      page-mode
+      v-slot="{ item, active }"
+    >
+      <DynamicScrollerItem :item="item" :active="active">
+        <div v-if="item.type === 'header'" class="month-header mb-3">
           <div class="d-flex align-center px-2 py-3 rounded-lg header-blur">
-            <h2 class="text-h5 font-weight-bold text-zinc-primary letter-spacing-tight">{{ group.name }}</h2>
+            <h2 class="text-h5 font-weight-bold text-zinc-primary letter-spacing-tight">{{ item.name }}</h2>
             <v-spacer></v-spacer>
             <span class="text-caption text-zinc-muted font-weight-medium bg-zinc-100 px-3 py-1 rounded-pill border-subtle">
-              {{ $t('photos.items_count', { count: group.images.length }) }}
+              {{ $t('photos.items_count', { count: item.count }) }}
             </span>
           </div>
         </div>
-        <div class="photo-grid">
+        <div v-else class="photo-row" :style="{ gridTemplateColumns: `repeat(${columns}, 1fr)` }">
           <Image
-            v-for="image in group.images"
-            v-bind:key="image.id"
-            :path="image"
-            :selected="selectedIds.includes(image.id)"
+            v-for="photo in item.photos"
+            v-bind:key="photo.id"
+            :path="photo"
+            :selected="selectedIds.includes(photo.id)"
             :selection-mode="selectedIds.length > 0"
-            @click="openViewerByPhoto(image)"
+            @click="openViewerByPhoto(photo)"
             @select="toggleSelection"
             @toggle-favorite="handleToggleFavorite"
           />
         </div>
-      </div>
-    </div>
+      </DynamicScrollerItem>
+    </DynamicScroller>
 
     <!-- Empty States -->
     <div v-else-if="!loading" class="empty-state-container d-flex flex-column align-center justify-center text-center">
@@ -119,12 +127,14 @@
 <script>
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { DynamicScroller, DynamicScrollerItem } from "vue-virtual-scroller";
+import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 import Image from "./Image.vue";
 import PhotoViewer from "./PhotoViewer.vue";
 
 export default {
   name: "Photos",
-  components: { Image, PhotoViewer },
+  components: { DynamicScroller, DynamicScrollerItem, Image, PhotoViewer },
   data: () => ({
     loading: false,
     allLoaded: false,
@@ -141,12 +151,9 @@ export default {
     currentPhotoIndex: 0,
     observer: null,
     unlistenDiscovered: null,
-    unlistenReceived: null,
-    unlistenUpdated: null,
     unlistenAnalysisResult: null,
-    scanBuffer: [],
-    scanInterval: null,
-    reloadTimer: null
+    reloadTimer: null,
+    columns: 5,
   }),
   props: {
     searchQuery: {
@@ -167,39 +174,35 @@ export default {
       })
     }
   },
+  computed: {
+    virtualItems() {
+      const cols = this.columns;
+      const items = [];
+      for (const group of this.groups) {
+        items.push({
+          type: 'header',
+          key: `h-${group.name}`,
+          name: group.name,
+          count: group.images.length,
+        });
+        for (let i = 0; i < group.images.length; i += cols) {
+          items.push({
+            type: 'row',
+            key: `r-${group.name}-${i}`,
+            photos: group.images.slice(i, i + cols),
+          });
+        }
+      }
+      return items;
+    },
+  },
   async created() {
     this.list_files();
 
-    this.scanInterval = setInterval(() => {
-        if (this.scanBuffer.length > 0) {
-            const batch = this.scanBuffer.splice(0, 100);
-            console.log(`[Photos] flush scanBuffer: ${batch.length} photos (total in grid: ${this.images.length})`);
-            this.updateGroups(batch);
-        }
-    }, 2000);
-
     this.unlistenDiscovered = await listen("photos-discovered", (event) => {
+      console.log("photos-discovered", event.payload?.length ?? 0, "photos");
       if (Array.isArray(event.payload)) {
-          console.log(`[Photos] photos-discovered: ${event.payload.length} photos`);
-          event.payload.forEach(photo => this.handleIncomingPhoto(photo));
-      }
-    });
-
-    this.unlistenReceived = await listen("photo-received", (event) => {
-      console.log(`[Photos] photo-received: ${event.payload.id}`);
-      this.handleIncomingPhoto(event.payload);
-    });
-
-    this.unlistenUpdated = await listen("photo-updated", (event) => {
-      const updatedPhoto = event.payload;
-      const existing = this.imagesMap[updatedPhoto.id];
-      if (existing) {
-          // Skip partial updates (Rust emits {id} only) — full data comes via photo-analysis-result
-          const keys = Object.keys(updatedPhoto);
-          if (keys.length <= 1) return;
-          Object.assign(existing, updatedPhoto);
-      } else {
-          this.handleIncomingPhoto(updatedPhoto);
+        this.updateGroups(event.payload);
       }
     });
 
@@ -212,17 +215,13 @@ export default {
           const updated = JSON.parse(raw);
           const existing = this.imagesMap[id];
           if (existing) {
-            // Copy frontend-only properties
             updated._groupKey = existing._groupKey;
             updated._sortKey = existing._sortKey;
-            // Directly assign to imagesMap so the flat lookup works
             this.imagesMap[id] = updated;
-            // Replace in the flat images array — this triggers Vue 3 v-for reactivity
             const idx = this.images.findIndex(p => p.id === id);
             if (idx !== -1) {
               this.images[idx] = updated;
             }
-            // Also update in groups
             for (const g of this.groups) {
               const gi = g.images.findIndex(p => p.id === id);
               if (gi !== -1) {
@@ -230,7 +229,7 @@ export default {
               }
             }
           } else {
-            this.handleIncomingPhoto(updated);
+            this.updateGroups([updated]);
           }
         }
       } catch (e) {
@@ -239,20 +238,26 @@ export default {
     });
   },
   mounted() {
+    this.updateColumns();
+    window.addEventListener('resize', this.updateColumns);
     if (!this.isPersonFilter) {
       this.setupInfiniteScroll();
     }
   },
   beforeUnmount() {
+    window.removeEventListener('resize', this.updateColumns);
     if (this.observer) this.observer.disconnect();
     if (this.unlistenDiscovered) this.unlistenDiscovered();
-    if (this.unlistenReceived) this.unlistenReceived();
-    if (this.unlistenUpdated) this.unlistenUpdated();
     if (this.unlistenAnalysisResult) this.unlistenAnalysisResult();
-    if (this.scanInterval) clearInterval(this.scanInterval);
     if (this.reloadTimer) clearTimeout(this.reloadTimer);
   },
   methods: {
+    updateColumns() {
+      const width = window.innerWidth;
+      if (width < 640) this.columns = 2;
+      else if (width < 1024) this.columns = 3;
+      else this.columns = 5;
+    },
     updateGroups(newImages) {
         const locale = localStorage.getItem('siegu_language') || 'en';
         const affectedGroups = new Set();
@@ -303,25 +308,8 @@ export default {
       if (existing) {
         Object.assign(existing, updatedPhoto);
       } else {
-        this.handleIncomingPhoto(updatedPhoto);
+        this.updateGroups([updatedPhoto]);
       }
-    },
-    handleIncomingPhoto(newPhoto) {
-      if (!newPhoto || !newPhoto.location) return;
-      if (this.imagesMap[newPhoto.id]) return;
-
-      if (this.filters.favoritesOnly && !newPhoto.favorite) return;
-
-      const isVideo = (photo) => {
-          if (!photo || !photo.location) return false;
-          const ext = photo.location.split('.').pop().toLowerCase();
-          return ["mp4", "mkv", "mov", "avi", "webm"].includes(ext);
-      };
-
-      if (this.filters.videosOnly && !isVideo(newPhoto)) return;
-      if (this.searchQuery && !newPhoto.location.toLowerCase().includes(this.searchQuery.toLowerCase())) return;
-
-      this.scanBuffer.push(newPhoto);
     },
     toggleSelection(id) {
       const index = this.selectedIds.indexOf(id);
@@ -419,7 +407,6 @@ export default {
           if (this.filters.favoritesOnly && !isNowFavorite) {
             this.images = this.images.filter((p) => p.id !== id);
             delete this.imagesMap[id];
-            // Re-build groups if needed or just remove from group
             const group = this.groupsMap[photo._groupKey];
             if (group) {
                 group.images = group.images.filter(p => p.id !== id);
@@ -458,20 +445,13 @@ export default {
   min-height: 100vh;
 }
 
-.photo-grid {
+.photo-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 16px;
+  padding-bottom: 16px;
 }
 
-@media (max-width: 600px) {
-  .photo-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 8px;
-  }
-}
-
-.sticky-header {
+.month-header {
   position: sticky;
   top: 64px;
   z-index: 10;

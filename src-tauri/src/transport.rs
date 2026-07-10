@@ -290,6 +290,38 @@ impl WebRtcClient {
         Ok(())
     }
 
+    /// Starts a WebRTC session using a local embedded signaling server (LAN mode).
+    /// Useful for syncing devices on the same network without a remote signaling server.
+    pub async fn start_lan(
+        mut self,
+        signaling_port: u16,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if self.room_id.is_empty() {
+            let err_msg = "Room ID is missing".to_string();
+            if let Some(app) = &self.app_handle {
+                emit_log(app, err_msg.clone());
+            }
+            self.emit("webrtc-state", err_msg.clone());
+            return Err(err_msg.into());
+        }
+
+        let port = if signaling_port > 0 {
+            signaling_port
+        } else {
+            crate::lan_server::start(0).await
+        };
+        let local_url = format!("ws://127.0.0.1:{}", port);
+        if let Some(app) = &self.app_handle {
+            emit_log(
+                app,
+                format!("Local signaling server started on port {}", port),
+            );
+        }
+
+        self.signaling_url = local_url;
+        self.start().await
+    }
+
     pub async fn start(self) -> Result<(), Box<dyn std::error::Error>> {
         let self_arc = Arc::new(self);
 
@@ -1141,5 +1173,26 @@ impl WebRtcClient {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
+
+    #[tokio::test]
+    async fn test_start_lan_rejects_empty_room_id() {
+        let client = WebRtcClient {
+            room_id: "".to_string(),
+            is_initiator: true,
+            signaling_url: "".to_string(),
+            app_handle: None,
+            config_path: "/tmp".to_string(),
+            sync_tx: Arc::new(Mutex::new(None)),
+        };
+        let result = client.start_lan(0).await;
+        assert!(result.is_err(), "Empty room_id should be rejected");
     }
 }

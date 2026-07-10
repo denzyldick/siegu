@@ -678,6 +678,34 @@ pub fn start_background_worker(
                 );
             }
 
+            // If no models are enabled, mark photos indexed and skip
+            let config = db.lock().unwrap().get_state();
+            let has_enabled_model = [
+                "clip",
+                "face",
+                "ocr",
+                "nsfw",
+                "aesthetics",
+                "yolo",
+                "blip",
+                "arcface",
+                "midas",
+                "whisper",
+            ]
+            .iter()
+            .any(|m| {
+                config
+                    .get(&format!("model_enabled_{}", m))
+                    .map_or(false, |v| v == "true")
+            });
+            if !has_enabled_model && target_model.is_none() {
+                let lock = db.lock().unwrap();
+                for pid in &photo_ids {
+                    lock.update_photo_indexed(pid, 2);
+                }
+                continue;
+            }
+
             let total_pending = increment_pending_count(&pending_count_clone, photo_ids.len());
             let _ = app_handle.emit("indexing-progress", total_pending);
 
@@ -1126,10 +1154,6 @@ pub fn start_background_worker(
                                 }
                             }
 
-                            // Thumbnails are generated lazily on-demand by the frontend (convertFileSrc fallback).
-                            // Generating them here triggered a SIGTRAP in the image crate (likely memory
-                            // corruption from a decoder FFI) that killed the process. Skip it until the
-                            // root cause is fixed. See also file.rs:181.
                         } else {
                             emit_log(&app_handle_task, format!("ERROR: Could not open image for AI analysis: {photo_loc_actual}"));
                         }
@@ -1150,6 +1174,8 @@ pub fn start_background_worker(
                                 }
                             }
                         }
+
+                        drop(lock);
 
                         let _ = app_handle_task.emit("photo-updated", serde_json::json!({
                             "id": photo_id_task,

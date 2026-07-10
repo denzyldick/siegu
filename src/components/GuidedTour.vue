@@ -165,7 +165,11 @@ export default {
     },
     startObserver() {
       this.observer = new ResizeObserver(() => this.measureTarget());
-      this.observer.observe(document.body);
+      const t = this.currentStep.target;
+      if (t) {
+        const el = document.querySelector(t);
+        if (el) this.observer.observe(el);
+      }
     },
     stopObserver() {
       if (this.observer) {

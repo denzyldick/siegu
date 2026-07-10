@@ -345,7 +345,14 @@
     "objects_count": "{count} objetos",
     "faces_count": "{count} rostros",
     "has_caption": "pie de foto",
-    "nothing_detected": "nada detectado"
+    "nothing_detected": "nada detectado",
+    "set_wallpaper": "Establecer como fondo de pantalla",
+    "show_in_explorer": "Mostrar en el explorador de archivos",
+    "open_with_app": "Abrir con aplicación predeterminada",
+    "wallpaper_set": "Fondo de pantalla establecido correctamente",
+    "wallpaper_error": "Error al establecer el fondo de pantalla",
+    "opened_in_explorer": "Abierto en el explorador de archivos",
+    "explorer_error": "Error al abrir en el explorador de archivos"
   },
   "folder_picker": {
     "select_folder": "Seleccionar carpeta",

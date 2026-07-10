@@ -345,7 +345,14 @@
     "objects_count": "{count} objecten",
     "faces_count": "{count} gezichten",
     "has_caption": "onderschrift",
-    "nothing_detected": "niets gedetecteerd"
+    "nothing_detected": "niets gedetecteerd",
+    "set_wallpaper": "Instellen als achtergrond",
+    "show_in_explorer": "Tonen in bestandsverkenner",
+    "open_with_app": "Openen met standaard app",
+    "wallpaper_set": "Achtergrond succesvol ingesteld",
+    "wallpaper_error": "Achtergrond instellen mislukt",
+    "opened_in_explorer": "Geopend in bestandsverkenner",
+    "explorer_error": "Openen in bestandsverkenner mislukt"
   },
   "folder_picker": {
     "select_folder": "Map selecteren",

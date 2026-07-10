@@ -345,7 +345,14 @@
     "objects_count": "{count} opheto",
     "faces_count": "{count} kara",
     "has_caption": "leyenda",
-    "nothing_detected": "nada detectá"
+    "nothing_detected": "nada detectá",
+    "set_wallpaper": "Poné como fondo di pantaya",
+    "show_in_explorer": "Mustra den exploradó di archivo",
+    "open_with_app": "Habri ku app predeterminá",
+    "wallpaper_set": "Fondo di pantaya poné eksitosamente",
+    "wallpaper_error": "No a logra poné fondo di pantaya",
+    "opened_in_explorer": "Habri den exploradó di archivo",
+    "explorer_error": "No a logra habri den exploradó di archivo"
   },
   "folder_picker": {
     "select_folder": "Selekshoná Karpeta",

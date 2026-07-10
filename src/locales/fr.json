@@ -345,7 +345,14 @@
     "objects_count": "{count} objets",
     "faces_count": "{count} visages",
     "has_caption": "légende",
-    "nothing_detected": "rien détecté"
+    "nothing_detected": "rien détecté",
+    "set_wallpaper": "Définir comme fond d'écran",
+    "show_in_explorer": "Afficher dans l'explorateur de fichiers",
+    "open_with_app": "Ouvrir avec l'application par défaut",
+    "wallpaper_set": "Fond d'écran défini avec succès",
+    "wallpaper_error": "Échec de la définition du fond d'écran",
+    "opened_in_explorer": "Ouvert dans l'explorateur de fichiers",
+    "explorer_error": "Échec de l'ouverture dans l'explorateur de fichiers"
   },
   "folder_picker": {
     "select_folder": "Sélectionner un dossier",

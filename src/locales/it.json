@@ -345,7 +345,14 @@
     "objects_count": "{count} oggetti",
     "faces_count": "{count} volti",
     "has_caption": "didascalia",
-    "nothing_detected": "nulla rilevato"
+    "nothing_detected": "nulla rilevato",
+    "set_wallpaper": "Imposta come sfondo",
+    "show_in_explorer": "Mostra nel file explorer",
+    "open_with_app": "Apri con app predefinita",
+    "wallpaper_set": "Sfondo impostato con successo",
+    "wallpaper_error": "Impossibile impostare lo sfondo",
+    "opened_in_explorer": "Aperto nel file explorer",
+    "explorer_error": "Impossibile aprire nel file explorer"
   },
   "folder_picker": {
     "select_folder": "Seleziona Cartella",

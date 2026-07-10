@@ -345,7 +345,14 @@
     "objects_count": "{count} Objekte",
     "faces_count": "{count} Gesichter",
     "has_caption": "Beschreibung",
-    "nothing_detected": "nichts erkannt"
+    "nothing_detected": "nichts erkannt",
+    "set_wallpaper": "Als Hintergrundbild festlegen",
+    "show_in_explorer": "Im Datei-Explorer anzeigen",
+    "open_with_app": "Mit Standard-App öffnen",
+    "wallpaper_set": "Hintergrundbild erfolgreich festgelegt",
+    "wallpaper_error": "Fehler beim Festlegen des Hintergrundbilds",
+    "opened_in_explorer": "Im Datei-Explorer geöffnet",
+    "explorer_error": "Fehler beim Öffnen im Datei-Explorer"
   },
   "folder_picker": {
     "select_folder": "Ordner auswählen",

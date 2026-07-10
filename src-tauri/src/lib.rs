@@ -9,11 +9,15 @@ mod database;
 mod face_detector;
 mod file;
 mod geocode;
+mod lan_server;
+mod mdns;
 mod ml;
 mod server;
 #[cfg(test)]
 mod test;
+mod thumbnail;
 mod transport;
+mod wallpaper_plugin;
 
 struct WebRtcState {
     active_session: std::sync::Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
@@ -30,8 +34,10 @@ fn get_config_path(app: &tauri::AppHandle) -> String {
 
 #[tauri::command]
 fn scan_files(app: tauri::AppHandle) {
+    dbg!(">>> scan_files INVOKED");
     emit_log(&app, "Starting media scan...".to_string());
     let path = get_config_path(&app);
+    dbg!(&path);
     if path.is_empty() {
         emit_log(
             &app,
@@ -41,6 +47,7 @@ fn scan_files(app: tauri::AppHandle) {
     }
     let database = database::Database::new(&path);
     let folders = database.list_directories();
+    dbg!(&folders);
     emit_log(
         &app,
         format!("Found {} folders to scan in database.", folders.len()),
@@ -78,7 +85,7 @@ fn scan_files(app: tauri::AppHandle) {
         let app = app_handle_for_batch.clone();
         let ui = Arc::clone(&ui_buffer);
         tauri::async_runtime::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
+            let mut interval = tokio::time::interval(std::time::Duration::from_millis(2000));
             loop {
                 interval.tick().await;
                 let batch = {
@@ -104,26 +111,28 @@ fn scan_files(app: tauri::AppHandle) {
         ui_buffer: &Arc<tokio::sync::Mutex<Vec<database::Photo>>>,
         batch: Vec<database::Photo>,
     ) {
-        emit_log(
-            app_handle,
-            format!("[batch] flushing {} photos to DB", batch.len()),
-        );
-
-        // Clone for DB insert (spawn_blocking needs owned data)
+        // Clone for blocking work (thumbnails + DB insert)
         let db_clone = Arc::clone(database);
-        let batch_for_db = batch.clone();
+        let batch_for_blocking = batch.clone();
         let app_for_blocking = app_handle.clone();
-        let _ = tauri::async_runtime::spawn_blocking(move || {
+        let batch_with_thumbs = tauri::async_runtime::spawn_blocking(move || {
+            dbg!("[batch] spawn_blocking START", batch_for_blocking.len());
+            let mut batch = batch_for_blocking;
+            // Generate thumbnails
+            for photo in &mut batch {
+                if !thumbnail::needs_thumbnail(&photo.encoded) {
+                    continue;
+                }
+                if let Some(data_url) = thumbnail::generate_thumbnail(&photo.location) {
+                    photo.encoded = data_url;
+                }
+            }
+            // Store in DB
             if let Ok(mut db) = db_clone.lock() {
-                if let Err(e) = db.store_photo_batch(&batch_for_db) {
+                if let Err(e) = db.store_photo_batch(&batch) {
                     emit_log(
                         &app_for_blocking,
                         format!("[batch] ERROR storing photo batch: {e}"),
-                    );
-                } else {
-                    emit_log(
-                        &app_for_blocking,
-                        format!("[batch] stored {} photos in DB", batch_for_db.len()),
                     );
                 }
             } else {
@@ -132,36 +141,55 @@ fn scan_files(app: tauri::AppHandle) {
                     "[batch] ERROR: could not lock DB mutex".to_string(),
                 );
             }
+            batch
         })
-        .await;
+        .await
+        .unwrap_or_else(|join_err| {
+            dbg!("[batch] spawn_blocking JOIN ERROR", &join_err);
+            batch
+        });
 
-        // Push all to UI buffer
+        // Push all to UI buffer (with thumbnails)
         {
             let mut buf = ui_buffer.lock().await;
-            for p in &batch {
-                emit_log(app_handle, format!("[batch] pushing {} to UI buffer", p.id));
+            for p in &batch_with_thumbs {
                 buf.push(p.clone());
             }
         }
 
-        // Send AutoAnalyzeSingle for each
-        for p in &batch {
-            if let Some(state) = app_handle.try_state::<ml::MlContext>() {
-                emit_log(
-                    app_handle,
-                    format!("[batch] sending AutoAnalyzeSingle({})", p.id),
-                );
-                if let Err(e) = state.tx.send(ml::Job::AutoAnalyzeSingle(p.id.clone())) {
-                    emit_log(
-                        app_handle,
-                        format!("[batch] ERROR sending AutoAnalyzeSingle: {e}"),
-                    );
+        // Send AutoAnalyzeSingle for each (skip if no models enabled)
+        let config = {
+            let lock = database.lock().unwrap();
+            lock.get_state()
+        };
+        let any_model_enabled = [
+            "clip",
+            "face",
+            "ocr",
+            "nsfw",
+            "aesthetics",
+            "yolo",
+            "blip",
+            "arcface",
+            "midas",
+            "whisper",
+        ]
+        .iter()
+        .any(|m| {
+            config
+                .get(&format!("model_enabled_{}", m))
+                .map_or(false, |v| v == "true")
+        });
+        if any_model_enabled {
+            for p in &batch_with_thumbs {
+                if let Some(state) = app_handle.try_state::<ml::MlContext>() {
+                    if let Err(e) = state.tx.send(ml::Job::AutoAnalyzeSingle(p.id.clone())) {
+                        emit_log(
+                            app_handle,
+                            format!("[batch] ERROR sending AutoAnalyzeSingle: {e}"),
+                        );
+                    }
                 }
-            } else {
-                emit_log(
-                    app_handle,
-                    "[batch] WARN: MlContext state not available".to_string(),
-                );
             }
         }
     }
@@ -170,12 +198,15 @@ fn scan_files(app: tauri::AppHandle) {
         let mut batch_accum: Vec<database::Photo> = Vec::new();
         while let Some(photo) = batch_rx.recv().await {
             batch_accum.push(photo);
+            dbg!("[batch-rx] accumulated", batch_accum.len());
 
-            if batch_accum.len() >= 50 {
+            if batch_accum.len() >= 500 {
                 let batch = std::mem::take(&mut batch_accum);
+                dbg!("[batch-rx] flushing 500");
                 flush_batch_to_db_and_ui(&database, &app_handle_for_batch, &ui_buffer, batch).await;
             }
         }
+        dbg!("[batch-rx] channel closed");
 
         if !batch_accum.is_empty() {
             let batch = std::mem::take(&mut batch_accum);
@@ -227,10 +258,46 @@ fn scan_files(app: tauri::AppHandle) {
             &app,
             "Finished scanning all folders. Updating last scan time...".to_string(),
         );
-        let _ = app.emit(
-            "scan-progress",
-            serde_json::json!({ "status": "indexing", "progress": 100, "message": "Analyzing photos with AI..." }),
-        );
+        // Check if any AI models are enabled
+        let db_check = database::Database::new(&path);
+        let config = db_check.get_state();
+        let any_model_enabled = [
+            "clip",
+            "face",
+            "ocr",
+            "nsfw",
+            "aesthetics",
+            "yolo",
+            "blip",
+            "arcface",
+            "midas",
+            "whisper",
+        ]
+        .iter()
+        .any(|m| {
+            config
+                .get(&format!("model_enabled_{}", m))
+                .map_or(false, |v| v == "true")
+        });
+
+        if any_model_enabled {
+            let _ = app.emit(
+                "scan-progress",
+                serde_json::json!({ "status": "indexing", "progress": 100, "message": "Analyzing photos with AI..." }),
+            );
+            use tauri_plugin_notification::NotificationExt;
+            let _ = app
+                .notification()
+                .builder()
+                .title("Siegu")
+                .body("Files discovered, analyzing with AI...")
+                .show();
+        } else {
+            let _ = app.emit(
+                "scan-progress",
+                serde_json::json!({ "status": "complete", "progress": 100, "message": "Scan complete" }),
+            );
+        }
 
         let database = database::Database::new(&path);
         let timestamp = SystemTime::now()
@@ -239,14 +306,6 @@ fn scan_files(app: tauri::AppHandle) {
             .as_secs()
             .to_string();
         database.set_last_scan_time(timestamp);
-
-        use tauri_plugin_notification::NotificationExt;
-        let _ = app
-            .notification()
-            .builder()
-            .title("Siegu")
-            .body("Files discovered, analyzing with AI...")
-            .show();
 
         // Final signal to process everything found in the discovery pass
         if let Some(state) = app.try_state::<ml::MlContext>() {
@@ -825,6 +884,15 @@ async fn start_webrtc_session(
         return Err("Config error".to_string());
     }
 
+    // Check tier: free tier cannot use remote signaling servers
+    let db = database::Database::new(&config_path);
+    let config = db.get_state();
+    let tier = config.get("tier").map(|s| s.as_str()).unwrap_or("free");
+    if tier == "free" && !signalingUrl.contains("127.0.0.1") && !signalingUrl.contains("localhost")
+    {
+        return Err("Free tier does not support remote sync. Use LAN sync instead.".to_string());
+    }
+
     // Abort existing session if any
     if let Ok(mut session) = state.active_session.lock() {
         if let Some(handle) = session.take() {
@@ -850,6 +918,56 @@ async fn start_webrtc_session(
     }
 
     Ok(())
+}
+
+#[tauri::command]
+async fn start_lan_host(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, WebRtcState>,
+    room_id: String,
+    is_initiator: bool,
+) -> Result<(), String> {
+    let app_handle = app.clone();
+    let config_path = get_config_path(&app);
+    if config_path.is_empty() {
+        return Err("Config error".to_string());
+    }
+
+    if let Ok(mut session) = state.active_session.lock() {
+        if let Some(handle) = session.take() {
+            emit_log(&app, "Aborting previous WebRTC session".to_string());
+            handle.abort();
+        }
+
+        let sync_tx_inner = Arc::clone(&state.sync_tx);
+
+        let handle = tauri::async_runtime::spawn(async move {
+            let client = transport::WebRtcClient {
+                room_id,
+                is_initiator,
+                signaling_url: String::new(),
+                app_handle: Some(app_handle),
+                config_path,
+                sync_tx: sync_tx_inner,
+            };
+            let _ = client.start_lan(0).await;
+        });
+
+        *session = Some(handle);
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn discover_lan_devices(
+    app: tauri::AppHandle,
+    timeout_secs: u64,
+) -> Result<Vec<crate::mdns::DiscoveredHost>, String> {
+    let daemon = crate::mdns::create_daemon().map_err(|e| e.to_string())?;
+    let hosts = crate::mdns::discover_hosts(&daemon, timeout_secs).map_err(|e| e.to_string())?;
+    emit_log(&app, format!("Discovered {} LAN device(s)", hosts.len()));
+    Ok(hosts)
 }
 
 #[tauri::command]
@@ -1087,6 +1205,81 @@ async fn get_os() -> String {
 }
 
 #[tauri::command]
+async fn set_wallpaper(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    set_wallpaper_impl(&app, &path)
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn set_wallpaper_impl(_app: &tauri::AppHandle, path: &str) -> Result<(), String> {
+    if let Ok(desktop) = std::env::var("XDG_CURRENT_DESKTOP") {
+        if desktop.contains("COSMIC") {
+            return set_cosmic_wallpaper(path);
+        }
+    }
+
+    if let Err(e) = wallpaper::set_from_path(path) {
+        let uri = format!("\"file://{}\"", path);
+        let output = std::process::Command::new("gsettings")
+            .arg("set")
+            .arg("org.gnome.desktop.background")
+            .arg("picture-uri")
+            .arg(&uri)
+            .output()
+            .map_err(|e| format!("Failed to run gsettings: {}", e))?;
+
+        if output.status.success() {
+            return Ok(());
+        }
+
+        return Err(format!(
+            "wallpaper crate: {}; gsettings: {}",
+            e,
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn set_cosmic_wallpaper(path: &str) -> Result<(), String> {
+    let home = std::env::var("HOME").map_err(|_| "HOME not set".to_string())?;
+    let config_dir = std::path::Path::new(&home)
+        .join(".config")
+        .join("cosmic")
+        .join("com.system76.CosmicBackground")
+        .join("v1");
+
+    let content = format!(
+        "(\n    output: \"all\",\n    source: Path(\"{}\"),\n    filter_by_theme: true,\n    rotation_frequency: 300,\n    filter_method: Lanczos,\n    scaling_mode: Zoom,\n    sampling_method: Alphanumeric,\n)",
+        path
+    );
+
+    std::fs::write(config_dir.join("all"), &content)
+        .map_err(|e| format!("Failed to write COSMIC background config: {}", e))?;
+
+    std::fs::write(config_dir.join("same-on-all"), "true")
+        .map_err(|e| format!("Failed to write COSMIC same-on-all config: {}", e))?;
+
+    Ok(())
+}
+
+#[cfg(target_os = "android")]
+fn set_wallpaper_impl(app: &tauri::AppHandle, path: &str) -> Result<(), String> {
+    app.run_mobile_plugin(
+        "wallpaper",
+        "setWallpaper",
+        serde_json::json!({"path": path}),
+    )
+    .map(|_| ())
+    .map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "ios")]
+fn set_wallpaper_impl(_app: &tauri::AppHandle, _path: &str) -> Result<(), String> {
+    Err("Setting wallpaper is not supported on this platform".to_string())
+}
+
+#[tauri::command]
 async fn resolve_photo_locations(app: tauri::AppHandle) -> Result<(), String> {
     let path = get_config_path(&app);
     if path.is_empty() {
@@ -1159,6 +1352,7 @@ const ALLOWED_CONFIG_KEYS: &[&str] = &[
     "indexing_mode",
     "theme",
     "language",
+    "tier",
     "model_enabled_clip",
     "model_enabled_face",
     "model_enabled_ocr",
@@ -1264,7 +1458,15 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(wallpaper_plugin::init())
         .setup(|app| {
+            if let Err(e) = ffmpeg_next::init() {
+                emit_log(
+                    &app.handle(),
+                    format!("WARNING: ffmpeg init failed (thumbnails for videos disabled): {e}"),
+                );
+            }
+
             #[cfg(desktop)]
             {
                 let show_i = MenuItem::with_id(app, "show", "Show Window", true, None::<&str>)?;
@@ -1399,6 +1601,8 @@ pub fn run() {
             server::generate_pairing_codes,
             server::hash_pairing_code,
             start_webrtc_session,
+            start_lan_host,
+            discover_lan_devices,
             stop_webrtc_session,
             request_start_sync,
             process_video_frames,
@@ -1410,6 +1614,7 @@ pub fn run() {
             index_faces,
             abort_indexing,
             get_os,
+            set_wallpaper,
             save_config,
             get_config,
             get_indexing_status,

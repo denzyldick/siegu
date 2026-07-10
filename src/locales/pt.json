@@ -345,7 +345,14 @@
     "objects_count": "{count} objetos",
     "faces_count": "{count} rostos",
     "has_caption": "legenda",
-    "nothing_detected": "nada detectado"
+    "nothing_detected": "nada detectado",
+    "set_wallpaper": "Definir como papel de parede",
+    "show_in_explorer": "Mostrar no explorador de arquivos",
+    "open_with_app": "Abrir com aplicativo padrão",
+    "wallpaper_set": "Papel de parede definido com sucesso",
+    "wallpaper_error": "Falha ao definir papel de parede",
+    "opened_in_explorer": "Aberto no explorador de arquivos",
+    "explorer_error": "Falha ao abrir no explorador de arquivos"
   },
   "folder_picker": {
     "select_folder": "Selecionar Pasta",
