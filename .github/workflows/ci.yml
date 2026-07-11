@@ -53,9 +53,10 @@ jobs:
         if: matrix.platform == 'windows-latest'
         shell: bash
         run: |
-          curl -L https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip -o ffmpeg.zip
+          FFMPEG_BUILD="ffmpeg-n8.0-latest-win64-gpl-shared-8.0"
+          curl -L "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2025-10-22-13-33/${FFMPEG_BUILD}.zip" -o ffmpeg.zip
           unzip ffmpeg.zip
-          FFMPEG_DIR=$(pwd)/ffmpeg-master-latest-win64-gpl-shared
+          FFMPEG_DIR=$(pwd)/${FFMPEG_BUILD}
           FFMPEG_DIR_WIN=$(cygpath -w "$FFMPEG_DIR")
           echo "FFMPEG_DIR=$FFMPEG_DIR_WIN" >> $GITHUB_ENV
           echo "FFMPEG_INCLUDE_DIR=$FFMPEG_DIR_WIN\\include" >> $GITHUB_ENV
@@ -250,9 +251,10 @@ jobs:
         if: matrix.platform == 'windows-latest'
         shell: bash
         run: |
-          curl -L https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip -o ffmpeg.zip
+          FFMPEG_BUILD="ffmpeg-n8.0-latest-win64-gpl-shared-8.0"
+          curl -L "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2025-10-22-13-33/${FFMPEG_BUILD}.zip" -o ffmpeg.zip
           unzip ffmpeg.zip
-          FFMPEG_DIR=$(pwd)/ffmpeg-master-latest-win64-gpl-shared
+          FFMPEG_DIR=$(pwd)/${FFMPEG_BUILD}
           FFMPEG_DIR_WIN=$(cygpath -w "$FFMPEG_DIR")
           echo "FFMPEG_DIR=$FFMPEG_DIR_WIN" >> $GITHUB_ENV
           echo "FFMPEG_INCLUDE_DIR=$FFMPEG_DIR_WIN\\include" >> $GITHUB_ENV
