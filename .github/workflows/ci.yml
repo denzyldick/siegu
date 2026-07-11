@@ -187,7 +187,7 @@ jobs:
             echo "NM_aarch64_linux_android=$NM_PATH" >> $GITHUB_ENV
             echo "NM_x86_64_linux_android=$NM_PATH" >> $GITHUB_ENV
             echo "ANDROID_NM=$NM_PATH" >> $GITHUB_ENV
-            NDK_ROOT=$(dirname "$(dirname "$(dirname "$(dirname "$(dirname "$NM_PATH")")")")")
+            NDK_ROOT=$(dirname "$(dirname "$(dirname "$(dirname "$(dirname "$(dirname "$NM_PATH")")")")")")
             echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
             echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
           fi
@@ -375,7 +375,7 @@ jobs:
             echo "NM_aarch64_linux_android=$NM_PATH" >> $GITHUB_ENV
             echo "NM_x86_64_linux_android=$NM_PATH" >> $GITHUB_ENV
             echo "ANDROID_NM=$NM_PATH" >> $GITHUB_ENV
-            NDK_ROOT=$(dirname "$(dirname "$(dirname "$(dirname "$(dirname "$NM_PATH")")")")")
+            NDK_ROOT=$(dirname "$(dirname "$(dirname "$(dirname "$(dirname "$(dirname "$NM_PATH")")")")")")
             echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
             echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
           fi
