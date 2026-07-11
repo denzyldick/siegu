@@ -35,3 +35,6 @@ tokio-tungstenite = { version = "0.28.0", features = ["rustls-tls-webpki-roots"]
 crossbeam-channel = "0.5.15"
 tempfile = "3.19.0"
 tungstenite = "0.28.0"
+
+[patch.crates-io]
+esaxx-rs = { path = "src-tauri/vendor/esaxx-rs" }
