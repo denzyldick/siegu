@@ -64,15 +64,18 @@ jobs:
           echo "LIB=$FFMPEG_DIR_WIN\\lib" >> $GITHUB_ENV
           echo "$FFMPEG_DIR_WIN\\lib" >> $GITHUB_PATH
 
-      - name: Set MSVC include path for bindgen (Windows only)
+      - name: Set MSVC + UCRT include paths for bindgen (Windows only)
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
           $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $installPath = & $vsWhere -latest -property installationPath
           $latestMsvc = Get-ChildItem "$installPath\VC\Tools\MSVC" -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1
-          $includePath = Join-Path $latestMsvc.FullName "include"
-          "BINDGEN_EXTRA_CLANG_ARGS=-I`"$includePath`"" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $msvcInclude = Join-Path $latestMsvc.FullName "include"
+          $sdkBase = "C:\Program Files (x86)\Windows Kits\10\Include"
+          $latestSdk = Get-ChildItem $sdkBase -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1
+          $ucrtInclude = Join-Path $latestSdk.FullName "ucrt"
+          "BINDGEN_EXTRA_CLANG_ARGS=-I`"$msvcInclude`" -I`"$ucrtInclude`"" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - run: npm install
 
@@ -161,6 +164,12 @@ jobs:
 
       - name: Set up cargo-ndk
         run: cargo install cargo-ndk
+
+      - name: Set NDK cross-compilation env vars
+        run: |
+          NM_PATH=$(find /usr/local/lib/android/sdk/ndk -name "llvm-nm" -path "*/prebuilt/*" 2>/dev/null | head -1)
+          echo "NM_aarch64-linux-android=$NM_PATH" >> $GITHUB_ENV
+          echo "NM_x86_64-linux-android=$NM_PATH" >> $GITHUB_ENV
 
       - run: npm install
 
@@ -252,15 +261,18 @@ jobs:
           echo "LIB=$FFMPEG_DIR_WIN\\lib" >> $GITHUB_ENV
           echo "$FFMPEG_DIR_WIN\\lib" >> $GITHUB_PATH
 
-      - name: Set MSVC include path for bindgen (Windows only)
+      - name: Set MSVC + UCRT include paths for bindgen (Windows only)
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
           $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $installPath = & $vsWhere -latest -property installationPath
           $latestMsvc = Get-ChildItem "$installPath\VC\Tools\MSVC" -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1
-          $includePath = Join-Path $latestMsvc.FullName "include"
-          "BINDGEN_EXTRA_CLANG_ARGS=-I`"$includePath`"" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $msvcInclude = Join-Path $latestMsvc.FullName "include"
+          $sdkBase = "C:\Program Files (x86)\Windows Kits\10\Include"
+          $latestSdk = Get-ChildItem $sdkBase -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1
+          $ucrtInclude = Join-Path $latestSdk.FullName "ucrt"
+          "BINDGEN_EXTRA_CLANG_ARGS=-I`"$msvcInclude`" -I`"$ucrtInclude`"" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - run: npm install
 
@@ -319,6 +331,12 @@ jobs:
 
       - name: Set up cargo-ndk
         run: cargo install cargo-ndk
+
+      - name: Set NDK cross-compilation env vars
+        run: |
+          NM_PATH=$(find /usr/local/lib/android/sdk/ndk -name "llvm-nm" -path "*/prebuilt/*" 2>/dev/null | head -1)
+          echo "NM_aarch64-linux-android=$NM_PATH" >> $GITHUB_ENV
+          echo "NM_x86_64-linux-android=$NM_PATH" >> $GITHUB_ENV
 
       - run: npm install
 

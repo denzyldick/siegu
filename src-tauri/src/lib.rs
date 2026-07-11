@@ -68,9 +68,6 @@ fn scan_files(app: tauri::AppHandle) {
         .abort
         .store(false, std::sync::atomic::Ordering::SeqCst);
 
-    // Initial signal to process any leftovers from previous runs
-    let _ = state.tx.send(ml::Job::ProcessAll);
-
     // Shared batcher for all folders in this scan session
     let (batch_tx, mut batch_rx) = tokio::sync::mpsc::unbounded_channel::<database::Photo>();
     let app_handle_for_batch = app.clone();
@@ -154,42 +151,6 @@ fn scan_files(app: tauri::AppHandle) {
             let mut buf = ui_buffer.lock().await;
             for p in &batch_with_thumbs {
                 buf.push(p.clone());
-            }
-        }
-
-        // Send AutoAnalyzeSingle for each (skip if no models enabled)
-        let config = {
-            let lock = database.lock().unwrap();
-            lock.get_state()
-        };
-        let any_model_enabled = [
-            "clip",
-            "face",
-            "ocr",
-            "nsfw",
-            "aesthetics",
-            "yolo",
-            "blip",
-            "arcface",
-            "midas",
-            "whisper",
-        ]
-        .iter()
-        .any(|m| {
-            config
-                .get(&format!("model_enabled_{}", m))
-                .map_or(false, |v| v == "true")
-        });
-        if any_model_enabled {
-            for p in &batch_with_thumbs {
-                if let Some(state) = app_handle.try_state::<ml::MlContext>() {
-                    if let Err(e) = state.tx.send(ml::Job::AutoAnalyzeSingle(p.id.clone())) {
-                        emit_log(
-                            app_handle,
-                            format!("[batch] ERROR sending AutoAnalyzeSingle: {e}"),
-                        );
-                    }
-                }
             }
         }
     }
