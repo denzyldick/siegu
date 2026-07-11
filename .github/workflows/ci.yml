@@ -197,6 +197,31 @@ jobs:
           echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
 
+      - name: Debug NDK paths
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          echo "SDK_ROOT=$SDK_ROOT"
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          NDK26="$SDK_ROOT/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          echo "--- NDK 26.1 bin contents (nm + clang) ---"
+          ls -la "$NDK26"/llvm-nm* 2>/dev/null || echo "NO llvm-nm found!"
+          ls -la "$NDK26"/aarch64-linux-android*-clang 2>/dev/null | head -5 || echo "NO aarch64 clang found!"
+          echo "--- All NDK versions ---"
+          ls "$SDK_ROOT/ndk/" 2>/dev/null || echo "No ndk dir"
+          echo "--- Ensure llvm-nm symlink ---"
+          if [ ! -f "$NDK26/llvm-nm" ]; then
+            NM_REAL=$(ls "$NDK26"/llvm-nm-* 2>/dev/null | head -n 1)
+            if [ -n "$NM_REAL" ]; then
+              ln -s "$(basename "$NM_REAL")" "$NDK26/llvm-nm"
+              echo "Created symlink: llvm-nm -> $(basename "$NM_REAL")"
+            else
+              echo "ERROR: No llvm-nm or llvm-nm-* found!"
+            fi
+          else
+            echo "llvm-nm already exists"
+          fi
+
       - run: npm install
 
       - run: cargo fmt --check
