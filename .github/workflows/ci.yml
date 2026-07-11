@@ -167,9 +167,6 @@ jobs:
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y nasm
 
-      - name: Set up cargo-ndk
-        run: cargo install cargo-ndk
-
       - name: Ensure rust targets are installed
         run: rustup target add aarch64-linux-android x86_64-linux-android || true
 
@@ -179,17 +176,25 @@ jobs:
           NDK_VERSION="26.1.10909125"
           NDK_ROOT="$SDK_ROOT/ndk/$NDK_VERSION"
           TOOLCHAIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64"
+          SYSROOT="$TOOLCHAIN/sysroot"
+          NDK_BIN="$TOOLCHAIN/bin"
 
-          CC_AARCH64="$TOOLCHAIN/bin/aarch64-linux-android26-clang"
-          CC_X86_64="$TOOLCHAIN/bin/x86_64-linux-android26-clang"
+          echo "SDK_ROOT=$SDK_ROOT"
+          echo "NDK_ROOT=$NDK_ROOT"
+          echo "TOOLCHAIN=$TOOLCHAIN"
+          echo "SYSROOT=$SYSROOT"
+          echo "NDK_BIN=$NDK_BIN"
 
-          if [ ! -f "$CC_AARCH64" ]; then
-            echo "Error: aarch64 clang not found at $CC_AARCH64"
+          if [ ! -f "$NDK_BIN/aarch64-linux-android26-clang" ]; then
+            echo "Error: aarch64 clang not found at $NDK_BIN/aarch64-linux-android26-clang"
+            echo "Listing NDK bin:"
+            ls "$NDK_BIN/" | head -20
             exit 1
           fi
 
-          echo "CC_aarch64-linux-android=$CC_AARCH64" >> $GITHUB_ENV
-          echo "CC_x86_64-linux-android=$CC_X86_64" >> $GITHUB_ENV
+          echo "CC_aarch64-linux-android=$NDK_BIN/aarch64-linux-android26-clang" >> $GITHUB_ENV
+          echo "CC_x86_64-linux-android=$NDK_BIN/x86_64-linux-android26-clang" >> $GITHUB_ENV
+          echo "CARGO_NDK_SYSROOT_PATH=$SYSROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
 
@@ -202,36 +207,41 @@ jobs:
         run: |
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           NDK_BIN="$SDK_ROOT/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/bin"
+
           echo "NDK_BIN=$NDK_BIN"
-          ls "$NDK_BIN/llvm-nm"* "$NDK_BIN/llvm-strip"* 2>/dev/null || echo "Missing nm/strip"
+          echo "Checking if llvm-nm exists..."
+          ls -la "$NDK_BIN/llvm-nm"* 2>/dev/null || echo "No llvm-nm found"
+          ls -la "$NDK_BIN/llvm-strip"* 2>/dev/null || echo "No llvm-strip found"
+          echo "All nm/strip related files:"
+          ls "$NDK_BIN/" | grep -iE 'nm|strip' || echo "None found"
 
           for TOOL in nm strip; do
             if [ ! -f "$NDK_BIN/llvm-$TOOL" ]; then
               echo "llvm-$TOOL missing, searching NDK..."
-              FOUND=$(find "$SDK_ROOT/ndk/26.1.10909125" -name "llvm-$TOOL" -type f -o -name "llvm-$TOOL" -type l 2>/dev/null | head -1)
+              FOUND=$(find "$SDK_ROOT/ndk/26.1.10909125" -name "llvm-$TOOL" 2>/dev/null | head -1)
               if [ -n "$FOUND" ]; then
                 ln -sf "$(realpath "$FOUND")" "$NDK_BIN/llvm-$TOOL"
                 echo "Created llvm-$TOOL -> $(realpath "$FOUND")"
               else
-                FOUND_VER=$(find "$SDK_ROOT/ndk/26.1.10909125" -name "llvm-$TOOL-*" 2>/dev/null | head -1)
-                if [ -n "$FOUND_VER" ]; then
-                  ln -sf "$(realpath "$FOUND_VER")" "$NDK_BIN/llvm-$TOOL"
-                  echo "Created llvm-$TOOL -> $(realpath "$FOUND_VER")"
-                else
-                  echo "ERROR: No llvm-$TOOL found anywhere in NDK"
-                  exit 1
-                fi
+                echo "ERROR: No llvm-$TOOL found anywhere in NDK"
+                exit 1
               fi
+            else
+              echo "llvm-$TOOL already exists at $NDK_BIN/llvm-$TOOL"
             fi
           done
 
           ls -la "$NDK_BIN"/llvm-nm* "$NDK_BIN"/llvm-strip*
 
-      - run: cargo ndk -t arm64-v8a check
+      - run: cargo check --target aarch64-linux-android
         working-directory: src-tauri
+        env:
+          CARGO_NDK_SYSROOT_PATH: ${{ env.CARGO_NDK_SYSROOT_PATH }}
 
-      - run: cargo ndk -t x86_64 check
+      - run: cargo check --target x86_64-linux-android
         working-directory: src-tauri
+        env:
+          CARGO_NDK_SYSROOT_PATH: ${{ env.CARGO_NDK_SYSROOT_PATH }}
 
   test-ios:
     if: github.event_name != 'release'
