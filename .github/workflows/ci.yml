@@ -190,85 +190,47 @@ jobs:
 
           echo "CC_aarch64-linux-android=$CC_AARCH64" >> $GITHUB_ENV
           echo "CC_x86_64-linux-android=$CC_X86_64" >> $GITHUB_ENV
-          echo "AR_aarch64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
-          echo "AR_x86_64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
-          echo "NM_aarch64-linux-android=$TOOLCHAIN/bin/llvm-nm" >> $GITHUB_ENV
-          echo "NM_x86_64-linux-android=$TOOLCHAIN/bin/llvm-nm" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
-
-      - name: Debug NDK paths
-        run: |
-          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
-          echo "SDK_ROOT=$SDK_ROOT"
-          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          NDK26="$SDK_ROOT/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          echo "--- NDK 26.1 bin contents (nm + clang) ---"
-          ls -la "$NDK26"/llvm-nm* 2>/dev/null || echo "NO llvm-nm found!"
-          ls -la "$NDK26"/aarch64-linux-android*-clang 2>/dev/null | head -5 || echo "NO aarch64 clang found!"
-          echo "--- All NDK versions ---"
-          ls "$SDK_ROOT/ndk/" 2>/dev/null || echo "No ndk dir"
-          echo "--- Ensure llvm-nm symlink ---"
-          if [ ! -f "$NDK26/llvm-nm" ]; then
-            NM_REAL=$(ls "$NDK26"/llvm-nm-* 2>/dev/null | head -n 1)
-            if [ -n "$NM_REAL" ]; then
-              ln -s "$(basename "$NM_REAL")" "$NDK26/llvm-nm"
-              echo "Created symlink: llvm-nm -> $(basename "$NM_REAL")"
-            else
-              echo "ERROR: No llvm-nm or llvm-nm-* found!"
-            fi
-          else
-            echo "llvm-nm already exists"
-          fi
 
       - run: npm install
 
       - run: cargo fmt --check
         working-directory: src-tauri
 
-      - name: Cross-check Android aarch64
+      - name: Ensure llvm-nm and llvm-strip exist in NDK
         run: |
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
-          NDK_ROOT="$SDK_ROOT/ndk/26.1.10909125"
-          NDK_BIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          NDK_BIN="$SDK_ROOT/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          echo "NDK_BIN=$NDK_BIN"
+          ls "$NDK_BIN/llvm-nm"* "$NDK_BIN/llvm-strip"* 2>/dev/null || echo "Missing nm/strip"
 
-          if [ ! -f "$NDK_BIN/llvm-nm" ]; then
-            echo "llvm-nm not found in $NDK_BIN, searching NDK..."
-            NM_SRC=$(find "$NDK_ROOT" -name "llvm-nm" -type f 2>/dev/null | head -1)
-            if [ -n "$NM_SRC" ]; then
-              ln -sf "$NM_SRC" "$NDK_BIN/llvm-nm"
-              echo "Symlinked $NM_SRC -> $NDK_BIN/llvm-nm"
-            else
-              echo "llvm-nm not in NDK, trying system..."
-              SYS_NM=$(which llvm-nm 2>/dev/null || ls /usr/bin/llvm-nm* 2>/dev/null | head -1 || true)
-              if [ -n "$SYS_NM" ]; then
-                ln -sf "$SYS_NM" "$NDK_BIN/llvm-nm"
-                echo "Symlinked $SYS_NM -> $NDK_BIN/llvm-nm"
+          for TOOL in nm strip; do
+            if [ ! -f "$NDK_BIN/llvm-$TOOL" ]; then
+              echo "llvm-$TOOL missing, searching NDK..."
+              FOUND=$(find "$SDK_ROOT/ndk/26.1.10909125" -name "llvm-$TOOL" -type f -o -name "llvm-$TOOL" -type l 2>/dev/null | head -1)
+              if [ -n "$FOUND" ]; then
+                ln -sf "$(realpath "$FOUND")" "$NDK_BIN/llvm-$TOOL"
+                echo "Created llvm-$TOOL -> $(realpath "$FOUND")"
               else
-                echo "ERROR: No llvm-nm found anywhere"
-                exit 1
+                FOUND_VER=$(find "$SDK_ROOT/ndk/26.1.10909125" -name "llvm-$TOOL-*" 2>/dev/null | head -1)
+                if [ -n "$FOUND_VER" ]; then
+                  ln -sf "$(realpath "$FOUND_VER")" "$NDK_BIN/llvm-$TOOL"
+                  echo "Created llvm-$TOOL -> $(realpath "$FOUND_VER")"
+                else
+                  echo "ERROR: No llvm-$TOOL found anywhere in NDK"
+                  exit 1
+                fi
               fi
             fi
-          fi
+          done
 
-          env \
-            "CC_aarch64-linux-android=$NDK_BIN/aarch64-linux-android26-clang" \
-            "AR_aarch64-linux-android=$NDK_BIN/llvm-ar" \
-            "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$NDK_BIN/aarch64-linux-android26-clang" \
-            cargo check --target aarch64-linux-android
+          ls -la "$NDK_BIN"/llvm-nm* "$NDK_BIN"/llvm-strip*
+
+      - run: cargo ndk -t arm64-v8a check
         working-directory: src-tauri
 
-      - name: Cross-check Android x86_64
-        run: |
-          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
-          NDK_ROOT="$SDK_ROOT/ndk/26.1.10909125"
-          NDK_BIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          env \
-            "CC_x86_64-linux-android=$NDK_BIN/x86_64-linux-android26-clang" \
-            "AR_x86_64-linux-android=$NDK_BIN/llvm-ar" \
-            "CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER=$NDK_BIN/x86_64-linux-android26-clang" \
-            cargo check --target x86_64-linux-android
+      - run: cargo ndk -t x86_64 check
         working-directory: src-tauri
 
   test-ios:
@@ -446,10 +408,6 @@ jobs:
 
           echo "CC_aarch64-linux-android=$CC_AARCH64" >> $GITHUB_ENV
           echo "CC_x86_64-linux-android=$CC_X86_64" >> $GITHUB_ENV
-          echo "AR_aarch64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
-          echo "AR_x86_64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
-          echo "NM_aarch64-linux-android=$TOOLCHAIN/bin/llvm-nm" >> $GITHUB_ENV
-          echo "NM_x86_64-linux-android=$TOOLCHAIN/bin/llvm-nm" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
 
