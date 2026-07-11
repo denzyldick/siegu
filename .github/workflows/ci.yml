@@ -49,6 +49,17 @@ jobs:
           brew install ffmpeg
           echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
+      - name: Install dependencies (Windows only)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          vcpkg install ffmpeg:x64-windows
+          $ffmpegDir = "C:\vcpkg\installed\x64-windows"
+          "FFMPEG_DIR=$ffmpegDir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FFMPEG_INCLUDE_DIR=$ffmpegDir\include" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FFMPEG_LIB_DIR=$ffmpegDir\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$ffmpegDir\lib" | Out-File -FilePath $env:GITHUB_PATH -Append
+
       - run: npm install
 
       - run: npm run check:translations
@@ -217,6 +228,17 @@ jobs:
         run: |
           brew install ffmpeg
           echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+
+      - name: Install dependencies (Windows only)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          vcpkg install ffmpeg:x64-windows
+          $ffmpegDir = "C:\vcpkg\installed\x64-windows"
+          "FFMPEG_DIR=$ffmpegDir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FFMPEG_INCLUDE_DIR=$ffmpegDir\include" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FFMPEG_LIB_DIR=$ffmpegDir\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$ffmpegDir\lib" | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - run: npm install
 
