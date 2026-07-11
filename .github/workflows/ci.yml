@@ -49,11 +49,31 @@ jobs:
           brew install ffmpeg
           echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
+      - name: Cache FFmpeg (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\installed\x64-windows
+          key: ffmpeg-windows-${{ runner.os }}-v1
+
       - name: Install dependencies (Windows only)
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
-          vcpkg install ffmpeg:x64-windows
+          if (Test-Path "C:\vcpkg\installed\x64-windows\include\libavcodec\avcodec.h") {
+            Write-Host "FFmpeg already cached, skipping install"
+          } else {
+            $retries = 3
+            for ($i = 1; $i -le $retries; $i++) {
+              try {
+                vcpkg install ffmpeg:x64-windows
+                break
+              } catch {
+                Write-Host "Attempt $i failed, retrying..."
+                Start-Sleep -Seconds (10 * $i)
+              }
+            }
+          }
           $ffmpegDir = "C:\vcpkg\installed\x64-windows"
           "FFMPEG_DIR=$ffmpegDir" | Out-File -FilePath $env:GITHUB_ENV -Append
           "FFMPEG_INCLUDE_DIR=$ffmpegDir\include" | Out-File -FilePath $env:GITHUB_ENV -Append
@@ -247,11 +267,31 @@ jobs:
           brew install ffmpeg
           echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
+      - name: Cache FFmpeg (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\installed\x64-windows
+          key: ffmpeg-windows-${{ runner.os }}-v1
+
       - name: Install dependencies (Windows only)
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
-          vcpkg install ffmpeg:x64-windows
+          if (Test-Path "C:\vcpkg\installed\x64-windows\include\libavcodec\avcodec.h") {
+            Write-Host "FFmpeg already cached, skipping install"
+          } else {
+            $retries = 3
+            for ($i = 1; $i -le $retries; $i++) {
+              try {
+                vcpkg install ffmpeg:x64-windows
+                break
+              } catch {
+                Write-Host "Attempt $i failed, retrying..."
+                Start-Sleep -Seconds (10 * $i)
+              }
+            }
+          }
           $ffmpegDir = "C:\vcpkg\installed\x64-windows"
           "FFMPEG_DIR=$ffmpegDir" | Out-File -FilePath $env:GITHUB_ENV -Append
           "FFMPEG_INCLUDE_DIR=$ffmpegDir\include" | Out-File -FilePath $env:GITHUB_ENV -Append
