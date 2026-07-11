@@ -260,6 +260,30 @@
                   <div class="text-caption text-zinc-muted">{{ $t('photo_viewer.aperture') }}</div>
                   <div class="text-body-2 text-zinc-secondary">{{ exifData.aperture }}</div>
                 </v-col>
+                <v-col cols="6" v-if="exifData.focalLength" class="mb-3">
+                  <div class="text-caption text-zinc-muted">{{ $t('photo_viewer.focal_length') }}</div>
+                  <div class="text-body-2 text-zinc-secondary">{{ exifData.focalLength }}</div>
+                </v-col>
+                <v-col cols="6" v-if="exifData.lens" class="mb-3">
+                  <div class="text-caption text-zinc-muted">{{ $t('photo_viewer.lens') }}</div>
+                  <div class="text-body-2 text-zinc-secondary">{{ exifData.lens }}</div>
+                </v-col>
+                <v-col cols="6" v-if="exifData.flash" class="mb-3">
+                  <div class="text-caption text-zinc-muted">{{ $t('photo_viewer.flash') }}</div>
+                  <div class="text-body-2 text-zinc-secondary">{{ exifData.flash }}</div>
+                </v-col>
+                <v-col cols="6" v-if="exifData.whiteBalance" class="mb-3">
+                  <div class="text-caption text-zinc-muted">{{ $t('photo_viewer.white_balance') }}</div>
+                  <div class="text-body-2 text-zinc-secondary">{{ exifData.whiteBalance }}</div>
+                </v-col>
+                <v-col cols="6" v-if="exifData.meteringMode" class="mb-3">
+                  <div class="text-caption text-zinc-muted">{{ $t('photo_viewer.metering_mode') }}</div>
+                  <div class="text-body-2 text-zinc-secondary">{{ exifData.meteringMode }}</div>
+                </v-col>
+                <v-col cols="6" v-if="exifData.software" class="mb-3">
+                  <div class="text-caption text-zinc-muted">{{ $t('photo_viewer.software') }}</div>
+                  <div class="text-body-2 text-zinc-secondary">{{ exifData.software }}</div>
+                </v-col>
               </v-row>
             </div>
 
@@ -437,9 +461,19 @@ export default {
         model: props.Model,
         date: props.DateTimeOriginal || props.DateTime,
         dimensions,
-        iso: props.PhotographicSensitivity || props.ISOSpeedRatings,
+        iso: props.PhotographicSensitivity,
         shutter: props.ExposureTime,
         aperture: props.FNumber,
+        lens: props.LensModel,
+        lensMake: props.LensMake,
+        focalLength: props.FocalLength,
+        focalLength35: props.FocalLengthIn35mmFilm,
+        flash: props.Flash,
+        whiteBalance: props.WhiteBalance,
+        exposureProgram: props.ExposureProgram,
+        meteringMode: props.MeteringMode,
+        sceneType: props.SceneCaptureType,
+        software: props.Software,
       };
     },
     hasExif() {

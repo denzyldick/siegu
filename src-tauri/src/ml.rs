@@ -803,6 +803,8 @@ pub fn start_background_worker(
                         let image_res = image::open(&photo_loc_actual);
                         if !abort_task.load(Ordering::SeqCst) {
                             if let Ok(dynamic_img) = image_res {
+                                let orientation = crate::thumbnail::read_exif_orientation(&photo_loc_actual);
+                                let dynamic_img = crate::thumbnail::apply_orientation(dynamic_img, orientation);
                                 let img = dynamic_img.to_rgb8();
 
                             // CLIP Visual

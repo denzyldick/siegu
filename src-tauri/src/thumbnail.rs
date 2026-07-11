@@ -1,7 +1,36 @@
 use base64::Engine;
-use image::ImageFormat;
+use image::{DynamicImage, ImageFormat};
+use std::fs::File;
+use std::io::BufReader;
 
 const THUMB_SIZE: u32 = 320;
+
+pub fn read_exif_orientation(path: &str) -> u16 {
+    let Ok(file) = File::open(path) else {
+        return 1;
+    };
+    let mut buf = BufReader::new(file);
+    let Ok(exif) = exif::Reader::new().read_from_container(&mut buf) else {
+        return 1;
+    };
+    let Some(field) = exif.get_field(exif::Tag::Orientation, exif::In::PRIMARY) else {
+        return 1;
+    };
+    field.value.get_uint(0).unwrap_or(1) as u16
+}
+
+pub fn apply_orientation(img: DynamicImage, orientation: u16) -> DynamicImage {
+    match orientation {
+        2 => img.fliph(),
+        3 => img.rotate180(),
+        4 => img.flipv(),
+        5 => img.fliph().rotate270(),
+        6 => img.rotate90(),
+        7 => img.flipv().rotate270(),
+        8 => img.rotate270(),
+        _ => img,
+    }
+}
 
 pub fn needs_thumbnail(encoded: &str) -> bool {
     encoded.is_empty()
@@ -28,6 +57,8 @@ pub fn generate_thumbnail(path: &str) -> Option<String> {
 
 fn generate_image_thumbnail(path: &str) -> Option<String> {
     let img = image::open(path).ok()?;
+    let orientation = read_exif_orientation(path);
+    let img = apply_orientation(img, orientation);
     let thumb = img.thumbnail(THUMB_SIZE, THUMB_SIZE);
     let mut buf = std::io::Cursor::new(Vec::new());
     thumb.write_to(&mut buf, ImageFormat::Jpeg).ok()?;

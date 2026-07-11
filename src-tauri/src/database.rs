@@ -1257,6 +1257,18 @@ impl Database {
                 ));
             }
         }
+        {
+            let mut prop_stmt = tx
+                .prepare_cached(
+                    "INSERT OR REPLACE INTO properties(photo_id, key, value) VALUES(?1, ?2, ?3)",
+                )
+                .map_err(|e| e.to_string())?;
+            for p in photos {
+                for (key, value) in &p.properties {
+                    let _ = prop_stmt.execute((&p.id, key, value));
+                }
+            }
+        }
         tx.commit().map_err(|e| e.to_string())
     }
 

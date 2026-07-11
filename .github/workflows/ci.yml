@@ -36,6 +36,8 @@ jobs:
           components: rustfmt
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
 
       - name: Install dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-24.04'
@@ -163,6 +165,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: android
+          workspaces: src-tauri
 
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y nasm
@@ -194,6 +197,8 @@ jobs:
 
           echo "CC_aarch64-linux-android=$NDK_BIN/aarch64-linux-android26-clang" >> $GITHUB_ENV
           echo "CC_x86_64-linux-android=$NDK_BIN/x86_64-linux-android26-clang" >> $GITHUB_ENV
+          echo "AR_aarch64-linux-android=$NDK_BIN/llvm-ar" >> $GITHUB_ENV
+          echo "AR_x86_64-linux-android=$NDK_BIN/llvm-ar" >> $GITHUB_ENV
           echo "CARGO_NDK_SYSROOT_PATH=$SYSROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
@@ -260,6 +265,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ios
+          workspaces: src-tauri
 
       - run: npm install
 
@@ -294,6 +300,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: release-${{ matrix.platform }}
+          workspaces: src-tauri
 
       - name: Install dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-24.04'
@@ -391,6 +398,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: release-android
+          workspaces: src-tauri
 
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y nasm
@@ -418,6 +426,8 @@ jobs:
 
           echo "CC_aarch64-linux-android=$CC_AARCH64" >> $GITHUB_ENV
           echo "CC_x86_64-linux-android=$CC_X86_64" >> $GITHUB_ENV
+          echo "AR_aarch64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
+          echo "AR_x86_64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
 
@@ -494,6 +504,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: release-ios
+          workspaces: src-tauri
 
       - run: npm install
 

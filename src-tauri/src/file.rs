@@ -183,6 +183,7 @@ pub fn scan_folder(
             let mut longitude = 0.0;
             let mut created = String::new();
             let encoded = String::new();
+            let mut properties = HashMap::new();
 
             if let Ok(file) = File::open(&file_path) {
                 let mut buff = BufReader::new(&file);
@@ -231,6 +232,38 @@ pub fn scan_folder(
                             }
                         }
                     }
+
+                    let exif_tags = [
+                        exif::Tag::Orientation,
+                        exif::Tag::Make,
+                        exif::Tag::Model,
+                        exif::Tag::LensModel,
+                        exif::Tag::LensMake,
+                        exif::Tag::FocalLength,
+                        exif::Tag::FocalLengthIn35mmFilm,
+                        exif::Tag::PixelXDimension,
+                        exif::Tag::PixelYDimension,
+                        exif::Tag::ImageWidth,
+                        exif::Tag::ImageLength,
+                        exif::Tag::PhotographicSensitivity,
+                        exif::Tag::ExposureTime,
+                        exif::Tag::FNumber,
+                        exif::Tag::ExposureProgram,
+                        exif::Tag::Flash,
+                        exif::Tag::WhiteBalance,
+                        exif::Tag::MeteringMode,
+                        exif::Tag::SceneCaptureType,
+                        exif::Tag::Software,
+                        exif::Tag::DateTimeOriginal,
+                        exif::Tag::DateTime,
+                    ];
+
+                    for tag in &exif_tags {
+                        if let Some(field) = exif.get_field(*tag, exif::In::PRIMARY) {
+                            let value = format!("{}", field.display_value());
+                            properties.insert(format!("{tag}"), value);
+                        }
+                    }
                 }
             }
 
@@ -240,7 +273,7 @@ pub fn scan_folder(
                 location: path_str.clone(),
                 created,
                 objects: HashMap::new(),
-                properties: HashMap::new(),
+                properties,
                 latitude,
                 longitude,
                 favorite: false,
