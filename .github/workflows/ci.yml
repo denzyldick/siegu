@@ -78,7 +78,7 @@ jobs:
           "FFMPEG_DIR=$ffmpegDir" | Out-File -FilePath $env:GITHUB_ENV -Append
           "FFMPEG_INCLUDE_DIR=$ffmpegDir\include" | Out-File -FilePath $env:GITHUB_ENV -Append
           "FFMPEG_LIB_DIR=$ffmpegDir\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "$ffmpegDir\lib" | Out-File -FilePath $env:GITHUB_PATH -Append
+          "$ffmpegDir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - run: npm install
 
@@ -299,7 +299,7 @@ jobs:
           "FFMPEG_DIR=$ffmpegDir" | Out-File -FilePath $env:GITHUB_ENV -Append
           "FFMPEG_INCLUDE_DIR=$ffmpegDir\include" | Out-File -FilePath $env:GITHUB_ENV -Append
           "FFMPEG_LIB_DIR=$ffmpegDir\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "$ffmpegDir\lib" | Out-File -FilePath $env:GITHUB_PATH -Append
+          "$ffmpegDir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - run: npm install
 
