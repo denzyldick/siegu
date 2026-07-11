@@ -227,10 +227,46 @@ jobs:
       - run: cargo fmt --check
         working-directory: src-tauri
 
-      - run: cargo ndk -t arm64-v8a check
+      - name: Cross-check Android aarch64
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          NDK_ROOT="$SDK_ROOT/ndk/26.1.10909125"
+          NDK_BIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+
+          if [ ! -f "$NDK_BIN/llvm-nm" ]; then
+            echo "llvm-nm not found in $NDK_BIN, searching NDK..."
+            NM_SRC=$(find "$NDK_ROOT" -name "llvm-nm" -type f 2>/dev/null | head -1)
+            if [ -n "$NM_SRC" ]; then
+              ln -sf "$NM_SRC" "$NDK_BIN/llvm-nm"
+              echo "Symlinked $NM_SRC -> $NDK_BIN/llvm-nm"
+            else
+              echo "llvm-nm not in NDK, trying system..."
+              SYS_NM=$(which llvm-nm 2>/dev/null || ls /usr/bin/llvm-nm* 2>/dev/null | head -1 || true)
+              if [ -n "$SYS_NM" ]; then
+                ln -sf "$SYS_NM" "$NDK_BIN/llvm-nm"
+                echo "Symlinked $SYS_NM -> $NDK_BIN/llvm-nm"
+              else
+                echo "ERROR: No llvm-nm found anywhere"
+                exit 1
+              fi
+            fi
+          fi
+
+          export CC_aarch64-linux-android="$NDK_BIN/aarch64-linux-android26-clang"
+          export AR_aarch64-linux-android="$NDK_BIN/llvm-ar"
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$NDK_BIN/aarch64-linux-android26-clang"
+          cargo check --target aarch64-linux-android
         working-directory: src-tauri
 
-      - run: cargo ndk -t x86_64 check
+      - name: Cross-check Android x86_64
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          NDK_ROOT="$SDK_ROOT/ndk/26.1.10909125"
+          NDK_BIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export CC_x86_64-linux-android="$NDK_BIN/x86_64-linux-android26-clang"
+          export AR_x86_64-linux-android="$NDK_BIN/llvm-ar"
+          export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$NDK_BIN/x86_64-linux-android26-clang"
+          cargo check --target x86_64-linux-android
         working-directory: src-tauri
 
   test-ios:
