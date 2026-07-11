@@ -176,15 +176,12 @@ jobs:
       - name: Set NDK cross-compilation env vars
         run: |
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
-          NM_PATH=$(find "$SDK_ROOT" -type f -name "llvm-nm" -path "*/prebuilt/*" 2>/dev/null | head -n 1)
+          NDK_VERSION="26.1.10909125"
+          NDK_ROOT="$SDK_ROOT/ndk/$NDK_VERSION"
+          NM_PATH="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
 
-          if [ -z "$NM_PATH" ]; then
-            NDK_VERSION="26.1.10909125"
-            NM_PATH=$(find "$SDK_ROOT/ndk/$NDK_VERSION" -type f -name "llvm-nm" 2>/dev/null | head -n 1)
-          fi
-
-          if [ -z "$NM_PATH" ]; then
-            echo "Error: llvm-nm not found under $SDK_ROOT"
+          if [ ! -f "$NM_PATH" ]; then
+            echo "Error: llvm-nm not found at $NM_PATH"
             exit 1
           fi
 
@@ -194,7 +191,6 @@ jobs:
           echo "NM_aarch64_linux_android=$NM_PATH" >> $GITHUB_ENV
           echo "NM_x86_64_linux_android=$NM_PATH" >> $GITHUB_ENV
           echo "ANDROID_NM=$NM_PATH" >> $GITHUB_ENV
-          NDK_ROOT=$(dirname "$(dirname "$(dirname "$(dirname "$(dirname "$(dirname "$NM_PATH")")")")")")
           echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
 
@@ -370,15 +366,12 @@ jobs:
       - name: Set NDK cross-compilation env vars
         run: |
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
-          NM_PATH=$(find "$SDK_ROOT" -type f -name "llvm-nm" -path "*/prebuilt/*" 2>/dev/null | head -n 1)
+          NDK_VERSION="26.1.10909125"
+          NDK_ROOT="$SDK_ROOT/ndk/$NDK_VERSION"
+          NM_PATH="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
 
-          if [ -z "$NM_PATH" ]; then
-            NDK_VERSION="26.1.10909125"
-            NM_PATH=$(find "$SDK_ROOT/ndk/$NDK_VERSION" -type f -name "llvm-nm" 2>/dev/null | head -n 1)
-          fi
-
-          if [ -z "$NM_PATH" ]; then
-            echo "Error: llvm-nm not found under $SDK_ROOT"
+          if [ ! -f "$NM_PATH" ]; then
+            echo "Error: llvm-nm not found at $NM_PATH"
             exit 1
           fi
 
@@ -388,7 +381,6 @@ jobs:
           echo "NM_aarch64_linux_android=$NM_PATH" >> $GITHUB_ENV
           echo "NM_x86_64_linux_android=$NM_PATH" >> $GITHUB_ENV
           echo "ANDROID_NM=$NM_PATH" >> $GITHUB_ENV
-          NDK_ROOT=$(dirname "$(dirname "$(dirname "$(dirname "$(dirname "$(dirname "$NM_PATH")")")")")")
           echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
 
