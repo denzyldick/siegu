@@ -178,19 +178,20 @@ jobs:
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           NDK_VERSION="26.1.10909125"
           NDK_ROOT="$SDK_ROOT/ndk/$NDK_VERSION"
-          NM_PATH="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          TOOLCHAIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64"
 
-          if [ ! -f "$NM_PATH" ]; then
-            echo "Error: llvm-nm not found at $NM_PATH"
+          CC_AARCH64="$TOOLCHAIN/bin/aarch64-linux-android26-clang"
+          CC_X86_64="$TOOLCHAIN/bin/x86_64-linux-android26-clang"
+
+          if [ ! -f "$CC_AARCH64" ]; then
+            echo "Error: aarch64 clang not found at $CC_AARCH64"
             exit 1
           fi
 
-          echo "Found llvm-nm: $NM_PATH"
-          echo "NM_aarch64-linux-android=$NM_PATH" >> $GITHUB_ENV
-          echo "NM_x86_64-linux-android=$NM_PATH" >> $GITHUB_ENV
-          echo "NM_aarch64_linux_android=$NM_PATH" >> $GITHUB_ENV
-          echo "NM_x86_64_linux_android=$NM_PATH" >> $GITHUB_ENV
-          echo "ANDROID_NM=$NM_PATH" >> $GITHUB_ENV
+          echo "CC_aarch64-linux-android=$CC_AARCH64" >> $GITHUB_ENV
+          echo "CC_x86_64-linux-android=$CC_X86_64" >> $GITHUB_ENV
+          echo "AR_aarch64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
+          echo "AR_x86_64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
 
@@ -368,19 +369,20 @@ jobs:
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           NDK_VERSION="26.1.10909125"
           NDK_ROOT="$SDK_ROOT/ndk/$NDK_VERSION"
-          NM_PATH="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          TOOLCHAIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64"
 
-          if [ ! -f "$NM_PATH" ]; then
-            echo "Error: llvm-nm not found at $NM_PATH"
+          CC_AARCH64="$TOOLCHAIN/bin/aarch64-linux-android26-clang"
+          CC_X86_64="$TOOLCHAIN/bin/x86_64-linux-android26-clang"
+
+          if [ ! -f "$CC_AARCH64" ]; then
+            echo "Error: aarch64 clang not found at $CC_AARCH64"
             exit 1
           fi
 
-          echo "Found llvm-nm: $NM_PATH"
-          echo "NM_aarch64-linux-android=$NM_PATH" >> $GITHUB_ENV
-          echo "NM_x86_64-linux-android=$NM_PATH" >> $GITHUB_ENV
-          echo "NM_aarch64_linux_android=$NM_PATH" >> $GITHUB_ENV
-          echo "NM_x86_64_linux_android=$NM_PATH" >> $GITHUB_ENV
-          echo "ANDROID_NM=$NM_PATH" >> $GITHUB_ENV
+          echo "CC_aarch64-linux-android=$CC_AARCH64" >> $GITHUB_ENV
+          echo "CC_x86_64-linux-android=$CC_X86_64" >> $GITHUB_ENV
+          echo "AR_aarch64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
+          echo "AR_x86_64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
 
