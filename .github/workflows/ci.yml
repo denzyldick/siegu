@@ -192,6 +192,8 @@ jobs:
           echo "CC_x86_64-linux-android=$CC_X86_64" >> $GITHUB_ENV
           echo "AR_aarch64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
           echo "AR_x86_64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
+          echo "NM_aarch64-linux-android=$TOOLCHAIN/bin/llvm-nm" >> $GITHUB_ENV
+          echo "NM_x86_64-linux-android=$TOOLCHAIN/bin/llvm-nm" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
 
@@ -383,6 +385,8 @@ jobs:
           echo "CC_x86_64-linux-android=$CC_X86_64" >> $GITHUB_ENV
           echo "AR_aarch64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
           echo "AR_x86_64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
+          echo "NM_aarch64-linux-android=$TOOLCHAIN/bin/llvm-nm" >> $GITHUB_ENV
+          echo "NM_x86_64-linux-android=$TOOLCHAIN/bin/llvm-nm" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
 
