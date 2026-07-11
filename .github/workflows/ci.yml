@@ -136,7 +136,9 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: stable
           targets: aarch64-linux-android, x86_64-linux-android
+          components: rustfmt
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -148,11 +150,27 @@ jobs:
       - name: Set up cargo-ndk
         run: cargo install cargo-ndk
 
+      - name: Ensure rust targets are installed
+        run: rustup target add aarch64-linux-android x86_64-linux-android || true
+
       - name: Set NDK cross-compilation env vars
         run: |
-          NM_PATH=$(find /usr/local/lib/android/sdk/ndk -name "llvm-nm" -path "*/prebuilt/*" 2>/dev/null | head -1)
-          echo "NM_aarch64-linux-android=$NM_PATH" >> $GITHUB_ENV
-          echo "NM_x86_64-linux-android=$NM_PATH" >> $GITHUB_ENV
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          NM_PATH=$(find "$SDK_ROOT" -type f -name "llvm-nm" -path "*/prebuilt/*" 2>/dev/null | head -n 1 || true)
+
+          if [ -z "$NM_PATH" ]; then
+            echo "Warning: llvm-nm not found under $SDK_ROOT"
+          else
+            echo "Found llvm-nm: $NM_PATH"
+            echo "NM_aarch64-linux-android=$NM_PATH" >> $GITHUB_ENV
+            echo "NM_x86_64-linux-android=$NM_PATH" >> $GITHUB_ENV
+            echo "NM_aarch64_linux_android=$NM_PATH" >> $GITHUB_ENV
+            echo "NM_x86_64_linux_android=$NM_PATH" >> $GITHUB_ENV
+            echo "ANDROID_NM=$NM_PATH" >> $GITHUB_ENV
+            NDK_ROOT=$(dirname "$(dirname "$NM_PATH")")
+            echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
+            echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
+          fi
 
       - run: npm install
 
@@ -286,7 +304,9 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: stable
           targets: aarch64-linux-android, x86_64-linux-android
+          components: rustfmt
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -298,11 +318,27 @@ jobs:
       - name: Set up cargo-ndk
         run: cargo install cargo-ndk
 
+      - name: Ensure rust targets are installed
+        run: rustup target add aarch64-linux-android x86_64-linux-android || true
+
       - name: Set NDK cross-compilation env vars
         run: |
-          NM_PATH=$(find /usr/local/lib/android/sdk/ndk -name "llvm-nm" -path "*/prebuilt/*" 2>/dev/null | head -1)
-          echo "NM_aarch64-linux-android=$NM_PATH" >> $GITHUB_ENV
-          echo "NM_x86_64-linux-android=$NM_PATH" >> $GITHUB_ENV
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          NM_PATH=$(find "$SDK_ROOT" -type f -name "llvm-nm" -path "*/prebuilt/*" 2>/dev/null | head -n 1 || true)
+
+          if [ -z "$NM_PATH" ]; then
+            echo "Warning: llvm-nm not found under $SDK_ROOT"
+          else
+            echo "Found llvm-nm: $NM_PATH"
+            echo "NM_aarch64-linux-android=$NM_PATH" >> $GITHUB_ENV
+            echo "NM_x86_64-linux-android=$NM_PATH" >> $GITHUB_ENV
+            echo "NM_aarch64_linux_android=$NM_PATH" >> $GITHUB_ENV
+            echo "NM_x86_64_linux_android=$NM_PATH" >> $GITHUB_ENV
+            echo "ANDROID_NM=$NM_PATH" >> $GITHUB_ENV
+            NDK_ROOT=$(dirname "$(dirname "$NM_PATH")")
+            echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
+            echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
+          fi
 
       - run: npm install
 
