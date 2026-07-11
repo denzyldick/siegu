@@ -252,10 +252,11 @@ jobs:
             fi
           fi
 
-          export CC_aarch64-linux-android="$NDK_BIN/aarch64-linux-android26-clang"
-          export AR_aarch64-linux-android="$NDK_BIN/llvm-ar"
-          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$NDK_BIN/aarch64-linux-android26-clang"
-          cargo check --target aarch64-linux-android
+          env \
+            "CC_aarch64-linux-android=$NDK_BIN/aarch64-linux-android26-clang" \
+            "AR_aarch64-linux-android=$NDK_BIN/llvm-ar" \
+            "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$NDK_BIN/aarch64-linux-android26-clang" \
+            cargo check --target aarch64-linux-android
         working-directory: src-tauri
 
       - name: Cross-check Android x86_64
@@ -263,10 +264,11 @@ jobs:
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           NDK_ROOT="$SDK_ROOT/ndk/26.1.10909125"
           NDK_BIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          export CC_x86_64-linux-android="$NDK_BIN/x86_64-linux-android26-clang"
-          export AR_x86_64-linux-android="$NDK_BIN/llvm-ar"
-          export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$NDK_BIN/x86_64-linux-android26-clang"
-          cargo check --target x86_64-linux-android
+          env \
+            "CC_x86_64-linux-android=$NDK_BIN/x86_64-linux-android26-clang" \
+            "AR_x86_64-linux-android=$NDK_BIN/llvm-ar" \
+            "CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER=$NDK_BIN/x86_64-linux-android26-clang" \
+            cargo check --target x86_64-linux-android
         working-directory: src-tauri
 
   test-ios:
