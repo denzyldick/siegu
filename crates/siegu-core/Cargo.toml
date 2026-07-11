@@ -1,0 +1,45 @@
+[package]
+name = "siegu-core"
+version = "0.1.0"
+description = "Core library for Siegu — privacy-first media management"
+authors = ["Denzyl Dick"]
+license-file = "../../LICENSE"
+edition = "2021"
+
+[lib]
+name = "siegu_core"
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+rusqlite = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+sha2 = { workspace = true }
+rand = { workspace = true }
+bip39 = { workspace = true }
+hex = { workspace = true }
+zeroize = { workspace = true }
+sysinfo = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true }
+base64 = { workspace = true }
+image = { workspace = true }
+rayon = { workspace = true }
+notify = { workspace = true }
+kamadak-exif = { workspace = true }
+ndarray = { workspace = true }
+futures-util = { workspace = true }
+tokio-tungstenite = { workspace = true }
+crossbeam-channel = { workspace = true }
+reqwest = { workspace = true }
+anyhow = "1.0.102"
+lazy_static = "1.5.0"
+num_cpus = "1.16.0"
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tungstenite = { workspace = true }
+tracing-subscriber = { workspace = true }
