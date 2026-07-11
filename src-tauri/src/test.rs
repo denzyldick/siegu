@@ -1,20 +1,20 @@
 #[cfg(test)]
 mod tests {
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     use crate::ml::ModelEngine;
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     use ndarray::{Array2, Array4};
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     use ort::{session::builder::GraphOptimizationLevel, session::Session};
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     use std::path::{Path, PathBuf};
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     use std::sync::{Arc, Mutex};
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     static ORT_INIT: std::sync::OnceLock<()> = std::sync::OnceLock::new();
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     fn ensure_ort() {
         ORT_INIT.get_or_init(|| {
             assert!(
@@ -24,7 +24,7 @@ mod tests {
         });
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     fn test_models_dir() -> Option<PathBuf> {
         if let Some(dir) = std::env::var_os("SIEGU_TEST_MODELS_DIR") {
             let p = PathBuf::from(dir);
@@ -63,7 +63,7 @@ mod tests {
         None
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     fn sample_image_tensor(width: u32, height: u32) -> Array4<f32> {
         let sample_photo = Path::new("icons/icon.png");
         let image = image::open(sample_photo)
@@ -180,7 +180,7 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     fn assert_downloaded_model(path: &Path) {
         let metadata = std::fs::metadata(path)
             .unwrap_or_else(|e| panic!("missing downloaded model {}: {e}", path.display()));
@@ -192,7 +192,7 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     fn load_model(path: &Path, name: &str) -> Result<ModelEngine, String> {
         let metadata = std::fs::metadata(path)
             .map_err(|e| format!("missing model {}: {e}", path.display()))?;
@@ -212,7 +212,7 @@ mod tests {
         Ok(ModelEngine::Ort(Arc::new(Mutex::new(session))))
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     fn assert_clip_text_infers(models_dir: &Path) {
         let tokenizer_path = models_dir.join("tokenizer.json");
         assert_downloaded_model(&tokenizer_path);
@@ -254,7 +254,7 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     struct ModelSmokeCase {
         name: &'static str,
         file: &'static str,
@@ -262,7 +262,7 @@ mod tests {
         shape: (usize, usize, usize, usize),
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     fn run_model_tests(models_dir: &Path, cases: &[ModelSmokeCase]) {
         for case in cases {
             let model_path = models_dir.join(case.file);
@@ -311,7 +311,7 @@ mod tests {
     //   aesthetics: input (not pixel_values)
     //   arcface:    input.1 (not data)
     //   midas:      pixel_values (not 0)
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     const ALL_MODEL_CASES: [ModelSmokeCase; 9] = [
         ModelSmokeCase {
             name: "clip visual",
@@ -369,7 +369,7 @@ mod tests {
         },
     ];
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     const PIPELINE_MODEL_CASES: [ModelSmokeCase; 5] = [
         ModelSmokeCase {
             name: "clip",
@@ -405,7 +405,7 @@ mod tests {
 
     #[test]
     fn test_full_inference_on_sample() {
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         {
             let Some(models_dir) = test_models_dir() else {
                 eprintln!("SKIP: no models directory found.");
@@ -446,7 +446,7 @@ mod tests {
 
     #[test]
     fn test_indexing_pipeline() {
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         {
             let Some(models_dir) = test_models_dir() else {
                 eprintln!("SKIP: no models directory found.");
@@ -1537,7 +1537,7 @@ mod tests {
 
     #[test]
     fn test_get_photo_by_id_serialization() {
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         {
             use crate::database::Database;
 

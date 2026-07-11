@@ -12,7 +12,7 @@ use tauri::{AppHandle, Manager};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
 // Conditional imports for AI Engines
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use ort::{session::builder::GraphOptimizationLevel, session::Session};
 
 #[cfg(target_os = "android")]
@@ -113,7 +113,7 @@ fn increment_pending_count(counter: &AtomicUsize, amount: usize) -> usize {
 // Model wrappers to handle different engine types
 #[derive(Clone)]
 pub(crate) enum ModelEngine {
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     Ort(Arc<Mutex<Session>>),
     #[cfg(target_os = "android")]
     Tract(Arc<SimplePlan<TypedFact, Box<dyn TypedOp>, TypedModel>>),
@@ -122,7 +122,7 @@ pub(crate) enum ModelEngine {
 impl ModelEngine {
     pub(crate) fn run(&self, input: Array4<f32>, _input_name: &str) -> Result<Vec<f32>, String> {
         match self {
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             ModelEngine::Ort(session) => {
                 let shape = input.shape().to_vec();
                 let data = input.into_raw_vec_and_offset().0;
@@ -162,7 +162,7 @@ impl ModelEngine {
 }
 
 fn compute_text_embeddings(
-    #[cfg(not(target_os = "android"))] text_model: &mut Session,
+    #[cfg(not(any(target_os = "android", target_os = "ios")))] text_model: &mut Session,
     #[cfg(target_os = "android")] text_model: &SimplePlan<TypedFact, Box<dyn TypedOp>, TypedModel>,
     tokenizer: &tokenizers::Tokenizer,
 ) -> Vec<(String, Vec<f32>)> {
@@ -218,7 +218,7 @@ fn compute_text_embeddings(
     let mut embeddings = Vec::new();
     for text_label in search_vocabulary {
         if let Ok(encoding) = tokenizer.encode(format!("a photo of {text_label}"), true) {
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             let mut ids = encoding
                 .get_ids()
                 .iter()
@@ -239,12 +239,12 @@ fn compute_text_embeddings(
                 }
             }
 
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             let arr = Array2::from_shape_vec((1, 77), ids).unwrap();
             #[cfg(target_os = "android")]
             let arr = Array2::from_shape_vec((1, 77), ids).unwrap();
 
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             {
                 let shape = arr.shape().to_vec();
                 let data = arr.into_raw_vec_and_offset().0;
@@ -407,7 +407,7 @@ pub fn start_background_worker(
                     &app_handle,
                     "ML Worker: Initializing AI Engines...".to_string(),
                 );
-                #[cfg(not(target_os = "android"))]
+                #[cfg(not(any(target_os = "android", target_os = "ios")))]
                 {
                     let _ = ort::init().with_name("siegu").commit();
                 }
@@ -421,7 +421,7 @@ pub fn start_background_worker(
                     .map(Arc::new);
 
                 if is_ok(&ultraface_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -432,7 +432,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&clip_visual_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -443,7 +443,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&clip_text_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Some(tokenizer) = tokenizer.as_ref() {
                         if let Ok(mut s) = Session::builder()
                             .unwrap()
@@ -456,7 +456,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&ocr_det_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -467,7 +467,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&ocr_rec_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -478,7 +478,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&nsfw_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -489,7 +489,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&aesthetics_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -500,7 +500,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&yolo_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -511,7 +511,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&blip_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -522,7 +522,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&arcface_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -533,7 +533,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&midas_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -544,7 +544,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&whisper_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)

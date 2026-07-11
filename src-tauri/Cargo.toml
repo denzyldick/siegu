@@ -54,14 +54,13 @@ tokenizers = "0.23.1"
 bip39 = { version = "2.2.2", features = ["std"] }
 sha2 = "0.10.9"
 hex = "0.4.3"
-ffmpeg-next = "8.1.0"
+
 tokio-tungstenite = { version = "0.28.0", features = ["rustls-tls-webpki-roots"] }
 futures-util = "0.3.32"
 url = "2.5.8"
 uuid = { version = "1.23.3", features = ["v4"] }
 rayon = "1.10.0"
 num_cpus = "1.16.0"
-ffmpeg-sidecar = { version = "2.5.2", features = ["download_ffmpeg"] }
 tauri-plugin-notification = "2.3.3"
 notify = "8.2.0"
 heic = "0.1.6"
@@ -71,16 +70,17 @@ mdns-sd = "0.13"
 tempfile = "3.19.0"
 tungstenite = "0.28.0"
 
-[target.'cfg(not(target_os = "android"))'.dependencies]
-ort = { version = "2.0.0-rc.12", default-features = false, features = ["ndarray", "std", "copy-dylibs", "download-binaries", "tls-rustls"] }
-
-[target.'cfg(target_os = "android")'.dependencies]
-tract-onnx = "0.21.0"
-
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+ort = { version = "2.0.0-rc.12", default-features = false, features = ["ndarray", "std", "copy-dylibs", "download-binaries", "tls-rustls"] }
+ffmpeg-next = "8.1.0"
 tauri-plugin-updater = "2"
 wallpaper = "3.2.0"
 
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+ffmpeg-next = { version = "8.1.0", features = ["build"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+tract-onnx = "0.21.0"
 
 [patch.crates-io]
 esaxx-rs = { path = "vendor/esaxx-rs" }

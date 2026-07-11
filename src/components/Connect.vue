@@ -662,6 +662,10 @@ export default {
           this.unlistenSync();
           this.unlistenSync = null;
         }
+        if (this.unlistenRoomCode) {
+          this.unlistenRoomCode();
+          this.unlistenRoomCode = null;
+        }
         this.loading = false;
       }
     },
@@ -689,6 +693,7 @@ export default {
   beforeUnmount() {
     if (this.unlisten) this.unlisten();
     if (this.unlistenSync) this.unlistenSync();
+    if (this.unlistenRoomCode) this.unlistenRoomCode();
   },
   methods: {
     async triggerSync() {

@@ -2344,19 +2344,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ffmpeg-sidecar"
-version = "2.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "126522985748cb6a56a966037c3d86d94414be7a01d7749eccf71f7290f6eacd"
-dependencies = [
- "anyhow",
- "tar",
- "ureq",
- "xz2",
- "zip",
-]
-
-[[package]]
 name = "ffmpeg-sys-next"
 version = "8.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2410,7 +2397,6 @@ checksum = "843fba2746e448b37e26a819579957415c8cef339bf08564fe8b7ddbd959573c"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
- "zlib-rs",
 ]
 
 [[package]]
@@ -4256,17 +4242,6 @@ name = "lzma-rust2"
 version = "0.15.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e20f57f9918e5bd7bc58c22cdd70a6afc7375d4dd9683af5f2b34bd3d2bba619"
-
-[[package]]
-name = "lzma-sys"
-version = "0.1.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fda04ab3764e6cde78b9974eec4f779acaba7c4e84b36eca3cf77c581b85d27"
-dependencies = [
- "cc",
- "libc",
- "pkg-config",
-]
 
 [[package]]
 name = "lzw"
@@ -7082,7 +7057,6 @@ dependencies = [
  "bytes",
  "crossbeam-channel",
  "ffmpeg-next",
- "ffmpeg-sidecar",
  "futures-util",
  "get_if_addrs",
  "heic",
@@ -9040,7 +9014,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dea7109cdcd5864d4eeb1b58a1648dc9bf520360d7af16ec26d0a9354bafcfc0"
 dependencies = [
  "base64 0.22.1",
- "flate2",
  "log",
  "percent-encoding",
  "rustls 0.23.40",
@@ -10565,15 +10538,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "xz2"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "388c44dc09d76f1536602ead6d325eb532f5c122f17782bd57fb47baeeb767e2"
-dependencies = [
- "lzma-sys",
-]
-
-[[package]]
 name = "y4m"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10783,17 +10747,9 @@ checksum = "caa8cd6af31c3b31c6631b8f483848b91589021b28fffe50adada48d4f4d2ed1"
 dependencies = [
  "arbitrary",
  "crc32fast",
- "flate2",
  "indexmap 2.14.0",
  "memchr",
- "zopfli",
 ]
-
-[[package]]
-name = "zlib-rs"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3be3d40e40a133f9c916ee3f9f4fa2d9d63435b5fbe1bfc6d9dae0aa0ada1513"
 
 [[package]]
 name = "zmij"
