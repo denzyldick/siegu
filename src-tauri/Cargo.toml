@@ -70,11 +70,16 @@ mdns-sd = "0.13"
 tempfile = "3.19.0"
 tungstenite = "0.28.0"
 
+[target.'cfg(target_os = "windows")'.dependencies]
+ffmpeg-next = { version = "8.1.0", features = ["build"] }
+
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 ort = { version = "2.0.0-rc.12", default-features = false, features = ["ndarray", "std", "copy-dylibs", "download-binaries", "tls-rustls"] }
-ffmpeg-next = "8.1.0"
 tauri-plugin-updater = "2"
 wallpaper = "3.2.0"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios", target_os = "windows")))'.dependencies]
+ffmpeg-next = "8.1.0"
 
 [target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
 ffmpeg-next = { version = "8.1.0", features = ["build"] }

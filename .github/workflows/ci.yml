@@ -49,35 +49,6 @@ jobs:
           brew install ffmpeg
           echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
-      - name: Install dependencies (Windows only)
-        if: matrix.platform == 'windows-latest'
-        shell: bash
-        run: |
-          FFMPEG_BUILD="ffmpeg-n8.0-latest-win64-gpl-shared-8.0"
-          curl -L "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2025-10-22-13-33/${FFMPEG_BUILD}.zip" -o ffmpeg.zip
-          unzip ffmpeg.zip
-          FFMPEG_DIR=$(pwd)/${FFMPEG_BUILD}
-          FFMPEG_DIR_WIN=$(cygpath -w "$FFMPEG_DIR")
-          echo "FFMPEG_DIR=$FFMPEG_DIR_WIN" >> $GITHUB_ENV
-          echo "FFMPEG_INCLUDE_DIR=$FFMPEG_DIR_WIN\\include" >> $GITHUB_ENV
-          echo "FFMPEG_LIB_DIR=$FFMPEG_DIR_WIN\\lib" >> $GITHUB_ENV
-          echo "INCLUDE=$FFMPEG_DIR_WIN\\include" >> $GITHUB_ENV
-          echo "LIB=$FFMPEG_DIR_WIN\\lib" >> $GITHUB_ENV
-          echo "$FFMPEG_DIR_WIN\\lib" >> $GITHUB_PATH
-
-      - name: Set MSVC + UCRT include paths for bindgen (Windows only)
-        if: matrix.platform == 'windows-latest'
-        shell: pwsh
-        run: |
-          $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $installPath = & $vsWhere -latest -property installationPath
-          $latestMsvc = Get-ChildItem "$installPath\VC\Tools\MSVC" -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1
-          $msvcInclude = Join-Path $latestMsvc.FullName "include"
-          $sdkBase = "C:\Program Files (x86)\Windows Kits\10\Include"
-          $latestSdk = Get-ChildItem $sdkBase -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1
-          $ucrtInclude = Join-Path $latestSdk.FullName "ucrt"
-          "BINDGEN_EXTRA_CLANG_ARGS=-I`"$msvcInclude`" -I`"$ucrtInclude`"" | Out-File -FilePath $env:GITHUB_ENV -Append
-
       - run: npm install
 
       - run: npm run check:translations
@@ -246,35 +217,6 @@ jobs:
         run: |
           brew install ffmpeg
           echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
-
-      - name: Install dependencies (Windows only)
-        if: matrix.platform == 'windows-latest'
-        shell: bash
-        run: |
-          FFMPEG_BUILD="ffmpeg-n8.0-latest-win64-gpl-shared-8.0"
-          curl -L "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2025-10-22-13-33/${FFMPEG_BUILD}.zip" -o ffmpeg.zip
-          unzip ffmpeg.zip
-          FFMPEG_DIR=$(pwd)/${FFMPEG_BUILD}
-          FFMPEG_DIR_WIN=$(cygpath -w "$FFMPEG_DIR")
-          echo "FFMPEG_DIR=$FFMPEG_DIR_WIN" >> $GITHUB_ENV
-          echo "FFMPEG_INCLUDE_DIR=$FFMPEG_DIR_WIN\\include" >> $GITHUB_ENV
-          echo "FFMPEG_LIB_DIR=$FFMPEG_DIR_WIN\\lib" >> $GITHUB_ENV
-          echo "INCLUDE=$FFMPEG_DIR_WIN\\include" >> $GITHUB_ENV
-          echo "LIB=$FFMPEG_DIR_WIN\\lib" >> $GITHUB_ENV
-          echo "$FFMPEG_DIR_WIN\\lib" >> $GITHUB_PATH
-
-      - name: Set MSVC + UCRT include paths for bindgen (Windows only)
-        if: matrix.platform == 'windows-latest'
-        shell: pwsh
-        run: |
-          $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $installPath = & $vsWhere -latest -property installationPath
-          $latestMsvc = Get-ChildItem "$installPath\VC\Tools\MSVC" -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1
-          $msvcInclude = Join-Path $latestMsvc.FullName "include"
-          $sdkBase = "C:\Program Files (x86)\Windows Kits\10\Include"
-          $latestSdk = Get-ChildItem $sdkBase -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1
-          $ucrtInclude = Join-Path $latestSdk.FullName "ucrt"
-          "BINDGEN_EXTRA_CLANG_ARGS=-I`"$msvcInclude`" -I`"$ucrtInclude`"" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - run: npm install
 
