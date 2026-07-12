@@ -11,6 +11,7 @@ pub mod scanner;
 pub mod server;
 pub mod shutdown;
 pub mod signal;
+pub mod sync_transport;
 pub mod thumbnail;
 
 pub use database::{

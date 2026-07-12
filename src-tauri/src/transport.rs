@@ -600,7 +600,7 @@ impl WebRtcClient {
                                     }
                                 }
                                 SyncMessage::FileHeader { id, filename, size, created, latitude, longitude, objects, faces } => {
-                                    let sanitized = filename.replace("..", "").replace(['/', '\\'], "_");
+                                    let sanitized = siegu_core::sync_transport::sanitize_filename(&filename);
                                     let save_path = Path::new(&config_path).join("sync_temp").join(&sanitized);
                                     if let Some(parent) = save_path.parent() { let _ = tokio::fs::create_dir_all(parent).await; }
                                     if let Ok(file) = tokio::fs::File::create(&save_path).await {
@@ -635,13 +635,11 @@ impl WebRtcClient {
                                         let sync_path_str = state.get("sync_path");
                                         let dirs = db.list_directories();
 
-                                        let target_dir = if let Some(sp) = sync_path_str {
-                                            PathBuf::from(sp).join("siegu")
-                                        } else if !dirs.is_empty() {
-                                            PathBuf::from(&dirs[0]).join("siegu")
-                                        } else {
-                                            Path::new(&config_path).join("Siegu").join("siegu")
-                                        };
+                                        let target_dir = siegu_core::sync_transport::resolve_sync_target_dir(
+                                            &config_path,
+                                            sync_path_str.map(|s| s.as_str()),
+                                            &dirs,
+                                        );
 
                                         let final_path = target_dir.join(&file_state.filename);
                                         if let Err(e) = tokio::fs::rename(&temp_path, &final_path).await {
@@ -945,7 +943,7 @@ impl WebRtcClient {
                                     }
                                 }
                                 SyncMessage::FileHeader { id, filename, size, created, latitude, longitude, objects, faces } => {
-                                    let sanitized = filename.replace("..", "").replace(['/', '\\'], "_");
+                                    let sanitized = siegu_core::sync_transport::sanitize_filename(&filename);
                                     let save_path = Path::new(&config_path).join("sync_temp").join(&sanitized);
                                     if let Some(parent) = save_path.parent() { let _ = tokio::fs::create_dir_all(parent).await; }
                                     if let Ok(file) = tokio::fs::File::create(&save_path).await {
@@ -980,13 +978,11 @@ impl WebRtcClient {
                                         let sync_path_str = state.get("sync_path");
                                         let dirs = db.list_directories();
 
-                                        let target_dir = if let Some(sp) = sync_path_str {
-                                            PathBuf::from(sp).join("siegu")
-                                        } else if !dirs.is_empty() {
-                                            PathBuf::from(&dirs[0]).join("siegu")
-                                        } else {
-                                            Path::new(&config_path).join("Siegu").join("siegu")
-                                        };
+                                        let target_dir = siegu_core::sync_transport::resolve_sync_target_dir(
+                                            &config_path,
+                                            sync_path_str.map(|s| s.as_str()),
+                                            &dirs,
+                                        );
 
                                         let final_path = target_dir.join(&file_state.filename);
                                         if let Err(e) = tokio::fs::rename(&temp_path, &final_path).await {
@@ -1318,7 +1314,7 @@ impl WebRtcClient {
                                     }
                                 }
                                 SyncMessage::FileHeader { id, filename, size, created, latitude, longitude, objects, faces } => {
-                                    let sanitized = filename.replace("..", "").replace(['/', '\\'], "_");
+                                    let sanitized = siegu_core::sync_transport::sanitize_filename(&filename);
                                     let save_path = Path::new(&config_path).join("sync_temp").join(&sanitized);
                                     if let Some(parent) = save_path.parent() { let _ = tokio::fs::create_dir_all(parent).await; }
                                     if let Ok(file) = tokio::fs::File::create(&save_path).await {
@@ -1352,13 +1348,11 @@ impl WebRtcClient {
                                         let sync_path_str = state.get("sync_path");
                                         let dirs = db.list_directories();
 
-                                        let target_dir = if let Some(sp) = sync_path_str {
-                                            PathBuf::from(sp).join("siegu")
-                                        } else if !dirs.is_empty() {
-                                            PathBuf::from(&dirs[0]).join("siegu")
-                                        } else {
-                                            Path::new(&config_path).join("Siegu").join("siegu")
-                                        };
+                                        let target_dir = siegu_core::sync_transport::resolve_sync_target_dir(
+                                            &config_path,
+                                            sync_path_str.map(|s| s.as_str()),
+                                            &dirs,
+                                        );
 
                                         let final_path = target_dir.join(&file_state.filename);
                                         if let Err(e) = tokio::fs::rename(&temp_path, &final_path).await {
@@ -1656,7 +1650,7 @@ impl WebRtcClient {
                                     }
                                 }
                                 SyncMessage::FileHeader { id, filename, size, created, latitude, longitude, objects, faces } => {
-                                    let sanitized = filename.replace("..", "").replace(['/', '\\'], "_");
+                                    let sanitized = siegu_core::sync_transport::sanitize_filename(&filename);
                                     let save_path = Path::new(&config_path).join("sync_temp").join(&sanitized);
                                     if let Some(parent) = save_path.parent() { let _ = tokio::fs::create_dir_all(parent).await; }
                                     if let Ok(file) = tokio::fs::File::create(&save_path).await {
@@ -1690,13 +1684,11 @@ impl WebRtcClient {
                                         let sync_path_str = state.get("sync_path");
                                         let dirs = db.list_directories();
 
-                                        let target_dir = if let Some(sp) = sync_path_str {
-                                            PathBuf::from(sp).join("siegu")
-                                        } else if !dirs.is_empty() {
-                                            PathBuf::from(&dirs[0]).join("siegu")
-                                        } else {
-                                            Path::new(&config_path).join("Siegu").join("siegu")
-                                        };
+                                        let target_dir = siegu_core::sync_transport::resolve_sync_target_dir(
+                                            &config_path,
+                                            sync_path_str.map(|s| s.as_str()),
+                                            &dirs,
+                                        );
 
                                         let final_path = target_dir.join(&file_state.filename);
                                         if let Err(e) = tokio::fs::rename(&temp_path, &final_path).await {
