@@ -27,6 +27,8 @@ use tauri::Emitter;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use warp::Filter;
 
+pub use siegu_core::SignalMessage;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SyncProgress {
     pub device_id: String,
@@ -85,49 +87,6 @@ pub enum SyncMessage {
         items_completed: usize,
         items_total: usize,
     },
-}
-
-// Use the same SignalMessage structure as the axum server
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum SignalMessage {
-    #[serde(rename = "join")]
-    Join { device_id: String },
-    #[serde(rename = "joined")]
-    Joined {
-        device_id: String,
-        room_id: String,
-        peer_count: usize,
-    },
-    #[serde(rename = "offer")]
-    Offer { payload: String, target: String },
-    #[serde(rename = "answer")]
-    Answer { payload: String, target: String },
-    #[serde(rename = "ice_candidate")]
-    IceCandidate { payload: String, target: String },
-    #[serde(rename = "peer_disconnected")]
-    PeerDisconnected { device_id: String },
-    #[serde(rename = "peer_joined")]
-    PeerJoined { device_id: String },
-    #[serde(rename = "error")]
-    Error { message: String },
-
-    // Go server relay protocol
-    #[serde(rename = "create_room")]
-    CreateRoom,
-    #[serde(rename = "room_created")]
-    RoomCreated { code: String },
-    #[serde(rename = "join_room")]
-    JoinRoom { code: String },
-    #[serde(rename = "room_joined")]
-    RoomJoined,
-    #[serde(rename = "relay")]
-    Relay {
-        from: Option<String>,
-        payload: serde_json::Value,
-    },
-    #[serde(rename = "room_closed")]
-    RoomClosed,
 }
 
 pub struct WebRtcClient {
@@ -325,7 +284,7 @@ impl WebRtcClient {
         let port = if signaling_port > 0 {
             signaling_port
         } else {
-            crate::lan_server::start(0).await
+            siegu_core::lan_server::start(0).await
         };
         let local_url = format!("ws://127.0.0.1:{}", port);
         if let Some(app) = &self.app_handle {

@@ -5,17 +5,16 @@ use std::time::SystemTime;
 use tauri::Emitter;
 use tauri::Manager;
 
+use siegu_core::{
+    generate_pairing_codes as core_generate_pairing_codes,
+    hash_pairing_code as core_hash_pairing_code, PairingCodes as CorePairingCodes,
+};
+
 mod database;
-mod face_detector;
 mod file;
-mod geocode;
-mod lan_server;
-mod mdns;
 mod ml;
-mod server;
 #[cfg(test)]
 mod test;
-mod thumbnail;
 mod transport;
 mod wallpaper_plugin;
 
@@ -117,10 +116,10 @@ fn scan_files(app: tauri::AppHandle) {
             let mut batch = batch_for_blocking;
             // Generate thumbnails
             for photo in &mut batch {
-                if !thumbnail::needs_thumbnail(&photo.encoded) {
+                if !siegu_core::thumbnail::needs_thumbnail(&photo.encoded) {
                     continue;
                 }
-                if let Some(data_url) = thumbnail::generate_thumbnail(&photo.location) {
+                if let Some(data_url) = siegu_core::thumbnail::generate_thumbnail(&photo.location) {
                     photo.encoded = data_url;
                 }
             }
@@ -924,9 +923,10 @@ async fn start_lan_host(
 async fn discover_lan_devices(
     app: tauri::AppHandle,
     timeout_secs: u64,
-) -> Result<Vec<crate::mdns::DiscoveredHost>, String> {
-    let daemon = crate::mdns::create_daemon().map_err(|e| e.to_string())?;
-    let hosts = crate::mdns::discover_hosts(&daemon, timeout_secs).map_err(|e| e.to_string())?;
+) -> Result<Vec<siegu_core::mdns::DiscoveredHost>, String> {
+    let daemon = siegu_core::mdns::create_daemon().map_err(|e| e.to_string())?;
+    let hosts =
+        siegu_core::mdns::discover_hosts(&daemon, timeout_secs).map_err(|e| e.to_string())?;
     emit_log(&app, format!("Discovered {} LAN device(s)", hosts.len()));
     Ok(hosts)
 }
@@ -1259,7 +1259,7 @@ async fn resolve_photo_locations(app: tauri::AppHandle) -> Result<(), String> {
         }) {
             for row in rows.flatten() {
                 let (id, lat, lon) = row;
-                if let Some((city, country)) = geocode::find_nearest_city(lat, lon) {
+                if let Some((city, country)) = siegu_core::geocode::find_nearest_city(lat, lon) {
                     let location_name = format!("{}, {}", city, country);
                     let _ = db.connection.execute(
                         "INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
@@ -1407,6 +1407,16 @@ use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
+
+#[tauri::command]
+async fn generate_pairing_codes() -> Result<CorePairingCodes, String> {
+    core_generate_pairing_codes()
+}
+
+#[tauri::command]
+async fn hash_pairing_code(input: String) -> Result<String, String> {
+    core_hash_pairing_code(input)
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -1559,8 +1569,8 @@ pub fn run() {
             remove_device,
             list_devices,
             list_objects,
-            server::generate_pairing_codes,
-            server::hash_pairing_code,
+            generate_pairing_codes,
+            hash_pairing_code,
             start_webrtc_session,
             start_lan_host,
             discover_lan_devices,

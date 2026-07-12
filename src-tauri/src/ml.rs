@@ -803,8 +803,8 @@ pub fn start_background_worker(
                         let image_res = image::open(&photo_loc_actual);
                         if !abort_task.load(Ordering::SeqCst) {
                             if let Ok(dynamic_img) = image_res {
-                                let orientation = crate::thumbnail::read_exif_orientation(&photo_loc_actual);
-                                let dynamic_img = crate::thumbnail::apply_orientation(dynamic_img, orientation);
+                    let orientation = siegu_core::thumbnail::read_exif_orientation(&photo_loc_actual);
+                    let dynamic_img = siegu_core::thumbnail::apply_orientation(dynamic_img, orientation);
                                 let img = dynamic_img.to_rgb8();
 
                             // CLIP Visual
@@ -975,17 +975,17 @@ pub fn start_background_worker(
                                     if let Ok(data) = face_model.run(input, "input") {
                                         if data.len() >= 4420 * 6 {
                                             let scores = &data[..4420 * 2]; let boxes = &data[4420 * 2..];
-                                            let anchors = crate::face_detector::generate_anchors();
+                                            let anchors = siegu_core::face_detector::generate_anchors();
                                             let mut proposals = Vec::new();
                                             for i in 0..anchors.len() {
                                                 let score = scores[i * 2 + 1];
                                                 if score > 0.6 {
                                                     let loc = [boxes[i * 4], boxes[i * 4 + 1], boxes[i * 4 + 2], boxes[i * 4 + 3]];
-                                                    let decoded = crate::face_detector::decode(&loc, &anchors[i]);
+                                                     let decoded = siegu_core::face_detector::decode(&loc, &anchors[i]);
                                                     proposals.push((decoded, score));
                                                 }
                                             }
-                                            let keep = crate::face_detector::nms(&mut proposals, 0.3);
+                                            let keep = siegu_core::face_detector::nms(&mut proposals, 0.3);
                                             for &idx in &keep {
                                                 let bbox = proposals[idx].0;
                                                 let xmin = (bbox[0] * orig_w).max(0.0) as u32; let ymin = (bbox[1] * orig_h).max(0.0) as u32;

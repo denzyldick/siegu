@@ -38,6 +38,16 @@ reqwest = { workspace = true }
 anyhow = "1.0.102"
 lazy_static = "1.5.0"
 num_cpus = "1.16.0"
+warp = { workspace = true }
+mdns-sd = { workspace = true }
+
+[features]
+default = []
+video-thumbs = ["dep:ffmpeg-next"]
+
+[dependencies.ffmpeg-next]
+workspace = true
+optional = true
 
 [dev-dependencies]
 tempfile = { workspace = true }
