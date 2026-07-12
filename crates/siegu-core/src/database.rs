@@ -258,6 +258,17 @@ impl Database {
             "CREATE INDEX IF NOT EXISTS idx_photo_location ON photo(location);",
             (),
         );
+
+        // Deduplicate existing rows by location, then enforce uniqueness
+        let _ = conn.execute(
+            "DELETE FROM photo WHERE rowid NOT IN (SELECT MIN(rowid) FROM photo GROUP BY location)",
+            (),
+        );
+        let _ = conn.execute("DROP INDEX IF EXISTS idx_photo_location;", ());
+        let _ = conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_photo_location_unique ON photo(location);",
+            (),
+        );
         let _ = conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_photo_created ON photo(created);",
             (),
@@ -1243,7 +1254,7 @@ impl Database {
     pub fn store_photo_batch(&mut self, photos: &[Photo]) -> Result<(), String> {
         let tx = self.connection.transaction().map_err(|e| e.to_string())?;
         {
-            let mut stmt = tx.prepare_cached("INSERT OR REPLACE INTO photo(id, location, encoded, created, latitude, longitude, indexed) VALUES(?1, ?2, ?3, ?4, ?5, ?6, 1)").map_err(|e| e.to_string())?;
+            let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO photo(id, location, encoded, created, latitude, longitude, indexed) VALUES(?1, ?2, ?3, ?4, ?5, ?6, 1)").map_err(|e| e.to_string())?;
             for p in photos {
                 let _ = stmt.execute((
                     &p.id,
@@ -1533,7 +1544,7 @@ mod tests {
         let mut db = test_db();
         let photo = Photo {
             id: "test_fav_1".to_string(),
-            location: "/tmp/test.jpg".to_string(),
+            location: "/tmp/test_fav.jpg".to_string(),
             encoded: String::new(),
             created: "2024-01-01".to_string(),
             objects: HashMap::new(),
@@ -1568,7 +1579,7 @@ mod tests {
 
         let photo = Photo {
             id: "test_props_1".to_string(),
-            location: "/tmp/test.jpg".to_string(),
+            location: "/tmp/test_props.jpg".to_string(),
             encoded: String::new(),
             created: "2024-06-01".to_string(),
             objects: HashMap::new(),
@@ -1593,7 +1604,7 @@ mod tests {
         let mut db = test_db();
         let photo = Photo {
             id: "test_heat_1".to_string(),
-            location: "/tmp/test.jpg".to_string(),
+            location: "/tmp/test_heat.jpg".to_string(),
             encoded: String::new(),
             created: "2024-01-01".to_string(),
             objects: HashMap::new(),

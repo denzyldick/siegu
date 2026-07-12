@@ -7,10 +7,15 @@ use std::sync::Arc;
 
 use crate::database::Photo;
 
-pub const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "webp", "heic", "avif"];
-pub const VIDEO_EXTENSIONS: &[&str] = &["mp4", "mkv", "mov", "avi", "webm"];
+pub const IMAGE_EXTENSIONS: &[&str] = &[
+    "png", "jpg", "jpeg", "webp", "heic", "heif", "avif", "gif", "bmp", "tiff", "tif",
+];
+pub const VIDEO_EXTENSIONS: &[&str] = &[
+    "mp4", "mkv", "mov", "avi", "webm", "flv", "wmv", "m4v", "3gp",
+];
 pub const ALL_MEDIA_EXTENSIONS: &[&str] = &[
-    "png", "jpg", "jpeg", "webp", "heic", "avif", "mp4", "mkv", "mov", "avi", "webm",
+    "png", "jpg", "jpeg", "webp", "heic", "heif", "avif", "gif", "bmp", "tiff", "tif", "mp4",
+    "mkv", "mov", "avi", "webm", "flv", "wmv", "m4v", "3gp",
 ];
 
 pub fn is_media_file(path: &Path) -> bool {
