@@ -17,6 +17,7 @@ impl AnalysisCallbacks for TauriCallbacks {
     fn on_photo_complete(
         &self,
         photo_id: &str,
+        _location: &str,
         result: &PhotoResult,
         remaining: usize,
         progress_model: Option<&str>,

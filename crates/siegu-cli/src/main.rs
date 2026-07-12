@@ -5,6 +5,8 @@ use indicatif::{ProgressBar, ProgressStyle};
 use siegu_core::database::Database;
 use siegu_core::scanner::ScanGuard;
 
+mod analyze_tui;
+
 #[derive(Parser)]
 #[command(name = "siegu", version, about = "Privacy-first media management CLI")]
 struct Cli {
@@ -255,49 +257,15 @@ async fn cmd_scan(config_dir: &Path, folder: Option<&str>) {
 }
 
 fn cmd_analyze_all(config_dir: &Path) {
-    let db_path = config_dir.join("siegu.db");
-    if !db_path.exists() {
-        eprintln!("Error: no database found at {}", db_path.display());
-        std::process::exit(1);
-    }
-
-    let db = Database::new(&config_dir.display().to_string());
-    let unindexed = db.get_unindexed_photos();
-
-    if unindexed.is_empty() {
-        println!("All photos already analyzed.");
-        return;
-    }
-
-    println!("{} photos need ML analysis.", unindexed.len());
-    println!("Run `siegu models download` first, then launch the Tauri app for GPU-accelerated analysis.");
+    analyze_tui::run_analyze_all(config_dir);
 }
 
 fn cmd_analyze_photo(config_dir: &Path, id: &str) {
-    let db_path = config_dir.join("siegu.db");
-    if !db_path.exists() {
-        eprintln!("Error: no database found");
-        std::process::exit(1);
-    }
-    let db = Database::new(&config_dir.display().to_string());
-    match db.get_photo_by_id(id) {
-        Some(photo) => {
-            println!("Photo: {}", photo.location);
-            println!("  ID: {}", photo.id);
-            println!("  Created: {}", photo.created);
-            println!("  Indexed: {}", photo.indexed);
-            println!("Launch the Tauri app to run ML analysis on this photo.");
-        }
-        None => {
-            eprintln!("Error: photo not found: {id}");
-            std::process::exit(1);
-        }
-    }
+    analyze_tui::run_analyze_photo(config_dir, id);
 }
 
-fn cmd_analyze_model(_config_dir: &Path, model_id: &str) {
-    println!("Running model '{model_id}' requires the Tauri app for GPU/ORT runtime.");
-    println!("Use the GUI to run per-model analysis, or `siegu analyze all` for batch mode.");
+fn cmd_analyze_model(config_dir: &Path, model_id: &str) {
+    analyze_tui::run_analyze_model(config_dir, model_id);
 }
 
 fn cmd_models_list(config_dir: &Path) {

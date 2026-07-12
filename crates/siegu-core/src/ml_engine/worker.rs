@@ -12,6 +12,7 @@ pub trait AnalysisCallbacks: Send + Sync {
     fn on_photo_complete(
         &self,
         photo_id: &str,
+        location: &str,
         result: &PhotoResult,
         remaining: usize,
         progress_model: Option<&str>,
@@ -30,6 +31,7 @@ impl AnalysisCallbacks for NoopCallbacks {
     fn on_photo_complete(
         &self,
         _photo_id: &str,
+        _location: &str,
         _result: &PhotoResult,
         _remaining: usize,
         _progress_model: Option<&str>,
@@ -284,6 +286,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                             let remaining = decrement_pending_count(&pending_count_ref);
                             callbacks.on_photo_complete(
                                 &photo_entry.id,
+                                &photo_entry.location,
                                 &result,
                                 remaining,
                                 progress_model_ref.as_deref(),
