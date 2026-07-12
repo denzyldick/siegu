@@ -9,7 +9,14 @@ use super::models::LoadedModels;
 use super::pipeline::{self, PhotoResult};
 
 pub trait AnalysisCallbacks: Send + Sync {
-    fn on_batch_complete(&self, results: &[(String, PhotoResult)]);
+    fn on_photo_complete(
+        &self,
+        photo_id: &str,
+        result: &PhotoResult,
+        remaining: usize,
+        progress_model: Option<&str>,
+    );
+    fn on_scan_complete(&self);
     fn on_progress(&self, completed: usize, total: usize, avg_ms: f64);
     fn on_model_status(&self, model: &str, status: &str, pending: usize, total: usize);
     fn on_ep_selected(&self, ep: &str);
@@ -20,7 +27,15 @@ pub trait AnalysisCallbacks: Send + Sync {
 pub struct NoopCallbacks;
 
 impl AnalysisCallbacks for NoopCallbacks {
-    fn on_batch_complete(&self, _results: &[(String, PhotoResult)]) {}
+    fn on_photo_complete(
+        &self,
+        _photo_id: &str,
+        _result: &PhotoResult,
+        _remaining: usize,
+        _progress_model: Option<&str>,
+    ) {
+    }
+    fn on_scan_complete(&self) {}
     fn on_progress(&self, _completed: usize, _total: usize, _avg_ms: f64) {}
     fn on_model_status(&self, _model: &str, _status: &str, _pending: usize, _total: usize) {}
     fn on_ep_selected(&self, _ep: &str) {}
@@ -41,6 +56,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
     let abort = Arc::new(AtomicBool::new(false));
     let abort_clone = Arc::clone(&abort);
     let db_path = config_path.clone();
+    let callbacks = Arc::new(callbacks);
 
     std::thread::spawn(move || {
         let faces_dir = format!("{db_path}/faces");
@@ -192,10 +208,13 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
             let pending_count_ref = Arc::clone(&pending_count_clone);
             let faces_dir_ref = faces_dir.clone();
             let target_model_ref = target_model.clone();
+            let progress_model_ref = progress_model.clone();
             let config_ref = config.clone();
             let models_ref = Arc::clone(&models);
+            let callbacks_ref = Arc::clone(&callbacks);
 
             pool.spawn(move || {
+                let callbacks = callbacks_ref;
                 let photo_ids_batches: Vec<Vec<String>> =
                     photo_ids.chunks(batch_size).map(|c| c.to_vec()).collect();
 
@@ -203,8 +222,6 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                     if abort_flag.load(Ordering::SeqCst) {
                         break;
                     }
-
-                    let mut batch_results: Vec<(String, PhotoResult)> = Vec::new();
 
                     for photo_id in &batch {
                         if abort_flag.load(Ordering::SeqCst) {
@@ -217,7 +234,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                         };
 
                         if let Some(photo_entry) = photo_entry {
-                            let result = {
+                            let mut result = {
                                 let mut m = models_ref.lock().unwrap();
                                 let models = m.as_mut().unwrap();
                                 pipeline::analyze_photo(
@@ -231,6 +248,32 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                                 )
                             };
 
+                            let new_people: Vec<(String, Vec<f32>)> = {
+                                let lock = db_ref.lock().unwrap();
+                                let mut new_people = Vec::new();
+                                for face in &mut result.faces {
+                                    if face.person_id.is_none() {
+                                        if !face.embedding.is_empty() {
+                                            let new_id =
+                                                lock.create_anonymous_person(&face.embedding);
+                                            new_people
+                                                .push((new_id.clone(), face.embedding.clone()));
+                                            face.person_id = Some(new_id);
+                                        } else {
+                                            let new_id = lock.create_anonymous_person(&[]);
+                                            face.person_id = Some(new_id);
+                                        }
+                                    }
+                                }
+                                new_people
+                            };
+                            if !new_people.is_empty() {
+                                let mut m = models_ref.lock().unwrap();
+                                if let Some(models) = m.as_mut() {
+                                    models.known_people.extend(new_people);
+                                }
+                            }
+
                             pipeline::flush_results_to_db(
                                 &db_ref.lock().unwrap(),
                                 &photo_entry.id,
@@ -238,12 +281,20 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                                 target_model_ref.as_deref(),
                             );
 
-                            batch_results.push((photo_entry.id.clone(), result));
+                            let remaining = decrement_pending_count(&pending_count_ref);
+                            callbacks.on_photo_complete(
+                                &photo_entry.id,
+                                &result,
+                                remaining,
+                                progress_model_ref.as_deref(),
+                            );
+                        } else {
+                            decrement_pending_count(&pending_count_ref);
                         }
-
-                        decrement_pending_count(&pending_count_ref);
                     }
                 }
+
+                callbacks.on_scan_complete();
             });
         }
     });

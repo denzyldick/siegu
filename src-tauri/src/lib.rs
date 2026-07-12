@@ -1414,13 +1414,8 @@ pub fn run() {
             });
 
             let config_path = get_config_path(app.handle());
-            let (tx, pending_count, abort) =
-                ml::start_background_worker(app.handle(), config_path.clone());
-            app.manage(ml::MlContext {
-                tx,
-                pending_count,
-                abort,
-            });
+            let ml_context = ml::start_background_worker(app.handle(), config_path.clone());
+            app.manage(ml_context);
 
             let media_server_port = transport::start_media_server(config_path);
             app.manage(transport::MediaServerState {
