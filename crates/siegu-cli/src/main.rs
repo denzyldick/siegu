@@ -101,36 +101,7 @@ fn resolve_config_dir(cli_dir: &Option<String>, cmd_dir: &Option<String>) -> Pat
     if let Some(d) = cli_dir {
         return PathBuf::from(d);
     }
-    default_config_dir()
-}
-
-fn default_config_dir() -> PathBuf {
-    let home = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("."));
-
-    if cfg!(target_os = "android") {
-        PathBuf::from("/data/data/com.siegu.app/files")
-    } else if cfg!(target_os = "ios") {
-        home.join("Library")
-            .join("Application Support")
-            .join("com.siegu.app")
-    } else if cfg!(target_os = "linux") {
-        home.join(".config").join("com.siegu.app")
-    } else if cfg!(target_os = "macos") {
-        home.join("Library")
-            .join("Application Support")
-            .join("com.siegu.app")
-    } else if cfg!(target_os = "windows") {
-        PathBuf::from(
-            std::env::var("APPDATA")
-                .unwrap_or_else(|_| home.join("AppData\\Roaming").display().to_string()),
-        )
-        .join("com.siegu.app")
-    } else {
-        home.join(".config").join("com.siegu.app")
-    }
+    siegu_core::config::default_config_dir()
 }
 
 #[tokio::main]
@@ -338,12 +309,15 @@ fn cmd_models_list(config_dir: &Path) {
         );
     }
 
-    let missing = siegu_core::model_manager::check_models_downloaded(&models_dir);
+    let statuses = siegu_core::model_manager::all_model_status(&models_dir);
+    let missing: Vec<_> = statuses.iter().filter(|s| !s.downloaded).collect();
     if !missing.is_empty() {
         println!(
             "\n{} model(s) missing. Run: siegu models download",
             missing.len()
         );
+    } else {
+        println!("\nAll models downloaded.");
     }
 }
 
