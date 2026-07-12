@@ -11,6 +11,10 @@ use tauri::Emitter;
 use tauri::{AppHandle, Manager};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
+pub use siegu_core::ml_worker::{
+    decrement_pending_count, increment_pending_count, job_status_model, should_run_model, Job,
+};
+
 // Conditional imports for AI Engines
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use ort::{session::builder::GraphOptimizationLevel, session::Session};
@@ -18,97 +22,13 @@ use ort::{session::builder::GraphOptimizationLevel, session::Session};
 #[cfg(target_os = "android")]
 use tract_onnx::prelude::*;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum Job {
-    ProcessAll,
-    AutoAnalyzeSingle(String),
-    AnalyzeSingle(String),
-    AnalyzeSingleWithModel(String, String),
-    ProcessModel(String),
-}
-
 pub struct MlContext {
     pub tx: UnboundedSender<Job>,
     pub pending_count: Arc<AtomicUsize>,
     pub abort: Arc<std::sync::atomic::AtomicBool>,
 }
 
-const MAX_REASONABLE_PENDING: usize = 1_000_000;
 type FaceEmbeddingStore = Arc<Mutex<Vec<(String, Vec<f32>)>>>;
-
-fn job_status_model(model_id: &str) -> Option<&'static str> {
-    match model_id {
-        "clip" => Some("clip"),
-        "ultraface" | "face" => Some("face"),
-        "ocr" => Some("ocr"),
-        "nsfw" => Some("nsfw"),
-        "aesthetics" => Some("aesthetics"),
-        "yolo" => Some("yolo"),
-        "blip" => Some("blip"),
-        "arcface" => Some("arcface"),
-        "midas" => Some("midas"),
-        "whisper" => Some("whisper"),
-        _ => None,
-    }
-}
-
-fn should_run_model(
-    target_model: Option<&str>,
-    model: &str,
-    config: Option<&std::collections::HashMap<String, String>>,
-) -> bool {
-    if let Some(config) = config {
-        let key = format!("model_enabled_{}", model);
-        if let Some(val) = config.get(&key) {
-            if val != "true" {
-                return false;
-            }
-        }
-    }
-    target_model.is_none_or(|target| target == model)
-}
-
-// The pending counter is shared by UI commands, discovery, and background model work.
-// Clamp obviously invalid values so stale underflows do not leave the UI stuck indexing forever.
-fn decrement_pending_count(counter: &AtomicUsize) -> usize {
-    counter
-        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
-            if current > MAX_REASONABLE_PENDING {
-                Some(0)
-            } else {
-                Some(current.saturating_sub(1))
-            }
-        })
-        .map(|previous| {
-            if previous > MAX_REASONABLE_PENDING {
-                0
-            } else {
-                previous.saturating_sub(1)
-            }
-        })
-        .unwrap_or(0)
-}
-
-fn increment_pending_count(counter: &AtomicUsize, amount: usize) -> usize {
-    counter
-        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
-            let base = if current > MAX_REASONABLE_PENDING {
-                0
-            } else {
-                current
-            };
-            Some(base.saturating_add(amount))
-        })
-        .map(|previous| {
-            let base = if previous > MAX_REASONABLE_PENDING {
-                0
-            } else {
-                previous
-            };
-            base.saturating_add(amount)
-        })
-        .unwrap_or(amount)
-}
 
 // Model wrappers to handle different engine types
 #[derive(Clone)]
@@ -1109,32 +1029,46 @@ pub fn start_background_worker(
                             }
                         }
 
-                        // === SINGLE DB LOCK: flush all batched writes ===
+                        // === SINGLE DB LOCK: flush all batched writes in a transaction ===
                         {
                             let lock = db_task.lock().unwrap();
+                            let photo_id_ref = &photo_id_task;
+                            let pending_objects_ref = &pending_objects;
+                            let completed_models_ref = &completed_models;
+                            let pending_ocr_ref = &pending_ocr;
+                            let pending_nsfw_ref = &pending_nsfw;
+                            let pending_aesthetics_val = pending_aesthetics;
+                            let pending_face_count_val = pending_face_count;
 
-                            for (class, prob) in &pending_objects {
-                                let _ = lock.connection.execute("INSERT INTO object (photo_id, class, probability) VALUES(?1, ?2, ?3)", (&photo_id_task, class, prob));
-                            }
-                            if let Some(ref text) = pending_ocr {
-                                let _ = lock.connection.execute("INSERT INTO ocr (photo_id, text) VALUES(?1, ?2)", (&photo_id_task, text));
-                            }
-                            if let Some(ref score) = pending_nsfw {
-                                let _ = lock.connection.execute("INSERT INTO properties (photo_id, key, value) VALUES(?1, 'nsfw', ?2)", (&photo_id_task, score));
-                            }
-                            if let Some(score) = pending_aesthetics {
-                                let _ = lock.connection.execute("UPDATE photo SET aesthetics_score = ?1 WHERE id = ?2", (score, &photo_id_task));
-                            }
-                            let _ = lock.connection.execute("INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES(?1, 'face_count', ?2)", (&photo_id_task, &pending_face_count.to_string()));
+                            let _ = siegu_core::ml_worker::flush_batch_in_transaction(
+                                &lock.connection,
+                                || {
+                                    for (class, prob) in pending_objects_ref {
+                                        let _ = lock.connection.execute("INSERT INTO object (photo_id, class, probability) VALUES(?1, ?2, ?3)", (photo_id_ref, class, prob));
+                                    }
+                                    if let Some(ref text) = pending_ocr_ref {
+                                        let _ = lock.connection.execute("INSERT INTO ocr (photo_id, text) VALUES(?1, ?2)", (photo_id_ref, text));
+                                    }
+                                    if let Some(ref score) = pending_nsfw_ref {
+                                        let _ = lock.connection.execute("INSERT INTO properties (photo_id, key, value) VALUES(?1, 'nsfw', ?2)", (photo_id_ref, score));
+                                    }
+                                    if let Some(score) = pending_aesthetics_val {
+                                        let _ = lock.connection.execute("UPDATE photo SET aesthetics_score = ?1 WHERE id = ?2", (score, photo_id_ref));
+                                    }
+                                    let _ = lock.connection.execute("INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES(?1, 'face_count', ?2)", (photo_id_ref, &pending_face_count_val.to_string()));
 
-                            for model in &completed_models {
-                                lock.update_ai_status(&photo_id_task, model, 1);
-                            }
+                                    for model in completed_models_ref {
+                                        lock.update_ai_status(photo_id_ref, model, 1);
+                                    }
 
-                            if target_model_inner.is_none() {
-                                lock.update_photo_indexed(&photo_id_task, 2);
-                            }
-                            let _ = lock.connection.execute("UPDATE photo SET sync_needed = 1 WHERE id = ?1", [&photo_id_task]);
+                                    if target_model_inner.is_none() {
+                                        lock.update_photo_indexed(photo_id_ref, 2);
+                                    }
+                                    let _ = lock.connection.execute("UPDATE photo SET sync_needed = 1 WHERE id = ?1", [photo_id_ref]);
+
+                                    Ok(())
+                                },
+                            );
 
                             if let Some(state) = app_handle_task.try_state::<crate::WebRtcState>() {
                                 let mut tx_lock = state.sync_tx.blocking_lock();
