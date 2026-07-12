@@ -170,9 +170,8 @@ async fn cmd_scan(config_dir: &Path, folder: &str) {
         .unwrap_or_else(|_| folder_path.to_path_buf());
     let folder_str = folder.display().to_string();
 
-    let db_path = config_dir.join("siegu.db");
     let _ = std::fs::create_dir_all(config_dir);
-    let mut db = Database::new(&db_path.display().to_string());
+    let mut db = Database::new(&config_dir.display().to_string());
 
     println!("Scanning: {folder_str}");
 
@@ -185,7 +184,7 @@ async fn cmd_scan(config_dir: &Path, folder: &str) {
         }
     };
 
-    let existing = siegu_core::scanner::load_existing_paths(&db_path.display().to_string());
+    let existing = siegu_core::scanner::load_existing_paths(&config_dir.display().to_string());
     println!("Loaded {} existing paths from DB", existing.len());
 
     let pb = ProgressBar::new_spinner();
@@ -243,7 +242,7 @@ fn cmd_analyze_all(config_dir: &Path) {
         std::process::exit(1);
     }
 
-    let db = Database::new(&db_path.display().to_string());
+    let db = Database::new(&config_dir.display().to_string());
     let unindexed = db.get_unindexed_photos();
 
     if unindexed.is_empty() {
@@ -261,7 +260,7 @@ fn cmd_analyze_photo(config_dir: &Path, id: &str) {
         eprintln!("Error: no database found");
         std::process::exit(1);
     }
-    let db = Database::new(&db_path.display().to_string());
+    let db = Database::new(&config_dir.display().to_string());
     match db.get_photo_by_id(id) {
         Some(photo) => {
             println!("Photo: {}", photo.location);
@@ -443,7 +442,7 @@ fn cmd_status(config_dir: &Path) {
     );
 
     if db_path.exists() {
-        let db = Database::new(&db_path.display().to_string());
+        let db = Database::new(&config_dir.display().to_string());
         let (photo_count, video_count) = db.get_media_counts();
         let folders = db.list_directories();
         let config = db.get_state();
@@ -500,7 +499,7 @@ fn cmd_config_get(config_dir: &Path) {
         println!("{{}}");
         return;
     }
-    let db = Database::new(&db_path.display().to_string());
+    let db = Database::new(&config_dir.display().to_string());
     let config = db.get_state();
     println!(
         "{}",
@@ -514,7 +513,7 @@ fn cmd_config_get_key(config_dir: &Path, key: &str) {
         eprintln!("No database found");
         return;
     }
-    let db = Database::new(&db_path.display().to_string());
+    let db = Database::new(&config_dir.display().to_string());
     let config = db.get_state();
     match config.get(key) {
         Some(v) => println!("{v}"),
@@ -527,9 +526,8 @@ fn cmd_config_set(config_dir: &Path, key: &str, value: &str) {
         eprintln!("Error: {e}");
         std::process::exit(1);
     }
-    let db_path = config_dir.join("siegu.db");
     let _ = std::fs::create_dir_all(config_dir);
-    let db = Database::new(&db_path.display().to_string());
+    let db = Database::new(&config_dir.display().to_string());
     let mut state = std::collections::HashMap::new();
     state.insert(key.to_string(), value.to_string());
     db.set_state(state);
