@@ -101,36 +101,7 @@ fn resolve_config_dir(cli_dir: &Option<String>, cmd_dir: &Option<String>) -> Pat
     if let Some(d) = cli_dir {
         return PathBuf::from(d);
     }
-    default_config_dir()
-}
-
-fn default_config_dir() -> PathBuf {
-    let home = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("."));
-
-    if cfg!(target_os = "android") {
-        PathBuf::from("/data/data/com.siegu.app/files")
-    } else if cfg!(target_os = "ios") {
-        home.join("Library")
-            .join("Application Support")
-            .join("com.siegu.app")
-    } else if cfg!(target_os = "linux") {
-        home.join(".config").join("com.siegu.app")
-    } else if cfg!(target_os = "macos") {
-        home.join("Library")
-            .join("Application Support")
-            .join("com.siegu.app")
-    } else if cfg!(target_os = "windows") {
-        PathBuf::from(
-            std::env::var("APPDATA")
-                .unwrap_or_else(|_| home.join("AppData\\Roaming").display().to_string()),
-        )
-        .join("com.siegu.app")
-    } else {
-        home.join(".config").join("com.siegu.app")
-    }
+    siegu_core::config::default_config_dir()
 }
 
 #[tokio::main]
@@ -199,9 +170,8 @@ async fn cmd_scan(config_dir: &Path, folder: &str) {
         .unwrap_or_else(|_| folder_path.to_path_buf());
     let folder_str = folder.display().to_string();
 
-    let db_path = config_dir.join("siegu.db");
     let _ = std::fs::create_dir_all(config_dir);
-    let mut db = Database::new(&db_path.display().to_string());
+    let mut db = Database::new(&config_dir.display().to_string());
 
     println!("Scanning: {folder_str}");
 
@@ -214,7 +184,7 @@ async fn cmd_scan(config_dir: &Path, folder: &str) {
         }
     };
 
-    let existing = siegu_core::scanner::load_existing_paths(&db_path.display().to_string());
+    let existing = siegu_core::scanner::load_existing_paths(&config_dir.display().to_string());
     println!("Loaded {} existing paths from DB", existing.len());
 
     let pb = ProgressBar::new_spinner();
@@ -272,7 +242,7 @@ fn cmd_analyze_all(config_dir: &Path) {
         std::process::exit(1);
     }
 
-    let db = Database::new(&db_path.display().to_string());
+    let db = Database::new(&config_dir.display().to_string());
     let unindexed = db.get_unindexed_photos();
 
     if unindexed.is_empty() {
@@ -290,7 +260,7 @@ fn cmd_analyze_photo(config_dir: &Path, id: &str) {
         eprintln!("Error: no database found");
         std::process::exit(1);
     }
-    let db = Database::new(&db_path.display().to_string());
+    let db = Database::new(&config_dir.display().to_string());
     match db.get_photo_by_id(id) {
         Some(photo) => {
             println!("Photo: {}", photo.location);
@@ -338,12 +308,15 @@ fn cmd_models_list(config_dir: &Path) {
         );
     }
 
-    let missing = siegu_core::model_manager::check_models_downloaded(&models_dir);
+    let statuses = siegu_core::model_manager::all_model_status(&models_dir);
+    let missing: Vec<_> = statuses.iter().filter(|s| !s.downloaded).collect();
     if !missing.is_empty() {
         println!(
             "\n{} model(s) missing. Run: siegu models download",
             missing.len()
         );
+    } else {
+        println!("\nAll models downloaded.");
     }
 }
 
@@ -469,7 +442,7 @@ fn cmd_status(config_dir: &Path) {
     );
 
     if db_path.exists() {
-        let db = Database::new(&db_path.display().to_string());
+        let db = Database::new(&config_dir.display().to_string());
         let (photo_count, video_count) = db.get_media_counts();
         let folders = db.list_directories();
         let config = db.get_state();
@@ -526,7 +499,7 @@ fn cmd_config_get(config_dir: &Path) {
         println!("{{}}");
         return;
     }
-    let db = Database::new(&db_path.display().to_string());
+    let db = Database::new(&config_dir.display().to_string());
     let config = db.get_state();
     println!(
         "{}",
@@ -540,7 +513,7 @@ fn cmd_config_get_key(config_dir: &Path, key: &str) {
         eprintln!("No database found");
         return;
     }
-    let db = Database::new(&db_path.display().to_string());
+    let db = Database::new(&config_dir.display().to_string());
     let config = db.get_state();
     match config.get(key) {
         Some(v) => println!("{v}"),
@@ -553,9 +526,8 @@ fn cmd_config_set(config_dir: &Path, key: &str, value: &str) {
         eprintln!("Error: {e}");
         std::process::exit(1);
     }
-    let db_path = config_dir.join("siegu.db");
     let _ = std::fs::create_dir_all(config_dir);
-    let db = Database::new(&db_path.display().to_string());
+    let db = Database::new(&config_dir.display().to_string());
     let mut state = std::collections::HashMap::new();
     state.insert(key.to_string(), value.to_string());
     db.set_state(state);

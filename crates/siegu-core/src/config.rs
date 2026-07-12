@@ -1,3 +1,36 @@
+use std::path::PathBuf;
+
+pub const APP_IDENTIFIER: &str = "io.denzyl.siegu";
+
+pub fn default_config_dir() -> PathBuf {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("."));
+
+    if cfg!(target_os = "android") {
+        PathBuf::from(format!("/data/data/{APP_IDENTIFIER}/files"))
+    } else if cfg!(target_os = "ios") {
+        home.join("Library")
+            .join("Application Support")
+            .join(APP_IDENTIFIER)
+    } else if cfg!(target_os = "linux") {
+        home.join(".config").join(APP_IDENTIFIER)
+    } else if cfg!(target_os = "macos") {
+        home.join("Library")
+            .join("Application Support")
+            .join(APP_IDENTIFIER)
+    } else if cfg!(target_os = "windows") {
+        PathBuf::from(
+            std::env::var("APPDATA")
+                .unwrap_or_else(|_| home.join("AppData\\Roaming").display().to_string()),
+        )
+        .join(APP_IDENTIFIER)
+    } else {
+        home.join(".config").join(APP_IDENTIFIER)
+    }
+}
+
 pub const ALLOWED_CONFIG_KEYS: &[&str] = &[
     "sync_path",
     "scan_threads",
