@@ -39,9 +39,12 @@ impl EventBus for TracingEventBus {
     }
 }
 
+type EventCallback = dyn Fn(&str, serde_json::Value) + Send + Sync;
+type LogCallback = dyn Fn(Level, &str) + Send + Sync;
+
 pub struct CallbackEventBus {
-    callback: Box<dyn Fn(&str, serde_json::Value) + Send + Sync>,
-    log_callback: Box<dyn Fn(Level, &str) + Send + Sync>,
+    callback: Box<EventCallback>,
+    log_callback: Box<LogCallback>,
 }
 
 impl CallbackEventBus {

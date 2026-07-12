@@ -60,14 +60,12 @@ pub fn validate_config_value(key: &str, value: &str) -> Result<(), ConfigError> 
                 });
             }
         }
-        "tier" => {
-            if !["free", "paid"].contains(&value) {
-                return Err(ConfigError::InvalidType {
-                    key: key.to_string(),
-                    expected: "free|paid".to_string(),
-                    got: value.to_string(),
-                });
-            }
+        "tier" if !["free", "paid"].contains(&value) => {
+            return Err(ConfigError::InvalidType {
+                key: key.to_string(),
+                expected: "free|paid".to_string(),
+                got: value.to_string(),
+            });
         }
         _ => {}
     }

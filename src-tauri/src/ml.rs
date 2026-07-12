@@ -619,7 +619,7 @@ pub fn start_background_worker(
             .any(|m| {
                 config
                     .get(&format!("model_enabled_{}", m))
-                    .map_or(false, |v| v == "true")
+                    .is_some_and(|v| v == "true")
             });
             if !has_enabled_model && target_model.is_none() {
                 let lock = db.lock().unwrap();

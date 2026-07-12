@@ -1,7 +1,6 @@
 /// Offline reverse geocoding using an embedded dataset of world cities.
 /// Finds the nearest city to given coordinates using Euclidean distance
 /// (sufficient for approximate offline matching at this scale).
-
 const CITIES: &[(&str, &str, f64, f64)] = &[
     // North America
     ("New York", "United States", 40.7128, -74.0060),

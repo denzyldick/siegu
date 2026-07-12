@@ -50,19 +50,16 @@ pub fn discover_hosts(
     let deadline = std::time::Instant::now() + Duration::from_secs(timeout_secs);
 
     while std::time::Instant::now() < deadline {
-        if let Ok(event) = receiver.recv_timeout(Duration::from_millis(200)) {
-            match event {
-                ServiceEvent::ServiceResolved(info) => {
-                    for addr in info.get_addresses().iter() {
-                        let key = format!("{}:{}", addr, info.get_port());
-                        hosts.entry(key).or_insert_with(|| DiscoveredHost {
-                            name: info.get_hostname().trim_end_matches('.').to_string(),
-                            ip: addr.to_string(),
-                            port: info.get_port(),
-                        });
-                    }
-                }
-                _ => {}
+        if let Ok(ServiceEvent::ServiceResolved(info)) =
+            receiver.recv_timeout(Duration::from_millis(200))
+        {
+            for addr in info.get_addresses().iter() {
+                let key = format!("{}:{}", addr, info.get_port());
+                hosts.entry(key).or_insert_with(|| DiscoveredHost {
+                    name: info.get_hostname().trim_end_matches('.').to_string(),
+                    ip: addr.to_string(),
+                    port: info.get_port(),
+                });
             }
         }
     }

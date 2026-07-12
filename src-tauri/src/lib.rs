@@ -262,7 +262,7 @@ fn scan_files(app: tauri::AppHandle) {
         .any(|m| {
             config
                 .get(&format!("model_enabled_{}", m))
-                .map_or(false, |v| v == "true")
+                .is_some_and(|v| v == "true")
         });
 
         if any_model_enabled {
@@ -1352,7 +1352,7 @@ pub fn run() {
         .setup(|app| {
             if let Err(e) = ffmpeg_next::init() {
                 emit_log(
-                    &app.handle(),
+                    app.handle(),
                     format!("WARNING: ffmpeg init failed (thumbnails for videos disabled): {e}"),
                 );
             }

@@ -1,6 +1,6 @@
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
@@ -28,6 +28,11 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use warp::Filter;
 
 pub use siegu_core::SignalMessage;
+
+type WsWrite = futures_util::stream::SplitSink<
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
+    Message,
+>;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SyncProgress {
@@ -1917,16 +1922,7 @@ impl WebRtcClient {
 
     async fn handle_relay_payload(
         pc: &Arc<webrtc::peer_connection::RTCPeerConnection>,
-        write: &Arc<
-            Mutex<
-                futures_util::stream::SplitSink<
-                    tokio_tungstenite::WebSocketStream<
-                        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
-                    >,
-                    Message,
-                >,
-            >,
-        >,
+        write: &Arc<Mutex<WsWrite>>,
         pending_ice: &Arc<Mutex<Vec<RTCIceCandidateInit>>>,
         _self_arc: &Arc<Self>,
         payload: &serde_json::Value,

@@ -84,7 +84,7 @@ pub fn any_model_enabled(config: &HashMap<String, String>) -> bool {
     ALL_MODEL_NAMES.iter().any(|m| {
         config
             .get(&format!("model_enabled_{m}"))
-            .map_or(false, |v| v == "true")
+            .is_some_and(|v| v == "true")
     })
 }
 

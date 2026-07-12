@@ -724,7 +724,7 @@ impl Database {
         let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, \
              s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres \
              FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE p.id = ?1";
-        let mut stmt = self.connection.prepare(&sql).ok()?;
+        let mut stmt = self.connection.prepare(sql).ok()?;
         let mut rows = stmt
             .query_map([photo_id], |row| {
                 Ok(Photo {
