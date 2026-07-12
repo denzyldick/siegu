@@ -24,6 +24,10 @@ struct WebRtcState {
         Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<transport::SyncMessage>>>>,
 }
 
+struct ScanState {
+    guard: siegu_core::ScanGuard,
+}
+
 fn get_config_path(app: &tauri::AppHandle) -> String {
     app.path()
         .app_config_dir()
@@ -33,10 +37,20 @@ fn get_config_path(app: &tauri::AppHandle) -> String {
 
 #[tauri::command]
 fn scan_files(app: tauri::AppHandle) {
-    dbg!(">>> scan_files INVOKED");
+    let _session = {
+        let scan_state = app.state::<ScanState>();
+        scan_state.guard.try_start()
+    };
+    let _session = match _session {
+        Some(s) => s,
+        None => {
+            emit_log(&app, "Scan already in progress, skipping.".to_string());
+            return;
+        }
+    };
+
     emit_log(&app, "Starting media scan...".to_string());
     let path = get_config_path(&app);
-    dbg!(&path);
     if path.is_empty() {
         emit_log(
             &app,
@@ -46,7 +60,6 @@ fn scan_files(app: tauri::AppHandle) {
     }
     let database = database::Database::new(&path);
     let folders = database.list_directories();
-    dbg!(&folders);
     emit_log(
         &app,
         format!("Found {} folders to scan in database.", folders.len()),
@@ -111,8 +124,8 @@ fn scan_files(app: tauri::AppHandle) {
         let db_clone = Arc::clone(database);
         let batch_for_blocking = batch.clone();
         let app_for_blocking = app_handle.clone();
+        let app_for_error = app_handle.clone();
         let batch_with_thumbs = tauri::async_runtime::spawn_blocking(move || {
-            dbg!("[batch] spawn_blocking START", batch_for_blocking.len());
             let mut batch = batch_for_blocking;
             // Generate thumbnails
             for photo in &mut batch {
@@ -141,7 +154,10 @@ fn scan_files(app: tauri::AppHandle) {
         })
         .await
         .unwrap_or_else(|join_err| {
-            dbg!("[batch] spawn_blocking JOIN ERROR", &join_err);
+            emit_log(
+                &app_for_error,
+                format!("[batch] spawn_blocking JOIN ERROR: {join_err}"),
+            );
             batch
         });
 
@@ -158,15 +174,12 @@ fn scan_files(app: tauri::AppHandle) {
         let mut batch_accum: Vec<database::Photo> = Vec::new();
         while let Some(photo) = batch_rx.recv().await {
             batch_accum.push(photo);
-            dbg!("[batch-rx] accumulated", batch_accum.len());
 
             if batch_accum.len() >= 500 {
                 let batch = std::mem::take(&mut batch_accum);
-                dbg!("[batch-rx] flushing 500");
                 flush_batch_to_db_and_ui(&database, &app_handle_for_batch, &ui_buffer, batch).await;
             }
         }
-        dbg!("[batch-rx] channel closed");
 
         if !batch_accum.is_empty() {
             let batch = std::mem::take(&mut batch_accum);
@@ -1421,6 +1434,10 @@ pub fn run() {
             app.manage(WebRtcState {
                 active_session: std::sync::Mutex::new(None),
                 sync_tx: Arc::new(tokio::sync::Mutex::new(None)),
+            });
+
+            app.manage(ScanState {
+                guard: siegu_core::ScanGuard::new(),
             });
 
             // Start periodic background scan
