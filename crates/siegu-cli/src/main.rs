@@ -233,14 +233,7 @@ async fn cmd_scan(config_dir: &Path, folder: Option<&str>) {
                     return None;
                 }
                 let meta = siegu_core::scanner::extract_photo_metadata(&file_path);
-                let id: String = {
-                    use rand::Rng;
-                    let mut rng = rand::thread_rng();
-                    (0..7)
-                        .map(|_| rng.sample(rand::distributions::Alphanumeric) as char)
-                        .collect()
-                };
-                Some(siegu_core::scanner::photo_from_metadata(&id, &meta))
+                Some(siegu_core::scanner::photo_from_metadata(&path_str, &meta))
             })
             .collect();
 
