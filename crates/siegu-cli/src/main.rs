@@ -19,8 +19,8 @@ struct Cli {
 enum Commands {
     /// Scan a folder for media
     Scan {
-        /// Folder path to scan
-        folder: String,
+        /// Folder path to scan (uses configured directories if omitted)
+        folder: Option<String>,
         #[arg(short, long)]
         config: Option<String>,
     },
@@ -115,7 +115,7 @@ async fn main() {
     match &cli.command {
         Commands::Scan { folder, config } => {
             let config_dir = resolve_config_dir(&cli.config_dir, config);
-            cmd_scan(&config_dir, folder).await;
+            cmd_scan(&config_dir, folder.as_deref()).await;
         }
         Commands::Analyze { action } => {
             let config_dir = resolve_config_dir(&cli.config_dir, &None);
@@ -158,22 +158,35 @@ async fn main() {
     }
 }
 
-async fn cmd_scan(config_dir: &Path, folder: &str) {
-    let folder_path = Path::new(folder);
-    if !folder_path.exists() {
-        eprintln!("Error: folder does not exist: {folder}");
-        std::process::exit(1);
-    }
-
-    let folder = folder_path
-        .canonicalize()
-        .unwrap_or_else(|_| folder_path.to_path_buf());
-    let folder_str = folder.display().to_string();
-
+async fn cmd_scan(config_dir: &Path, folder: Option<&str>) {
     let _ = std::fs::create_dir_all(config_dir);
     let mut db = Database::new(&config_dir.display().to_string());
 
-    println!("Scanning: {folder_str}");
+    let folders: Vec<String> = if let Some(f) = folder {
+        let folder_path = Path::new(f);
+        if !folder_path.exists() {
+            eprintln!("Error: folder does not exist: {f}");
+            std::process::exit(1);
+        }
+        let canonical = folder_path
+            .canonicalize()
+            .unwrap_or_else(|_| folder_path.to_path_buf())
+            .display()
+            .to_string();
+        let dirs = db.list_directories();
+        if !dirs.contains(&canonical) {
+            db.add_directory(&canonical);
+            println!("Added {canonical} to watched directories");
+        }
+        vec![canonical]
+    } else {
+        let dirs = db.list_directories();
+        if dirs.is_empty() {
+            eprintln!("No directories configured. Run `siegu scan <folder>` to add one.");
+            std::process::exit(1);
+        }
+        dirs
+    };
 
     let guard = ScanGuard::new();
     let _session = match guard.try_start() {
@@ -187,52 +200,65 @@ async fn cmd_scan(config_dir: &Path, folder: &str) {
     let existing = siegu_core::scanner::load_existing_paths(&config_dir.display().to_string());
     println!("Loaded {} existing paths from DB", existing.len());
 
-    let pb = ProgressBar::new_spinner();
-    pb.set_style(ProgressStyle::with_template("{spinner:.green} {msg}").unwrap());
-    pb.set_message("Scanning for media files...");
-
     use rayon::prelude::*;
 
-    let entries: Vec<_> = jwalk::WalkDir::new(&folder)
-        .follow_links(false)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| siegu_core::scanner::is_media_file(&e.path()))
-        .collect();
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(ProgressStyle::with_template("{spinner:.green} {msg}").unwrap());
 
-    let total_scanned = entries.len();
+    let mut total_new_all = 0usize;
+    let mut total_scanned_all = 0usize;
 
-    let new_photos: Vec<_> = entries
-        .par_iter()
-        .filter_map(|entry| {
-            let file_path = entry.path();
-            let path_str = file_path.display().to_string();
-            if existing.contains(&path_str) {
-                return None;
+    for dir in &folders {
+        let folder_path = Path::new(dir);
+        println!("Scanning: {dir}");
+
+        pb.set_message(format!("Scanning {dir}..."));
+
+        let entries: Vec<_> = jwalk::WalkDir::new(folder_path)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| siegu_core::scanner::is_media_file(&e.path()))
+            .collect();
+
+        let total_scanned = entries.len();
+        total_scanned_all += total_scanned;
+
+        let new_photos: Vec<_> = entries
+            .par_iter()
+            .filter_map(|entry| {
+                let file_path = entry.path();
+                let path_str = file_path.display().to_string();
+                if existing.contains(&path_str) {
+                    return None;
+                }
+                let meta = siegu_core::scanner::extract_photo_metadata(&file_path);
+                let id: String = {
+                    use rand::Rng;
+                    let mut rng = rand::thread_rng();
+                    (0..7)
+                        .map(|_| rng.sample(rand::distributions::Alphanumeric) as char)
+                        .collect()
+                };
+                Some(siegu_core::scanner::photo_from_metadata(&id, &meta))
+            })
+            .collect();
+
+        let total_new = new_photos.len();
+        total_new_all += total_new;
+
+        if total_new > 0 {
+            pb.set_message(format!("Writing {total_new} new photos from {dir}..."));
+            for batch in new_photos.chunks(500) {
+                let _ = db.store_photo_batch(batch);
             }
-            let meta = siegu_core::scanner::extract_photo_metadata(&file_path);
-            let id: String = {
-                use rand::Rng;
-                let mut rng = rand::thread_rng();
-                (0..7)
-                    .map(|_| rng.sample(rand::distributions::Alphanumeric) as char)
-                    .collect()
-            };
-            Some(siegu_core::scanner::photo_from_metadata(&id, &meta))
-        })
-        .collect();
-
-    let total_new = new_photos.len();
-
-    if total_new > 0 {
-        pb.set_message(format!("Writing {total_new} new photos to database..."));
-        for batch in new_photos.chunks(500) {
-            let _ = db.store_photo_batch(batch);
         }
     }
 
-    pb.finish_with_message(format!("Done"));
-    println!("\nScan complete: {total_new} new photos found ({total_scanned} total scanned)");
+    pb.finish_with_message("Done");
+    println!(
+        "\nScan complete: {total_new_all} new photos found ({total_scanned_all} total scanned)"
+    );
 }
 
 fn cmd_analyze_all(config_dir: &Path) {
