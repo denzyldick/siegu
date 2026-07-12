@@ -42,7 +42,18 @@ warp = { workspace = true }
 mdns-sd = { workspace = true }
 
 [features]
-default = []
+default = ["ml"]
+ml = ["dep:ort", "dep:tokenizers"]
+
+[dependencies.ort]
+version = "2.0.0-rc.12"
+default-features = false
+features = ["ndarray", "std", "copy-dylibs", "download-binaries", "tls-rustls"]
+optional = true
+
+[dependencies.tokenizers]
+version = "0.23.1"
+optional = true
 video-thumbs = ["dep:ffmpeg-next"]
 
 [dependencies.ffmpeg-next]

@@ -13,6 +13,7 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
 pub use siegu_core::ml_worker::{
     decrement_pending_count, increment_pending_count, job_status_model, should_run_model, Job,
+    MlContext,
 };
 
 // Conditional imports for AI Engines
@@ -21,12 +22,6 @@ use ort::{session::builder::GraphOptimizationLevel, session::Session};
 
 #[cfg(target_os = "android")]
 use tract_onnx::prelude::*;
-
-pub struct MlContext {
-    pub tx: UnboundedSender<Job>,
-    pub pending_count: Arc<AtomicUsize>,
-    pub abort: Arc<std::sync::atomic::AtomicBool>,
-}
 
 type FaceEmbeddingStore = Arc<Mutex<Vec<(String, Vec<f32>)>>>;
 

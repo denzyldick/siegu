@@ -1347,6 +1347,52 @@ impl Database {
         photos
     }
 
+    pub fn get_unindexed_photos_batch(&self, offset: usize, limit: usize) -> Vec<Photo> {
+        let mut photos = Vec::new();
+        let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, p.indexed, p.caption, p.aesthetics_score, 
+            s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres 
+            FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE p.indexed < 2 LIMIT ?1 OFFSET ?2";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) =
+                stmt.query_map(rusqlite::params![limit as i64, offset as i64], |row| {
+                    Ok(Photo {
+                        id: row.get(0)?,
+                        location: row.get(1)?,
+                        encoded: row.get(2)?,
+                        created: row.get(5).unwrap_or_default(),
+                        objects: HashMap::new(),
+                        properties: HashMap::new(),
+                        latitude: row.get(3).unwrap_or(0.0),
+                        longitude: row.get(4).unwrap_or(0.0),
+                        favorite: false,
+                        indexed: row.get(6).unwrap_or(0),
+                        caption: row.get(7).ok(),
+                        aesthetics_score: row.get(8).ok(),
+                        ai_status: AiStatus {
+                            clip: row.get(9).unwrap_or(0),
+                            face: row.get(10).unwrap_or(0),
+                            ocr: row.get(11).unwrap_or(0),
+                            nsfw: row.get(12).unwrap_or(0),
+                            aesthetics: row.get(13).unwrap_or(0),
+                            yolo: row.get(14).unwrap_or(0),
+                            blip: row.get(15).unwrap_or(0),
+                            arcface: row.get(16).unwrap_or(0),
+                            midas: row.get(17).unwrap_or(0),
+                            whisper: row.get(18).unwrap_or(0),
+                            sam: row.get(19).unwrap_or(0),
+                            superres: row.get(20).unwrap_or(0),
+                        },
+                    })
+                })
+            {
+                for p in iter.flatten() {
+                    photos.push(p);
+                }
+            }
+        }
+        photos
+    }
+
     pub fn get_photos_missing_model(&self, model: &str) -> Vec<String> {
         let mut ids = Vec::new();
         match model {
@@ -1453,8 +1499,13 @@ pub struct DeviceInfo {
 mod tests {
     use super::*;
 
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static TEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
     fn test_db() -> Database {
-        let dir = std::env::temp_dir().join(format!("siegu_test_{}", std::process::id()));
+        let id = TEST_COUNTER.fetch_add(1, Ordering::SeqCst);
+        let dir = std::env::temp_dir().join(format!("siegu_test_{}_{}", std::process::id(), id));
+        let _ = fs::remove_dir_all(&dir);
         let _ = fs::create_dir_all(&dir);
         Database::new(&dir.display().to_string())
     }
@@ -1642,5 +1693,143 @@ mod tests {
 
         db.set_last_scan_time("2024-06-01T12:00:00Z".to_string());
         assert_eq!(db.get_last_scan_time().unwrap(), "2024-06-01T12:00:00Z");
+    }
+
+    #[test]
+    fn test_update_photo_indexed() {
+        let mut db = test_db();
+        let photo = Photo {
+            id: "idx_1".to_string(),
+            location: "/tmp/test_idx.jpg".to_string(),
+            encoded: String::new(),
+            created: "2024-01-01".to_string(),
+            objects: HashMap::new(),
+            properties: HashMap::new(),
+            latitude: 0.0,
+            longitude: 0.0,
+            favorite: false,
+            indexed: 0,
+            caption: None,
+            aesthetics_score: None,
+            ai_status: AiStatus::default(),
+        };
+        let _ = db.store_photo_batch(&[photo]);
+
+        db.update_photo_indexed("idx_1", 2);
+        let loaded = db.get_photo_by_id("idx_1").expect("exists");
+        assert_eq!(loaded.indexed, 2);
+    }
+
+    #[test]
+    fn test_update_ai_status_and_missing_model() {
+        let mut db = test_db();
+        let photo = Photo {
+            id: "ai_1".to_string(),
+            location: "/tmp/test_ai.jpg".to_string(),
+            encoded: String::new(),
+            created: "2024-01-01".to_string(),
+            objects: HashMap::new(),
+            properties: HashMap::new(),
+            latitude: 0.0,
+            longitude: 0.0,
+            favorite: false,
+            indexed: 0,
+            caption: None,
+            aesthetics_score: None,
+            ai_status: AiStatus::default(),
+        };
+        let _ = db.store_photo_batch(&[photo]);
+
+        let missing = db.get_photos_missing_model("clip");
+        assert_eq!(missing.len(), 1);
+        assert_eq!(missing[0], "ai_1");
+
+        db.update_ai_status("ai_1", "clip", 1);
+        let missing = db.get_photos_missing_model("clip");
+        assert!(missing.is_empty());
+    }
+
+    #[test]
+    fn test_get_unindexed_photos() {
+        let mut db = test_db();
+        let mut p1 = Photo {
+            id: "unidx_1".to_string(),
+            location: "/tmp/test_unidx1.jpg".to_string(),
+            encoded: String::new(),
+            created: "2024-01-01".to_string(),
+            objects: HashMap::new(),
+            properties: HashMap::new(),
+            latitude: 0.0,
+            longitude: 0.0,
+            favorite: false,
+            indexed: 0,
+            caption: None,
+            aesthetics_score: None,
+            ai_status: AiStatus::default(),
+        };
+        let mut p2 = Photo {
+            id: "unidx_2".to_string(),
+            location: "/tmp/test_unidx2.jpg".to_string(),
+            encoded: String::new(),
+            created: "2024-01-01".to_string(),
+            objects: HashMap::new(),
+            properties: HashMap::new(),
+            latitude: 0.0,
+            longitude: 0.0,
+            favorite: false,
+            indexed: 2,
+            caption: None,
+            aesthetics_score: None,
+            ai_status: AiStatus::default(),
+        };
+        let _ = db.store_photo_batch(&[p1, p2]);
+
+        db.update_photo_indexed("unidx_1", 0);
+        db.update_photo_indexed("unidx_2", 2);
+
+        let unindexed = db.get_unindexed_photos();
+        assert_eq!(unindexed.len(), 1);
+        assert_eq!(unindexed[0].id, "unidx_1");
+    }
+
+    #[test]
+    fn test_get_unindexed_photos_batch() {
+        let mut db = test_db();
+        let photos: Vec<Photo> = (0..10)
+            .map(|i| Photo {
+                id: format!("batch_{i}"),
+                location: format!("/tmp/test_batch_{i}.jpg"),
+                encoded: String::new(),
+                created: "2024-01-01".to_string(),
+                objects: HashMap::new(),
+                properties: HashMap::new(),
+                latitude: 0.0,
+                longitude: 0.0,
+                favorite: false,
+                indexed: 0,
+                caption: None,
+                aesthetics_score: None,
+                ai_status: AiStatus::default(),
+            })
+            .collect();
+        let _ = db.store_photo_batch(&photos);
+
+        let batch1 = db.get_unindexed_photos_batch(0, 3);
+        assert_eq!(batch1.len(), 3);
+
+        let batch2 = db.get_unindexed_photos_batch(3, 3);
+        assert_eq!(batch2.len(), 3);
+
+        let batch_end = db.get_unindexed_photos_batch(9, 3);
+        assert_eq!(batch_end.len(), 1);
+
+        let batch_past = db.get_unindexed_photos_batch(20, 3);
+        assert!(batch_past.is_empty());
+    }
+
+    #[test]
+    fn test_update_ai_status_invalid_model() {
+        let db = test_db();
+        db.update_ai_status("photo_1", "invalid_model", 1);
     }
 }

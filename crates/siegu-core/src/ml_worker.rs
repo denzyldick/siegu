@@ -1,4 +1,13 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::sync::Arc;
+use tokio::sync::mpsc::UnboundedSender;
+
+pub struct MlContext {
+    pub tx: UnboundedSender<Job>,
+    pub pending_count: Arc<AtomicUsize>,
+    pub abort: Arc<AtomicBool>,
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Job {
