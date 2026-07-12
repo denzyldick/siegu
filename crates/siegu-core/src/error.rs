@@ -76,4 +76,49 @@ mod tests {
         let err = SieguError::Shutdown;
         assert_eq!(err.to_string(), "Shutdown requested");
     }
+
+    #[test]
+    fn test_all_constructors() {
+        let err = SieguError::model("missing file");
+        assert!(matches!(err, SieguError::Model(_)));
+        assert_eq!(err.to_string(), "Model error: missing file");
+
+        let err = SieguError::scan("corrupt file");
+        assert!(matches!(err, SieguError::Scan(_)));
+
+        let err = SieguError::sync("connection lost");
+        assert!(matches!(err, SieguError::Sync(_)));
+
+        let err = SieguError::other("something");
+        assert!(matches!(err, SieguError::Other(_)));
+    }
+
+    #[test]
+    fn test_display_all_variants() {
+        let cases = vec![
+            (SieguError::config("k"), "Config error: k"),
+            (SieguError::model("m"), "Model error: m"),
+            (SieguError::scan("s"), "Scan error: s"),
+            (SieguError::sync("y"), "Sync error: y"),
+            (SieguError::other("o"), "o"),
+            (SieguError::Shutdown, "Shutdown requested"),
+        ];
+        for (err, expected) in cases {
+            assert_eq!(err.to_string(), expected);
+        }
+    }
+
+    #[test]
+    fn test_io_conversion() {
+        let err: SieguError =
+            std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied").into();
+        assert!(format!("{err}").contains("denied"));
+    }
+
+    #[test]
+    fn test_debug_format() {
+        let err = SieguError::config("test");
+        let debug = format!("{err:?}");
+        assert!(debug.contains("Config"));
+    }
 }

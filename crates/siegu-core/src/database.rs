@@ -1437,3 +1437,199 @@ pub struct DeviceInfo {
     pub video_count: i64,
     pub os: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_db() -> Database {
+        let dir = std::env::temp_dir().join(format!("siegu_test_{}", std::process::id()));
+        let _ = fs::create_dir_all(&dir);
+        Database::new(&dir.display().to_string())
+    }
+
+    #[test]
+    fn test_database_creation() {
+        let db = test_db();
+        let (photos, videos) = db.get_media_counts();
+        assert!(photos >= 0);
+        assert!(videos >= 0);
+    }
+
+    #[test]
+    fn test_state_set_get() {
+        let db = test_db();
+        let mut state = HashMap::new();
+        state.insert("theme".to_string(), "dark".to_string());
+        state.insert("tier".to_string(), "paid".to_string());
+        db.set_state(state);
+
+        let config = db.get_state();
+        assert_eq!(config.get("theme").unwrap(), "dark");
+        assert_eq!(config.get("tier").unwrap(), "paid");
+    }
+
+    #[test]
+    fn test_state_overwrite() {
+        let db = test_db();
+        let mut state = HashMap::new();
+        state.insert("theme".to_string(), "dark".to_string());
+        db.set_state(state);
+
+        let mut state2 = HashMap::new();
+        state2.insert("theme".to_string(), "light".to_string());
+        db.set_state(state2);
+
+        let config = db.get_state();
+        assert_eq!(config.get("theme").unwrap(), "light");
+    }
+
+    #[test]
+    fn test_add_list_remove_directory() {
+        let db = test_db();
+        db.add_directory("/home/test/photos");
+        db.add_directory("/home/test/videos");
+
+        let dirs = db.list_directories();
+        assert!(dirs.contains(&"/home/test/photos".to_string()));
+        assert!(dirs.contains(&"/home/test/videos".to_string()));
+
+        db.remove_directory("/home/test/photos".to_string());
+        let dirs = db.list_directories();
+        assert!(!dirs.contains(&"/home/test/photos".to_string()));
+        assert!(dirs.contains(&"/home/test/videos".to_string()));
+    }
+
+    #[test]
+    fn test_log_store_retrieve() {
+        let db = test_db();
+        db.store_log("info", "Test message 1");
+        db.store_log("error", "Test error");
+        db.store_log("info", "Test message 2");
+
+        let logs = db.get_logs(10);
+        assert!(logs.len() >= 3);
+        assert!(logs.iter().any(|l| l.message.contains("Test error")));
+    }
+
+    #[test]
+    fn test_clear_logs() {
+        let db = test_db();
+        db.store_log("info", "to be cleared");
+        assert!(!db.get_logs(10).is_empty());
+
+        db.clear_logs();
+        assert!(db.get_logs(10).is_empty());
+    }
+
+    #[test]
+    fn test_check_integrity() {
+        let db = test_db();
+        assert!(db.check_integrity().unwrap_or(false));
+    }
+
+    #[test]
+    fn test_toggle_favorite() {
+        let mut db = test_db();
+        let photo = Photo {
+            id: "test_fav_1".to_string(),
+            location: "/tmp/test.jpg".to_string(),
+            encoded: String::new(),
+            created: "2024-01-01".to_string(),
+            objects: HashMap::new(),
+            properties: HashMap::new(),
+            latitude: 0.0,
+            longitude: 0.0,
+            favorite: false,
+            indexed: 0,
+            caption: None,
+            aesthetics_score: None,
+            ai_status: AiStatus::default(),
+        };
+        let _ = db.store_photo_batch(&[photo]);
+
+        let result = db.toggle_favorite("test_fav_1");
+        assert!(result);
+        let p = db.get_photo_by_id("test_fav_1").unwrap();
+        assert!(p.favorite);
+
+        let result = db.toggle_favorite("test_fav_1");
+        assert!(!result);
+        let p = db.get_photo_by_id("test_fav_1").unwrap();
+        assert!(!p.favorite);
+    }
+
+    #[test]
+    fn test_store_and_get_photo_properties() {
+        let mut db = test_db();
+        let mut props = HashMap::new();
+        props.insert("Make".to_string(), "Apple".to_string());
+        props.insert("Model".to_string(), "iPhone 15".to_string());
+
+        let photo = Photo {
+            id: "test_props_1".to_string(),
+            location: "/tmp/test.jpg".to_string(),
+            encoded: String::new(),
+            created: "2024-06-01".to_string(),
+            objects: HashMap::new(),
+            properties: props,
+            latitude: 40.7128,
+            longitude: -74.0060,
+            favorite: false,
+            indexed: 0,
+            caption: None,
+            aesthetics_score: None,
+            ai_status: AiStatus::default(),
+        };
+        let _ = db.store_photo_batch(&[photo]);
+
+        let p = db.get_photo_by_id("test_props_1").unwrap();
+        assert_eq!(p.latitude, 40.7128);
+        assert_eq!(p.longitude, -74.0060);
+    }
+
+    #[test]
+    fn test_get_heatmap_points() {
+        let mut db = test_db();
+        let photo = Photo {
+            id: "test_heat_1".to_string(),
+            location: "/tmp/test.jpg".to_string(),
+            encoded: String::new(),
+            created: "2024-01-01".to_string(),
+            objects: HashMap::new(),
+            properties: HashMap::new(),
+            latitude: 52.3676,
+            longitude: 4.9041,
+            favorite: false,
+            indexed: 0,
+            caption: None,
+            aesthetics_score: None,
+            ai_status: AiStatus::default(),
+        };
+        let _ = db.store_photo_batch(&[photo]);
+        let points = db.get_heatmap_points();
+        assert!(points.iter().any(|p| p.id == "test_heat_1"));
+    }
+
+    #[test]
+    fn test_device_list() {
+        let db = test_db();
+        db.connection
+            .execute(
+                "INSERT OR REPLACE INTO device(ip, name) VALUES(?1, ?2)",
+                ("192.168.1.1", "test-device"),
+            )
+            .unwrap();
+        let devices = db.list_devices();
+        assert!(devices.iter().any(|d| d.title == "test-device"));
+    }
+
+    #[test]
+    fn test_last_scan_time() {
+        let db = test_db();
+        assert!(db.get_last_scan_time().is_none());
+
+        db.set_last_scan_time("2024-06-01T12:00:00Z".to_string());
+        assert_eq!(db.get_last_scan_time().unwrap(), "2024-06-01T12:00:00Z");
+    }
+}
