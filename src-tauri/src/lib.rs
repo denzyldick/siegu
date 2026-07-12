@@ -28,6 +28,18 @@ struct ScanState {
     guard: siegu_core::ScanGuard,
 }
 
+struct ShutdownState {
+    coordinator: siegu_core::shutdown::ShutdownCoordinator,
+}
+
+impl Default for ShutdownState {
+    fn default() -> Self {
+        Self {
+            coordinator: siegu_core::shutdown::ShutdownCoordinator::new(),
+        }
+    }
+}
+
 fn get_config_path(app: &tauri::AppHandle) -> String {
     app.path()
         .app_config_dir()
@@ -1285,8 +1297,13 @@ pub fn emit_log(app: &tauri::AppHandle, message: String) {
     let path = get_config_path(app);
     if !path.is_empty() {
         let database = database::Database::new(&path);
-        let level = if message.to_lowercase().contains("error") {
+        let upper = message.to_uppercase();
+        let level = if upper.contains("ERROR") || upper.contains("FATAL") {
             "error"
+        } else if upper.contains("WARN") || upper.contains("WARNING") {
+            "warn"
+        } else if upper.contains("DEBUG") {
+            "debug"
         } else {
             "info"
         };
@@ -1351,6 +1368,9 @@ pub fn run() {
                     .icon(app.default_window_icon().unwrap().clone())
                     .on_menu_event(|app, event| match event.id.as_ref() {
                         "quit" => {
+                            if let Some(state) = app.try_state::<ShutdownState>() {
+                                state.coordinator.signal();
+                            }
                             app.exit(0);
                         }
                         "show" => {
@@ -1415,6 +1435,8 @@ pub fn run() {
             app.manage(ScanState {
                 guard: siegu_core::ScanGuard::new(),
             });
+
+            app.manage(ShutdownState::default());
 
             // Start periodic background scan
             let app_handle_for_interval = app.handle().clone();
