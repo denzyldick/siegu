@@ -1233,34 +1233,10 @@ async fn initialize_sync_folder(app: tauri::AppHandle, path: String) -> Result<(
     Ok(())
 }
 
-const ALLOWED_CONFIG_KEYS: &[&str] = &[
-    "sync_path",
-    "scan_threads",
-    "indexing_mode",
-    "theme",
-    "language",
-    "tier",
-    "model_enabled_clip",
-    "model_enabled_face",
-    "model_enabled_ocr",
-    "model_enabled_nsfw",
-    "model_enabled_aesthetics",
-    "model_enabled_yolo",
-    "model_enabled_blip",
-    "model_enabled_arcface",
-    "model_enabled_midas",
-    "model_enabled_whisper",
-    "model_enabled_sam",
-    "model_enabled_superres",
-    "last_scan_completed",
-    "auto_scan",
-    "sync_enabled",
-];
-
 #[tauri::command]
 async fn save_config(app: tauri::AppHandle, key: String, value: String) {
-    if !ALLOWED_CONFIG_KEYS.contains(&key.as_str()) || key.len() > 64 || value.len() > 1024 {
-        emit_log(&app, format!("Invalid config key or value: key={key}"));
+    if let Err(e) = siegu_core::config::validate_config_value(&key, &value) {
+        emit_log(&app, format!("Invalid config: {e}"));
         return;
     }
     let path = get_config_path(&app);
