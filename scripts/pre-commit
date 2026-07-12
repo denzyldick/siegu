@@ -14,13 +14,6 @@ cargo fmt
 cargo clippy --fix --allow-dirty --allow-staged
 cd ..
 
-# Format and fix signaling-server
-echo "Checking signaling-server..."
-cd signaling-server
-cargo fmt
-cargo clippy --fix --allow-dirty --allow-staged
-cd ..
-
 # Re-add changed files if clippy modified them
 git add .
 

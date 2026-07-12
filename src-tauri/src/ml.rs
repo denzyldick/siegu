@@ -11,21 +11,16 @@ use tauri::Emitter;
 use tauri::{AppHandle, Manager};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
+pub use siegu_core::ml_worker::{
+    decrement_pending_count, increment_pending_count, job_status_model, should_run_model, Job,
+};
+
 // Conditional imports for AI Engines
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use ort::{session::builder::GraphOptimizationLevel, session::Session};
 
 #[cfg(target_os = "android")]
 use tract_onnx::prelude::*;
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum Job {
-    ProcessAll,
-    AutoAnalyzeSingle(String),
-    AnalyzeSingle(String),
-    AnalyzeSingleWithModel(String, String),
-    ProcessModel(String),
-}
 
 pub struct MlContext {
     pub tx: UnboundedSender<Job>,
@@ -33,87 +28,12 @@ pub struct MlContext {
     pub abort: Arc<std::sync::atomic::AtomicBool>,
 }
 
-const MAX_REASONABLE_PENDING: usize = 1_000_000;
 type FaceEmbeddingStore = Arc<Mutex<Vec<(String, Vec<f32>)>>>;
-
-fn job_status_model(model_id: &str) -> Option<&'static str> {
-    match model_id {
-        "clip" => Some("clip"),
-        "ultraface" | "face" => Some("face"),
-        "ocr" => Some("ocr"),
-        "nsfw" => Some("nsfw"),
-        "aesthetics" => Some("aesthetics"),
-        "yolo" => Some("yolo"),
-        "blip" => Some("blip"),
-        "arcface" => Some("arcface"),
-        "midas" => Some("midas"),
-        "whisper" => Some("whisper"),
-        _ => None,
-    }
-}
-
-fn should_run_model(
-    target_model: Option<&str>,
-    model: &str,
-    config: Option<&std::collections::HashMap<String, String>>,
-) -> bool {
-    if let Some(config) = config {
-        let key = format!("model_enabled_{}", model);
-        if let Some(val) = config.get(&key) {
-            if val != "true" {
-                return false;
-            }
-        }
-    }
-    target_model.is_none_or(|target| target == model)
-}
-
-// The pending counter is shared by UI commands, discovery, and background model work.
-// Clamp obviously invalid values so stale underflows do not leave the UI stuck indexing forever.
-fn decrement_pending_count(counter: &AtomicUsize) -> usize {
-    counter
-        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
-            if current > MAX_REASONABLE_PENDING {
-                Some(0)
-            } else {
-                Some(current.saturating_sub(1))
-            }
-        })
-        .map(|previous| {
-            if previous > MAX_REASONABLE_PENDING {
-                0
-            } else {
-                previous.saturating_sub(1)
-            }
-        })
-        .unwrap_or(0)
-}
-
-fn increment_pending_count(counter: &AtomicUsize, amount: usize) -> usize {
-    counter
-        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
-            let base = if current > MAX_REASONABLE_PENDING {
-                0
-            } else {
-                current
-            };
-            Some(base.saturating_add(amount))
-        })
-        .map(|previous| {
-            let base = if previous > MAX_REASONABLE_PENDING {
-                0
-            } else {
-                previous
-            };
-            base.saturating_add(amount)
-        })
-        .unwrap_or(amount)
-}
 
 // Model wrappers to handle different engine types
 #[derive(Clone)]
 pub(crate) enum ModelEngine {
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     Ort(Arc<Mutex<Session>>),
     #[cfg(target_os = "android")]
     Tract(Arc<SimplePlan<TypedFact, Box<dyn TypedOp>, TypedModel>>),
@@ -122,7 +42,7 @@ pub(crate) enum ModelEngine {
 impl ModelEngine {
     pub(crate) fn run(&self, input: Array4<f32>, _input_name: &str) -> Result<Vec<f32>, String> {
         match self {
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             ModelEngine::Ort(session) => {
                 let shape = input.shape().to_vec();
                 let data = input.into_raw_vec_and_offset().0;
@@ -157,10 +77,13 @@ impl ModelEngine {
                 }
                 Ok(results)
             }
+            #[cfg(target_os = "ios")]
+            _ => unreachable!("ModelEngine has no variants on iOS"),
         }
     }
 }
 
+#[cfg(not(target_os = "ios"))]
 fn compute_text_embeddings(
     #[cfg(not(target_os = "android"))] text_model: &mut Session,
     #[cfg(target_os = "android")] text_model: &SimplePlan<TypedFact, Box<dyn TypedOp>, TypedModel>,
@@ -244,7 +167,7 @@ fn compute_text_embeddings(
             #[cfg(target_os = "android")]
             let arr = Array2::from_shape_vec((1, 77), ids).unwrap();
 
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             {
                 let shape = arr.shape().to_vec();
                 let data = arr.into_raw_vec_and_offset().0;
@@ -407,7 +330,7 @@ pub fn start_background_worker(
                     &app_handle,
                     "ML Worker: Initializing AI Engines...".to_string(),
                 );
-                #[cfg(not(target_os = "android"))]
+                #[cfg(not(any(target_os = "android", target_os = "ios")))]
                 {
                     let _ = ort::init().with_name("siegu").commit();
                 }
@@ -421,7 +344,7 @@ pub fn start_background_worker(
                     .map(Arc::new);
 
                 if is_ok(&ultraface_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -432,7 +355,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&clip_visual_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -443,7 +366,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&clip_text_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Some(tokenizer) = tokenizer.as_ref() {
                         if let Ok(mut s) = Session::builder()
                             .unwrap()
@@ -456,7 +379,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&ocr_det_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -467,7 +390,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&ocr_rec_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -478,7 +401,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&nsfw_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -489,7 +412,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&aesthetics_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -500,7 +423,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&yolo_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -511,7 +434,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&blip_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -522,7 +445,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&arcface_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -533,7 +456,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&midas_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -544,7 +467,7 @@ pub fn start_background_worker(
                     }
                 }
                 if is_ok(&whisper_path) {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if let Ok(s) = Session::builder()
                         .unwrap()
                         .with_optimization_level(GraphOptimizationLevel::Disable)
@@ -696,7 +619,7 @@ pub fn start_background_worker(
             .any(|m| {
                 config
                     .get(&format!("model_enabled_{}", m))
-                    .map_or(false, |v| v == "true")
+                    .is_some_and(|v| v == "true")
             });
             if !has_enabled_model && target_model.is_none() {
                 let lock = db.lock().unwrap();
@@ -762,17 +685,6 @@ pub fn start_background_worker(
                     let app_handle_task = app_handle.clone();
                     let pending_count_task = Arc::clone(&pending_count_clone);
 
-                    let _ = app_handle.emit(
-                        "current-ai-job",
-                        serde_json::json!({
-                            "id": photo_id,
-                            "filename": Path::new(&photo_entry.location)
-                                .file_name()
-                                .and_then(|n| n.to_str())
-                                .unwrap_or(""),
-                            "model": target_model.clone().unwrap_or_default(),
-                        }),
-                    );
                     let db_task = Arc::clone(&db);
 
                     let clip_visual_task = clip_visual.clone();
@@ -800,14 +712,22 @@ pub fn start_background_worker(
                             let lock = db_task.lock().unwrap();
                             lock.get_state()
                         };
+
+                        let mut pending_objects: Vec<(String, String)> = Vec::new();
+                        let mut pending_ocr: Option<String> = None;
+                        let mut pending_nsfw: Option<String> = None;
+                        let mut pending_aesthetics: Option<f64> = None;
+                        let mut pending_face_count: usize = 0;
+                        let mut completed_models: Vec<&'static str> = Vec::new();
+
                         let image_res = image::open(&photo_loc_actual);
-                        if abort_task.load(Ordering::SeqCst) {
-                            // aborted — skip processing, still emit event below
-                        } else {
+                        if !abort_task.load(Ordering::SeqCst) {
                             if let Ok(dynamic_img) = image_res {
+                    let orientation = siegu_core::thumbnail::read_exif_orientation(&photo_loc_actual);
+                    let dynamic_img = siegu_core::thumbnail::apply_orientation(dynamic_img, orientation);
                                 let img = dynamic_img.to_rgb8();
 
-                            // Tier 2: CLIP Visual
+                            // CLIP Visual
                             if should_run_model(target_model_inner.as_deref(), "clip", Some(&config)) && photo_entry.ai_status.clip == 0 {
                                 if abort_task.load(Ordering::SeqCst) { return; }
                                 let __start = std::time::Instant::now();
@@ -823,32 +743,21 @@ pub fn start_background_worker(
                                         let mut visual_embedding = data;
                                         let visual_norm: f32 = visual_embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
                                         if visual_norm > 0.0 { for v in visual_embedding.iter_mut() { *v /= visual_norm; } }
-                                        let mut similarities = Vec::new();
-                                        for (text_label, text_embedding) in text_embeddings_task.iter() {
-                                            let dot_product: f32 = visual_embedding.iter().zip(text_embedding.iter()).map(|(a, b)| a * b).sum();
-                                            similarities.push((text_label, dot_product));
-                                        }
+                                        let mut similarities: Vec<(String, f32)> = text_embeddings_task.iter().map(|(label, emb)| {
+                                            let dot: f32 = visual_embedding.iter().zip(emb.iter()).map(|(a, b)| a * b).sum();
+                                            (label.clone(), dot)
+                                        }).collect();
                                         similarities.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-                                        let top_matches = similarities
-                                            .iter()
-                                            .take(5)
-                                            .map(|(class_name, score)| format!("{class_name} ({score:.2})"))
-                                            .collect::<Vec<_>>()
-                                            .join(", ");
-                                        let lock = db_task.lock().unwrap();
-                                        for (class_name, score) in similarities.iter().take(5) {
-                                            let _ = lock.connection.execute("INSERT INTO object (photo_id, class, probability) VALUES(?1, ?2, ?3)", (&photo_id_task, class_name, &score.to_string()));
+                                        for (label, score) in similarities.iter().take(5) {
+                                            pending_objects.push((label.clone(), format!("{score:.2}")));
                                         }
-                                        lock.update_ai_status(&photo_id_task, "clip", 1);
+                                        completed_models.push("clip");
                                         model_timings.insert("clip".to_string(), __start.elapsed().as_secs_f64());
-                                        emit_log(&app_handle_task, format!("ML Worker: CLIP tags for {photo_id_task}: {top_matches}"));
                                     }
-                                } else if progress_model_inner.is_some() {
-                                    emit_log(&app_handle_task, "ERROR: CLIP model is not loaded. Download or update Smart Search first.".to_string());
                                 }
                             }
 
-                            // Tier 1: Aesthetics
+                            // Aesthetics
                             if should_run_model(target_model_inner.as_deref(), "aesthetics", Some(&config)) && photo_entry.ai_status.aesthetics == 0 {
                                 if abort_task.load(Ordering::SeqCst) { return; }
                                 let __start = std::time::Instant::now();
@@ -861,19 +770,14 @@ pub fn start_background_worker(
                                         input[[0, 2, y as usize, x as usize]] = pixel[2] as f32 / 127.5 - 1.0;
                                     }
                                     if let Ok(data) = model.run(input, "input") {
-                                        let score = data[0];
-                                        let lock = db_task.lock().unwrap();
-                                        let _ = lock.connection.execute("UPDATE photo SET aesthetics_score = ?1 WHERE id = ?2", (score as f64, &photo_id_task));
-                                        lock.update_ai_status(&photo_id_task, "aesthetics", 1);
+                                        pending_aesthetics = Some(data[0] as f64);
+                                        completed_models.push("aesthetics");
                                         model_timings.insert("aesthetics".to_string(), __start.elapsed().as_secs_f64());
-                                        emit_log(&app_handle_task, format!("ML Worker: Aesthetic score for {photo_id_task}: {score:.2}"));
                                     }
-                                } else if progress_model_inner.is_some() {
-                                    emit_log(&app_handle_task, "ERROR: Aesthetics model is not loaded. Download or update Quality Scorer first.".to_string());
                                 }
                             }
 
-                            // Tier 1: NSFW
+                            // NSFW
                             if should_run_model(target_model_inner.as_deref(), "nsfw", Some(&config)) && photo_entry.ai_status.nsfw == 0 {
                                 if abort_task.load(Ordering::SeqCst) { return; }
                                 let __start = std::time::Instant::now();
@@ -887,18 +791,14 @@ pub fn start_background_worker(
                                     }
                                     if let Ok(data) = model.run(input, "pixel_values") {
                                         let nsfw_score = if data.len() >= 2 { let e0 = data[0].exp(); let e1 = data[1].exp(); e1 / (e0 + e1) } else { data[0] };
-                                        let lock = db_task.lock().unwrap();
-                                        let _ = lock.connection.execute("INSERT INTO properties (photo_id, key, value) VALUES(?1, 'nsfw', ?2)", (&photo_id_task, &nsfw_score.to_string()));
-                                        lock.update_ai_status(&photo_id_task, "nsfw", 1);
+                                        pending_nsfw = Some(nsfw_score.to_string());
+                                        completed_models.push("nsfw");
                                         model_timings.insert("nsfw".to_string(), __start.elapsed().as_secs_f64());
-                                        emit_log(&app_handle_task, format!("ML Worker: NSFW score for {photo_id_task}: {nsfw_score:.2}"));
                                     }
-                                } else if progress_model_inner.is_some() {
-                                    emit_log(&app_handle_task, "ERROR: NSFW model is not loaded. Download or update Safe Mode first.".to_string());
                                 }
                             }
 
-                            // Tier 2: OCR
+                            // OCR
                             if should_run_model(target_model_inner.as_deref(), "ocr", Some(&config)) && photo_entry.ai_status.ocr == 0 {
                                 if abort_task.load(Ordering::SeqCst) { return; }
                                 let __start = std::time::Instant::now();
@@ -926,24 +826,17 @@ pub fn start_background_worker(
                                                     last_char_idx = max_idx;
                                                 }
                                                 if !recognized_text.trim().is_empty() {
-                                                    let lock = db_task.lock().unwrap();
-                                                    let _ = lock.connection.execute("INSERT INTO ocr (photo_id, text) VALUES(?1, ?2)", (&photo_id_task, &recognized_text));
-                                                    emit_log(&app_handle_task, format!("ML Worker: OCR text for {photo_id_task}: {}", recognized_text.trim()));
-                                                } else {
-                                                    emit_log(&app_handle_task, format!("ML Worker: OCR found no text for {photo_id_task}."));
+                                                    pending_ocr = Some(recognized_text);
                                                 }
                                             }
                                         }
-                                        let lock = db_task.lock().unwrap();
-                                        lock.update_ai_status(&photo_id_task, "ocr", 1);
+                                        completed_models.push("ocr");
                                         model_timings.insert("ocr".to_string(), __start.elapsed().as_secs_f64());
                                     }
-                                } else if progress_model_inner.is_some() {
-                                    emit_log(&app_handle_task, "ERROR: OCR model is not loaded. Download or update Text Finder first.".to_string());
                                 }
                             }
 
-                            // Tier 2: YOLOv8
+                            // YOLOv8
                             if should_run_model(target_model_inner.as_deref(), "yolo", Some(&config)) && photo_entry.ai_status.yolo == 0 {
                                 if abort_task.load(Ordering::SeqCst) { return; }
                                 let __start = std::time::Instant::now();
@@ -956,8 +849,6 @@ pub fn start_background_worker(
                                         input[[0, 2, y as usize, x as usize]] = pixel[2] as f32 / 255.0;
                                     }
                                     if let Ok(data) = model.run(input, "images") {
-                                        // YOLOv8n output is [1, 84, 8400]
-                                        // We just check for high-confidence classes to tag
                                         let num_classes = 80;
                                         let num_anchors = 8400;
                                         let mut found_classes: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
@@ -973,22 +864,17 @@ pub fn start_background_worker(
                                             }
                                         }
                                         const COCO_CLASSES: &[&str] = &["person","bicycle","car","motorcycle","airplane","bus","train","truck","boat","traffic light","fire hydrant","stop sign","parking meter","bench","bird","cat","dog","horse","sheep","cow","elephant","bear","zebra","giraffe","backpack","umbrella","handbag","tie","suitcase","frisbee","skis","snowboard","sports ball","kite","baseball bat","baseball glove","skateboard","surfboard","tennis racket","bottle","wine glass","cup","fork","knife","spoon","bowl","banana","apple","sandwich","orange","broccoli","carrot","hot dog","pizza","donut","cake","chair","couch","potted plant","bed","dining table","toilet","tv","laptop","mouse","remote","keyboard","cell phone","microwave","oven","toaster","sink","refrigerator","book","clock","vase","scissors","teddy bear","hair drier","toothbrush"];
-                                        let lock = db_task.lock().unwrap();
-                                        let found_count = found_classes.len();
                                         for (cls_idx, conf) in found_classes {
                                             let name = COCO_CLASSES.get(cls_idx).copied().unwrap_or("unknown");
-                                            let _ = lock.connection.execute("INSERT INTO object (photo_id, class, probability) VALUES(?1, ?2, ?3)", (&photo_id_task, name, &conf.to_string()));
+                                            pending_objects.push((name.to_string(), conf.to_string()));
                                         }
-                                        lock.update_ai_status(&photo_id_task, "yolo", 1);
+                                        completed_models.push("yolo");
                                         model_timings.insert("yolo".to_string(), __start.elapsed().as_secs_f64());
-                                        emit_log(&app_handle_task, format!("ML Worker: YOLO found {found_count} object classes for {photo_id_task}."));
                                     }
-                                } else if progress_model_inner.is_some() {
-                                    emit_log(&app_handle_task, "ERROR: YOLO model is not loaded. Download or update Object Pro first.".to_string());
                                 }
                             }
 
-                            // Tier 1: Face Detection
+                            // Face Detection
                             let should_run_face = should_run_model(target_model_inner.as_deref(), "face", Some(&config))
                                 && photo_entry.ai_status.face == 0;
                             let should_run_arcface = should_run_model(target_model_inner.as_deref(), "arcface", Some(&config))
@@ -1009,17 +895,17 @@ pub fn start_background_worker(
                                     if let Ok(data) = face_model.run(input, "input") {
                                         if data.len() >= 4420 * 6 {
                                             let scores = &data[..4420 * 2]; let boxes = &data[4420 * 2..];
-                                            let anchors = crate::face_detector::generate_anchors();
+                                            let anchors = siegu_core::face_detector::generate_anchors();
                                             let mut proposals = Vec::new();
                                             for i in 0..anchors.len() {
                                                 let score = scores[i * 2 + 1];
                                                 if score > 0.6 {
                                                     let loc = [boxes[i * 4], boxes[i * 4 + 1], boxes[i * 4 + 2], boxes[i * 4 + 3]];
-                                                    let decoded = crate::face_detector::decode(&loc, &anchors[i]);
+                                                     let decoded = siegu_core::face_detector::decode(&loc, &anchors[i]);
                                                     proposals.push((decoded, score));
                                                 }
                                             }
-                                            let keep = crate::face_detector::nms(&mut proposals, 0.3);
+                                            let keep = siegu_core::face_detector::nms(&mut proposals, 0.3);
                                             for &idx in &keep {
                                                 let bbox = proposals[idx].0;
                                                 let xmin = (bbox[0] * orig_w).max(0.0) as u32; let ymin = (bbox[1] * orig_h).max(0.0) as u32;
@@ -1032,8 +918,6 @@ pub fn start_background_worker(
                                                         let crop_path = format!("{faces_dir_task}/{face_id}.jpg");
                                                         if face_crop.save(&crop_path).is_ok() {
                                                             let mut face_embedding = Vec::new();
-
-                                                            // Use ArcFace if available (higher accuracy)
                                                             if let Some(ref model) = arcface_task {
                                                                 let f_resized = image::imageops::resize(&face_crop, 112, 112, image::imageops::FilterType::Triangle);
                                                                 let mut f_input = Array4::<f32>::zeros((1, 3, 112, 112));
@@ -1095,20 +979,16 @@ pub fn start_background_worker(
                                             }
                                         }
                                     }
-                                    let lock = db_task.lock().unwrap();
-                                    let _ = lock.connection.execute("INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES(?1, 'face_count', ?2)", (&photo_id_task, &face_count.to_string()));
-                                    lock.update_ai_status(&photo_id_task, "face", 1);
+                                    pending_face_count = face_count;
+                                    completed_models.push("face");
                                     if arcface_task.is_some() {
-                                        lock.update_ai_status(&photo_id_task, "arcface", 1);
+                                        completed_models.push("arcface");
                                     }
                                     model_timings.insert("face".to_string(), __start.elapsed().as_secs_f64());
-                                    emit_log(&app_handle_task, format!("ML Worker: Face analysis found {face_count} faces for {photo_id_task}."));
-                                } else if progress_model_inner.is_some() {
-                                    emit_log(&app_handle_task, "ERROR: Face model is not loaded. Download or update Face Grouping first.".to_string());
                                 }
                             }
 
-                            // Tier 3: BLIP (Captioning)
+                            // BLIP
                             if should_run_model(target_model_inner.as_deref(), "blip", Some(&config)) && photo_entry.ai_status.blip == 0 {
                                 if abort_task.load(Ordering::SeqCst) { return; }
                                 let __start = std::time::Instant::now();
@@ -1121,17 +1001,13 @@ pub fn start_background_worker(
                                         input[[0, 2, y as usize, x as usize]] = (pixel[2] as f32 / 255.0 - 0.40821073) / 0.2757771;
                                     }
                                     if let Ok(_data) = model.run(input, "pixel_values") {
-                                        let lock = db_task.lock().unwrap();
-                                        lock.update_ai_status(&photo_id_task, "blip", 1);
+                                        completed_models.push("blip");
                                         model_timings.insert("blip".to_string(), __start.elapsed().as_secs_f64());
-                                        emit_log(&app_handle_task, format!("ML Worker: BLIP caption model ran for {photo_id_task}."));
                                     }
-                                } else if progress_model_inner.is_some() {
-                                    emit_log(&app_handle_task, "ERROR: BLIP model is not loaded. Download or update Photo Describer first.".to_string());
                                 }
                             }
 
-                            // Tier 3: MiDaS (Depth)
+                            // MiDaS
                             if should_run_model(target_model_inner.as_deref(), "midas", Some(&config)) && photo_entry.ai_status.midas == 0 {
                                 if abort_task.load(Ordering::SeqCst) { return; }
                                 let __start = std::time::Instant::now();
@@ -1144,65 +1020,81 @@ pub fn start_background_worker(
                                         input[[0, 2, y as usize, x as usize]] = pixel[2] as f32 / 255.0;
                                     }
                                     if let Ok(_data) = model.run(input, "pixel_values") {
-                                        let lock = db_task.lock().unwrap();
-                                        lock.update_ai_status(&photo_id_task, "midas", 1);
+                                        completed_models.push("midas");
                                         model_timings.insert("midas".to_string(), __start.elapsed().as_secs_f64());
-                                        emit_log(&app_handle_task, format!("ML Worker: MiDaS depth analysis completed for {photo_id_task}."));
                                     }
-                                } else if progress_model_inner.is_some() {
-                                    emit_log(&app_handle_task, "ERROR: MiDaS model is not loaded. Download or update Depth Vision first.".to_string());
                                 }
                             }
 
-                        } else {
-                            emit_log(&app_handle_task, format!("ERROR: Could not open image for AI analysis: {photo_loc_actual}"));
-                        }
-                        }
-
-                        // Finalize
-                        let lock = db_task.lock().unwrap();
-                        if target_model_inner.is_none() {
-                            lock.update_photo_indexed(&photo_id_task, 2);
-                        }
-                        let _ = lock.connection.execute("UPDATE photo SET sync_needed = 1 WHERE id = ?1", [&photo_id_task]);
-
-                        if let Some(state) = app_handle_task.try_state::<crate::WebRtcState>() {
-                            let mut tx_lock = state.sync_tx.blocking_lock();
-                            if let Some(tx) = tx_lock.as_mut() {
-                                if let Ok(info) = lock.get_photo_sync_info_by_id(&photo_id_task) {
-                                    let _ = tx.send(crate::transport::SyncMessage::SyncFile { photo: info });
-                                }
                             }
                         }
 
-                        drop(lock);
-
-                        let _ = app_handle_task.emit("photo-updated", serde_json::json!({
-                            "id": photo_id_task,
-                        }));
-
+                        // === SINGLE DB LOCK: flush all batched writes in a transaction ===
                         {
                             let lock = db_task.lock().unwrap();
+                            let photo_id_ref = &photo_id_task;
+                            let pending_objects_ref = &pending_objects;
+                            let completed_models_ref = &completed_models;
+                            let pending_ocr_ref = &pending_ocr;
+                            let pending_nsfw_ref = &pending_nsfw;
+                            let pending_aesthetics_val = pending_aesthetics;
+                            let pending_face_count_val = pending_face_count;
+
+                            let _ = siegu_core::ml_worker::flush_batch_in_transaction(
+                                &lock.connection,
+                                || {
+                                    for (class, prob) in pending_objects_ref {
+                                        let _ = lock.connection.execute("INSERT INTO object (photo_id, class, probability) VALUES(?1, ?2, ?3)", (photo_id_ref, class, prob));
+                                    }
+                                    if let Some(ref text) = pending_ocr_ref {
+                                        let _ = lock.connection.execute("INSERT INTO ocr (photo_id, text) VALUES(?1, ?2)", (photo_id_ref, text));
+                                    }
+                                    if let Some(ref score) = pending_nsfw_ref {
+                                        let _ = lock.connection.execute("INSERT INTO properties (photo_id, key, value) VALUES(?1, 'nsfw', ?2)", (photo_id_ref, score));
+                                    }
+                                    if let Some(score) = pending_aesthetics_val {
+                                        let _ = lock.connection.execute("UPDATE photo SET aesthetics_score = ?1 WHERE id = ?2", (score, photo_id_ref));
+                                    }
+                                    let _ = lock.connection.execute("INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES(?1, 'face_count', ?2)", (photo_id_ref, &pending_face_count_val.to_string()));
+
+                                    for model in completed_models_ref {
+                                        lock.update_ai_status(photo_id_ref, model, 1);
+                                    }
+
+                                    if target_model_inner.is_none() {
+                                        lock.update_photo_indexed(photo_id_ref, 2);
+                                    }
+                                    let _ = lock.connection.execute("UPDATE photo SET sync_needed = 1 WHERE id = ?1", [photo_id_ref]);
+
+                                    Ok(())
+                                },
+                            );
+
+                            if let Some(state) = app_handle_task.try_state::<crate::WebRtcState>() {
+                                let mut tx_lock = state.sync_tx.blocking_lock();
+                                if let Some(tx) = tx_lock.as_mut() {
+                                    if let Ok(info) = lock.get_photo_sync_info_by_id(&photo_id_task) {
+                                        let _ = tx.send(crate::transport::SyncMessage::SyncFile { photo: info });
+                                    }
+                                }
+                            }
+
+                            let _ = app_handle_task.emit("photo-updated", serde_json::json!({ "id": &photo_id_task }));
+
                             let object_count: i32 = lock.connection
-                                .query_row("SELECT COUNT(*) FROM object WHERE photo_id = ?1", [&photo_id_task], |r| r.get(0))
-                                .unwrap_or(0);
-                            let face_count: i32 = lock.connection
-                                .query_row("SELECT COUNT(*) FROM faces WHERE photo_id = ?1", [&photo_id_task], |r| r.get(0))
-                                .unwrap_or(0);
+                                .query_row("SELECT COUNT(*) FROM object WHERE photo_id = ?1", [&photo_id_task], |r| r.get(0)).unwrap_or(0);
+                            let face_count_db: i32 = lock.connection
+                                .query_row("SELECT COUNT(*) FROM faces WHERE photo_id = ?1", [&photo_id_task], |r| r.get(0)).unwrap_or(0);
                             let has_caption: bool = lock.connection
-                                .query_row("SELECT caption FROM photo WHERE id = ?1", [&photo_id_task], |r| r.get::<_, Option<String>>(0))
-                                .unwrap_or(None)
-                                .is_some();
-                            emit_log(&app_handle_task, format!("[ml] emitting photo-analysis-result for {}", photo_id_task));
+                                .query_row("SELECT caption FROM photo WHERE id = ?1", [&photo_id_task], |r| r.get::<_, Option<String>>(0)).unwrap_or(None).is_some();
                             let _ = app_handle_task.emit("photo-analysis-result", serde_json::json!({
                                 "id": photo_id_task,
                                 "object_count": object_count,
-                                "face_count": face_count,
+                                "face_count": face_count_db,
                                 "has_caption": has_caption,
                                 "indexed": true,
                                 "model_timings": model_timings,
                             }));
-                            emit_log(&app_handle_task, format!("[siegu-bench] photo={photo_id_task} timings={:?}", model_timings));
                         }
 
                         let remaining = decrement_pending_count(&pending_count_task);

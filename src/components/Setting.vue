@@ -13,14 +13,22 @@
         </div>
 
         <!-- Authorized Folders Card -->
-        <v-card v-if="!hideFolderSection" variant="flat" color="surface" rounded="xl" class="mb-6 overflow-hidden border-subtle">
+        <v-card
+          v-if="!hideFolderSection"
+          variant="flat"
+          color="surface"
+          rounded="xl"
+          class="mb-6 overflow-hidden border-subtle"
+        >
           <v-card-item class="bg-zinc-100 py-4">
             <template v-slot:prepend>
               <div class="siegu-icon-circle-dark mr-3">
                 <v-icon color="#ffffff" size="small">mdi-folder-lock</v-icon>
               </div>
             </template>
-            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ $t('settings.folders') }}</v-card-title>
+            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
+              $t('settings.folders')
+            }}</v-card-title>
           </v-card-item>
 
           <v-card-text class="pt-4">
@@ -35,28 +43,49 @@
                     <template v-slot:prepend>
                       <v-icon color="#71717a" class="mr-2">mdi-folder</v-icon>
                     </template>
-                    <v-list-item-title class="text-zinc-primary font-weight-medium text-truncate">{{ directory.title }}</v-list-item-title>
-                    <v-list-item-subtitle class="text-zinc-muted text-caption text-truncate">{{ directory.value }}</v-list-item-subtitle>
+                    <v-list-item-title class="text-zinc-primary font-weight-medium text-truncate">{{
+                      directory.title
+                    }}</v-list-item-title>
+                    <v-list-item-subtitle class="text-zinc-muted text-caption text-truncate">{{
+                      directory.value
+                    }}</v-list-item-subtitle>
                     <template v-slot:append>
                       <v-menu>
                         <template v-slot:activator="{ props }">
-                          <v-btn icon="mdi-dots-vertical" variant="text" size="small" color="#71717a" v-bind="props"></v-btn>
+                          <v-btn
+                            icon="mdi-dots-vertical"
+                            variant="text"
+                            size="small"
+                            color="#71717a"
+                            v-bind="props"
+                          ></v-btn>
                         </template>
                         <v-list size="small" class="siegu-list">
                           <v-list-item @click="remove_directory(directory.value)">
-                            <v-list-item-title>{{ $t('settings.remove_folder') }}</v-list-item-title>
+                            <v-list-item-title>{{
+                              $t('settings.remove_folder')
+                            }}</v-list-item-title>
                           </v-list-item>
-                          <v-list-item @click="remove_directory_full(directory.value)" color="error">
+                          <v-list-item
+                            @click="remove_directory_full(directory.value)"
+                            color="error"
+                          >
                             <v-list-item-title>{{ $t('settings.wipe_folder') }}</v-list-item-title>
                           </v-list-item>
                         </v-list>
                       </v-menu>
                     </template>
-                     <v-divider v-if="index < directories.length - 1" class="border-subtle"></v-divider>
+                    <v-divider
+                      v-if="index < directories.length - 1"
+                      class="border-subtle"
+                    ></v-divider>
                   </v-list-item>
                 </v-list>
               </div>
-              <div v-else class="text-center py-8 text-zinc-muted border border-dashed rounded-lg border-subtle">
+              <div
+                v-else
+                class="text-center py-8 text-zinc-muted border border-dashed rounded-lg border-subtle"
+              >
                 <div>{{ $t('settings.no_folders') }}</div>
               </div>
             </v-expand-transition>
@@ -82,24 +111,42 @@
           </v-card-actions>
         </v-card>
 
-
         <!-- AI Models Card -->
-        <v-card v-if="!hideAiSection" variant="flat" color="surface" rounded="xl" class="mb-6 overflow-hidden border-subtle">
+        <v-card
+          v-if="!hideAiSection"
+          variant="flat"
+          color="surface"
+          rounded="xl"
+          class="mb-6 overflow-hidden border-subtle"
+        >
           <v-card-item class="bg-zinc-100 py-4">
             <template v-slot:prepend>
               <div class="siegu-icon-circle-dark mr-3">
                 <v-icon color="#ffffff" size="small">mdi-robot-outline</v-icon>
               </div>
             </template>
-            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ $t('settings.ai_models') }}</v-card-title>
+            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
+              $t('settings.ai_models')
+            }}</v-card-title>
             <template v-slot:append v-if="activeModelSummary || pendingCount > 0">
-               <div class="text-right">
-                  <div v-if="activeModelSummary" class="text-caption font-weight-bold text-zinc-primary">
-                    {{ activeModelSummary }}
-                  </div>
-                  <div v-else class="text-caption font-weight-bold text-zinc-primary">{{ $t('settings.indexing_jobs', { count: formatIndexingCount(pendingCount) }) }}</div>
-                  <div v-if="pendingCount > 0" class="text-caption text-zinc-muted" style="font-size: 10px;">{{ $t('settings.eta_label', { time: formatEta(globalEta) }) }}</div>
-               </div>
+              <div class="text-right">
+                <div
+                  v-if="activeModelSummary"
+                  class="text-caption font-weight-bold text-zinc-primary"
+                >
+                  {{ activeModelSummary }}
+                </div>
+                <div v-else class="text-caption font-weight-bold text-zinc-primary">
+                  {{ $t('settings.indexing_jobs', { count: formatIndexingCount(pendingCount) }) }}
+                </div>
+                <div
+                  v-if="pendingCount > 0"
+                  class="text-caption text-zinc-muted"
+                  style="font-size: 10px"
+                >
+                  {{ $t('settings.eta_label', { time: formatEta(globalEta) }) }}
+                </div>
+              </div>
             </template>
           </v-card-item>
 
@@ -119,29 +166,24 @@
                   color="black"
                   class="mr-3 flex-shrink-0"
                 ></v-progress-circular>
-                <v-icon
-                  v-else
-                  size="20"
-                  color="#18181b"
-                  class="mr-3 flex-shrink-0"
-                >
+                <v-icon v-else size="20" color="#18181b" class="mr-3 flex-shrink-0">
                   {{ getModelActivityIcon(visibleActivityModel.id) }}
                 </v-icon>
                 <div class="min-width-0">
                   <div class="text-caption text-zinc-muted font-weight-bold">
-                    {{ isModelProcessing(visibleActivityModel.id) ? $t('settings.current_model') : $t('settings.latest_model') }}
+                    {{
+                      isModelProcessing(visibleActivityModel.id)
+                        ? $t('settings.current_model')
+                        : $t('settings.latest_model')
+                    }}
                   </div>
                   <div class="text-body-2 text-zinc-primary font-weight-bold text-truncate">
-                    {{ visibleActivityModel.title }} · {{ getModelStatusText(visibleActivityModel.id) }}
+                    {{ visibleActivityModel.title }} ·
+                    {{ getModelStatusText(visibleActivityModel.id) }}
                   </div>
                 </div>
               </div>
-              <v-chip
-                size="small"
-                color="black"
-                variant="flat"
-                class="ml-3 flex-shrink-0"
-              >
+              <v-chip size="small" color="black" variant="flat" class="ml-3 flex-shrink-0">
                 {{ getModelStatusLabel(visibleActivityModel.id) }}
               </v-chip>
             </v-sheet>
@@ -156,9 +198,18 @@
                 >
                   <v-card-item class="pb-2">
                     <template v-slot:prepend>
-                      <v-checkbox v-model="selectedModels" :value="model.id" hide-details density="compact" color="black" class="ma-0 pa-0"></v-checkbox>
+                      <v-checkbox
+                        v-model="selectedModels"
+                        :value="model.id"
+                        hide-details
+                        density="compact"
+                        color="black"
+                        class="ma-0 pa-0"
+                      ></v-checkbox>
                     </template>
-                    <v-card-title class="text-subtitle-1 font-weight-bold d-flex align-center flex-wrap ga-1">
+                    <v-card-title
+                      class="text-subtitle-1 font-weight-bold d-flex align-center flex-wrap ga-1"
+                    >
                       <span>{{ $t('models.' + model.id + '.title') }}</span>
                       <v-chip
                         v-if="isModelActive(model.id)"
@@ -191,16 +242,28 @@
                         @change="toggleModel(model.id)"
                         :true-value="true"
                         :false-value="false"
-                        :title="(modelEnabled[model.id] ? $t('settings.disable_model') : $t('settings.enable_model')) + ' ' + $t('models.' + model.id + '.title')"
+                        :title="
+                          (modelEnabled[model.id]
+                            ? $t('settings.disable_model')
+                            : $t('settings.enable_model')) +
+                          ' ' +
+                          $t('models.' + model.id + '.title')
+                        "
                       ></v-switch>
                     </template>
                   </v-card-item>
 
                   <v-card-text class="py-0 flex-grow-1">
-                    <div class="text-body-2 text-zinc-primary">{{ $t('models.' + model.id + '.desc') }}</div>
-                    <div class="text-caption text-zinc-muted mt-1 font-italic">{{ $t('models.' + model.id + '.search') }}</div>
+                    <div class="text-body-2 text-zinc-primary">
+                      {{ $t('models.' + model.id + '.desc') }}
+                    </div>
+                    <div class="text-caption text-zinc-muted mt-1 font-italic">
+                      {{ $t('models.' + model.id + '.search') }}
+                    </div>
                     <div class="d-flex align-center justify-space-between mt-2 model-status-line">
-                      <span class="text-caption text-zinc-muted">{{ $t('settings.file_size', { size: model.size }) }}</span>
+                      <span class="text-caption text-zinc-muted">{{
+                        $t('settings.file_size', { size: model.size })
+                      }}</span>
                       <span
                         v-if="getModelStatusText(model.id)"
                         class="text-caption font-weight-bold model-status-text"
@@ -214,7 +277,9 @@
                     <!-- Progress Area -->
                     <div v-if="isModelProcessing(model.id)" class="mt-4">
                       <div class="d-flex justify-space-between text-caption mb-1">
-                        <span class="font-weight-bold text-zinc-primary">{{ getModelStatusLabel(model.id) }}</span>
+                        <span class="font-weight-bold text-zinc-primary">{{
+                          getModelStatusLabel(model.id)
+                        }}</span>
                         <span>{{ getModelProgressText(model.id) }}</span>
                       </div>
                       <v-progress-linear
@@ -229,7 +294,7 @@
 
                     <!-- Download Progress -->
                     <div v-if="isModelDownloading(model.id)" class="mt-4">
-                       <v-progress-linear
+                      <v-progress-linear
                         :model-value="getProgress(model.id)"
                         color="black"
                         bg-color="#f4f4f5"
@@ -254,17 +319,17 @@
                       {{ $t('settings.download') }}
                     </v-btn>
                     <div v-else-if="!embedded" class="d-flex ga-2">
-                       <v-btn
-                         variant="tonal"
-                         size="small"
-                         color="zinc-muted"
-                         prepend-icon="mdi-refresh"
-                         :loading="isModelDownloading(model.id)"
-                         :disabled="isAnyModelProcessing"
-                         @click="downloadModels(true, [model.id])"
-                       >
-                         {{ $t('settings.update_model') }}
-                       </v-btn>
+                      <v-btn
+                        variant="tonal"
+                        size="small"
+                        color="zinc-muted"
+                        prepend-icon="mdi-refresh"
+                        :loading="isModelDownloading(model.id)"
+                        :disabled="isAnyModelProcessing"
+                        @click="downloadModels(true, [model.id])"
+                      >
+                        {{ $t('settings.update_model') }}
+                      </v-btn>
                       <v-btn
                         variant="tonal"
                         size="small"
@@ -274,7 +339,11 @@
                         :disabled="isAnyModelProcessing && !isModelProcessing(model.id)"
                         @click="runModel(model.id)"
                       >
-                        {{ isModelProcessing(model.id) ? getModelStatusLabel(model.id) : $t('settings.run_now') }}
+                        {{
+                          isModelProcessing(model.id)
+                            ? getModelStatusLabel(model.id)
+                            : $t('settings.run_now')
+                        }}
                       </v-btn>
                     </div>
                   </v-card-actions>
@@ -284,7 +353,7 @@
           </v-card-text>
 
           <v-card-actions class="pa-4 bg-zinc-50 border-top-subtle">
-             <v-btn
+            <v-btn
               v-if="missingSelectedCount > 0"
               variant="flat"
               color="black"
@@ -308,39 +377,47 @@
             >
               {{ $t('settings.all_selected_ready') }}
             </v-btn>
-             <v-spacer></v-spacer>
-             <div class="d-flex ga-2">
-               <v-btn
-                 variant="tonal"
-                 color="black"
-                 size="small"
-                 class="font-weight-bold"
-                 @click="enableAllModels"
-               >
-                 {{ $t('settings.enable_all') }}
-               </v-btn>
-               <v-btn
-                 variant="tonal"
-                 color="error"
-                 size="small"
-                 class="font-weight-bold"
-                 @click="disableAllModels"
-               >
-                 {{ $t('settings.disable_all') }}
-               </v-btn>
-             </div>
+            <v-spacer></v-spacer>
+            <div class="d-flex ga-2">
+              <v-btn
+                variant="tonal"
+                color="black"
+                size="small"
+                class="font-weight-bold"
+                @click="enableAllModels"
+              >
+                {{ $t('settings.enable_all') }}
+              </v-btn>
+              <v-btn
+                variant="tonal"
+                color="error"
+                size="small"
+                class="font-weight-bold"
+                @click="disableAllModels"
+              >
+                {{ $t('settings.disable_all') }}
+              </v-btn>
+            </div>
           </v-card-actions>
         </v-card>
 
         <!-- Language Section -->
-        <v-card v-if="!embedded" variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
+        <v-card
+          v-if="!embedded"
+          variant="flat"
+          color="surface"
+          rounded="xl"
+          class="mb-6 border-subtle overflow-hidden"
+        >
           <v-card-item class="bg-zinc-100 py-4">
             <template v-slot:prepend>
               <div class="siegu-icon-circle-dark mr-3">
                 <v-icon color="#ffffff" size="small">mdi-translate</v-icon>
               </div>
             </template>
-            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ $t('language.label') }}</v-card-title>
+            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
+              $t('language.label')
+            }}</v-card-title>
           </v-card-item>
           <v-card-text class="pt-4">
             <v-select
@@ -360,17 +437,30 @@
         </v-card>
 
         <!-- Appearance Section -->
-        <v-card v-if="!embedded" variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
+        <v-card
+          v-if="!embedded"
+          variant="flat"
+          color="surface"
+          rounded="xl"
+          class="mb-6 border-subtle overflow-hidden"
+        >
           <v-card-item class="bg-zinc-100 py-4">
             <template v-slot:prepend>
               <div class="siegu-icon-circle-dark mr-3">
                 <v-icon color="#ffffff" size="small">mdi-theme-light-dark</v-icon>
               </div>
             </template>
-            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ $t('settings.appearance') }}</v-card-title>
+            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
+              $t('settings.appearance')
+            }}</v-card-title>
           </v-card-item>
           <v-card-text class="pt-4">
-            <v-radio-group v-model="currentTheme" @update:model-value="setAppearance" hide-details class="mt-0">
+            <v-radio-group
+              v-model="currentTheme"
+              @update:model-value="setAppearance"
+              hide-details
+              class="mt-0"
+            >
               <v-radio :label="$t('settings.theme_system')" value="system">
                 <template v-slot:prepend>
                   <v-icon size="small" color="#71717a" class="mr-2">mdi-theme-light-dark</v-icon>
@@ -391,33 +481,43 @@
         </v-card>
 
         <!-- Maintenance Section -->
-        <v-card v-if="!embedded" variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
+        <v-card
+          v-if="!embedded"
+          variant="flat"
+          color="surface"
+          rounded="xl"
+          class="mb-6 border-subtle overflow-hidden"
+        >
           <v-card-item class="bg-zinc-100 py-4">
             <template v-slot:prepend>
               <div class="siegu-icon-circle-dark mr-3">
                 <v-icon color="#ffffff" size="small">mdi-wrench-outline</v-icon>
               </div>
             </template>
-            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ $t('settings.maintenance') }}</v-card-title>
+            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
+              $t('settings.maintenance')
+            }}</v-card-title>
           </v-card-item>
 
           <v-card-text class="pt-2">
             <v-list lines="two" class="bg-transparent">
               <v-list-item class="px-0">
                 <template v-slot:title>
-                  <span class="font-weight-bold text-zinc-primary">{{ $t('settings.cleanup_db') }}</span>
+                  <span class="font-weight-bold text-zinc-primary">{{
+                    $t('settings.cleanup_db')
+                  }}</span>
                 </template>
                 <template v-slot:subtitle>
                   <span class="text-zinc-secondary">{{ $t('settings.cleanup_db_desc') }}</span>
                 </template>
                 <template v-slot:append>
-                  <v-btn 
-                    size="small" 
-                    variant="flat" 
+                  <v-btn
+                    size="small"
+                    variant="flat"
                     color="#000000"
                     theme="dark"
-                    @click="cleanupDb" 
-                    :loading="isCleaning" 
+                    @click="cleanupDb"
+                    :loading="isCleaning"
                     class="siegu-btn px-4"
                   >
                     <div class="d-flex align-center">
@@ -435,11 +535,23 @@
 
             <!-- Advanced Performance -->
             <div class="mb-6">
-              <div class="text-caption font-weight-bold text-zinc-muted mb-4 tracking-widest uppercase">{{ $t('settings.advanced') }}</div>
+              <div
+                class="text-caption font-weight-bold text-zinc-muted mb-4 tracking-widest uppercase"
+              >
+                {{ $t('settings.advanced') }}
+              </div>
               <div class="pt-2">
                 <div class="d-flex justify-space-between align-center mb-2">
-                  <div class="text-caption font-weight-bold text-zinc-primary">{{ $t('settings.scan_threads') }}</div>
-                  <v-chip size="x-small" color="#000000" variant="flat" class="font-weight-bold text-white">{{ performance.scanThreads }}</v-chip>
+                  <div class="text-caption font-weight-bold text-zinc-primary">
+                    {{ $t('settings.scan_threads') }}
+                  </div>
+                  <v-chip
+                    size="x-small"
+                    color="#000000"
+                    variant="flat"
+                    class="font-weight-bold text-white"
+                    >{{ performance.scanThreads }}</v-chip
+                  >
                 </div>
                 <v-slider
                   v-model="performance.scanThreads"
@@ -453,18 +565,34 @@
                 ></v-slider>
 
                 <v-list-item class="px-0 mt-4">
-                  <v-list-item-title class="text-caption font-weight-bold text-zinc-primary">{{ $t('settings.indexing_mode') }}</v-list-item-title>
+                  <v-list-item-title class="text-caption font-weight-bold text-zinc-primary">{{
+                    $t('settings.indexing_mode')
+                  }}</v-list-item-title>
                   <template v-slot:append>
                     <v-menu offset-y>
                       <template v-slot:activator="{ props }">
-                        <v-btn variant="tonal" size="x-small" color="black" v-bind="props" class="font-weight-bold">
+                        <v-btn
+                          variant="tonal"
+                          size="x-small"
+                          color="black"
+                          v-bind="props"
+                          class="font-weight-bold"
+                        >
                           {{ getModeLabel(performance.indexingMode) }}
                           <v-icon size="12" class="ml-1">mdi-chevron-down</v-icon>
                         </v-btn>
                       </template>
                       <v-list density="compact" class="siegu-list">
-                        <v-list-item v-for="mode in indexingModes" :key="mode.value" @click="setIndexingMode(mode.value)">
-                          <v-list-item-title class="text-caption" :class="{'font-weight-bold': performance.indexingMode === mode.value}">{{ $t('settings.mode_' + mode.value) }}</v-list-item-title>
+                        <v-list-item
+                          v-for="mode in indexingModes"
+                          :key="mode.value"
+                          @click="setIndexingMode(mode.value)"
+                        >
+                          <v-list-item-title
+                            class="text-caption"
+                            :class="{ 'font-weight-bold': performance.indexingMode === mode.value }"
+                            >{{ $t('settings.mode_' + mode.value) }}</v-list-item-title
+                          >
                         </v-list-item>
                       </v-list>
                     </v-menu>
@@ -477,23 +605,35 @@
 
             <!-- Debug Logs -->
             <div v-if="!embedded">
-              <div class="text-caption font-weight-bold text-zinc-muted mb-4 tracking-widest uppercase">{{ $t('settings.system_logs') }}</div>
+              <div
+                class="text-caption font-weight-bold text-zinc-muted mb-4 tracking-widest uppercase"
+              >
+                {{ $t('settings.system_logs') }}
+              </div>
               <v-sheet
                 color="#f4f4f5"
                 class="pa-4 rounded-lg overflow-y-auto border-subtle debug-logs-sheet mb-4"
                 max-height="300"
               >
-                <div v-for="(log, i) in logs" :key="i" :class="log.type === 'error' ? 'text-error' : 'text-zinc-secondary'" class="mb-1" style="font-family: monospace; font-size: 11px;">
+                <div
+                  v-for="(log, i) in logs"
+                  :key="i"
+                  :class="log.type === 'error' ? 'text-error' : 'text-zinc-secondary'"
+                  class="mb-1"
+                  style="font-family: monospace; font-size: 11px"
+                >
                   <span class="text-zinc-muted">[{{ log.time }}]</span> {{ log.message }}
                 </div>
-                <div v-if="logs.length === 0" class="text-zinc-muted text-center py-4 text-caption">{{ $t('settings.no_logs') }}</div>
+                <div v-if="logs.length === 0" class="text-zinc-muted text-center py-4 text-caption">
+                  {{ $t('settings.no_logs') }}
+                </div>
               </v-sheet>
-              
+
               <div v-if="logs.length > 0" class="d-flex justify-center">
-                <v-btn 
-                  variant="text" 
-                  size="small" 
-                  class="text-none font-weight-bold" 
+                <v-btn
+                  variant="text"
+                  size="small"
+                  class="text-none font-weight-bold"
                   color="error"
                   prepend-icon="mdi-trash-can-outline"
                   @click.stop="clearLogs"
@@ -506,14 +646,21 @@
         </v-card>
 
         <!-- Update Card -->
-        <v-card variant="flat" color="surface" rounded="xl" class="mb-6 overflow-hidden border-subtle">
+        <v-card
+          variant="flat"
+          color="surface"
+          rounded="xl"
+          class="mb-6 overflow-hidden border-subtle"
+        >
           <v-card-item class="bg-zinc-100 py-4">
             <template v-slot:prepend>
               <div class="siegu-icon-circle-dark mr-3">
                 <v-icon color="#ffffff" size="small">mdi-update</v-icon>
               </div>
             </template>
-            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ $t('update_title') }}</v-card-title>
+            <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
+              $t('update_title')
+            }}</v-card-title>
           </v-card-item>
           <v-card-text class="pt-2">
             <v-list lines="two" class="bg-transparent">
@@ -558,12 +705,19 @@
               <v-icon color="#ffffff" size="small">mdi-cloud-download-outline</v-icon>
             </div>
           </template>
-          <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ downloadDialog.title }}</v-card-title>
+          <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
+            downloadDialog.title
+          }}</v-card-title>
           <template v-slot:append>
-            <v-btn icon="mdi-close" variant="text" size="small" @click="downloadDialog.show = false"></v-btn>
+            <v-btn
+              icon="mdi-close"
+              variant="text"
+              size="small"
+              @click="downloadDialog.show = false"
+            ></v-btn>
           </template>
         </v-card-item>
-        
+
         <v-card-text class="py-6 text-center">
           <div class="text-subtitle-1 text-zinc-secondary px-2">
             {{ downloadDialog.message }}
@@ -571,8 +725,22 @@
         </v-card-text>
 
         <v-card-actions class="pa-4 bg-zinc-50 border-top-subtle ga-2">
-          <v-btn variant="flat" color="black" @click="downloadDialog.show = false" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.cancel') }}</v-btn>
-          <v-btn variant="flat" color="black" @click="startConfirmedDownload" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.download') }}</v-btn>
+          <v-btn
+            variant="flat"
+            color="black"
+            @click="downloadDialog.show = false"
+            class="siegu-btn flex-grow-1"
+            height="44"
+            >{{ $t('settings.cancel') }}</v-btn
+          >
+          <v-btn
+            variant="flat"
+            color="black"
+            @click="startConfirmedDownload"
+            class="siegu-btn flex-grow-1"
+            height="44"
+            >{{ $t('settings.download') }}</v-btn
+          >
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -585,12 +753,19 @@
               <v-icon color="#ffffff" size="small">mdi-wrench-outline</v-icon>
             </div>
           </template>
-          <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ $t('settings.clear_db_title') }}</v-card-title>
+          <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
+            $t('settings.clear_db_title')
+          }}</v-card-title>
           <template v-slot:append>
-            <v-btn icon="mdi-close" variant="text" size="small" @click="cleanupDialog.show = false"></v-btn>
+            <v-btn
+              icon="mdi-close"
+              variant="text"
+              size="small"
+              @click="cleanupDialog.show = false"
+            ></v-btn>
           </template>
         </v-card-item>
-        
+
         <v-card-text class="py-6 text-center">
           <div class="text-subtitle-1 text-zinc-secondary px-2">
             {{ $t('settings.clear_db_desc') }}
@@ -598,8 +773,22 @@
         </v-card-text>
 
         <v-card-actions class="pa-4 bg-zinc-50 border-top-subtle ga-2">
-          <v-btn variant="flat" color="black" @click="cleanupDialog.show = false" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.cancel') }}</v-btn>
-          <v-btn variant="flat" color="black" @click="startConfirmedCleanup" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.clear') }}</v-btn>
+          <v-btn
+            variant="flat"
+            color="black"
+            @click="cleanupDialog.show = false"
+            class="siegu-btn flex-grow-1"
+            height="44"
+            >{{ $t('settings.cancel') }}</v-btn
+          >
+          <v-btn
+            variant="flat"
+            color="black"
+            @click="startConfirmedCleanup"
+            class="siegu-btn flex-grow-1"
+            height="44"
+            >{{ $t('settings.clear') }}</v-btn
+          >
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -612,12 +801,19 @@
               <v-icon color="#ffffff" size="small">mdi-folder-remove-outline</v-icon>
             </div>
           </template>
-          <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{ $t('settings.wipe_title') }}</v-card-title>
+          <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
+            $t('settings.wipe_title')
+          }}</v-card-title>
           <template v-slot:append>
-            <v-btn icon="mdi-close" variant="text" size="small" @click="removeFolderDialog.show = false"></v-btn>
+            <v-btn
+              icon="mdi-close"
+              variant="text"
+              size="small"
+              @click="removeFolderDialog.show = false"
+            ></v-btn>
           </template>
         </v-card-item>
-        
+
         <v-card-text class="py-6 text-center">
           <div class="text-subtitle-1 text-zinc-secondary px-2">
             <span v-html="$t('settings.wipe_desc')"></span>
@@ -625,19 +821,32 @@
         </v-card-text>
 
         <v-card-actions class="pa-4 bg-zinc-50 border-top-subtle ga-2">
-          <v-btn variant="flat" color="black" @click="removeFolderDialog.show = false" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.cancel') }}</v-btn>
-          <v-btn variant="flat" color="black" @click="startConfirmedRemoveFolder" class="siegu-btn flex-grow-1" height="44">{{ $t('settings.wipe_data') }}</v-btn>
+          <v-btn
+            variant="flat"
+            color="black"
+            @click="removeFolderDialog.show = false"
+            class="siegu-btn flex-grow-1"
+            height="44"
+            >{{ $t('settings.cancel') }}</v-btn
+          >
+          <v-btn
+            variant="flat"
+            color="black"
+            @click="startConfirmedRemoveFolder"
+            class="siegu-btn flex-grow-1"
+            height="44"
+            >{{ $t('settings.wipe_data') }}</v-btn
+          >
         </v-card-actions>
       </v-card>
     </v-dialog>
 
-    <FolderPicker
-        v-model="showFolderPicker"
-        @select="onFolderSelected"
-    />
+    <FolderPicker v-model="showFolderPicker" @select="onFolderSelected" />
     <v-snackbar v-model="snackbar.show" :timeout="3000" location="bottom" color="black">
       <div class="d-flex align-center">
-        <v-icon size="small" class="mr-3" :color="snackbar.error ? 'error' : 'white'">{{ snackbar.error ? 'mdi-alert-circle' : 'mdi-check-circle' }}</v-icon>
+        <v-icon size="small" class="mr-3" :color="snackbar.error ? 'error' : 'white'">{{
+          snackbar.error ? 'mdi-alert-circle' : 'mdi-check-circle'
+        }}</v-icon>
         <span class="text-body-2">{{ snackbar.text }}</span>
       </div>
     </v-snackbar>
@@ -645,30 +854,30 @@
 </template>
 
 <script>
-import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
-import { homeDir } from "@tauri-apps/api/path";
-import { platform } from "@tauri-apps/plugin-os";
-import { listen } from "@tauri-apps/api/event";
-import { check } from "@tauri-apps/plugin-updater";
-import FolderPicker from "./FolderPicker.vue";
+import { invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
+import { homeDir } from '@tauri-apps/api/path';
+import { platform } from '@tauri-apps/plugin-os';
+import { listen } from '@tauri-apps/api/event';
+import { check } from '@tauri-apps/plugin-updater';
+import FolderPicker from './FolderPicker.vue';
 
 export default {
-  name: "Setting",
+  name: 'Setting',
   components: { FolderPicker },
   props: {
     embedded: { type: Boolean, default: false },
     hideAiSection: { type: Boolean, default: false },
-    hideFolderSection: { type: Boolean, default: false }
+    hideFolderSection: { type: Boolean, default: false },
   },
-  emits: ["folder-added", "models-ready", "done"],
+  emits: ['folder-added', 'models-ready', 'done'],
   data: () => ({
     directories: [],
     showFolderPicker: false,
     isAndroid: false,
-    dataDir: "",
-    configDir: "",
-    checkResults: "",
+    dataDir: '',
+    configDir: '',
+    checkResults: '',
     isDownloading: false,
     isCleaning: false,
     downloadedModels: [],
@@ -705,35 +914,31 @@ export default {
     modelEnabled: {},
     performance: {
       scanThreads: 4,
-      indexingMode: "immediate",
+      indexingMode: 'immediate',
     },
     maxThreads: 8,
-    indexingModes: [
-      { value: "immediate" },
-      { value: "idle" },
-      { value: "manual" },
-    ],
+    indexingModes: [{ value: 'immediate' }, { value: 'idle' }, { value: 'manual' }],
     downloadDialog: {
       show: false,
-      title: "",
-      message: "",
-      models: []
+      title: '',
+      message: '',
+      models: [],
     },
     updateStatus: 'idle', // 'idle' | 'checking' | 'available' | 'uptodate' | 'downloading' | 'error'
     updateInfo: null,
     cleanupDialog: {
-      show: false
+      show: false,
     },
     removeFolderDialog: {
       show: false,
-      path: ""
+      path: '',
     },
-    currentLang: localStorage.getItem("siegu_language") || "en",
-    currentTheme: localStorage.getItem("siegu_theme") || "system",
+    currentLang: localStorage.getItem('siegu_language') || 'en',
+    currentTheme: localStorage.getItem('siegu_theme') || 'system',
   }),
   computed: {
     missingSelectedCount() {
-      return this.selectedModels.filter(id => !this.downloadedModels.includes(id)).length;
+      return this.selectedModels.filter((id) => !this.downloadedModels.includes(id)).length;
     },
     sortedModels() {
       return [...this.aiModels].sort((a, b) => {
@@ -749,37 +954,43 @@ export default {
       });
     },
     processingModels() {
-      return this.aiModels.filter(model => this.isModelProcessing(model.id));
+      return this.aiModels.filter((model) => this.isModelProcessing(model.id));
     },
     isAnyModelProcessing() {
       return this.processingModels.length > 0;
     },
     activeModelSummary() {
-      if (!this.visibleActivityModel) return "";
+      if (!this.visibleActivityModel) return '';
       return `${this.getModelStatusLabel(this.visibleActivityModel.id)}: ${this.visibleActivityModel.title}`;
     },
     visibleActivityModel() {
       if (!this.activeModelId) return null;
-      const model = this.aiModels.find(m => m.id === this.activeModelId);
+      const model = this.aiModels.find((m) => m.id === this.activeModelId);
       if (!model) return null;
       if (this.isModelProcessing(model.id) || this.uiNow < this.activeModelHoldUntil) return model;
       return null;
     },
     availableLanguages() {
-      const codes = ["en", "nl", "fr", "es", "pap", "de", "it", "pt"];
-      return codes.map(code => ({
+      const codes = ['en', 'nl', 'fr', 'es', 'pap', 'de', 'it', 'pt'];
+      return codes.map((code) => ({
         code,
         label: this.$t(`language.${code}`),
       }));
     },
     updateStatusText() {
       switch (this.updateStatus) {
-        case 'checking': return this.$t('checking');
-        case 'available': return this.$t('update_available', { version: this.updateInfo?.version });
-        case 'uptodate': return this.$t('up_to_date');
-        case 'downloading': return this.$t('update_progress');
-        case 'error': return this.$t('update_error');
-        default: return '';
+        case 'checking':
+          return this.$t('checking');
+        case 'available':
+          return this.$t('update_available', { version: this.updateInfo?.version });
+        case 'uptodate':
+          return this.$t('up_to_date');
+        case 'downloading':
+          return this.$t('update_progress');
+        case 'error':
+          return this.$t('update_error');
+        default:
+          return '';
       }
     },
     updateBtnText() {
@@ -789,67 +1000,67 @@ export default {
     updateBtnIcon() {
       if (this.updateStatus === 'available') return 'mdi-download';
       return 'mdi-update';
-    }
+    },
   },
   async mounted() {
     this.uiClock = window.setInterval(() => {
       this.uiNow = Date.now();
     }, 1000);
 
-    this.unlistenLog = await listen("log-message", (event) => {
+    this.unlistenLog = await listen('log-message', (event) => {
       const log = {
         time: new Date().toLocaleTimeString(localStorage.getItem('siegu_language') || 'en'),
         message: event.payload,
-        type: event.payload.toLowerCase().includes("error") ? "error" : "info"
+        type: event.payload.toLowerCase().includes('error') ? 'error' : 'info',
       };
       this.logs.unshift(log);
       if (this.logs.length > 100) this.logs.pop();
     });
 
-    this.unlistenDownloadProgress = await listen("download-progress", (event) => {
-        const { model, downloaded, total } = event.payload;
-        this.downloadProgress = { ...this.downloadProgress, [model]: { downloaded, total } };
+    this.unlistenDownloadProgress = await listen('download-progress', (event) => {
+      const { model, downloaded, total } = event.payload;
+      this.downloadProgress = { ...this.downloadProgress, [model]: { downloaded, total } };
     });
 
-    this.unlistenDownloadComplete = await listen("download-complete", () => {
-        this.isDownloading = false;
-        this.downloadingModels = {};
-        this.downloadProgress = {};
-        this.checkExistingModels();
-        this.$emit('models-ready');
+    this.unlistenDownloadComplete = await listen('download-complete', () => {
+      this.isDownloading = false;
+      this.downloadingModels = {};
+      this.downloadProgress = {};
+      this.checkExistingModels();
+      this.$emit('models-ready');
     });
 
-    this.unlistenProgress = await listen("indexing-progress", (event) => {
-        this.pendingCount = this.normalizeIndexingCount(event.payload);
+    this.unlistenProgress = await listen('indexing-progress', (event) => {
+      this.pendingCount = this.normalizeIndexingCount(event.payload);
     });
 
-    this.unlistenEta = await listen("indexing-eta", (event) => {
-        this.globalEta = event.payload;
+    this.unlistenEta = await listen('indexing-eta', (event) => {
+      this.globalEta = event.payload;
     });
 
-    this.unlistenModelProgress = await listen("model-progress", (event) => {
-        const { model, pending, total, status, message } = event.payload;
-        const previous = this.modelProgress[model] || {};
-        const normalizedPending = typeof pending === "number" ? pending : previous.pending;
-        const normalizedTotal = typeof total === "number" ? total : previous.total;
-        const normalizedStatus = status || (normalizedPending > 0 ? "running" : "idle");
-        this.activeModelId = model;
-        if (["completed", "up_to_date", "unavailable", "error"].includes(normalizedStatus)) {
-          this.activeModelHoldUntil = Date.now() + 15000;
-        } else {
-          this.activeModelHoldUntil = 0;
-        }
-        this.modelProgress = { 
-          ...this.modelProgress, 
-          [model]: { 
-            ...previous,
-            pending: normalizedPending, 
-            total: normalizedTotal,
-            status: normalizedStatus,
-            message: message || previous.message || "",
-            updatedAt: Date.now(),
-          } 
-        };
+    this.unlistenModelProgress = await listen('model-progress', (event) => {
+      const { model, pending, total, status, message } = event.payload;
+      const previous = this.modelProgress[model] || {};
+      const normalizedPending = typeof pending === 'number' ? pending : previous.pending;
+      const normalizedTotal = typeof total === 'number' ? total : previous.total;
+      const normalizedStatus = status || (normalizedPending > 0 ? 'running' : 'idle');
+      this.activeModelId = model;
+      if (['completed', 'up_to_date', 'unavailable', 'error'].includes(normalizedStatus)) {
+        this.activeModelHoldUntil = Date.now() + 15000;
+      } else {
+        this.activeModelHoldUntil = 0;
+      }
+      this.modelProgress = {
+        ...this.modelProgress,
+        [model]: {
+          ...previous,
+          pending: normalizedPending,
+          total: normalizedTotal,
+          status: normalizedStatus,
+          message: message || previous.message || '',
+          updatedAt: Date.now(),
+        },
+      };
     });
 
     this.dataDir = await homeDir();
@@ -894,31 +1105,35 @@ export default {
       return count;
     },
     formatIndexingCount(value) {
-      return this.normalizeIndexingCount(value).toLocaleString(localStorage.getItem('siegu_language') || 'en');
+      return this.normalizeIndexingCount(value).toLocaleString(
+        localStorage.getItem('siegu_language') || 'en',
+      );
     },
     setLanguage(code) {
       this.currentLang = code;
-      localStorage.setItem("siegu_language", code);
+      localStorage.setItem('siegu_language', code);
       window.location.reload();
     },
     setAppearance(val) {
       this.currentTheme = val;
-      localStorage.setItem("siegu_theme", val);
+      localStorage.setItem('siegu_theme', val);
       window.dispatchEvent(new CustomEvent('siegu-theme-changed'));
     },
     async fetchLogs() {
       try {
-        const logsStr = await invoke("get_logs", { limit: 100 });
+        const logsStr = await invoke('get_logs', { limit: 100 });
         const parsed = JSON.parse(logsStr);
-        this.logs = parsed.map(l => ({
-          time: new Date(l.timestamp).toLocaleTimeString(localStorage.getItem('siegu_language') || 'en'),
+        this.logs = parsed.map((l) => ({
+          time: new Date(l.timestamp).toLocaleTimeString(
+            localStorage.getItem('siegu_language') || 'en',
+          ),
           message: l.message,
-          type: l.level === 'error' ? 'error' : 'info'
+          type: l.level === 'error' ? 'error' : 'info',
         }));
       } catch (err) {}
     },
     async clearLogs() {
-      await invoke("clear_logs");
+      await invoke('clear_logs');
       this.logs = [];
       this.showSnackbar(this.$t('settings.logs_cleared'));
     },
@@ -926,7 +1141,7 @@ export default {
       return this.$t('settings.mode_' + val);
     },
     async loadPerformanceConfig() {
-      const configStr = await invoke("get_config");
+      const configStr = await invoke('get_config');
       const config = JSON.parse(configStr);
 
       if (config.scan_threads) {
@@ -942,78 +1157,105 @@ export default {
       this.snackbar = { show: true, text, error };
     },
     async savePerformanceConfig() {
-      await invoke("save_config", { key: "scan_threads", value: this.performance.scanThreads.toString() });
+      await invoke('save_config', {
+        key: 'scan_threads',
+        value: this.performance.scanThreads.toString(),
+      });
       this.showSnackbar(this.$t('settings.scan_threads_saved'));
     },
     async setIndexingMode(mode) {
       this.performance.indexingMode = mode;
-      await invoke("save_config", { key: "indexing_mode", value: mode });
-      if (mode === "manual") {
-        await invoke("abort_indexing");
+      await invoke('save_config', { key: 'indexing_mode', value: mode });
+      if (mode === 'manual') {
+        await invoke('abort_indexing');
         this.showSnackbar(this.$t('settings.manual_enabled'));
       } else {
         this.showSnackbar(this.$t('settings.mode_set', { mode: this.getModeLabel(mode) }));
       }
     },
     async loadModelEnabledStates() {
-      const configStr = await invoke("get_config");
+      const configStr = await invoke('get_config');
       const config = JSON.parse(configStr);
       const enabled = {};
       for (const m of this.aiModels) {
-        const key = "model_enabled_" + m.id;
-        enabled[m.id] = config[key] !== "false";
+        const key = 'model_enabled_' + m.id;
+        enabled[m.id] = config[key] !== 'false';
       }
       this.modelEnabled = enabled;
     },
     configKeyForModel(modelId) {
-      return "model_enabled_" + (modelId === "ultraface" ? "face" : modelId);
+      return 'model_enabled_' + (modelId === 'ultraface' ? 'face' : modelId);
     },
     async toggleModel(modelId) {
       const key = this.configKeyForModel(modelId);
-      await invoke("save_config", { key, value: this.modelEnabled[modelId] ? "true" : "false" });
+      await invoke('save_config', { key, value: this.modelEnabled[modelId] ? 'true' : 'false' });
       const label = this.$t('models.' + modelId + '.title');
-      this.showSnackbar(this.modelEnabled[modelId]
-        ? this.$t('settings.model_enabled', { model: label })
-        : this.$t('settings.model_disabled', { model: label }));
+      this.showSnackbar(
+        this.modelEnabled[modelId]
+          ? this.$t('settings.model_enabled', { model: label })
+          : this.$t('settings.model_disabled', { model: label }),
+      );
     },
     async enableAllModels() {
       for (const m of this.downloadedModels) {
         this.modelEnabled[m] = true;
-        await invoke("save_config", { key: this.configKeyForModel(m), value: "true" });
+        await invoke('save_config', { key: this.configKeyForModel(m), value: 'true' });
       }
     },
     async disableAllModels() {
       for (const m of this.downloadedModels) {
         this.modelEnabled[m] = false;
-        await invoke("save_config", { key: this.configKeyForModel(m), value: "false" });
+        await invoke('save_config', { key: this.configKeyForModel(m), value: 'false' });
       }
     },
     async checkExistingModels() {
-        const downloaded = await invoke("check_models");
-        this.downloadedModels = downloaded;
-        this.checkResults = JSON.stringify(downloaded);
-        this.selectedModels = ["clip", "ultraface", "ocr", "nsfw", "aesthetics", "yolo", "blip", "arcface", "midas", "whisper"];
+      const downloaded = await invoke('check_models');
+      this.downloadedModels = downloaded;
+      this.checkResults = JSON.stringify(downloaded);
+      this.selectedModels = [
+        'clip',
+        'ultraface',
+        'ocr',
+        'nsfw',
+        'aesthetics',
+        'yolo',
+        'blip',
+        'arcface',
+        'midas',
+        'whisper',
+      ];
     },
     async downloadModels(forceUpdate = false, specificModels = null) {
       let modelsToDownload = specificModels || this.selectedModels;
       if (!forceUpdate && !specificModels) {
-        modelsToDownload = ["clip", "ultraface", "ocr", "nsfw", "aesthetics", "yolo", "blip", "arcface", "midas", "whisper"].filter(m => !this.downloadedModels.includes(m));
+        modelsToDownload = [
+          'clip',
+          'ultraface',
+          'ocr',
+          'nsfw',
+          'aesthetics',
+          'yolo',
+          'blip',
+          'arcface',
+          'midas',
+          'whisper',
+        ].filter((m) => !this.downloadedModels.includes(m));
       }
       if (!modelsToDownload || modelsToDownload.length === 0) return;
-      
+
       this.isDownloading = true;
       this.downloadingModels = {
         ...this.downloadingModels,
-        ...Object.fromEntries(modelsToDownload.map(m => [m, true]))
+        ...Object.fromEntries(modelsToDownload.map((m) => [m, true])),
       };
       // Initialize progress tracking for requested models
-      modelsToDownload.forEach(m => {
+      modelsToDownload.forEach((m) => {
         if (m === 'clip') {
-           this.downloadProgress['clip-visual'] = { downloaded: 0, total: 1 };
+          this.downloadProgress['clip-visual'] = { downloaded: 0, total: 1 };
         } else if (m === 'ocr') {
-           this.downloadProgress['ocr-det'] = { downloaded: 0, total: 1 };
+          this.downloadProgress['ocr-det'] = { downloaded: 0, total: 1 };
         } else {
-           this.downloadProgress[m] = { downloaded: 0, total: 1 };
+          this.downloadProgress[m] = { downloaded: 0, total: 1 };
         }
       });
 
@@ -1021,7 +1263,7 @@ export default {
         await invoke('download_models', { models: modelsToDownload });
       } catch (err) {
         this.isDownloading = false;
-        modelsToDownload.forEach(m => {
+        modelsToDownload.forEach((m) => {
           delete this.downloadingModels[m];
         });
         this.downloadingModels = { ...this.downloadingModels };
@@ -1032,7 +1274,7 @@ export default {
         const parts = ['clip-visual', 'clip-text', 'clip-tokenizer'];
         let downloaded = 0;
         let total = 0;
-        parts.forEach(p => {
+        parts.forEach((p) => {
           if (this.downloadProgress[p]) {
             downloaded += this.downloadProgress[p].downloaded;
             total += this.downloadProgress[p].total || 0;
@@ -1045,7 +1287,7 @@ export default {
         const parts = ['ocr-det', 'ocr-rec', 'ocr-dict'];
         let downloaded = 0;
         let total = 0;
-        parts.forEach(p => {
+        parts.forEach((p) => {
           if (this.downloadProgress[p]) {
             downloaded += this.downloadProgress[p].downloaded;
             total += this.downloadProgress[p].total || 0;
@@ -1084,32 +1326,40 @@ export default {
           ...previous,
           pending: previous.pending || null,
           total: previous.total || null,
-          status: "starting",
+          status: 'starting',
           updatedAt: Date.now(),
-        }
+        },
       };
       try {
-        await invoke("analyze_model", { modelId });
-        this.showSnackbar(this.$t('settings.analysis_started', { model: this.$t('models.' + modelId + '.title') }));
+        await invoke('analyze_model', { modelId });
+        this.showSnackbar(
+          this.$t('settings.analysis_started', { model: this.$t('models.' + modelId + '.title') }),
+        );
       } catch (err) {
         this.modelProgress = {
           ...this.modelProgress,
           [modelId]: {
             ...this.modelProgress[modelId],
             pending: 0,
-            status: "idle",
+            status: 'idle',
             updatedAt: Date.now(),
-          }
+          },
         };
-        this.showSnackbar(this.$t('settings.analysis_failed', { model: this.$t('models.' + modelId + '.title') }), true);
+        this.showSnackbar(
+          this.$t('settings.analysis_failed', { model: this.$t('models.' + modelId + '.title') }),
+          true,
+        );
       }
     },
     isModelProcessing(modelId) {
       const progress = this.modelProgress[modelId];
-      return !!progress && (progress.status === "starting" || progress.pending > 0);
+      return !!progress && (progress.status === 'starting' || progress.pending > 0);
     },
     isModelActive(modelId) {
-      return this.activeModelId === modelId && (this.isModelProcessing(modelId) || this.uiNow < this.activeModelHoldUntil);
+      return (
+        this.activeModelId === modelId &&
+        (this.isModelProcessing(modelId) || this.uiNow < this.activeModelHoldUntil)
+      );
     },
     getModelPending(modelId) {
       return this.modelProgress[modelId]?.pending || 0;
@@ -1125,44 +1375,51 @@ export default {
     },
     getModelProgressText(modelId) {
       const progress = this.modelProgress[modelId];
-      if (!progress || progress.status === "starting") return "Starting";
+      if (!progress || progress.status === 'starting') return 'Starting';
       if (!progress.total) return `${progress.pending || 0} left`;
       return `${Math.max(progress.total - (progress.pending || 0), 0)} of ${progress.total}`;
     },
     getModelStatusLabel(modelId) {
       const progress = this.modelProgress[modelId];
-      if (progress?.status === "starting") return this.$t('settings.model_status_starting');
-      if (progress?.status === "completed") return this.$t('settings.model_status_finished');
-      if (progress?.status === "up_to_date") return this.$t('settings.model_status_up_to_date');
-      if (progress?.status === "unavailable") return this.$t('settings.model_status_unavailable');
-      if (progress?.status === "error") return this.$t('settings.model_status_error');
+      if (progress?.status === 'starting') return this.$t('settings.model_status_starting');
+      if (progress?.status === 'completed') return this.$t('settings.model_status_finished');
+      if (progress?.status === 'up_to_date') return this.$t('settings.model_status_up_to_date');
+      if (progress?.status === 'unavailable') return this.$t('settings.model_status_unavailable');
+      if (progress?.status === 'error') return this.$t('settings.model_status_error');
       return this.$t('settings.model_status_running');
     },
     getModelStatusText(modelId) {
       const progress = this.modelProgress[modelId];
       if (this.isModelProcessing(modelId)) return this.getModelProgressText(modelId);
       if (progress?.message) return progress.message;
-      if (progress?.status === "completed") return this.$t('settings.model_status_finished');
-      if (progress?.status === "up_to_date") return this.$t('settings.model_status_up_to_date');
-      if (progress?.status === "unavailable") return this.$t('settings.model_status_not_available');
-      if (progress?.status === "error") return this.$t('settings.model_status_error');
-      if (progress?.total > 0 && progress?.pending === 0) return this.$t('settings.model_status_finished');
-      if (progress?.total === 0 && progress?.pending === 0) return this.$t('settings.model_status_up_to_date');
-      if (this.downloadedModels.includes(modelId)) return "";
+      if (progress?.status === 'completed') return this.$t('settings.model_status_finished');
+      if (progress?.status === 'up_to_date') return this.$t('settings.model_status_up_to_date');
+      if (progress?.status === 'unavailable') return this.$t('settings.model_status_not_available');
+      if (progress?.status === 'error') return this.$t('settings.model_status_error');
+      if (progress?.total > 0 && progress?.pending === 0)
+        return this.$t('settings.model_status_finished');
+      if (progress?.total === 0 && progress?.pending === 0)
+        return this.$t('settings.model_status_up_to_date');
+      if (this.downloadedModels.includes(modelId)) return '';
       return this.$t('settings.model_status_not_downloaded');
     },
     getModelProgressText(modelId) {
       const progress = this.modelProgress[modelId];
-      if (!progress || progress.status === "starting") return this.$t('settings.model_status_starting');
-      if (!progress.total) return this.$t('settings.model_n_remaining', { n: progress.pending || 0 });
-      return this.$t('settings.model_n_of_total', { n: Math.max(progress.total - (progress.pending || 0), 0), total: progress.total });
+      if (!progress || progress.status === 'starting')
+        return this.$t('settings.model_status_starting');
+      if (!progress.total)
+        return this.$t('settings.model_n_remaining', { n: progress.pending || 0 });
+      return this.$t('settings.model_n_of_total', {
+        n: Math.max(progress.total - (progress.pending || 0), 0),
+        total: progress.total,
+      });
     },
     getModelActivityIcon(modelId) {
       const status = this.modelProgress[modelId]?.status;
-      if (status === "completed" || status === "up_to_date") return "mdi-check-circle-outline";
-      if (status === "unavailable") return "mdi-alert-circle-outline";
-      if (status === "error") return "mdi-alert-outline";
-      return "mdi-robot-outline";
+      if (status === 'completed' || status === 'up_to_date') return 'mdi-check-circle-outline';
+      if (status === 'unavailable') return 'mdi-alert-circle-outline';
+      if (status === 'error') return 'mdi-alert-outline';
+      return 'mdi-robot-outline';
     },
     isModelDownloading(modelId) {
       return !!this.downloadingModels[modelId];
@@ -1174,13 +1431,13 @@ export default {
       this.cleanupDialog.show = false;
       this.isCleaning = true;
       try {
-        await invoke("abort_indexing");
+        await invoke('abort_indexing');
         // Short delay to let threads exit
-        await new Promise(r => setTimeout(r, 500));
-        await invoke("cleanup_database", { confirm: true });
+        await new Promise((r) => setTimeout(r, 500));
+        await invoke('cleanup_database', { confirm: true });
         window.location.reload();
       } catch (err) {
-        console.error("Failed to cleanup database:", err);
+        console.error('Failed to cleanup database:', err);
       } finally {
         this.isCleaning = false;
       }
@@ -1193,9 +1450,9 @@ export default {
       const path = this.removeFolderDialog.path;
       this.removeFolderDialog.show = false;
       try {
-        await invoke("abort_indexing");
-        await new Promise(r => setTimeout(r, 300));
-        await invoke("remove_directory_full", { path });
+        await invoke('abort_indexing');
+        await new Promise((r) => setTimeout(r, 300));
+        await invoke('remove_directory_full', { path });
         this.list_directories();
         this.showSnackbar(this.$t('settings.folder_removed'));
       } catch (err) {
@@ -1210,32 +1467,34 @@ export default {
       try {
         const selection = await open({ multiple: true, directory: true });
         if (Array.isArray(selection)) {
-          for (const path of selection) { await invoke("add_directory", { path }); }
+          for (const path of selection) {
+            await invoke('add_directory', { path });
+          }
         } else if (selection) {
-          await invoke("add_directory", { path: selection });
+          await invoke('add_directory', { path: selection });
         }
         this.list_directories();
       } catch (err) {}
     },
     list_directories() {
-      invoke("list_directories").then((response) => {
+      invoke('list_directories').then((response) => {
         const dirs = JSON.parse(response);
-        this.directories = dirs.map(dir => ({ title: dir.split('/').pop() || dir, value: dir }));
+        this.directories = dirs.map((dir) => ({ title: dir.split('/').pop() || dir, value: dir }));
         this.$emit('folder-added', this.directories);
       });
     },
     remove_directory(path) {
-      invoke("remove_directory", { path }).then(() => {
+      invoke('remove_directory', { path }).then(() => {
         this.list_directories();
         this.showSnackbar(this.$t('settings.folder_removed_watch'));
       });
     },
     onFolderSelected(path) {
-      invoke("add_directory", { path }).then(() => {
+      invoke('add_directory', { path }).then(() => {
         this.list_directories();
         this.showSnackbar(this.$t('settings.folder_added'));
       });
-    }
+    },
   },
   beforeUnmount() {
     if (this.uiClock) window.clearInterval(this.uiClock);
@@ -1245,7 +1504,7 @@ export default {
     if (this.unlistenEta) this.unlistenEta();
     if (this.unlistenProgress) this.unlistenProgress();
     if (this.unlistenModelProgress) this.unlistenModelProgress();
-  }
+  },
 };
 </script>
 
@@ -1260,7 +1519,10 @@ export default {
   border-top: 1px solid var(--color-border-subtle) !important;
 }
 .ai-model-card {
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
 }
 .ai-activity-strip {
   border-color: var(--color-border-default) !important;

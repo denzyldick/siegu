@@ -3,19 +3,25 @@
     <!-- Bulk Actions Toolbar -->
     <v-fade-transition>
       <div v-if="selectedIds.length > 0" class="bulk-toolbar-container">
-        <v-sheet class="bulk-toolbar d-flex align-center px-6 py-3 rounded-pill shadow-xl" color="#18181b">
-          <v-btn icon="mdi-close" variant="text" density="comfortable" color="white" @click="clearSelection"></v-btn>
+        <v-sheet
+          class="bulk-toolbar d-flex align-center px-6 py-3 rounded-pill shadow-xl"
+          color="#18181b"
+        >
+          <v-btn
+            icon="mdi-close"
+            variant="text"
+            density="comfortable"
+            color="white"
+            @click="clearSelection"
+          ></v-btn>
           <div class="ml-4">
-            <div class="text-subtitle-2 font-weight-bold text-white">{{ $t('photos.items_selected', { count: selectedIds.length }) }}</div>
+            <div class="text-subtitle-2 font-weight-bold text-white">
+              {{ $t('photos.items_selected', { count: selectedIds.length }) }}
+            </div>
           </div>
           <v-spacer></v-spacer>
           <div class="d-flex ga-2">
-            <v-btn
-              variant="flat"
-              class="siegu-btn-modern px-6"
-              size="small"
-              @click="bulkFavorite"
-            >
+            <v-btn variant="flat" class="siegu-btn-modern px-6" size="small" @click="bulkFavorite">
               <v-icon size="16" class="mr-2">mdi-heart</v-icon>
               <span>{{ $t('photos.favorite') }}</span>
             </v-btn>
@@ -46,9 +52,13 @@
       <DynamicScrollerItem :item="item" :active="active">
         <div v-if="item.type === 'header'" class="month-header mb-3">
           <div class="d-flex align-center px-2 py-3 rounded-lg header-blur">
-            <h2 class="text-h5 font-weight-bold text-zinc-primary letter-spacing-tight">{{ item.name }}</h2>
+            <h2 class="text-h5 font-weight-bold text-zinc-primary letter-spacing-tight">
+              {{ item.name }}
+            </h2>
             <v-spacer></v-spacer>
-            <span class="text-caption text-zinc-muted font-weight-medium bg-zinc-100 px-3 py-1 rounded-pill border-subtle">
+            <span
+              class="text-caption text-zinc-muted font-weight-medium bg-zinc-100 px-3 py-1 rounded-pill border-subtle"
+            >
               {{ $t('photos.items_count', { count: item.count }) }}
             </span>
           </div>
@@ -69,7 +79,10 @@
     </DynamicScroller>
 
     <!-- Empty States -->
-    <div v-else-if="!loading" class="empty-state-container d-flex flex-column align-center justify-center text-center">
+    <div
+      v-else-if="!loading"
+      class="empty-state-container d-flex flex-column align-center justify-center text-center"
+    >
       <div class="empty-state-icon mb-6">
         <template v-if="searchQuery">
           <v-icon size="80" color="#d4d4d8">mdi-text-search-variant</v-icon>
@@ -83,13 +96,30 @@
       </div>
 
       <h3 class="text-h5 font-weight-bold text-zinc-primary mb-2">
-        {{ searchQuery ? $t('photos.no_results') : (filters.favoritesOnly ? $t('photos.no_favorites') : $t('photos.your_library_empty')) }}
+        {{
+          searchQuery
+            ? $t('photos.no_results')
+            : filters.favoritesOnly
+              ? $t('photos.no_favorites')
+              : $t('photos.your_library_empty')
+        }}
       </h3>
       <p class="text-body-1 text-zinc-secondary max-w-400 mx-auto mb-8">
-        {{ searchQuery ? $t('photos.no_results_for', { query: searchQuery }) : (filters.favoritesOnly ? $t('photos.tap_heart_hint') : $t('photos.add_folder_hint')) }}
+        {{
+          searchQuery
+            ? $t('photos.no_results_for', { query: searchQuery })
+            : filters.favoritesOnly
+              ? $t('photos.tap_heart_hint')
+              : $t('photos.add_folder_hint')
+        }}
       </p>
 
-      <v-btn v-if="searchQuery" variant="flat" class="siegu-btn-modern px-8 py-6" @click="$emit('clear-search')">
+      <v-btn
+        v-if="searchQuery"
+        variant="flat"
+        class="siegu-btn-modern px-8 py-6"
+        @click="$emit('clear-search')"
+      >
         {{ $t('photos.clear_search') }}
       </v-btn>
     </div>
@@ -100,8 +130,16 @@
     <div class="loading-container py-12 d-flex justify-center">
       <v-fade-transition>
         <div v-if="loading" class="d-flex flex-column align-center">
-          <v-progress-circular indeterminate color="#18181b" size="32" width="3"></v-progress-circular>
-          <span class="mt-4 text-caption text-zinc-muted font-weight-medium tracking-widest text-uppercase">{{ $t('photos.loading_memories') }}</span>
+          <v-progress-circular
+            indeterminate
+            color="#18181b"
+            size="32"
+            width="3"
+          ></v-progress-circular>
+          <span
+            class="mt-4 text-caption text-zinc-muted font-weight-medium tracking-widest text-uppercase"
+            >{{ $t('photos.loading_memories') }}</span
+          >
         </div>
         <v-btn
           v-else-if="!allLoaded && groups.length > 0"
@@ -125,15 +163,15 @@
 </template>
 
 <script>
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { DynamicScroller, DynamicScrollerItem } from "vue-virtual-scroller";
-import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
-import Image from "./Image.vue";
-import PhotoViewer from "./PhotoViewer.vue";
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller';
+import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
+import Image from './Image.vue';
+import PhotoViewer from './PhotoViewer.vue';
 
 export default {
-  name: "Photos",
+  name: 'Photos',
   components: { DynamicScroller, DynamicScrollerItem, Image, PhotoViewer },
   data: () => ({
     loading: false,
@@ -158,7 +196,7 @@ export default {
   props: {
     searchQuery: {
       type: String,
-      default: "",
+      default: '',
     },
     isPersonFilter: {
       type: Boolean,
@@ -171,8 +209,8 @@ export default {
         videosOnly: false,
         dateRange: 'all',
         folder: null,
-      })
-    }
+      }),
+    },
   },
   computed: {
     virtualItems() {
@@ -199,31 +237,31 @@ export default {
   async created() {
     this.list_files();
 
-    this.unlistenDiscovered = await listen("photos-discovered", (event) => {
-      console.log("photos-discovered", event.payload?.length ?? 0, "photos");
+    this.unlistenDiscovered = await listen('photos-discovered', (event) => {
+      console.log('photos-discovered', event.payload?.length ?? 0, 'photos');
       if (Array.isArray(event.payload)) {
         this.updateGroups(event.payload);
       }
     });
 
-    this.unlistenAnalysisResult = await listen("photo-analysis-result", async (event) => {
+    this.unlistenAnalysisResult = await listen('photo-analysis-result', async (event) => {
       const { id } = event.payload;
       if (!id) return;
       try {
-        const raw = await invoke("get_photo_by_id", { id });
-        if (raw && raw !== "null") {
+        const raw = await invoke('get_photo_by_id', { id });
+        if (raw && raw !== 'null') {
           const updated = JSON.parse(raw);
           const existing = this.imagesMap[id];
           if (existing) {
             updated._groupKey = existing._groupKey;
             updated._sortKey = existing._sortKey;
             this.imagesMap[id] = updated;
-            const idx = this.images.findIndex(p => p.id === id);
+            const idx = this.images.findIndex((p) => p.id === id);
             if (idx !== -1) {
               this.images[idx] = updated;
             }
             for (const g of this.groups) {
-              const gi = g.images.findIndex(p => p.id === id);
+              const gi = g.images.findIndex((p) => p.id === id);
               if (gi !== -1) {
                 g.images[gi] = updated;
               }
@@ -233,7 +271,7 @@ export default {
           }
         }
       } catch (e) {
-        console.warn("Failed to fetch updated photo after analysis:", e);
+        console.warn('Failed to fetch updated photo after analysis:', e);
       }
     });
   },
@@ -259,49 +297,51 @@ export default {
       else this.columns = 5;
     },
     updateGroups(newImages) {
-        const locale = localStorage.getItem('siegu_language') || 'en';
-        const affectedGroups = new Set();
-        
-        newImages.forEach(image => {
-            if (this.imagesMap[image.id]) return;
-            
-            this.imagesMap[image.id] = image;
-            this.images.push(image);
+      const locale = localStorage.getItem('siegu_language') || 'en';
+      const affectedGroups = new Set();
 
-            if (!image._groupKey) {
-                if (image.created) {
-                    const datePart = image.created.split(' ')[0];
-                    const dateParts = datePart.includes(':') ? datePart.split(':') : datePart.split('-');
-                    if (dateParts.length >= 2) {
-                        const year = dateParts[0];
-                        const monthIdx = parseInt(dateParts[1]) - 1;
-                        if (monthIdx >= 0 && monthIdx < 12) {
-                            const monthName = new Date(parseInt(year), monthIdx).toLocaleString(locale, { month: 'long' });
-                            image._groupKey = `${monthName} ${year}`;
-                            image._sortKey = `${year}${dateParts[1].padStart(2, '0')}`;
-                        }
-                    }
-                }
-                if (!image._groupKey) {
-                    image._groupKey = this.$t('photos.recent');
-                    image._sortKey = "999999";
-                }
+      newImages.forEach((image) => {
+        if (this.imagesMap[image.id]) return;
+
+        this.imagesMap[image.id] = image;
+        this.images.push(image);
+
+        if (!image._groupKey) {
+          if (image.created) {
+            const datePart = image.created.split(' ')[0];
+            const dateParts = datePart.includes(':') ? datePart.split(':') : datePart.split('-');
+            if (dateParts.length >= 2) {
+              const year = dateParts[0];
+              const monthIdx = parseInt(dateParts[1]) - 1;
+              if (monthIdx >= 0 && monthIdx < 12) {
+                const monthName = new Date(parseInt(year), monthIdx).toLocaleString(locale, {
+                  month: 'long',
+                });
+                image._groupKey = `${monthName} ${year}`;
+                image._sortKey = `${year}${dateParts[1].padStart(2, '0')}`;
+              }
             }
+          }
+          if (!image._groupKey) {
+            image._groupKey = this.$t('photos.recent');
+            image._sortKey = '999999';
+          }
+        }
 
-            let group = this.groupsMap[image._groupKey];
-            if (!group) {
-                group = { name: image._groupKey, sortKey: image._sortKey, images: [] };
-                this.groupsMap[image._groupKey] = group;
-                this.groups.push(group);
-                this.groups.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
-            }
-            group.images.push(image);
-            affectedGroups.add(group);
-        });
+        let group = this.groupsMap[image._groupKey];
+        if (!group) {
+          group = { name: image._groupKey, sortKey: image._sortKey, images: [] };
+          this.groupsMap[image._groupKey] = group;
+          this.groups.push(group);
+          this.groups.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+        }
+        group.images.push(image);
+        affectedGroups.add(group);
+      });
 
-        affectedGroups.forEach(group => {
-            group.images.sort((a, b) => (b.created || '').localeCompare(a.created || ''));
-        });
+      affectedGroups.forEach((group) => {
+        group.images.sort((a, b) => (b.created || '').localeCompare(a.created || ''));
+      });
     },
     handlePhotoUpdated(updatedPhoto) {
       const existing = this.imagesMap[updatedPhoto.id];
@@ -333,14 +373,17 @@ export default {
       this.clearSelection();
     },
     setupInfiniteScroll() {
-      this.observer = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting && !this.loading && !this.allLoaded) {
-          this.list_files();
-        }
-      }, {
-        threshold: 0.01,
-        rootMargin: '600px'
-      });
+      this.observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && !this.loading && !this.allLoaded) {
+            this.list_files();
+          }
+        },
+        {
+          threshold: 0.01,
+          rootMargin: '600px',
+        },
+      );
 
       const sentinel = document.getElementById('scroll-sentinel');
       if (sentinel) this.observer.observe(sentinel);
@@ -352,13 +395,13 @@ export default {
       try {
         let response;
         if (this.isPersonFilter && this.searchQuery) {
-          response = await invoke("get_person_photos", { personId: this.searchQuery });
+          response = await invoke('get_person_photos', { personId: this.searchQuery });
           this.allLoaded = true;
         } else {
-          response = await invoke("list_files", {
+          response = await invoke('list_files', {
             offset: this.paging.offset,
             limit: this.paging.limit,
-            query: this.searchQuery ?? "",
+            query: this.searchQuery ?? '',
             scan: false,
             favoritesOnly: this.filters.favoritesOnly,
             videosOnly: this.filters.videosOnly,
@@ -385,7 +428,7 @@ export default {
           }
         }
       } catch (err) {
-        console.error("Failed to list files:", err);
+        console.error('Failed to list files:', err);
       } finally {
         this.loading = false;
       }
@@ -400,7 +443,7 @@ export default {
     },
     async handleToggleFavorite(id) {
       try {
-        const isNowFavorite = await invoke("toggle_favorite", { id: id });
+        const isNowFavorite = await invoke('toggle_favorite', { id: id });
         const photo = this.imagesMap[id];
         if (photo) {
           photo.favorite = isNowFavorite;
@@ -409,12 +452,12 @@ export default {
             delete this.imagesMap[id];
             const group = this.groupsMap[photo._groupKey];
             if (group) {
-                group.images = group.images.filter(p => p.id !== id);
+              group.images = group.images.filter((p) => p.id !== id);
             }
           }
         }
       } catch (err) {
-        console.error("Failed to toggle favorite:", err);
+        console.error('Failed to toggle favorite:', err);
       }
     },
     openViewer(index) {
@@ -422,7 +465,7 @@ export default {
       this.viewerOpen = true;
     },
     openViewerByPhoto(photo) {
-      const index = this.images.findIndex(p => p.id === photo.id);
+      const index = this.images.findIndex((p) => p.id === photo.id);
       if (index !== -1) this.openViewer(index);
     },
   },
@@ -434,8 +477,8 @@ export default {
       deep: true,
       handler() {
         this.scheduleReload();
-      }
-    }
+      },
+    },
   },
 };
 </script>
@@ -485,7 +528,9 @@ export default {
 .bulk-toolbar {
   width: 100%;
   max-width: 560px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
 .siegu-btn-modern {
@@ -519,8 +564,14 @@ export default {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .scroll-sentinel {

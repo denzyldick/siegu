@@ -35,23 +35,77 @@ jobs:
         with:
           components: rustfmt
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
       - name: Install dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev libjs-mathjax build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+          sudo apt-get install -y pkg-config libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev libjs-mathjax build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev libavfilter-dev libavdevice-dev libpostproc-dev
+
+      - name: Install dependencies (macOS only)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          brew install ffmpeg
+          echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+
+      - name: Cache FFmpeg (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\installed\x64-windows
+          key: ffmpeg-windows-${{ runner.os }}-v1
+
+      - name: Install dependencies (Windows only)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          if (Test-Path "C:\vcpkg\installed\x64-windows\include\libavcodec\avcodec.h") {
+            Write-Host "FFmpeg already cached, skipping install"
+          } else {
+            $retries = 3
+            for ($i = 1; $i -le $retries; $i++) {
+              try {
+                vcpkg install ffmpeg:x64-windows
+                break
+              } catch {
+                Write-Host "Attempt $i failed, retrying..."
+                Start-Sleep -Seconds (10 * $i)
+              }
+            }
+          }
+          $ffmpegDir = "C:\vcpkg\installed\x64-windows"
+          "FFMPEG_DIR=$ffmpegDir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FFMPEG_INCLUDE_DIR=$ffmpegDir\include" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FFMPEG_LIB_DIR=$ffmpegDir\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$ffmpegDir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - run: npm install
 
       - run: npm run check:translations
 
-      - run: cargo fmt
+      - run: cargo fmt --check
+        working-directory: src-tauri
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Security audit
+        run: cargo audit
         working-directory: src-tauri
 
       - run: cargo check
         working-directory: src-tauri
 
       - run: cargo test
+        working-directory: src-tauri
+
+      - run: cargo test -p siegu-core
+        working-directory: src-tauri
+
+      - run: cargo clippy -- -D warnings
         working-directory: src-tauri
 
       - name: Cache AI test models
@@ -96,6 +150,144 @@ jobs:
       - name: Build Tauri App (no bundle)
         run: npm run tauri build -- --no-bundle
 
+  test-android:
+    if: github.event_name != 'release'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-34 build-tools;34.0.0 ndk;26.1.10909125"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: aarch64-linux-android, x86_64-linux-android
+          components: rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: android
+          workspaces: src-tauri
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y nasm
+
+      - name: Ensure rust targets are installed
+        run: rustup target add aarch64-linux-android x86_64-linux-android || true
+
+      - name: Set NDK cross-compilation env vars
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          NDK_VERSION="26.1.10909125"
+          NDK_ROOT="$SDK_ROOT/ndk/$NDK_VERSION"
+          TOOLCHAIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64"
+          SYSROOT="$TOOLCHAIN/sysroot"
+          NDK_BIN="$TOOLCHAIN/bin"
+
+          echo "SDK_ROOT=$SDK_ROOT"
+          echo "NDK_ROOT=$NDK_ROOT"
+          echo "TOOLCHAIN=$TOOLCHAIN"
+          echo "SYSROOT=$SYSROOT"
+          echo "NDK_BIN=$NDK_BIN"
+
+          if [ ! -f "$NDK_BIN/aarch64-linux-android26-clang" ]; then
+            echo "Error: aarch64 clang not found at $NDK_BIN/aarch64-linux-android26-clang"
+            echo "Listing NDK bin:"
+            ls "$NDK_BIN/" | head -20
+            exit 1
+          fi
+
+          echo "CC_aarch64-linux-android=$NDK_BIN/aarch64-linux-android26-clang" >> $GITHUB_ENV
+          echo "CC_x86_64-linux-android=$NDK_BIN/x86_64-linux-android26-clang" >> $GITHUB_ENV
+          echo "AR_aarch64-linux-android=$NDK_BIN/llvm-ar" >> $GITHUB_ENV
+          echo "AR_x86_64-linux-android=$NDK_BIN/llvm-ar" >> $GITHUB_ENV
+          echo "CARGO_NDK_SYSROOT_PATH=$SYSROOT" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
+
+      - run: npm install
+
+      - run: cargo fmt --check
+        working-directory: src-tauri
+
+      - name: Ensure llvm-nm and llvm-strip exist in NDK
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          NDK_BIN="$SDK_ROOT/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/bin"
+
+          echo "NDK_BIN=$NDK_BIN"
+          echo "Checking if llvm-nm exists..."
+          ls -la "$NDK_BIN/llvm-nm"* 2>/dev/null || echo "No llvm-nm found"
+          ls -la "$NDK_BIN/llvm-strip"* 2>/dev/null || echo "No llvm-strip found"
+          echo "All nm/strip related files:"
+          ls "$NDK_BIN/" | grep -iE 'nm|strip' || echo "None found"
+
+          for TOOL in nm strip; do
+            if [ ! -f "$NDK_BIN/llvm-$TOOL" ]; then
+              echo "llvm-$TOOL missing, searching NDK..."
+              FOUND=$(find "$SDK_ROOT/ndk/26.1.10909125" -name "llvm-$TOOL" 2>/dev/null | head -1)
+              if [ -n "$FOUND" ]; then
+                ln -sf "$(realpath "$FOUND")" "$NDK_BIN/llvm-$TOOL"
+                echo "Created llvm-$TOOL -> $(realpath "$FOUND")"
+              else
+                echo "ERROR: No llvm-$TOOL found anywhere in NDK"
+                exit 1
+              fi
+            else
+              echo "llvm-$TOOL already exists at $NDK_BIN/llvm-$TOOL"
+            fi
+          done
+
+          ls -la "$NDK_BIN"/llvm-nm* "$NDK_BIN"/llvm-strip*
+
+      - run: cargo check --target aarch64-linux-android
+        working-directory: src-tauri
+        env:
+          CARGO_NDK_SYSROOT_PATH: ${{ env.CARGO_NDK_SYSROOT_PATH }}
+
+      - run: cargo check --target x86_64-linux-android
+        working-directory: src-tauri
+        env:
+          CARGO_NDK_SYSROOT_PATH: ${{ env.CARGO_NDK_SYSROOT_PATH }}
+
+  test-ios:
+    if: github.event_name != 'release'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios, x86_64-apple-ios, aarch64-apple-ios-sim
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ios
+          workspaces: src-tauri
+
+      - run: npm install
+
+      - run: cargo fmt --check
+        working-directory: src-tauri
+
+      - run: cargo check --target aarch64-apple-ios
+        working-directory: src-tauri
+
   release:
     if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     permissions:
@@ -118,11 +310,53 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.platform }}
+          workspaces: src-tauri
+
       - name: Install dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev libjs-mathjax build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+          sudo apt-get install -y pkg-config libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev libjs-mathjax build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev libavfilter-dev libavdevice-dev libpostproc-dev
+
+      - name: Install dependencies (macOS only)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          brew install ffmpeg
+          echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+
+      - name: Cache FFmpeg (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\installed\x64-windows
+          key: ffmpeg-windows-${{ runner.os }}-v1
+
+      - name: Install dependencies (Windows only)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          if (Test-Path "C:\vcpkg\installed\x64-windows\include\libavcodec\avcodec.h") {
+            Write-Host "FFmpeg already cached, skipping install"
+          } else {
+            $retries = 3
+            for ($i = 1; $i -le $retries; $i++) {
+              try {
+                vcpkg install ffmpeg:x64-windows
+                break
+              } catch {
+                Write-Host "Attempt $i failed, retrying..."
+                Start-Sleep -Seconds (10 * $i)
+              }
+            }
+          }
+          $ffmpegDir = "C:\vcpkg\installed\x64-windows"
+          "FFMPEG_DIR=$ffmpegDir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FFMPEG_INCLUDE_DIR=$ffmpegDir\include" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FFMPEG_LIB_DIR=$ffmpegDir\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$ffmpegDir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - run: npm install
 
@@ -170,10 +404,45 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: stable
           targets: aarch64-linux-android, x86_64-linux-android
+          components: rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-android
+          workspaces: src-tauri
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y nasm
 
       - name: Set up cargo-ndk
         run: cargo install cargo-ndk
+
+      - name: Ensure rust targets are installed
+        run: rustup target add aarch64-linux-android x86_64-linux-android || true
+
+      - name: Set NDK cross-compilation env vars
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          NDK_VERSION="26.1.10909125"
+          NDK_ROOT="$SDK_ROOT/ndk/$NDK_VERSION"
+          TOOLCHAIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64"
+
+          CC_AARCH64="$TOOLCHAIN/bin/aarch64-linux-android26-clang"
+          CC_X86_64="$TOOLCHAIN/bin/x86_64-linux-android26-clang"
+
+          if [ ! -f "$CC_AARCH64" ]; then
+            echo "Error: aarch64 clang not found at $CC_AARCH64"
+            exit 1
+          fi
+
+          echo "CC_aarch64-linux-android=$CC_AARCH64" >> $GITHUB_ENV
+          echo "CC_x86_64-linux-android=$CC_X86_64" >> $GITHUB_ENV
+          echo "AR_aarch64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
+          echo "AR_x86_64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
 
       - run: npm install
 
@@ -187,6 +456,7 @@ jobs:
         run: npm run tauri android build -- --apk
 
       - name: Upload APK to Release
+        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -205,7 +475,7 @@ jobs:
       - name: Install dependencies
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm git nodejs npm rustup webkit2gtk-4.1 libayatana-appindicator librsvg xdotool openssl sudo yarn xdg-utils fuse2
+          pacman -S --noconfirm git nodejs npm rustup webkit2gtk-4.1 libayatana-appindicator librsvg xdotool openssl sudo yarn xdg-utils fuse2 ffmpeg pkgconf
 
           useradd -m -G wheel builder
           echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
@@ -222,6 +492,7 @@ jobs:
           "
 
       - name: Upload Arch AppImage
+        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -242,6 +513,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-ios, x86_64-apple-ios, aarch64-apple-ios-sim
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-ios
+          workspaces: src-tauri
 
       - run: npm install
 

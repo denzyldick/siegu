@@ -5,8 +5,12 @@
       <div class="w-100">
         <div class="d-flex align-center justify-space-between flex-wrap ga-4">
           <div>
-            <h1 class="text-h3 font-weight-black tracking-tight text-zinc-primary mb-2">{{ $t('people.title') }}</h1>
-            <p class="text-body-1 text-zinc-secondary font-weight-medium">{{ $t('people.desc') }}</p>
+            <h1 class="text-h3 font-weight-black tracking-tight text-zinc-primary mb-2">
+              {{ $t('people.title') }}
+            </h1>
+            <p class="text-body-1 text-zinc-secondary font-weight-medium">
+              {{ $t('people.desc') }}
+            </p>
           </div>
           <div class="d-flex align-center ga-3 flex-wrap">
             <v-btn
@@ -18,14 +22,28 @@
             >
               {{ $t('people.index_faces') }}
             </v-btn>
-            <div v-else class="d-flex align-center bg-white border-subtle rounded-lg px-4 py-2 shadow-sm animate-pulse">
-              <v-progress-circular indeterminate size="16" width="2" color="#18181b" class="mr-3"></v-progress-circular>
+            <div
+              v-else
+              class="d-flex align-center bg-white border-subtle rounded-lg px-4 py-2 shadow-sm animate-pulse"
+            >
+              <v-progress-circular
+                indeterminate
+                size="16"
+                width="2"
+                color="#18181b"
+                class="mr-3"
+              ></v-progress-circular>
               <div class="text-caption font-weight-black text-zinc-primary">
                 {{ $t('people.indexing_remaining', { count: formatIndexingCount(indexingCount) }) }}
               </div>
             </div>
 
-            <v-chip class="px-4 py-5 font-weight-bold border-subtle" variant="flat" color="white" rounded="lg">
+            <v-chip
+              class="px-4 py-5 font-weight-bold border-subtle"
+              variant="flat"
+              color="white"
+              rounded="lg"
+            >
               <v-icon start size="18" color="#18181b">mdi-account-check</v-icon>
               {{ $t('people.named_count', { count: people.length }) }}
             </v-chip>
@@ -38,7 +56,9 @@
       <!-- Named People Section -->
       <section v-if="people.length > 0" class="mb-12 animate-fade-up">
         <div class="d-flex align-center mb-8 flex-nowrap">
-          <h2 class="text-h5 font-weight-black text-zinc-primary pr-6 flex-shrink-0">{{ $t('people.your_people') }}</h2>
+          <h2 class="text-h5 font-weight-black text-zinc-primary pr-6 flex-shrink-0">
+            {{ $t('people.your_people') }}
+          </h2>
           <v-divider class="border-subtle border-opacity-100"></v-divider>
         </div>
 
@@ -69,7 +89,9 @@
               </div>
 
               <div class="pa-3 bg-white text-center">
-                <h3 class="text-subtitle-2 font-weight-bold text-zinc-primary text-truncate">{{ person.name }}</h3>
+                <h3 class="text-subtitle-2 font-weight-bold text-zinc-primary text-truncate">
+                  {{ person.name }}
+                </h3>
               </div>
 
               <div class="card-action-overlay">
@@ -88,9 +110,15 @@
       </section>
 
       <!-- New Identified Faces Section (Anonymous Clusters) -->
-      <section v-if="unnamedFaces.length > 0" class="animate-fade-up" :style="{ animationDelay: '0.1s' }">
+      <section
+        v-if="unnamedFaces.length > 0"
+        class="animate-fade-up"
+        :style="{ animationDelay: '0.1s' }"
+      >
         <div class="d-flex align-center mb-8 flex-nowrap">
-          <h2 class="text-h5 font-weight-black text-zinc-primary pr-6 flex-shrink-0">{{ $t('people.new_faces') }}</h2>
+          <h2 class="text-h5 font-weight-black text-zinc-primary pr-6 flex-shrink-0">
+            {{ $t('people.new_faces') }}
+          </h2>
           <v-divider class="border-subtle border-opacity-100"></v-divider>
         </div>
 
@@ -138,7 +166,10 @@
       </section>
 
       <!-- Empty State -->
-      <div v-if="people.length === 0 && unnamedFaces.length === 0" class="d-flex flex-column align-center justify-center py-16 animate-fade-in">
+      <div
+        v-if="people.length === 0 && unnamedFaces.length === 0"
+        class="d-flex flex-column align-center justify-center py-16 animate-fade-in"
+      >
         <div class="empty-icon-pulse mb-8">
           <v-icon size="80" color="#d4d4d8">mdi-face-recognition</v-icon>
         </div>
@@ -154,13 +185,19 @@
       <v-card class="rounded-xl pa-2 elevation-24 border-subtle" color="surface">
         <div class="pa-6">
           <div class="d-flex align-center justify-space-between mb-8">
-            <h3 class="text-h5 font-weight-black text-zinc-primary">{{ $t('people.who_is_this') }}</h3>
+            <h3 class="text-h5 font-weight-black text-zinc-primary">
+              {{ $t('people.who_is_this') }}
+            </h3>
             <v-btn icon="mdi-close" variant="text" size="small" @click="nameDialog = false"></v-btn>
           </div>
 
           <div class="d-flex justify-center mb-8">
             <v-avatar size="160" class="border-subtle shadow-xl elevation-2 bg-zinc-100">
-              <v-img v-if="activeFace" :src="getFaceImageSrc(activeFace.representative_crop, activeFace.encoded)" cover></v-img>
+              <v-img
+                v-if="activeFace"
+                :src="getFaceImageSrc(activeFace.representative_crop, activeFace.encoded)"
+                cover
+              ></v-img>
             </v-avatar>
           </div>
 
@@ -183,7 +220,9 @@
               <v-list-item v-bind="props" class="py-2">
                 <template v-slot:prepend>
                   <v-avatar size="32" class="mr-2 border-subtle">
-                    <v-img :src="getFaceImageSrc(item.raw.representative_crop, item.raw.encoded)"></v-img>
+                    <v-img
+                      :src="getFaceImageSrc(item.raw.representative_crop, item.raw.encoded)"
+                    ></v-img>
                   </v-avatar>
                 </template>
               </v-list-item>
@@ -209,18 +248,38 @@
       <v-card class="rounded-xl pa-2 elevation-24 overflow-hidden border-subtle" color="surface">
         <div class="pa-6">
           <div class="d-flex align-center justify-space-between mb-6">
-            <h3 class="text-h5 font-weight-black text-zinc-primary">{{ $t('people.profile_actions') }}</h3>
-            <v-btn icon="mdi-close" variant="text" size="small" @click="manageDialog = false"></v-btn>
+            <h3 class="text-h5 font-weight-black text-zinc-primary">
+              {{ $t('people.profile_actions') }}
+            </h3>
+            <v-btn
+              icon="mdi-close"
+              variant="text"
+              size="small"
+              @click="manageDialog = false"
+            ></v-btn>
           </div>
 
-          <v-tabs v-model="manageTab" bg-color="#f4f4f5" color="#18181b" grow mandatory class="rounded-xl mb-8 p-1 border-subtle">
-            <v-tab value="rename" class="rounded-lg text-none font-weight-bold">{{ $t('people.rename') }}</v-tab>
-            <v-tab value="merge" class="rounded-lg text-none font-weight-bold">{{ $t('people.merge') }}</v-tab>
+          <v-tabs
+            v-model="manageTab"
+            bg-color="#f4f4f5"
+            color="#18181b"
+            grow
+            mandatory
+            class="rounded-xl mb-8 p-1 border-subtle"
+          >
+            <v-tab value="rename" class="rounded-lg text-none font-weight-bold">{{
+              $t('people.rename')
+            }}</v-tab>
+            <v-tab value="merge" class="rounded-lg text-none font-weight-bold">{{
+              $t('people.merge')
+            }}</v-tab>
           </v-tabs>
 
           <v-window v-model="manageTab" class="py-2">
             <v-window-item value="rename">
-              <label class="text-caption font-weight-bold text-zinc-muted mb-2 d-block px-1">{{ $t('people.new_name_for', { name: activePerson?.name }) }}</label>
+              <label class="text-caption font-weight-bold text-zinc-muted mb-2 d-block px-1">{{
+                $t('people.new_name_for', { name: activePerson?.name })
+              }}</label>
               <v-text-field
                 v-model="newName"
                 variant="outlined"
@@ -242,7 +301,9 @@
             </v-window-item>
 
             <v-window-item value="merge">
-              <div class="bg-amber-50 rounded-xl pa-4 mb-8 d-flex align-start ga-3 border-amber-subtle">
+              <div
+                class="bg-amber-50 rounded-xl pa-4 mb-8 d-flex align-start ga-3 border-amber-subtle"
+              >
                 <v-icon color="#b45309" size="20" class="mt-1">mdi-alert-circle-outline</v-icon>
                 <div class="text-body-2 text-amber-darken-4 font-weight-medium">
                   <span>{{ $t('people.merge_desc', { name: activePerson?.name }) }}</span>
@@ -278,24 +339,46 @@
     </v-dialog>
 
     <!-- Cluster View Dialog -->
-    <v-dialog v-model="clusterDialog" max-width="800" transition="dialog-bottom-transition" scrollable>
+    <v-dialog
+      v-model="clusterDialog"
+      max-width="800"
+      transition="dialog-bottom-transition"
+      scrollable
+    >
       <v-card class="rounded-xl border-subtle overflow-hidden" color="surface">
         <v-card-title class="pa-6 bg-zinc-100 border-bottom-subtle d-flex align-center">
           <div>
-            <div class="text-h5 font-weight-black text-zinc-primary">{{ $t('people.grouped_faces') }}</div>
-            <div class="text-caption text-zinc-secondary font-weight-bold uppercase tracking-widest">
+            <div class="text-h5 font-weight-black text-zinc-primary">
+              {{ $t('people.grouped_faces') }}
+            </div>
+            <div
+              class="text-caption text-zinc-secondary font-weight-bold uppercase tracking-widest"
+            >
               {{ $t('people.appearances_in_cluster', { count: clusterFaces.length }) }}
             </div>
           </div>
           <v-spacer></v-spacer>
-          <v-btn icon="mdi-close" variant="text" size="small" @click="clusterDialog = false"></v-btn>
+          <v-btn
+            icon="mdi-close"
+            variant="text"
+            size="small"
+            @click="clusterDialog = false"
+          ></v-btn>
         </v-card-title>
 
         <v-card-text class="pa-6">
           <v-row class="ga-4">
             <v-col cols="4" sm="3" md="2" v-for="face in clusterFaces" :key="face.face_id">
-              <v-card variant="flat" border class="border-subtle overflow-hidden rounded-lg pos-rel group-face-card">
-                <v-img :src="getFaceImageSrc(face.crop_path, face.encoded)" aspect-ratio="1" cover></v-img>
+              <v-card
+                variant="flat"
+                border
+                class="border-subtle overflow-hidden rounded-lg pos-rel group-face-card"
+              >
+                <v-img
+                  :src="getFaceImageSrc(face.crop_path, face.encoded)"
+                  aspect-ratio="1"
+                  cover
+                ></v-img>
                 <div class="face-remove-btn">
                   <v-btn
                     icon="mdi-close"
@@ -329,11 +412,11 @@
 </template>
 
 <script>
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 export default {
-  name: "People",
+  name: 'People',
   data: () => ({
     people: [],
     unnamedFaces: [], // Now contains anonymous person groups from backend
@@ -341,8 +424,8 @@ export default {
     manageDialog: false,
     activeFace: null,
     activePerson: null,
-    newName: "",
-    manageTab: "rename",
+    newName: '',
+    manageTab: 'rename',
     mergeTargetId: null,
     indexingCount: 0,
     unlistenProgress: null,
@@ -352,19 +435,19 @@ export default {
   }),
   computed: {
     otherPeople() {
-      return this.people.filter(p => p.id !== this.activePerson?.id);
-    }
+      return this.people.filter((p) => p.id !== this.activePerson?.id);
+    },
   },
   async mounted() {
     this.fetchData();
 
     // Check initial indexing status
-    invoke("get_indexing_status").then(count => {
+    invoke('get_indexing_status').then((count) => {
       this.indexingCount = this.normalizeIndexingCount(count);
     });
 
     // Listen for progress updates
-    this.unlistenProgress = await listen("indexing-progress", (event) => {
+    this.unlistenProgress = await listen('indexing-progress', (event) => {
       this.indexingCount = this.normalizeIndexingCount(event.payload);
       if (this.indexingCount === 0) {
         this.fetchData(); // Refresh data when indexing is complete
@@ -381,23 +464,25 @@ export default {
       return count;
     },
     formatIndexingCount(value) {
-      return this.normalizeIndexingCount(value).toLocaleString(localStorage.getItem('siegu_language') || 'en');
+      return this.normalizeIndexingCount(value).toLocaleString(
+        localStorage.getItem('siegu_language') || 'en',
+      );
     },
     async startIndexing() {
       try {
-        await invoke("index_faces");
+        await invoke('index_faces');
       } catch (e) {
-        console.error("Failed to start indexing:", e);
+        console.error('Failed to start indexing:', e);
       }
     },
     async fetchData() {
       try {
-        const peopleStr = await invoke("get_people");
+        const peopleStr = await invoke('get_people');
         this.people = JSON.parse(peopleStr);
-        const unnamedStr = await invoke("get_unnamed_faces");
+        const unnamedStr = await invoke('get_unnamed_faces');
         this.unnamedFaces = JSON.parse(unnamedStr);
       } catch (e) {
-        console.error("Failed to fetch people data:", e);
+        console.error('Failed to fetch people data:', e);
       }
     },
     getFaceImageSrc(crop_path, encoded) {
@@ -405,7 +490,7 @@ export default {
     },
     promptName(group) {
       this.activeFace = group; // group contains representative_face_id and representative_crop
-      this.newName = "";
+      this.newName = '';
       this.nameDialog = true;
     },
     async saveName() {
@@ -413,52 +498,55 @@ export default {
 
       try {
         // Naming the representative face will now automatically name the entire cluster in the backend
-        await invoke("assign_name_to_face", { faceId: this.activeFace.representative_face_id, name: this.newName });
+        await invoke('assign_name_to_face', {
+          faceId: this.activeFace.representative_face_id,
+          name: this.newName,
+        });
         this.nameDialog = false;
         this.activeFace = null;
         this.fetchData();
       } catch (e) {
-        console.error("Failed to assign name:", e);
+        console.error('Failed to assign name:', e);
       }
     },
     viewPerson(person) {
-      this.$emit("search-person", person);
+      this.$emit('search-person', person);
     },
     openManageDialog(person) {
       this.activePerson = person;
       this.newName = person.name;
-      this.manageTab = "rename";
+      this.manageTab = 'rename';
       this.mergeTargetId = null;
       this.manageDialog = true;
     },
     async renamePerson() {
       if (!this.activePerson || !this.newName) return;
       try {
-        await invoke("rename_person", { id: this.activePerson.id, newName: this.newName });
+        await invoke('rename_person', { id: this.activePerson.id, newName: this.newName });
         this.manageDialog = false;
         this.fetchData();
       } catch (e) {
-        console.error("Failed to rename person:", e);
+        console.error('Failed to rename person:', e);
       }
     },
     async mergePerson() {
       if (!this.activePerson || !this.mergeTargetId) return;
       try {
-        await invoke("merge_people", { fromId: this.activePerson.id, toId: this.mergeTargetId });
+        await invoke('merge_people', { fromId: this.activePerson.id, toId: this.mergeTargetId });
         this.manageDialog = false;
         this.fetchData();
       } catch (e) {
-        console.error("Failed to merge people:", e);
+        console.error('Failed to merge people:', e);
       }
     },
     async viewCluster(group) {
       this.activeCluster = group;
       try {
-        const facesStr = await invoke("get_person_faces", { personId: group.id });
+        const facesStr = await invoke('get_person_faces', { personId: group.id });
         this.clusterFaces = JSON.parse(facesStr);
         this.clusterDialog = true;
       } catch (e) {
-        console.error("Failed to fetch cluster faces:", e);
+        console.error('Failed to fetch cluster faces:', e);
       }
     },
     promptNameFromCluster() {
@@ -468,31 +556,47 @@ export default {
     async removeFromCluster(faceId) {
       if (!confirm(this.$t('people.confirm_remove_face'))) return;
       try {
-        await invoke("delete_face", { faceId });
+        await invoke('delete_face', { faceId });
         // Refresh local cluster faces
-        this.clusterFaces = this.clusterFaces.filter(f => f.face_id !== faceId);
+        this.clusterFaces = this.clusterFaces.filter((f) => f.face_id !== faceId);
         // If last face removed, close dialog
         if (this.clusterFaces.length === 0) {
           this.clusterDialog = false;
         }
         this.fetchData(); // Refresh main lists
       } catch (e) {
-        console.error("Failed to remove face:", e);
+        console.error('Failed to remove face:', e);
       }
-    }
-  }
+    },
+  },
 };
 </script>
 
 <style scoped>
-.bg-siegu-main { background-color: var(--color-bg-primary); }
-.bg-zinc-100 { background-color: var(--color-bg-zinc-100); }
-.text-zinc-primary { color: var(--color-text-primary) !important; }
-.text-zinc-secondary { color: var(--color-text-secondary) !important; }
-.text-zinc-muted { color: var(--color-text-muted) !important; }
-.border-subtle { border: 1px solid var(--color-border-default) !important; }
-.border-bottom-subtle { border-bottom: 1px solid var(--color-border-default) !important; }
-.max-w-400 { max-width: 400px !important; }
+.bg-siegu-main {
+  background-color: var(--color-bg-primary);
+}
+.bg-zinc-100 {
+  background-color: var(--color-bg-zinc-100);
+}
+.text-zinc-primary {
+  color: var(--color-text-primary) !important;
+}
+.text-zinc-secondary {
+  color: var(--color-text-secondary) !important;
+}
+.text-zinc-muted {
+  color: var(--color-text-muted) !important;
+}
+.border-subtle {
+  border: 1px solid var(--color-border-default) !important;
+}
+.border-bottom-subtle {
+  border-bottom: 1px solid var(--color-border-default) !important;
+}
+.max-w-400 {
+  max-width: 400px !important;
+}
 
 .header-banner {
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -557,17 +661,30 @@ export default {
   --v-field-border-opacity: 0.15 !important;
 }
 
-.bg-amber-50 { background-color: #fffbeb !important; }
-.border-amber-subtle { border: 1px solid #fde68a !important; }
+.bg-amber-50 {
+  background-color: #fffbeb !important;
+}
+.border-amber-subtle {
+  border: 1px solid #fde68a !important;
+}
 
 .empty-icon-pulse {
   animation: pulse 2s infinite ease-in-out;
 }
 
 @keyframes pulse {
-  0% { transform: scale(1); opacity: 0.8; }
-  50% { transform: scale(1.1); opacity: 1; }
-  100% { transform: scale(1); opacity: 0.8; }
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
 }
 
 .animate-pulse {
@@ -579,8 +696,14 @@ export default {
 }
 
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fade-in {
@@ -588,12 +711,20 @@ export default {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
-.tracking-tight { letter-spacing: -0.025em !important; }
-.shadow-xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important; }
+.tracking-tight {
+  letter-spacing: -0.025em !important;
+}
+.shadow-xl {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+}
 
 .cluster-badge {
   position: absolute;
@@ -616,5 +747,7 @@ export default {
   z-index: 3;
 }
 
-.pos-rel { position: relative; }
+.pos-rel {
+  position: relative;
+}
 </style>

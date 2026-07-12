@@ -5,17 +5,16 @@ use std::time::SystemTime;
 use tauri::Emitter;
 use tauri::Manager;
 
+use siegu_core::{
+    generate_pairing_codes as core_generate_pairing_codes,
+    hash_pairing_code as core_hash_pairing_code, PairingCodes as CorePairingCodes,
+};
+
 mod database;
-mod face_detector;
 mod file;
-mod geocode;
-mod lan_server;
-mod mdns;
 mod ml;
-mod server;
 #[cfg(test)]
 mod test;
-mod thumbnail;
 mod transport;
 mod wallpaper_plugin;
 
@@ -23,6 +22,22 @@ struct WebRtcState {
     active_session: std::sync::Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
     sync_tx:
         Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<transport::SyncMessage>>>>,
+}
+
+struct ScanState {
+    guard: siegu_core::ScanGuard,
+}
+
+struct ShutdownState {
+    coordinator: siegu_core::shutdown::ShutdownCoordinator,
+}
+
+impl Default for ShutdownState {
+    fn default() -> Self {
+        Self {
+            coordinator: siegu_core::shutdown::ShutdownCoordinator::new(),
+        }
+    }
 }
 
 fn get_config_path(app: &tauri::AppHandle) -> String {
@@ -34,10 +49,20 @@ fn get_config_path(app: &tauri::AppHandle) -> String {
 
 #[tauri::command]
 fn scan_files(app: tauri::AppHandle) {
-    dbg!(">>> scan_files INVOKED");
+    let _session = {
+        let scan_state = app.state::<ScanState>();
+        scan_state.guard.try_start()
+    };
+    let _session = match _session {
+        Some(s) => s,
+        None => {
+            emit_log(&app, "Scan already in progress, skipping.".to_string());
+            return;
+        }
+    };
+
     emit_log(&app, "Starting media scan...".to_string());
     let path = get_config_path(&app);
-    dbg!(&path);
     if path.is_empty() {
         emit_log(
             &app,
@@ -47,7 +72,6 @@ fn scan_files(app: tauri::AppHandle) {
     }
     let database = database::Database::new(&path);
     let folders = database.list_directories();
-    dbg!(&folders);
     emit_log(
         &app,
         format!("Found {} folders to scan in database.", folders.len()),
@@ -67,9 +91,6 @@ fn scan_files(app: tauri::AppHandle) {
     state
         .abort
         .store(false, std::sync::atomic::Ordering::SeqCst);
-
-    // Initial signal to process any leftovers from previous runs
-    let _ = state.tx.send(ml::Job::ProcessAll);
 
     // Shared batcher for all folders in this scan session
     let (batch_tx, mut batch_rx) = tokio::sync::mpsc::unbounded_channel::<database::Photo>();
@@ -115,15 +136,15 @@ fn scan_files(app: tauri::AppHandle) {
         let db_clone = Arc::clone(database);
         let batch_for_blocking = batch.clone();
         let app_for_blocking = app_handle.clone();
+        let app_for_error = app_handle.clone();
         let batch_with_thumbs = tauri::async_runtime::spawn_blocking(move || {
-            dbg!("[batch] spawn_blocking START", batch_for_blocking.len());
             let mut batch = batch_for_blocking;
             // Generate thumbnails
             for photo in &mut batch {
-                if !thumbnail::needs_thumbnail(&photo.encoded) {
+                if !siegu_core::thumbnail::needs_thumbnail(&photo.encoded) {
                     continue;
                 }
-                if let Some(data_url) = thumbnail::generate_thumbnail(&photo.location) {
+                if let Some(data_url) = siegu_core::thumbnail::generate_thumbnail(&photo.location) {
                     photo.encoded = data_url;
                 }
             }
@@ -145,7 +166,10 @@ fn scan_files(app: tauri::AppHandle) {
         })
         .await
         .unwrap_or_else(|join_err| {
-            dbg!("[batch] spawn_blocking JOIN ERROR", &join_err);
+            emit_log(
+                &app_for_error,
+                format!("[batch] spawn_blocking JOIN ERROR: {join_err}"),
+            );
             batch
         });
 
@@ -156,57 +180,18 @@ fn scan_files(app: tauri::AppHandle) {
                 buf.push(p.clone());
             }
         }
-
-        // Send AutoAnalyzeSingle for each (skip if no models enabled)
-        let config = {
-            let lock = database.lock().unwrap();
-            lock.get_state()
-        };
-        let any_model_enabled = [
-            "clip",
-            "face",
-            "ocr",
-            "nsfw",
-            "aesthetics",
-            "yolo",
-            "blip",
-            "arcface",
-            "midas",
-            "whisper",
-        ]
-        .iter()
-        .any(|m| {
-            config
-                .get(&format!("model_enabled_{}", m))
-                .map_or(false, |v| v == "true")
-        });
-        if any_model_enabled {
-            for p in &batch_with_thumbs {
-                if let Some(state) = app_handle.try_state::<ml::MlContext>() {
-                    if let Err(e) = state.tx.send(ml::Job::AutoAnalyzeSingle(p.id.clone())) {
-                        emit_log(
-                            app_handle,
-                            format!("[batch] ERROR sending AutoAnalyzeSingle: {e}"),
-                        );
-                    }
-                }
-            }
-        }
     }
 
     tauri::async_runtime::spawn(async move {
         let mut batch_accum: Vec<database::Photo> = Vec::new();
         while let Some(photo) = batch_rx.recv().await {
             batch_accum.push(photo);
-            dbg!("[batch-rx] accumulated", batch_accum.len());
 
             if batch_accum.len() >= 500 {
                 let batch = std::mem::take(&mut batch_accum);
-                dbg!("[batch-rx] flushing 500");
                 flush_batch_to_db_and_ui(&database, &app_handle_for_batch, &ui_buffer, batch).await;
             }
         }
-        dbg!("[batch-rx] channel closed");
 
         if !batch_accum.is_empty() {
             let batch = std::mem::take(&mut batch_accum);
@@ -277,7 +262,7 @@ fn scan_files(app: tauri::AppHandle) {
         .any(|m| {
             config
                 .get(&format!("model_enabled_{}", m))
-                .map_or(false, |v| v == "true")
+                .is_some_and(|v| v == "true")
         });
 
         if any_model_enabled {
@@ -317,84 +302,11 @@ fn scan_files(app: tauri::AppHandle) {
 #[tauri::command]
 async fn check_models(app: tauri::AppHandle) -> Vec<String> {
     let path = get_config_path(&app);
-    let mut downloaded = Vec::new();
     if path.is_empty() {
-        return downloaded;
+        return Vec::new();
     }
     let models_dir = Path::new(&path).join("models");
-
-    let clip_files = [
-        "clip-vit-base-patch32-visual.onnx",
-        "clip-vit-base-patch32-text.onnx",
-        "tokenizer.json",
-    ];
-    let mut clip_ok = true;
-    for name in clip_files {
-        let p = models_dir.join(name);
-        let min_size = match name {
-            "clip-vit-base-patch32-visual.onnx" => 150 * 1024 * 1024,
-            "clip-vit-base-patch32-text.onnx" => 40 * 1024 * 1024,
-            _ => 1024, // tokenizer.json
-        };
-
-        if !p.exists() || p.metadata().map(|m| m.len()).unwrap_or(0) < min_size {
-            clip_ok = false;
-            break;
-        }
-    }
-    if clip_ok {
-        downloaded.push("clip".to_string());
-    }
-
-    let ultraface_path = models_dir.join("version-RFB-320.onnx");
-    if ultraface_path.exists()
-        && ultraface_path.metadata().map(|m| m.len()).unwrap_or(0) > 1024 * 1024
-    {
-        downloaded.push("ultraface".to_string());
-    }
-
-    let ocr_files = ["ocr_det.onnx", "ocr_rec.onnx"];
-    let mut ocr_ok = true;
-    for name in ocr_files {
-        let p = models_dir.join(name);
-        if !p.exists() || p.metadata().map(|m| m.len()).unwrap_or(0) < 1024 {
-            ocr_ok = false;
-            break;
-        }
-    }
-    if ocr_ok {
-        let dict_path = models_dir.join("en_dict.txt");
-        if !dict_path.exists() {
-            ocr_ok = false;
-        }
-    }
-    if ocr_ok {
-        downloaded.push("ocr".to_string());
-    }
-
-    if models_dir.join("nsfw.onnx").exists() {
-        downloaded.push("nsfw".to_string());
-    }
-    if models_dir.join("aesthetics.onnx").exists() {
-        downloaded.push("aesthetics".to_string());
-    }
-    if models_dir.join("yolov8.onnx").exists() {
-        downloaded.push("yolo".to_string());
-    }
-    if models_dir.join("blip.onnx").exists() {
-        downloaded.push("blip".to_string());
-    }
-    if models_dir.join("arcface.onnx").exists() {
-        downloaded.push("arcface".to_string());
-    }
-    if models_dir.join("midas.onnx").exists() {
-        downloaded.push("midas".to_string());
-    }
-    if models_dir.join("whisper.onnx").exists() {
-        downloaded.push("whisper".to_string());
-    }
-
-    downloaded
+    siegu_core::model_manager::check_models_downloaded(&models_dir)
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -419,53 +331,18 @@ async fn download_models(
     let models_dir = std::path::PathBuf::from(&path).join("models");
     std::fs::create_dir_all(&models_dir).map_err(|e| e.to_string())?;
 
-    let mut files_to_download: Vec<(String, String, String)> = Vec::new();
-    for model in &models {
-        let m = model.to_lowercase();
-        if m == "clip" {
-            files_to_download.push(("clip-visual".to_string(), "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model.onnx".to_string(), "clip-vit-base-patch32-visual.onnx".to_string()));
-            files_to_download.push(("clip-text".to_string(), "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/text_model.onnx".to_string(), "clip-vit-base-patch32-text.onnx".to_string()));
-            files_to_download.push((
-                "clip-tokenizer".to_string(),
-                "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/tokenizer.json"
-                    .to_string(),
-                "tokenizer.json".to_string(),
-            ));
-        } else if m == "ultraface" {
-            files_to_download.push(("ultraface".to_string(), "https://raw.githubusercontent.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB/master/models/onnx/version-RFB-320.onnx".to_string(), "version-RFB-320.onnx".to_string()));
-        } else if m == "ocr" {
-            files_to_download.push(("ocr-det".to_string(), "https://huggingface.co/SWHL/RapidOCR/resolve/main/PP-OCRv4/en_PP-OCRv3_det_infer.onnx".to_string(), "ocr_det.onnx".to_string()));
-            files_to_download.push(("ocr-rec".to_string(), "https://huggingface.co/SWHL/RapidOCR/resolve/main/PP-OCRv3/en_PP-OCRv3_rec_infer.onnx".to_string(), "ocr_rec.onnx".to_string()));
-            files_to_download.push(("ocr-dict".to_string(), "https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/release/2.6/ppocr/utils/en_dict.txt".to_string(), "en_dict.txt".to_string()));
-        } else if m == "nsfw" {
-            files_to_download.push(("nsfw".to_string(), "https://huggingface.co/onnx-community/nsfw_image_detection-ONNX/resolve/main/onnx/model.onnx".to_string(), "nsfw.onnx".to_string()));
-        } else if m == "aesthetics" {
-            files_to_download.push(("aesthetics".to_string(), "https://huggingface.co/fsw/aesthetic-predictor-v2-5_onnx/resolve/main/aesthetic_predictor_v2_5.onnx".to_string(), "aesthetics.onnx".to_string()));
-        } else if m == "yolo" {
-            files_to_download.push((
-                "yolo".to_string(),
-                "https://huggingface.co/webml/yolov8n/resolve/main/onnx/yolov8n.onnx".to_string(),
-                "yolov8.onnx".to_string(),
-            ));
-        } else if m == "blip" {
-            files_to_download.push(("blip".to_string(), "https://huggingface.co/onnx-community/Salesforce_blip-image-captioning-base/resolve/main/split_0.onnx".to_string(), "blip.onnx".to_string()));
-        } else if m == "arcface" {
-            files_to_download.push((
-                "arcface".to_string(),
-                "https://huggingface.co/crj/dl-ws/resolve/main/arcface_w600k_r50.onnx".to_string(),
-                "arcface.onnx".to_string(),
-            ));
-        } else if m == "midas" {
-            files_to_download.push((
-                "midas".to_string(),
-                "https://huggingface.co/Xenova/dpt-hybrid-midas/resolve/main/onnx/model.onnx"
-                    .to_string(),
-                "midas.onnx".to_string(),
-            ));
-        } else if m == "whisper" {
-            files_to_download.push(("whisper".to_string(), "https://huggingface.co/Xenova/whisper-tiny.en/resolve/main/onnx/encoder_model.onnx".to_string(), "whisper.onnx".to_string()));
-        }
-    }
+    let resolved = siegu_core::model_manager::resolve_files_for_models(&models);
+    let files_to_download: Vec<(String, String, String, String)> = resolved
+        .iter()
+        .map(|(entry, _)| {
+            (
+                entry.model_name.to_string(),
+                entry.url.to_string(),
+                entry.filename.to_string(),
+                entry.sha256.to_string(),
+            )
+        })
+        .collect();
 
     let tx = state.tx.clone();
 
@@ -491,7 +368,7 @@ async fn download_models(
                 }
             };
 
-        for (model_name, url, filename) in files_to_download {
+        for (model_name, url, filename, expected_hash) in files_to_download {
             let path = models_dir.join(&filename);
             emit_log(&app, format!("Initiating download: {filename}"));
             let mut response = match client.get(&url).send().await {
@@ -560,7 +437,28 @@ async fn download_models(
                     emit_log(&app, format!("ERROR: Failed to move {filename}: {e}"));
                     let _ = tokio::fs::remove_file(&tmp_path).await;
                 } else {
-                    emit_log(&app, format!("SUCCESS: Finished downloading {filename}"));
+                    if !expected_hash.is_empty() {
+                        match siegu_core::model_manager::verify_sha256(&path, &expected_hash) {
+                            Ok(true) => {
+                                emit_log(&app, format!("SUCCESS: Finished downloading {filename} (SHA-256 verified)"));
+                            }
+                            Ok(false) => {
+                                emit_log(
+                                    &app,
+                                    format!("ERROR: SHA-256 mismatch for {filename}, deleting"),
+                                );
+                                let _ = tokio::fs::remove_file(&path).await;
+                            }
+                            Err(e) => {
+                                emit_log(
+                                    &app,
+                                    format!("WARNING: Could not verify hash for {filename}: {e}"),
+                                );
+                            }
+                        }
+                    } else {
+                        emit_log(&app, format!("SUCCESS: Finished downloading {filename}"));
+                    }
                 }
             } else {
                 let _ = tokio::fs::remove_file(&tmp_path).await;
@@ -963,9 +861,10 @@ async fn start_lan_host(
 async fn discover_lan_devices(
     app: tauri::AppHandle,
     timeout_secs: u64,
-) -> Result<Vec<crate::mdns::DiscoveredHost>, String> {
-    let daemon = crate::mdns::create_daemon().map_err(|e| e.to_string())?;
-    let hosts = crate::mdns::discover_hosts(&daemon, timeout_secs).map_err(|e| e.to_string())?;
+) -> Result<Vec<siegu_core::mdns::DiscoveredHost>, String> {
+    let daemon = siegu_core::mdns::create_daemon().map_err(|e| e.to_string())?;
+    let hosts =
+        siegu_core::mdns::discover_hosts(&daemon, timeout_secs).map_err(|e| e.to_string())?;
     emit_log(&app, format!("Discovered {} LAN device(s)", hosts.len()));
     Ok(hosts)
 }
@@ -1298,7 +1197,7 @@ async fn resolve_photo_locations(app: tauri::AppHandle) -> Result<(), String> {
         }) {
             for row in rows.flatten() {
                 let (id, lat, lon) = row;
-                if let Some((city, country)) = geocode::find_nearest_city(lat, lon) {
+                if let Some((city, country)) = siegu_core::geocode::find_nearest_city(lat, lon) {
                     let location_name = format!("{}, {}", city, country);
                     let _ = db.connection.execute(
                         "INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
@@ -1346,34 +1245,10 @@ async fn initialize_sync_folder(app: tauri::AppHandle, path: String) -> Result<(
     Ok(())
 }
 
-const ALLOWED_CONFIG_KEYS: &[&str] = &[
-    "sync_path",
-    "scan_threads",
-    "indexing_mode",
-    "theme",
-    "language",
-    "tier",
-    "model_enabled_clip",
-    "model_enabled_face",
-    "model_enabled_ocr",
-    "model_enabled_nsfw",
-    "model_enabled_aesthetics",
-    "model_enabled_yolo",
-    "model_enabled_blip",
-    "model_enabled_arcface",
-    "model_enabled_midas",
-    "model_enabled_whisper",
-    "model_enabled_sam",
-    "model_enabled_superres",
-    "last_scan_completed",
-    "auto_scan",
-    "sync_enabled",
-];
-
 #[tauri::command]
 async fn save_config(app: tauri::AppHandle, key: String, value: String) {
-    if !ALLOWED_CONFIG_KEYS.contains(&key.as_str()) || key.len() > 64 || value.len() > 1024 {
-        emit_log(&app, format!("Invalid config key or value: key={key}"));
+    if let Err(e) = siegu_core::config::validate_config_value(&key, &value) {
+        emit_log(&app, format!("Invalid config: {e}"));
         return;
     }
     let path = get_config_path(&app);
@@ -1422,8 +1297,13 @@ pub fn emit_log(app: &tauri::AppHandle, message: String) {
     let path = get_config_path(app);
     if !path.is_empty() {
         let database = database::Database::new(&path);
-        let level = if message.to_lowercase().contains("error") {
+        let upper = message.to_uppercase();
+        let level = if upper.contains("ERROR") || upper.contains("FATAL") {
             "error"
+        } else if upper.contains("WARN") || upper.contains("WARNING") {
+            "warn"
+        } else if upper.contains("DEBUG") {
+            "debug"
         } else {
             "info"
         };
@@ -1447,6 +1327,16 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
+#[tauri::command]
+async fn generate_pairing_codes() -> Result<CorePairingCodes, String> {
+    core_generate_pairing_codes()
+}
+
+#[tauri::command]
+async fn hash_pairing_code(input: String) -> Result<String, String> {
+    core_hash_pairing_code(input)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default();
@@ -1462,7 +1352,7 @@ pub fn run() {
         .setup(|app| {
             if let Err(e) = ffmpeg_next::init() {
                 emit_log(
-                    &app.handle(),
+                    app.handle(),
                     format!("WARNING: ffmpeg init failed (thumbnails for videos disabled): {e}"),
                 );
             }
@@ -1478,6 +1368,9 @@ pub fn run() {
                     .icon(app.default_window_icon().unwrap().clone())
                     .on_menu_event(|app, event| match event.id.as_ref() {
                         "quit" => {
+                            if let Some(state) = app.try_state::<ShutdownState>() {
+                                state.coordinator.signal();
+                            }
                             app.exit(0);
                         }
                         "show" => {
@@ -1539,6 +1432,12 @@ pub fn run() {
                 sync_tx: Arc::new(tokio::sync::Mutex::new(None)),
             });
 
+            app.manage(ScanState {
+                guard: siegu_core::ScanGuard::new(),
+            });
+
+            app.manage(ShutdownState::default());
+
             // Start periodic background scan
             let app_handle_for_interval = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -1598,8 +1497,8 @@ pub fn run() {
             remove_device,
             list_devices,
             list_objects,
-            server::generate_pairing_codes,
-            server::hash_pairing_code,
+            generate_pairing_codes,
+            hash_pairing_code,
             start_webrtc_session,
             start_lan_host,
             discover_lan_devices,
