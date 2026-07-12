@@ -277,84 +277,11 @@ fn scan_files(app: tauri::AppHandle) {
 #[tauri::command]
 async fn check_models(app: tauri::AppHandle) -> Vec<String> {
     let path = get_config_path(&app);
-    let mut downloaded = Vec::new();
     if path.is_empty() {
-        return downloaded;
+        return Vec::new();
     }
     let models_dir = Path::new(&path).join("models");
-
-    let clip_files = [
-        "clip-vit-base-patch32-visual.onnx",
-        "clip-vit-base-patch32-text.onnx",
-        "tokenizer.json",
-    ];
-    let mut clip_ok = true;
-    for name in clip_files {
-        let p = models_dir.join(name);
-        let min_size = match name {
-            "clip-vit-base-patch32-visual.onnx" => 150 * 1024 * 1024,
-            "clip-vit-base-patch32-text.onnx" => 40 * 1024 * 1024,
-            _ => 1024, // tokenizer.json
-        };
-
-        if !p.exists() || p.metadata().map(|m| m.len()).unwrap_or(0) < min_size {
-            clip_ok = false;
-            break;
-        }
-    }
-    if clip_ok {
-        downloaded.push("clip".to_string());
-    }
-
-    let ultraface_path = models_dir.join("version-RFB-320.onnx");
-    if ultraface_path.exists()
-        && ultraface_path.metadata().map(|m| m.len()).unwrap_or(0) > 1024 * 1024
-    {
-        downloaded.push("ultraface".to_string());
-    }
-
-    let ocr_files = ["ocr_det.onnx", "ocr_rec.onnx"];
-    let mut ocr_ok = true;
-    for name in ocr_files {
-        let p = models_dir.join(name);
-        if !p.exists() || p.metadata().map(|m| m.len()).unwrap_or(0) < 1024 {
-            ocr_ok = false;
-            break;
-        }
-    }
-    if ocr_ok {
-        let dict_path = models_dir.join("en_dict.txt");
-        if !dict_path.exists() {
-            ocr_ok = false;
-        }
-    }
-    if ocr_ok {
-        downloaded.push("ocr".to_string());
-    }
-
-    if models_dir.join("nsfw.onnx").exists() {
-        downloaded.push("nsfw".to_string());
-    }
-    if models_dir.join("aesthetics.onnx").exists() {
-        downloaded.push("aesthetics".to_string());
-    }
-    if models_dir.join("yolov8.onnx").exists() {
-        downloaded.push("yolo".to_string());
-    }
-    if models_dir.join("blip.onnx").exists() {
-        downloaded.push("blip".to_string());
-    }
-    if models_dir.join("arcface.onnx").exists() {
-        downloaded.push("arcface".to_string());
-    }
-    if models_dir.join("midas.onnx").exists() {
-        downloaded.push("midas".to_string());
-    }
-    if models_dir.join("whisper.onnx").exists() {
-        downloaded.push("whisper".to_string());
-    }
-
-    downloaded
+    siegu_core::model_manager::check_models_downloaded(&models_dir)
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -379,53 +306,18 @@ async fn download_models(
     let models_dir = std::path::PathBuf::from(&path).join("models");
     std::fs::create_dir_all(&models_dir).map_err(|e| e.to_string())?;
 
-    let mut files_to_download: Vec<(String, String, String)> = Vec::new();
-    for model in &models {
-        let m = model.to_lowercase();
-        if m == "clip" {
-            files_to_download.push(("clip-visual".to_string(), "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model.onnx".to_string(), "clip-vit-base-patch32-visual.onnx".to_string()));
-            files_to_download.push(("clip-text".to_string(), "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/text_model.onnx".to_string(), "clip-vit-base-patch32-text.onnx".to_string()));
-            files_to_download.push((
-                "clip-tokenizer".to_string(),
-                "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/tokenizer.json"
-                    .to_string(),
-                "tokenizer.json".to_string(),
-            ));
-        } else if m == "ultraface" {
-            files_to_download.push(("ultraface".to_string(), "https://raw.githubusercontent.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB/master/models/onnx/version-RFB-320.onnx".to_string(), "version-RFB-320.onnx".to_string()));
-        } else if m == "ocr" {
-            files_to_download.push(("ocr-det".to_string(), "https://huggingface.co/SWHL/RapidOCR/resolve/main/PP-OCRv4/en_PP-OCRv3_det_infer.onnx".to_string(), "ocr_det.onnx".to_string()));
-            files_to_download.push(("ocr-rec".to_string(), "https://huggingface.co/SWHL/RapidOCR/resolve/main/PP-OCRv3/en_PP-OCRv3_rec_infer.onnx".to_string(), "ocr_rec.onnx".to_string()));
-            files_to_download.push(("ocr-dict".to_string(), "https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/release/2.6/ppocr/utils/en_dict.txt".to_string(), "en_dict.txt".to_string()));
-        } else if m == "nsfw" {
-            files_to_download.push(("nsfw".to_string(), "https://huggingface.co/onnx-community/nsfw_image_detection-ONNX/resolve/main/onnx/model.onnx".to_string(), "nsfw.onnx".to_string()));
-        } else if m == "aesthetics" {
-            files_to_download.push(("aesthetics".to_string(), "https://huggingface.co/fsw/aesthetic-predictor-v2-5_onnx/resolve/main/aesthetic_predictor_v2_5.onnx".to_string(), "aesthetics.onnx".to_string()));
-        } else if m == "yolo" {
-            files_to_download.push((
-                "yolo".to_string(),
-                "https://huggingface.co/webml/yolov8n/resolve/main/onnx/yolov8n.onnx".to_string(),
-                "yolov8.onnx".to_string(),
-            ));
-        } else if m == "blip" {
-            files_to_download.push(("blip".to_string(), "https://huggingface.co/onnx-community/Salesforce_blip-image-captioning-base/resolve/main/split_0.onnx".to_string(), "blip.onnx".to_string()));
-        } else if m == "arcface" {
-            files_to_download.push((
-                "arcface".to_string(),
-                "https://huggingface.co/crj/dl-ws/resolve/main/arcface_w600k_r50.onnx".to_string(),
-                "arcface.onnx".to_string(),
-            ));
-        } else if m == "midas" {
-            files_to_download.push((
-                "midas".to_string(),
-                "https://huggingface.co/Xenova/dpt-hybrid-midas/resolve/main/onnx/model.onnx"
-                    .to_string(),
-                "midas.onnx".to_string(),
-            ));
-        } else if m == "whisper" {
-            files_to_download.push(("whisper".to_string(), "https://huggingface.co/Xenova/whisper-tiny.en/resolve/main/onnx/encoder_model.onnx".to_string(), "whisper.onnx".to_string()));
-        }
-    }
+    let resolved = siegu_core::model_manager::resolve_files_for_models(&models);
+    let files_to_download: Vec<(String, String, String, String)> = resolved
+        .iter()
+        .map(|(entry, _)| {
+            (
+                entry.model_name.to_string(),
+                entry.url.to_string(),
+                entry.filename.to_string(),
+                entry.sha256.to_string(),
+            )
+        })
+        .collect();
 
     let tx = state.tx.clone();
 
@@ -451,7 +343,7 @@ async fn download_models(
                 }
             };
 
-        for (model_name, url, filename) in files_to_download {
+        for (model_name, url, filename, expected_hash) in files_to_download {
             let path = models_dir.join(&filename);
             emit_log(&app, format!("Initiating download: {filename}"));
             let mut response = match client.get(&url).send().await {
@@ -520,7 +412,28 @@ async fn download_models(
                     emit_log(&app, format!("ERROR: Failed to move {filename}: {e}"));
                     let _ = tokio::fs::remove_file(&tmp_path).await;
                 } else {
-                    emit_log(&app, format!("SUCCESS: Finished downloading {filename}"));
+                    if !expected_hash.is_empty() {
+                        match siegu_core::model_manager::verify_sha256(&path, &expected_hash) {
+                            Ok(true) => {
+                                emit_log(&app, format!("SUCCESS: Finished downloading {filename} (SHA-256 verified)"));
+                            }
+                            Ok(false) => {
+                                emit_log(
+                                    &app,
+                                    format!("ERROR: SHA-256 mismatch for {filename}, deleting"),
+                                );
+                                let _ = tokio::fs::remove_file(&path).await;
+                            }
+                            Err(e) => {
+                                emit_log(
+                                    &app,
+                                    format!("WARNING: Could not verify hash for {filename}: {e}"),
+                                );
+                            }
+                        }
+                    } else {
+                        emit_log(&app, format!("SUCCESS: Finished downloading {filename}"));
+                    }
                 }
             } else {
                 let _ = tokio::fs::remove_file(&tmp_path).await;

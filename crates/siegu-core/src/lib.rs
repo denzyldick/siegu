@@ -5,6 +5,7 @@ pub mod face_detector;
 pub mod geocode;
 pub mod lan_server;
 pub mod mdns;
+pub mod model_manager;
 pub mod server;
 pub mod shutdown;
 pub mod signal;
