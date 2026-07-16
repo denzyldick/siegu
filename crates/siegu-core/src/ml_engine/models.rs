@@ -1,3 +1,10 @@
+//! Model loading and management for all ML pipelines.
+//!
+//! Each ONNX model is wrapped in `Arc<Mutex<Session>>` so it can be shared
+//! across threads. Models are conditionally loaded based on user config flags
+//! (`model_enabled_<name>` in the app config). Missing models are silently
+//! skipped (returning `None`) so the app degrades gracefully.
+
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -5,8 +12,13 @@ use std::sync::{Arc, Mutex};
 use ndarray::Array2;
 use ort::session::Session;
 
+/// Thread-safe handle to an ORT inference session.
 pub type ModelEngine = Arc<Mutex<Session>>;
 
+/// Container for all loaded ML models and their associated data.
+///
+/// Each field is `Option<ModelEngine>` — `None` means the model was
+/// disabled in config, not found on disk, or failed to load.
 pub struct LoadedModels {
     pub clip_visual: Option<ModelEngine>,
     pub clip_text: Option<ModelEngine>,
@@ -28,12 +40,22 @@ pub struct LoadedModels {
     pub selected_ep: String,
 }
 
+/// Checks whether a model is enabled in the user's config.
+/// Config keys follow the pattern `model_enabled_<name>` (e.g., `model_enabled_clip`).
 fn model_enabled(config: &HashMap<String, String>, name: &str) -> bool {
     config
         .get(&format!("model_enabled_{name}"))
         .is_some_and(|v| v == "true")
 }
 
+/// Loads all enabled ONNX models from the models directory.
+///
+/// Models are loaded conditionally based on config flags. Each model is
+/// validated to be >1MB (to reject corrupt/truncated files) before loading.
+/// The `log` callback is used to report loading progress to the UI.
+///
+/// Returns a `LoadedModels` struct where each field is `Some` if the model
+/// loaded successfully, or `None` if it was disabled/missing/failed.
 pub fn load_models(
     config_path: &str,
     config: &HashMap<String, String>,
@@ -201,6 +223,8 @@ pub fn load_models(
     }
 }
 
+/// Loads a single ONNX model, returning `None` if the file doesn't exist,
+/// is too small (<1MB, likely corrupt), or fails to build an ORT session.
 fn load_model(models_dir: &Path, filename: &str) -> Option<ModelEngine> {
     let path = models_dir.join(filename);
     let is_ok = path.exists() && path.metadata().map(|m| m.len()).unwrap_or(0) > 1024 * 1024;
@@ -212,6 +236,12 @@ fn load_model(models_dir: &Path, filename: &str) -> Option<ModelEngine> {
         .map(|s| Arc::new(Mutex::new(s)))
 }
 
+/// Pre-computes CLIP text embeddings for a fixed vocabulary of common
+/// photo categories (people, pets, vehicles, landscapes, etc.).
+///
+/// These embeddings are computed once at startup and reused for zero-shot
+/// CLIP classification. Each embedding is L2-normalized so cosine similarity
+/// can be computed via dot product.
 fn compute_text_embeddings(
     text_model: &mut ModelEngine,
     tokenizer: &tokenizers::Tokenizer,

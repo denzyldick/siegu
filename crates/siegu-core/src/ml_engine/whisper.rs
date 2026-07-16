@@ -7,9 +7,20 @@ use rustfft::FftPlanner;
 
 use super::models::ModelEngine;
 
+/// Interval in seconds between extracted video frames.
 const FRAME_INTERVAL_SECS: u32 = 2;
+
+/// Maximum number of frames to extract from a single video.
 const MAX_FRAMES: usize = 30;
 
+/// Extracts RGB frames from a video file using ffmpeg.
+///
+/// Runs `ffmpeg -vf fps=1/{FRAME_INTERVAL_SECS}` to capture one frame every
+/// `FRAME_INTERVAL_SECS` seconds, up to `MAX_FRAMES` total frames. The frames
+/// are returned as raw `RgbImage` objects in memory (no disk I/O beyond ffmpeg).
+///
+/// Returns an empty vector if the video doesn't exist, has no video stream,
+/// or if ffmpeg/ffprobe fails.
 pub fn extract_frames(video_path: &str) -> Vec<image::RgbImage> {
     let fps_filter = format!("fps=1/{}", FRAME_INTERVAL_SECS);
     let Ok(output) = Command::new("ffmpeg")
@@ -97,14 +108,23 @@ const N_MELS: usize = 80;
 const CHUNK_LENGTH: usize = 30;
 const N_SAMPLES: usize = SAMPLE_RATE * CHUNK_LENGTH;
 const N_FRAMES: usize = N_SAMPLES / HOP_LENGTH;
+/// Maximum number of tokens the decoder can generate.
+/// The model's position embedding table has 448 entries (indices 0..447).
+/// We subtract the initial tokens consumed by the first decoder call to
+/// prevent the position index from overflowing the embedding table.
 const MAX_LENGTH: usize = 448;
 
+/// HuggingFace tokenizer special token IDs (different from OpenAI's original Whisper).
 pub(crate) const SOT: i64 = 50258;
 pub(crate) const EOT: i64 = 50257;
 pub(crate) const EN_LANG: i64 = 50259;
 pub(crate) const TRANSCRIBE: i64 = 50359;
 pub(crate) const NO_TIMESTAMPS: i64 = 50363;
 
+/// Extracts mono 16kHz audio from a video file using ffmpeg.
+///
+/// Resamples to 16kHz mono PCM s16le, then normalizes each sample to [-1.0, 1.0].
+/// Returns `None` if ffmpeg fails or produces no output.
 pub fn extract_audio(video_path: &str) -> Option<Vec<f32>> {
     let output = Command::new("ffmpeg")
         .args([
@@ -144,14 +164,21 @@ pub fn extract_audio(video_path: &str) -> Option<Vec<f32>> {
     Some(samples)
 }
 
+/// Converts a frequency in Hz to the mel scale.
 fn hz_to_mel(hz: f64) -> f64 {
     2595.0 * (1.0 + hz / 700.0).log10()
 }
 
+/// Converts a value from the mel scale back to Hz.
 fn mel_to_hz(mel: f64) -> f64 {
     700.0 * (10.0_f64.powf(mel / 2595.0) - 1.0)
 }
 
+/// Builds an 80-band triangular mel filterbank matrix.
+///
+/// Creates a matrix of shape [N_MELS, N_FFT/2+1] where each row is a
+/// triangular filter centered on a mel-spaced frequency. This is used to
+/// convert a linear-frequency power spectrogram into a mel-frequency one.
 fn mel_filterbank() -> Array2<f32> {
     let magnitude_bins = N_FFT / 2 + 1;
     let frequencies: Vec<f64> = (0..magnitude_bins)
@@ -187,12 +214,18 @@ fn mel_filterbank() -> Array2<f32> {
     filterbank
 }
 
+/// Generates a Hann window of the given size for STFT framing.
 fn hann_window(size: usize) -> Vec<f32> {
     (0..size)
         .map(|i| 0.5 - (std::f64::consts::PI * 2.0 * i as f64 / size as f64).cos() as f32 * 0.5)
         .collect()
 }
 
+/// Computes the Short-Time Fourier Transform of a signal.
+///
+/// Pads the signal, applies a Hann window to each frame, and computes the FFT.
+/// Returns a complex-valued matrix of shape [N_FFT/2+1, n_frames] containing
+/// the frequency-domain representation of each frame.
 fn stft(signal: &[f32], n_fft: usize, hop_length: usize) -> Array2<Complex<f32>> {
     let win = hann_window(n_fft);
     let padded_len = signal.len() + n_fft;
@@ -219,6 +252,14 @@ fn stft(signal: &[f32], n_fft: usize, hop_length: usize) -> Array2<Complex<f32>>
     output
 }
 
+/// Computes the log-mel spectrogram from raw audio samples.
+///
+/// This is the main preprocessing pipeline that mirrors Whisper's Python
+/// implementation:
+/// 1. Pads/truncates audio to exactly 30 seconds (N_SAMPLES)
+/// 2. Computes STFT → power spectrogram → mel filterbank → log10
+/// 3. Normalizes: clips to [-8, 0] range relative to max, then scales to [−1, 1]
+/// 4. Returns shape [1, N_MELS, N_FRAMES] = [1, 80, 3000]
 pub fn compute_mel_spectrogram(audio: &[f32]) -> Array3<f32> {
     let filterbank = mel_filterbank();
 
@@ -262,12 +303,17 @@ pub fn compute_mel_spectrogram(audio: &[f32]) -> Array3<f32> {
     result
 }
 
+/// Type alias for the KV cache: a flat list of 4D tensors.
+/// Each decoder layer produces 4 tensors: decoder.key, decoder.value, encoder.key, encoder.value.
 type KvCache = Vec<Array4<f32>>;
 
+/// Creates a single empty KV tensor of shape [1, n_heads, 1, head_dim].
 fn empty_kv(n_heads: usize, head_dim: usize) -> Array4<f32> {
     Array4::<f32>::zeros((1, n_heads, 1, head_dim))
 }
 
+/// Creates a full empty KV cache for all decoder layers.
+/// For `n_layers` layers, produces `n_layers * 4` empty tensors.
 fn make_empty_past(n_layers: usize, n_heads: usize, head_dim: usize) -> KvCache {
     let mut past = Vec::new();
     for _ in 0..n_layers {
@@ -279,6 +325,11 @@ fn make_empty_past(n_layers: usize, n_heads: usize, head_dim: usize) -> KvCache 
     past
 }
 
+/// Merges old and new KV caches, preserving old entries when new ones are empty.
+///
+/// The decoder ONNX model sometimes returns empty encoder KV tensors on
+/// subsequent calls. This function keeps the old (valid) cache entries in
+/// those cases, only overwriting with new data when it's non-empty.
 fn merge_kv(old: &KvCache, new: &KvCache) -> KvCache {
     old.iter()
         .zip(new.iter())
@@ -292,6 +343,7 @@ fn merge_kv(old: &KvCache, new: &KvCache) -> KvCache {
         .collect()
 }
 
+/// Converts a KV cache tensor to an ORT Value with the given input name.
 fn kv_to_tensor(kv: &Array4<f32>, name: &str) -> ort::value::Value {
     let shape = kv.shape().to_vec();
     let data = kv.clone().into_raw_vec();
@@ -305,6 +357,11 @@ fn kv_to_tensor(kv: &Array4<f32>, name: &str) -> ort::value::Value {
     }
 }
 
+/// Extracts KV cache tensors from decoder ONNX outputs.
+///
+/// The decoder outputs logits at index 0, followed by all KV cache tensors
+/// as 4D arrays. This function collects everything from `start_idx` onward
+/// that has exactly 4 dimensions.
 fn extract_kv(outputs: &ort::session::SessionOutputs, start_idx: usize) -> KvCache {
     let mut kv = Vec::new();
     for i in start_idx..outputs.len() {
@@ -325,6 +382,18 @@ fn extract_kv(outputs: &ort::session::SessionOutputs, start_idx: usize) -> KvCac
     kv
 }
 
+/// Transcribes audio using the Whisper tiny model via ONNX Runtime.
+///
+/// Pipeline:
+/// 1. Compute log-mel spectrogram from raw audio (30s, 80 mel bands)
+/// 2. Run the encoder to get hidden states [1, seq_len, hidden_dim]
+/// 3. Seed the decoder with [SOT, EN_LANG, TRANSCRIBE, NO_TIMESTAMPS]
+/// 4. Autoregressively decode tokens until EOT or position overflow
+/// 5. Decode token IDs back to text using the HuggingFace tokenizer
+///
+/// Uses a KV cache to avoid recomputing attention for the full sequence
+/// at each step. The encoder KV is cached after the first call; only
+/// decoder KV grows with each generated token.
 pub fn whisper_transcribe(
     encoder: &ModelEngine,
     decoder: &ModelEngine,
@@ -343,6 +412,7 @@ pub fn whisper_transcribe(
     let mel_data = mel.into_raw_vec();
     let enc_input = ort::value::Value::from_array((mel_shape, mel_data)).unwrap();
 
+    // ── Run the encoder to get hidden states ──────────────────────────
     let (enc_seq_len, hidden_dim, enc_data_arr) = {
         let mut lock = encoder.lock().unwrap();
 
@@ -364,11 +434,18 @@ pub fn whisper_transcribe(
         }
     };
 
+    // ── Configure decoder architecture ─────────────────────────────────
     let n_layers = 4;
     let n_heads = 6;
     let head_dim = hidden_dim / n_heads;
-    let initial_tokens: Vec<i64> = vec![SOT, EN_LANG, TRANSCRIBE, NO_TIMESTAMPS];
 
+    // Initial prompt tokens — these seed the decoder's first pass.
+    // The model learns to always start transcription after these tokens.
+    let initial_tokens: Vec<i64> = vec![SOT, EN_LANG, TRANSCRIBE, NO_TIMESTAMPS];
+    let initial_tokens_len = initial_tokens.len();
+
+    // Build KV cache input names: for each layer, there are 4 tensors
+    // (decoder.key, decoder.value, encoder.key, encoder.value).
     let kv_input_names: Vec<String> = (0..n_layers)
         .flat_map(|l| {
             vec![
@@ -380,6 +457,9 @@ pub fn whisper_transcribe(
         })
         .collect();
 
+    // ── Decoder closure: runs one forward pass ─────────────────────────
+    // Accepts token IDs, past KV cache, and encoder hidden states.
+    // Returns the greedy-decoded next token and updated KV cache.
     let run_decoder = |input_ids: Vec<i64>,
                        past_kv: &KvCache,
                        use_cache_branch: bool,
@@ -398,6 +478,8 @@ pub fn whisper_transcribe(
         ))
         .ok()?;
 
+        // Build the decoder's input tensors: input_ids, encoder hidden states,
+        // use_cache_branch flag, and all past KV cache entries.
         let mut inputs: HashMap<String, ort::value::Value> = HashMap::new();
         inputs.insert("input_ids".into(), ids_tensor.into_dyn());
         inputs.insert("encoder_hidden_states".into(), enc_hidden_tensor.into_dyn());
@@ -426,11 +508,13 @@ pub fn whisper_transcribe(
             }
         };
 
+        // Extract logits for the last position only (we only need the next token).
         let (logits_shape, logits_data) = outputs[0].try_extract_tensor::<f32>().ok()?;
         let vocab_size = *logits_shape.last().unwrap_or(&51865) as usize;
         let last_offset = logits_data.len().saturating_sub(vocab_size);
         let last_logits = &logits_data[last_offset..last_offset + vocab_size];
 
+        // Sort by logit value descending to find the top token.
         let mut indexed: Vec<(usize, f32)> = last_logits
             .iter()
             .enumerate()
@@ -439,12 +523,20 @@ pub fn whisper_transcribe(
         indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         whisper_debug!("top5 logits: {:?}", &indexed[..5]);
 
+        // Greedy decode: pick the token with the highest logit.
+        // (Beam search would be more accurate but much slower for on-device use.)
         let next_token = indexed[0].0 as i64;
 
+        // Extract new KV cache from decoder outputs (everything after logits).
         let new_past = extract_kv(&outputs, 1);
         Some((vec![next_token], new_past))
     };
 
+    // ── First decoder call: process the prompt tokens ──────────────────
+    // Feeds [SOT, EN_LANG, TRANSCRIBE, NO_TIMESTAMPS] with empty KV cache.
+    // use_cache_branch=false tells the model to ignore past KV and compute
+    // fresh attention for all 4 tokens. Output: first generated token + KV
+    // cache populated with the prompt's decoder self-attention.
     let empty_past = make_empty_past(n_layers, n_heads, head_dim);
 
     let (first_token, mut current_past) = match run_decoder(
@@ -465,7 +557,18 @@ pub fn whisper_transcribe(
     let mut generated_tokens: Vec<i64> = vec![first_token[0]];
     whisper_debug!("starting decode loop with first token {}", first_token[0]);
 
-    for step in 0..MAX_LENGTH {
+    // ── Autoregressive decode loop ─────────────────────────────────────
+    // Each step feeds the last generated token with `use_cache_branch=true`
+    // so the model only computes attention for the new position and appends
+    // it to the growing KV cache. Stop when EOT is generated or we run out
+    // of position slots (see max_steps calculation above).
+
+    // Cap iterations to prevent position embedding overflow.
+    // The first decoder call consumed `initial_tokens.len()` position slots,
+    // and the first generated token consumed 1 more. The model's position
+    // embedding table has exactly MAX_LENGTH entries (indices 0..MAX_LENGTH-1).
+    let max_steps = MAX_LENGTH - initial_tokens_len - 1;
+    for step in 0..max_steps {
         let last = *generated_tokens.last().unwrap();
         if last == EOT || last >= SOT {
             whisper_debug!("stop at step {step}: token {last}");
@@ -488,6 +591,9 @@ pub fn whisper_transcribe(
     }
     whisper_debug!("total tokens generated: {}", generated_tokens.len());
 
+    // ── Convert token IDs back to text ─────────────────────────────────
+    // Filter out all special tokens (SOT, EOT, language, task tokens)
+    // and decode only the vocabulary tokens via the HuggingFace tokenizer.
     let skip_tokens = [
         SOT as u32,
         EOT as u32,
