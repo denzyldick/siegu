@@ -10,7 +10,8 @@ use siegu_core::{
     hash_pairing_code as core_hash_pairing_code, PairingCodes as CorePairingCodes,
 };
 
-mod database;
+pub use siegu_core::database;
+
 mod file;
 mod ml;
 #[cfg(test)]
@@ -763,7 +764,7 @@ async fn remove_directory_full(app: tauri::AppHandle, path: String) {
     if config_path.is_empty() {
         return;
     }
-    let db = database::Database::new(&config_path);
+    let mut db = database::Database::new(&config_path);
     db.remove_directory_full(&path);
 }
 
@@ -897,6 +898,22 @@ fn get_indexing_status(state: tauri::State<'_, ml::MlContext>) -> usize {
     } else {
         count
     }
+}
+
+#[tauri::command]
+fn get_unindexed_count(app: tauri::AppHandle) -> usize {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return 0;
+    }
+    let db = database::Database::new(&path);
+    let count: i64 = db
+        .connection
+        .query_row("SELECT COUNT(*) FROM photo WHERE indexed < 2", [], |r| {
+            r.get(0)
+        })
+        .unwrap_or(0);
+    count as usize
 }
 
 #[tauri::command]
@@ -1292,7 +1309,7 @@ async fn clear_logs(app: tauri::AppHandle) {
 }
 
 pub fn emit_log(app: &tauri::AppHandle, message: String) {
-    println!("{message}");
+    tracing::info!("{}", message);
     let _ = app.emit("log-message", message.clone());
     let path = get_config_path(app);
     if !path.is_empty() {
@@ -1396,6 +1413,17 @@ pub fn run() {
                         }
                     })
                     .build(app)?;
+
+                #[cfg(target_os = "linux")]
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.with_webview(|webview| {
+                        use webkit2gtk::{WebContextExt, WebViewExt};
+                        let wv = webview.inner();
+                        if let Some(ctx) = wv.context() {
+                            ctx.set_spell_checking_enabled(false);
+                        }
+                    });
+                }
             }
 
             emit_log(
@@ -1512,6 +1540,7 @@ pub fn run() {
             save_config,
             get_config,
             get_indexing_status,
+            get_unindexed_count,
             get_heatmap_data,
             get_photo_by_id,
             get_photo_encoded_batch,
