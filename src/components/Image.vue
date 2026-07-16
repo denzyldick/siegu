@@ -8,7 +8,7 @@
     <div class="image-wrapper shadow-sm">
       <template v-if="isVisible">
         <video
-          v-if="isVideo"
+          v-if="isVideo && !path.encoded"
           :src="videoUrl + '#t=0.5'"
           class="photo-img"
           muted
@@ -124,7 +124,7 @@ export default {
     },
     imageSrc() {
       if (!this.path || !this.path.location) return null;
-      if (this.path.encoded && !this.isVideo) {
+      if (this.path.encoded) {
         return this.path.encoded;
       }
       if (!this.isVideo) {

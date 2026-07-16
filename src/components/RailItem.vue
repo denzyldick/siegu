@@ -2,7 +2,7 @@
   <div class="rail-item" ref="container" :class="{ active: active }" @click="$emit('click')">
     <template v-if="isVisible">
       <video
-        v-if="isVideo"
+        v-if="isVideo && !photo.encoded"
         :src="videoUrl + '#t=0.5'"
         :alt="$t('rail.alt_thumb')"
         muted
@@ -51,7 +51,7 @@ export default {
     },
     imageSrc() {
       if (!this.photo || !this.photo.location) return '';
-      if (this.photo.encoded && !this.isVideo) return this.photo.encoded;
+      if (this.photo.encoded) return this.photo.encoded;
       return convertFileSrc(this.photo.location);
     },
   },
