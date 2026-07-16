@@ -36,6 +36,7 @@ export default {
       current_directory: '',
     },
     indexingCount: 0,
+    unindexedCount: 0,
     lastScanTime: 'Never',
     search: '',
     objects: [],
@@ -129,6 +130,12 @@ export default {
       if (e.key === 'siegu_theme') this.applyTheme();
     });
 
+    invoke('get_people')
+      .then((response) => {
+        this.faces = JSON.parse(response);
+      })
+      .catch(() => {});
+
     listen('download-progress', (event) => {
       const { model, downloaded, total } = event.payload;
       this.isDownloadingModels = true;
@@ -158,8 +165,14 @@ export default {
       this.indexingCount = this.normalizeIndexingCount(count);
     });
 
+    invoke('get_unindexed_count').then((count) => {
+      this.unindexedCount = this.normalizeIndexingCount(count);
+    });
+
     listen('indexing-progress', (event) => {
-      this.indexingCount = this.normalizeIndexingCount(event.payload);
+      const count = this.normalizeIndexingCount(event.payload);
+      this.indexingCount = count;
+      this.unindexedCount = count;
     });
 
     invoke('get_people').then((response) => {
@@ -306,12 +319,14 @@ export default {
       return (
         this.scanStatus === 'discovering' ||
         this.scanStatus === 'indexing' ||
-        this.indexingCount > 0
+        this.indexingCount > 0 ||
+        this.unindexedCount > 0
       );
     },
     statusLabel() {
       if (this.scanStatus === 'discovering') return this.$t('sync.scanning');
       if (this.scanStatus === 'indexing' || this.indexingCount > 0) return this.$t('sync.indexing');
+      if (this.unindexedCount > 0) return this.$t('sync.indexing');
       return this.$t('sync.refresh');
     },
     searchItems() {
@@ -393,13 +408,15 @@ export default {
       }
     },
     onSearchClick(e) {
-      if (!this.searchItems.length && !this.filteredPeople.length && !this.recentSearches.length) {
+      if (this.unindexedCount > 0 && !this.searchItems.length && !this.filteredPeople.length && !this.recentSearches.length) {
         this.searchDisabledDialog.show = true;
       }
     },
     onSearchSelect(val) {
       if (val) {
-        this.addRecentSearch(val);
+        const title = typeof val === 'object' ? val.title : val;
+        this.search = title;
+        this.addRecentSearch(title);
       }
     },
     addPersonToSearch(person) {

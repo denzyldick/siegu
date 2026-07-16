@@ -435,6 +435,7 @@ export default {
     },
     scheduleReload() {
       if (this.reloadTimer) clearTimeout(this.reloadTimer);
+      this.loading = false;
       this.reloadTimer = setTimeout(() => {
         this.paging.offset = 0;
         this.allLoaded = false;

@@ -17,6 +17,27 @@ pub struct Database {
     pub connection: Connection,
 }
 
+use crate::scanner;
+
+fn video_sql_like() -> String {
+    let parts: Vec<String> = scanner::VIDEO_EXTENSIONS
+        .iter()
+        .map(|ext| format!("location LIKE '%.{ext}'"))
+        .collect();
+    format!("({})", parts.join(" OR "))
+}
+
+fn video_sql_not_like() -> String {
+    format!(
+        "NOT ({})",
+        video_sql_like()
+            .strip_prefix('(')
+            .unwrap_or("")
+            .strip_suffix(')')
+            .unwrap_or("")
+    )
+}
+
 const MONTH_NAMES: &[(u8, &str, &str)] = &[
     (1, "january", "jan"),
     (2, "february", "feb"),
@@ -308,6 +329,11 @@ impl Database {
             "CREATE TABLE IF NOT EXISTS config(key STRING, value STRING);",
             (),
         );
+        // Deduplicate config rows (old schema had no UNIQUE constraint)
+        let _ = conn.execute(
+            "DELETE FROM config WHERE rowid NOT IN (SELECT MIN(rowid) FROM config GROUP BY key)",
+            (),
+        );
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS logs (timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, level STRING, message TEXT);", ());
 
         Self { connection: conn }
@@ -344,7 +370,7 @@ impl Database {
             "INSERT INTO logs (level, message) VALUES (?1, ?2)",
             (level, message),
         ) {
-            eprintln!("store_log: failed to insert log entry: {e}");
+            tracing::warn!("store_log: failed to insert log entry: {e}");
         }
     }
 
@@ -369,14 +395,17 @@ impl Database {
 
     pub fn clear_logs(&self) {
         if let Err(e) = self.connection.execute("DELETE FROM logs", ()) {
-            eprintln!("clear_logs: {e}");
+            tracing::warn!("clear_logs: {e}");
         }
     }
 
     pub fn set_state(&self, state: HashMap<String, String>) {
         for (key, value) in state {
+            let _ = self
+                .connection
+                .execute("DELETE FROM config WHERE key = ?1", [&key]);
             let _ = self.connection.execute(
-                "INSERT OR REPLACE INTO config (key, value) VALUES(?1, ?2)",
+                "INSERT INTO config (key, value) VALUES(?1, ?2)",
                 (&key, &value),
             );
         }
@@ -536,7 +565,7 @@ impl Database {
             ""
         };
         let video_filter = if videos_only {
-            "AND (p.location LIKE '%.mp4' OR p.location LIKE '%.mkv' OR p.location LIKE '%.mov' OR p.location LIKE '%.avi' OR p.location LIKE '%.webm')"
+            &format!("AND {}", video_sql_like())
         } else {
             ""
         };
@@ -555,6 +584,7 @@ impl Database {
                     OR EXISTS(SELECT 1 FROM ocr WHERE photo_id=p.id AND text LIKE ?3) \
                     OR EXISTS(SELECT 1 FROM faces f JOIN people p_name ON f.person_id = p_name.id WHERE f.photo_id=p.id AND p_name.name LIKE ?3) \
                     OR EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='location_name' AND value LIKE ?3) \
+                    OR EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='transcript' AND value LIKE ?3) \
                     OR p.created LIKE ?3 OR p.created LIKE ?4)".to_string()
             } else {
                 "AND (p.location LIKE ?3 OR p.id LIKE ?3 OR p.caption LIKE ?3 \
@@ -562,6 +592,7 @@ impl Database {
                     OR EXISTS(SELECT 1 FROM ocr WHERE photo_id=p.id AND text LIKE ?3) \
                     OR EXISTS(SELECT 1 FROM faces f JOIN people p_name ON f.person_id = p_name.id WHERE f.photo_id=p.id AND p_name.name LIKE ?3) \
                     OR EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='location_name' AND value LIKE ?3) \
+                    OR EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='transcript' AND value LIKE ?3) \
                     OR p.created LIKE ?3)".to_string()
             }
         } else {
@@ -811,7 +842,7 @@ impl Database {
             .flat_map(|f| f.to_le_bytes())
             .collect();
         if let Err(e) = self.connection.execute("INSERT OR REPLACE INTO faces(photo_id, face_id, crop_path, encoded, embedding, person_id) VALUES(?1, ?2, ?3, ?4, ?5, ?6)", (&face.photo_id, &face.face_id, &face.crop_path, &face.encoded, &embedding_bytes, &face.person_id)) {
-            eprintln!("store_face: failed to store face {}: {e}", face.face_id);
+            tracing::warn!("store_face: failed to store face {}: {e}", face.face_id);
         }
     }
 
@@ -1070,7 +1101,7 @@ impl Database {
             .connection
             .execute("DELETE FROM directory WHERE name = ?1", [&path])
         {
-            eprintln!("remove_directory: failed to remove '{path}': {e}");
+            tracing::warn!("remove_directory: failed to remove '{path}': {e}");
         }
     }
 
@@ -1079,7 +1110,7 @@ impl Database {
             .connection
             .execute("INSERT INTO directory (name) VALUES(?1)", [&path])
         {
-            eprintln!("add_directory: failed to add '{path}': {e}");
+            tracing::warn!("add_directory: failed to add '{path}': {e}");
         }
     }
 
@@ -1088,14 +1119,14 @@ impl Database {
             "UPDATE faces SET person_id = ?1 WHERE person_id = ?2",
             (to_id, from_id),
         ) {
-            eprintln!("merge_people: failed to update faces from {from_id} to {to_id}: {e}");
+            tracing::warn!("merge_people: failed to update faces from {from_id} to {to_id}: {e}");
             return;
         }
         if let Err(e) = self
             .connection
             .execute("DELETE FROM people WHERE id = ?1", [from_id])
         {
-            eprintln!("merge_people: failed to delete {from_id}: {e}");
+            tracing::warn!("merge_people: failed to delete {from_id}: {e}");
             return;
         }
         self.update_person_centroid(to_id);
@@ -1106,7 +1137,7 @@ impl Database {
             .connection
             .execute("UPDATE people SET name = ?1 WHERE id = ?2", (new_name, id))
         {
-            eprintln!("rename_person: failed to rename {id} to {new_name}: {e}");
+            tracing::warn!("rename_person: failed to rename {id} to {new_name}: {e}");
         }
     }
 
@@ -1114,7 +1145,7 @@ impl Database {
         let tx = match self.connection.transaction() {
             Ok(t) => t,
             Err(e) => {
-                eprintln!("remove_directory_full: failed to start transaction: {e}");
+                tracing::warn!("remove_directory_full: failed to start transaction: {e}");
                 return;
             }
         };
@@ -1135,7 +1166,7 @@ impl Database {
         }
         let _ = tx.execute("DELETE FROM directory WHERE name = ?1", [path]);
         if let Err(e) = tx.commit() {
-            eprintln!("remove_directory_full: failed to commit: {e}");
+            tracing::warn!("remove_directory_full: failed to commit: {e}");
         }
     }
 
@@ -1143,7 +1174,7 @@ impl Database {
         let tx = match self.connection.transaction() {
             Ok(t) => t,
             Err(e) => {
-                eprintln!("import_photo: failed to start transaction: {e}");
+                tracing::warn!("import_photo: failed to start transaction: {e}");
                 return;
             }
         };
@@ -1152,18 +1183,18 @@ impl Database {
             "INSERT OR REPLACE INTO photo (id, location, created, latitude, longitude, encoded) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             (photo.id, photo.location, photo.created, photo.latitude, photo.longitude, photo.encoded),
         ) {
-            eprintln!("import_photo: failed to upsert photo {}: {e}", photo.id);
+            tracing::warn!("import_photo: failed to upsert photo {}: {e}", photo.id);
             return;
         }
 
         if let Err(e) = tx.execute("DELETE FROM object WHERE photo_id = ?1", [photo.id]) {
-            eprintln!(
+            tracing::warn!(
                 "import_photo: failed to clear objects for {}: {e}",
                 photo.id
             );
         }
         if let Err(e) = tx.execute("DELETE FROM faces WHERE photo_id = ?1", [photo.id]) {
-            eprintln!("import_photo: failed to clear faces for {}: {e}", photo.id);
+            tracing::warn!("import_photo: failed to clear faces for {}: {e}", photo.id);
         }
 
         if let Ok(objects) = serde_json::from_str::<Vec<SyncObject>>(photo.objects_json) {
@@ -1172,7 +1203,7 @@ impl Database {
                     "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
                     (photo.id, &obj.class, &obj.probability),
                 ) {
-                    eprintln!(
+                    tracing::warn!(
                         "import_photo: failed to insert object for {}: {e}",
                         photo.id
                     );
@@ -1186,13 +1217,13 @@ impl Database {
                     "INSERT OR REPLACE INTO faces (photo_id, face_id, crop_path, encoded, person_id) VALUES (?1, ?2, ?3, ?4, ?5)",
                     (photo.id, &face.face_id, &face.crop_path, &face.encoded, &face.person_id),
                 ) {
-                    eprintln!("import_photo: failed to insert face for {}: {e}", photo.id);
+                    tracing::warn!("import_photo: failed to insert face for {}: {e}", photo.id);
                 }
             }
         }
 
         if let Err(e) = tx.commit() {
-            eprintln!(
+            tracing::warn!(
                 "import_photo: failed to commit transaction for {}: {e}",
                 photo.id
             );
@@ -1200,8 +1231,24 @@ impl Database {
     }
 
     pub fn get_media_counts(&self) -> (i64, i64) {
-        let photo_count: i64 = self.connection.query_row("SELECT COUNT(*) FROM photo WHERE NOT (location LIKE '%.mp4' OR location LIKE '%.mkv' OR location LIKE '%.mov' OR location LIKE '%.avi' OR location LIKE '%.webm')", [], |r| r.get(0)).unwrap_or(0);
-        let video_count: i64 = self.connection.query_row("SELECT COUNT(*) FROM photo WHERE (location LIKE '%.mp4' OR location LIKE '%.mkv' OR location LIKE '%.mov' OR location LIKE '%.avi' OR location LIKE '%.webm')", [], |r| r.get(0)).unwrap_or(0);
+        let not_video = video_sql_not_like();
+        let is_video = video_sql_like();
+        let photo_count: i64 = self
+            .connection
+            .query_row(
+                &format!("SELECT COUNT(*) FROM photo WHERE {not_video}"),
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let video_count: i64 = self
+            .connection
+            .query_row(
+                &format!("SELECT COUNT(*) FROM photo WHERE {is_video}"),
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
         (photo_count, video_count)
     }
 
@@ -1286,7 +1333,7 @@ impl Database {
             .connection
             .execute("UPDATE photo SET indexed = ?1 WHERE id = ?2", (indexed, id))
         {
-            eprintln!("update_photo_indexed: failed for {id}: {e}");
+            tracing::warn!("update_photo_indexed: failed for {id}: {e}");
         }
     }
 
@@ -1295,7 +1342,7 @@ impl Database {
             "clip" | "face" | "ocr" | "nsfw" | "aesthetics" | "yolo" | "blip" | "arcface"
             | "midas" | "whisper" | "sam" | "superres" => {}
             _ => {
-                eprintln!("Invalid model name: {model}");
+                tracing::warn!("Invalid model name: {model}");
                 return;
             }
         }
@@ -1399,7 +1446,7 @@ impl Database {
             "clip" | "face" | "ocr" | "nsfw" | "aesthetics" | "yolo" | "blip" | "arcface"
             | "midas" | "whisper" | "sam" | "superres" => {}
             _ => {
-                eprintln!("Invalid model name: {model}");
+                tracing::warn!("Invalid model name: {model}");
                 return ids;
             }
         }
@@ -1831,5 +1878,105 @@ mod tests {
     fn test_update_ai_status_invalid_model() {
         let db = test_db();
         db.update_ai_status("photo_1", "invalid_model", 1);
+    }
+
+    #[test]
+    fn test_video_sql_like_contains_all_extensions() {
+        let sql = super::video_sql_like();
+        for ext in super::scanner::VIDEO_EXTENSIONS {
+            assert!(sql.contains(ext), "SQL should contain extension: {ext}");
+        }
+    }
+
+    #[test]
+    fn test_video_sql_not_like() {
+        let sql = super::video_sql_not_like();
+        assert!(sql.starts_with("NOT ("), "should start with NOT (");
+        assert!(sql.ends_with(')'), "should end with )");
+    }
+
+    #[test]
+    fn test_get_media_counts_includes_all_video_extensions() {
+        let mut db = test_db();
+        let extensions = [
+            "mp4", "mkv", "mov", "avi", "webm", "flv", "wmv", "m4v", "3gp",
+        ];
+        let mut photos: Vec<Photo> = extensions
+            .iter()
+            .enumerate()
+            .map(|(i, ext)| Photo {
+                id: format!("vid_{i}"),
+                location: format!("/tmp/video_{i}.{ext}"),
+                encoded: String::new(),
+                created: String::new(),
+                objects: HashMap::new(),
+                properties: HashMap::new(),
+                latitude: 0.0,
+                longitude: 0.0,
+                favorite: false,
+                indexed: 0,
+                caption: None,
+                aesthetics_score: None,
+                ai_status: AiStatus::default(),
+            })
+            .collect();
+        photos.push(Photo {
+            id: "img_1".to_string(),
+            location: "/tmp/photo.jpg".to_string(),
+            encoded: String::new(),
+            created: String::new(),
+            objects: HashMap::new(),
+            properties: HashMap::new(),
+            latitude: 0.0,
+            longitude: 0.0,
+            favorite: false,
+            indexed: 0,
+            caption: None,
+            aesthetics_score: None,
+            ai_status: AiStatus::default(),
+        });
+        let _ = db.store_photo_batch(&photos);
+
+        let (photo_count, video_count) = db.get_media_counts();
+        assert_eq!(
+            video_count, 9,
+            "should count all 9 video extensions, got {video_count}"
+        );
+        assert_eq!(photo_count, 1, "should count 1 photo, got {photo_count}");
+    }
+
+    #[test]
+    fn test_list_photos_videos_only() {
+        let mut db = test_db();
+        let photos: Vec<Photo> = (0..5)
+            .map(|i| {
+                let ext = if i % 2 == 0 { "mp4" } else { "jpg" };
+                Photo {
+                    id: format!("media_{i}"),
+                    location: format!("/tmp/file_{i}.{ext}"),
+                    encoded: String::new(),
+                    created: String::new(),
+                    objects: HashMap::new(),
+                    properties: HashMap::new(),
+                    latitude: 0.0,
+                    longitude: 0.0,
+                    favorite: false,
+                    indexed: 0,
+                    caption: None,
+                    aesthetics_score: None,
+                    ai_status: AiStatus::default(),
+                }
+            })
+            .collect();
+        let _ = db.store_photo_batch(&photos);
+
+        let all = db.list_photos("", 0, 100, false, false);
+        assert_eq!(all.len(), 5);
+
+        let videos = db.list_photos("", 0, 100, false, true);
+        assert_eq!(videos.len(), 3, "should return only mp4 files");
+        for v in &videos {
+            assert!(v.location.ends_with(".mp4"), "expected mp4: {}", v.location);
+        }
     }
 }
