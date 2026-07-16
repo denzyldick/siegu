@@ -877,7 +877,6 @@ export default {
     isAndroid: false,
     dataDir: '',
     configDir: '',
-    checkResults: '',
     isDownloading: false,
     isCleaning: false,
     downloadedModels: [],
@@ -1211,7 +1210,6 @@ export default {
     async checkExistingModels() {
       const downloaded = await invoke('check_models');
       this.downloadedModels = downloaded;
-      this.checkResults = JSON.stringify(downloaded);
       this.selectedModels = [
         'clip',
         'ultraface',

@@ -22,10 +22,6 @@ impl AnalysisCallbacks for TauriCallbacks {
         remaining: usize,
         progress_model: Option<&str>,
     ) {
-        let _ = self
-            .app
-            .emit("photo-updated", serde_json::json!({ "id": photo_id }));
-
         let db = Database::new(&self.config_path);
         let has_caption: bool = db
             .connection

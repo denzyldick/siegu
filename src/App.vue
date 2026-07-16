@@ -1,5 +1,5 @@
 <script>
-import { invoke, convertFileSrc } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import DeviceList from './components/DeviceList.vue';
 import Map from './components/Map.vue';
@@ -258,10 +258,6 @@ export default {
     listen('start-sync', () => {
       console.log('Peer requested sync start.');
       this.finishSetupAndScan();
-    });
-
-    listen('photo-scanned', (event) => {
-      // Local scan: show indexing status if needed
     });
 
     listen('photo-received', (event) => {

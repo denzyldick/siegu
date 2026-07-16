@@ -72,7 +72,6 @@
 
 <script>
 import { readDir } from '@tauri-apps/plugin-fs';
-import { join, dirname } from '@tauri-apps/api/path';
 
 export default {
   props: {

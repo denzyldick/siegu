@@ -86,7 +86,6 @@ describe('Photos.vue — data pipeline', () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(listen).toHaveBeenCalledWith('photos-discovered', expect.any(Function));
     expect(listen).toHaveBeenCalledWith('photo-received', expect.any(Function));
-    expect(listen).toHaveBeenCalledWith('photo-updated', expect.any(Function));
     expect(listen).toHaveBeenCalledWith('photo-analysis-result', expect.any(Function));
   });
 
