@@ -239,6 +239,7 @@ export default {
 
     listen('sync-progress', (event) => {
       this.syncStatus = {
+        ...this.syncStatus,
         status: event.payload.status,
         progress: event.payload.progress,
       };

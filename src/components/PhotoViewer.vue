@@ -402,7 +402,6 @@ export default {
     unlistenResult: null,
     snackbar: { show: false, text: '', error: false },
     downloadedModels: [],
-    isAnalyzingModel: null,
     modelInfo: [
       { id: 'clip' },
       { id: 'ultraface' },
@@ -413,6 +412,7 @@ export default {
       { id: 'blip' },
       { id: 'arcface' },
       { id: 'midas' },
+      { id: 'whisper' },
     ],
   }),
   computed: {
