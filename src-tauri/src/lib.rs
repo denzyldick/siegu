@@ -475,15 +475,14 @@ async fn download_models(
 }
 
 #[tauri::command]
-#[allow(non_snake_case)]
 async fn list_files(
     app: tauri::AppHandle,
     offset: usize,
     limit: usize,
     query: String,
     scan: bool,
-    favoritesOnly: bool,
-    videosOnly: bool,
+    favorites_only: bool,
+    videos_only: bool,
 ) -> Result<String, String> {
     let path = get_config_path(&app);
     if path.is_empty() {
@@ -497,8 +496,8 @@ async fn list_files(
         &query,
         offset,
         limit,
-        favoritesOnly,
-        videosOnly,
+        favorites_only,
+        videos_only,
     ))
     .unwrap_or("[]".to_string()))
 }
@@ -555,11 +554,6 @@ async fn remove_directory(app: tauri::AppHandle, path: String) {
 
 #[tauri::command]
 async fn read_file_base64(app: tauri::AppHandle, path: String) -> String {
-    file::read_file_base64(&app, path)
-}
-
-#[tauri::command]
-async fn get_raw_photo(app: tauri::AppHandle, path: String) -> String {
     file::read_file_base64(&app, path)
 }
 
@@ -981,22 +975,6 @@ async fn list_objects(app: tauri::AppHandle, query: String) -> Result<String, St
     }
     let db = database::Database::new(&path);
     Ok(serde_json::to_string(&db.list_objects(&query)).unwrap_or("[]".to_string()))
-}
-
-#[tauri::command]
-fn process_video_frames(
-    _app: tauri::AppHandle,
-    state: tauri::State<'_, ml::MlContext>,
-    id: String,
-    frames: Vec<String>,
-) {
-    if frames.len() > 1000 || id.len() > 64 {
-        return;
-    }
-    if frames.iter().any(|f| f.len() > 512) {
-        return;
-    }
-    let _ = state.tx.send(ml::Job::AnalyzeSingle(id));
 }
 
 #[tauri::command]
@@ -1504,7 +1482,6 @@ pub fn run() {
             list_directories,
             remove_directory,
             read_file_base64,
-            get_raw_photo,
             get_people,
             get_unnamed_faces,
             assign_name_to_face,
@@ -1527,9 +1504,6 @@ pub fn run() {
             discover_lan_devices,
             stop_webrtc_session,
             request_start_sync,
-            process_video_frames,
-            merge_people,
-            rename_person,
             cleanup_database,
             remove_directory_full,
             get_media_server_port,
