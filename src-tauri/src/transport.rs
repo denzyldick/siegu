@@ -122,16 +122,15 @@ pub struct MediaServerState {
     pub port: u16,
 }
 
-pub fn start_media_server(config_path: String) -> u16 {
+pub fn start_media_server(_config_path: String) -> u16 {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
     std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async move {
-            let config_path_clone = config_path.clone();
-            let images = warp::path("images").and(warp::fs::dir(config_path_clone));
+            let media = warp::path("media").and(warp::fs::dir(std::path::PathBuf::from("/")));
 
-            let routes = images;
+            let routes = media;
             let addr: std::net::SocketAddr = ([127, 0, 0, 1], 0).into();
             let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
             let addr = listener.local_addr().unwrap();
