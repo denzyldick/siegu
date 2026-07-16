@@ -378,13 +378,21 @@ export default {
     },
     list_objects: function (val) {
       if (val && val.length > 0) {
-        invoke('list_objects', { query: val }).then((response) => {
-          this.objects = JSON.parse(response);
-        });
+        invoke('list_objects', { query: val })
+          .then((response) => {
+            this.objects = JSON.parse(response);
+          })
+          .catch((e) => {
+            console.error('list_objects failed:', e);
+          });
       } else {
-        invoke('get_top_tags').then((response) => {
-          this.objects = JSON.parse(response);
-        });
+        invoke('get_top_tags')
+          .then((response) => {
+            this.objects = JSON.parse(response);
+          })
+          .catch((e) => {
+            console.error('get_top_tags failed:', e);
+          });
       }
     },
     getFaceImageSrc(crop_path, encoded) {
@@ -408,9 +416,7 @@ export default {
       }
     },
     onSearchClick(e) {
-      if (this.unindexedCount > 0 && !this.searchItems.length && !this.filteredPeople.length && !this.recentSearches.length) {
-        this.searchDisabledDialog.show = true;
-      }
+      // No-op: the search input handles its own focus.
     },
     onSearchSelect(val) {
       if (val) {
@@ -1354,7 +1360,7 @@ export default {
             v-if="current_page === 'home'"
             :search-query="search"
             :filters="filters"
-            @clear-search="search = null"
+            @clear-search="search = ''"
           />
         </div>
         <People v-if="current_page === 'people'" @search-person="addPersonToSearch" />

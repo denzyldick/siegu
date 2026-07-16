@@ -435,8 +435,8 @@ export default {
     },
     scheduleReload() {
       if (this.reloadTimer) clearTimeout(this.reloadTimer);
-      this.loading = false;
       this.reloadTimer = setTimeout(() => {
+        this.loading = false;
         this.paging.offset = 0;
         this.allLoaded = false;
         this.list_files();
