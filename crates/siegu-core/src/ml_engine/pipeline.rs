@@ -8,6 +8,7 @@ use crate::thumbnail;
 
 use super::models::{LoadedModels, ModelEngine};
 use super::preprocessing;
+use super::whisper;
 
 const COCO_CLASSES: &[&str] = &[
     "person",
@@ -98,6 +99,7 @@ pub struct PhotoResult {
     pub aesthetics: Option<f64>,
     pub nsfw: Option<String>,
     pub ocr: Option<String>,
+    pub transcript: Option<String>,
     pub face_count: usize,
     pub faces: Vec<FaceInfo>,
     pub completed_models: Vec<&'static str>,
@@ -122,16 +124,38 @@ pub fn analyze_photo(
     target_model: Option<&str>,
     faces_dir: &str,
 ) -> PhotoResult {
-    let mut result = PhotoResult::default();
-
     let dynamic_img = match image::open(location) {
         Ok(img) => img,
-        Err(_) => return result,
+        Err(_) => return PhotoResult::default(),
     };
 
     let orientation = thumbnail::read_exif_orientation(location);
     let dynamic_img = thumbnail::apply_orientation(dynamic_img, orientation);
     let img = dynamic_img.to_rgb8();
+
+    analyze_image(
+        photo_id,
+        0,
+        &img,
+        ai_status,
+        models,
+        config,
+        target_model,
+        faces_dir,
+    )
+}
+
+pub fn analyze_image(
+    photo_id: &str,
+    frame_index: usize,
+    img: &image::RgbImage,
+    ai_status: &AiStatus,
+    models: &mut LoadedModels,
+    config: &HashMap<String, String>,
+    target_model: Option<&str>,
+    faces_dir: &str,
+) -> PhotoResult {
+    let mut result = PhotoResult::default();
     let (orig_w, orig_h) = (img.width() as f32, img.height() as f32);
 
     // CLIP Visual
@@ -328,8 +352,8 @@ pub fn analyze_photo(
                             let (w, h) = (xmax - xmin, ymax - ymin);
                             if w > 20 && h > 20 {
                                 let face_crop =
-                                    image::imageops::crop_imm(&img, xmin, ymin, w, h).to_image();
-                                let face_id = format!("{photo_id}_face_{xmin}_{ymin}");
+                                    image::imageops::crop_imm(img, xmin, ymin, w, h).to_image();
+                                let face_id = format!("{photo_id}_f{frame_index}_{xmin}_{ymin}");
                                 let crop_path = format!("{faces_dir}/{face_id}.jpg");
                                 if face_crop.save(&crop_path).is_ok() {
                                     let mut face_embedding = Vec::new();
@@ -461,6 +485,182 @@ pub fn analyze_photo(
     result
 }
 
+pub fn is_video_file(path: &str) -> bool {
+    let lower = path.to_lowercase();
+    lower.ends_with(".mp4")
+        || lower.ends_with(".mkv")
+        || lower.ends_with(".mov")
+        || lower.ends_with(".avi")
+        || lower.ends_with(".webm")
+        || lower.ends_with(".flv")
+        || lower.ends_with(".wmv")
+        || lower.ends_with(".m4v")
+        || lower.ends_with(".ts")
+}
+
+pub fn analyze_video(
+    photo_id: &str,
+    location: &str,
+    ai_status: &AiStatus,
+    models: &mut LoadedModels,
+    config: &HashMap<String, String>,
+    target_model: Option<&str>,
+    faces_dir: &str,
+) -> PhotoResult {
+    let mut result = PhotoResult::default();
+
+    if should_run_model(target_model, "whisper", Some(config)) && ai_status.whisper == 0 {
+        let enc = models.whisper_encoder.as_ref();
+        let dec = models.whisper_decoder.as_ref();
+        let tok = models.whisper_tokenizer.as_ref();
+
+        if let (Some(enc), Some(dec), Some(tok)) = (enc, dec, tok) {
+            let start = Instant::now();
+            if let Some(audio) = whisper::extract_audio(location) {
+                if !audio.is_empty() {
+                    let transcript = whisper::whisper_transcribe(enc, dec, tok, &audio);
+                    if !transcript.is_empty() {
+                        result.transcript = Some(transcript);
+                        result.completed_models.push("whisper");
+                        result
+                            .model_timings
+                            .insert("whisper".to_string(), start.elapsed().as_secs_f64());
+                    }
+                }
+            }
+        }
+    }
+
+    let any_visual_disabled = ai_status.clip == 0
+        || ai_status.yolo == 0
+        || ai_status.nsfw == 0
+        || ai_status.aesthetics == 0
+        || ai_status.face == 0;
+    let any_visual_requested = target_model.is_none()
+        || should_run_model(target_model, "clip", Some(config))
+        || should_run_model(target_model, "yolo", Some(config))
+        || should_run_model(target_model, "nsfw", Some(config))
+        || should_run_model(target_model, "aesthetics", Some(config))
+        || should_run_model(target_model, "face", Some(config));
+
+    if any_visual_disabled && any_visual_requested {
+        let frames = whisper::extract_frames(location);
+        if !frames.is_empty() {
+            let frame_count = frames.len();
+            let mut frame_results: Vec<PhotoResult> = Vec::with_capacity(frame_count);
+
+            for (i, frame) in frames.iter().enumerate() {
+                let frame_ai = AiStatus::default();
+                frame_results.push(analyze_image(
+                    photo_id,
+                    i,
+                    frame,
+                    &frame_ai,
+                    models,
+                    config,
+                    target_model,
+                    faces_dir,
+                ));
+            }
+
+            result = aggregate_frame_results(&frame_results, frame_count);
+        }
+    }
+
+    result
+}
+
+fn aggregate_frame_results(frame_results: &[PhotoResult], _frame_count: usize) -> PhotoResult {
+    let mut merged = PhotoResult::default();
+
+    let mut best_objects: HashMap<String, f32> = HashMap::new();
+    let mut aesthetics_sum = 0.0f64;
+    let mut aesthetics_count = 0u32;
+    let mut max_nsfw = 0.0f64;
+    let mut ocr_texts: Vec<String> = Vec::new();
+    let mut all_faces: Vec<FaceInfo> = Vec::new();
+
+    for fr in frame_results {
+        for (cls, prob_str) in &fr.objects {
+            if let Ok(p) = prob_str.parse::<f32>() {
+                best_objects
+                    .entry(cls.clone())
+                    .and_modify(|e| {
+                        if p > *e {
+                            *e = p;
+                        }
+                    })
+                    .or_insert(p);
+            }
+        }
+        if let Some(a) = fr.aesthetics {
+            aesthetics_sum += a;
+            aesthetics_count += 1;
+        }
+        if let Some(ref nsfw_str) = fr.nsfw {
+            if let Ok(n) = nsfw_str.parse::<f64>() {
+                if n > max_nsfw {
+                    max_nsfw = n;
+                }
+            }
+        }
+        if let Some(ref text) = fr.ocr {
+            if !text.trim().is_empty() {
+                ocr_texts.push(text.clone());
+            }
+        }
+        all_faces.extend(fr.faces.iter().cloned());
+    }
+
+    for (cls, conf) in best_objects {
+        merged.objects.push((cls, format!("{conf:.2}")));
+    }
+
+    if aesthetics_count > 0 {
+        merged.aesthetics = Some(aesthetics_sum / aesthetics_count as f64);
+    }
+    if max_nsfw > 0.0 {
+        merged.nsfw = Some(max_nsfw.to_string());
+    }
+
+    let mut seen_ocr = std::collections::HashSet::new();
+    for text in &ocr_texts {
+        if seen_ocr.insert(text.clone()) {
+            merged.ocr = Some(text.clone());
+        }
+    }
+
+    let mut unique_faces: Vec<FaceInfo> = Vec::new();
+    for face in &all_faces {
+        let is_dup = unique_faces.iter().any(|existing| {
+            let dot: f32 = face
+                .embedding
+                .iter()
+                .zip(existing.embedding.iter())
+                .map(|(a, b)| a * b)
+                .sum();
+            dot > 0.85
+        });
+        if !is_dup {
+            unique_faces.push(face.clone());
+        }
+    }
+    merged.faces = unique_faces;
+    merged.face_count = merged.faces.len();
+
+    if !frame_results.is_empty() {
+        merged.completed_models.push("clip");
+        merged.completed_models.push("yolo");
+        merged.completed_models.push("nsfw");
+        merged.completed_models.push("aesthetics");
+        if merged.face_count > 0 {
+            merged.completed_models.push("face");
+        }
+    }
+
+    merged
+}
+
 fn run_model(
     model: &ModelEngine,
     input: ndarray::Array4<f32>,
@@ -535,6 +735,13 @@ pub fn flush_results_to_db(
             db.update_ai_status(photo_id, model, 1);
         }
 
+        if let Some(ref transcript) = result.transcript {
+            let _ = db.connection.execute(
+                "INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES(?1, 'transcript', ?2)",
+                (photo_id, transcript),
+            );
+        }
+
         if target_model.is_none() {
             db.update_photo_indexed(photo_id, 2);
         }
@@ -544,4 +751,463 @@ pub fn flush_results_to_db(
 
         Ok(())
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::AiStatus;
+
+    fn default_config() -> HashMap<String, String> {
+        let mut config = HashMap::new();
+        config.insert("model_enabled_clip".to_string(), "true".to_string());
+        config.insert("model_enabled_yolo".to_string(), "true".to_string());
+        config.insert("model_enabled_nsfw".to_string(), "true".to_string());
+        config.insert("model_enabled_aesthetics".to_string(), "true".to_string());
+        config.insert("model_enabled_face".to_string(), "true".to_string());
+        config.insert("model_enabled_whisper".to_string(), "true".to_string());
+        config
+    }
+
+    fn empty_models() -> LoadedModels {
+        LoadedModels {
+            clip_visual: None,
+            clip_text: None,
+            text_embeddings: Vec::new(),
+            face_detector: None,
+            arcface: None,
+            ocr_det: None,
+            ocr_rec: None,
+            ocr_alphabet: Vec::new(),
+            nsfw: None,
+            aesthetics: None,
+            yolo: None,
+            blip: None,
+            midas: None,
+            whisper_encoder: None,
+            whisper_decoder: None,
+            whisper_tokenizer: None,
+            known_people: Vec::new(),
+            selected_ep: "cpu".to_string(),
+        }
+    }
+
+    // ── is_video_file ───────────────────────────────────────────
+
+    #[test]
+    fn test_is_video_file_mp4() {
+        assert!(is_video_file("video.mp4"));
+        assert!(is_video_file("VIDEO.MP4"));
+    }
+
+    #[test]
+    fn test_is_video_file_mkv() {
+        assert!(is_video_file("movie.mkv"));
+    }
+
+    #[test]
+    fn test_is_video_file_mov() {
+        assert!(is_video_file("clip.mov"));
+    }
+
+    #[test]
+    fn test_is_video_file_avi() {
+        assert!(is_video_file("old.avi"));
+    }
+
+    #[test]
+    fn test_is_video_file_webm() {
+        assert!(is_video_file("web.webm"));
+    }
+
+    #[test]
+    fn test_is_video_file_flv() {
+        assert!(is_video_file("flash.flv"));
+    }
+
+    #[test]
+    fn test_is_video_file_wmv() {
+        assert!(is_video_file("windows.wmv"));
+    }
+
+    #[test]
+    fn test_is_video_file_m4v() {
+        assert!(is_video_file("apple.m4v"));
+    }
+
+    #[test]
+    fn test_is_video_file_ts() {
+        assert!(is_video_file("stream.ts"));
+    }
+
+    #[test]
+    fn test_is_video_file_not_image() {
+        assert!(!is_video_file("photo.jpg"));
+        assert!(!is_video_file("photo.png"));
+        assert!(!is_video_file("photo.heic"));
+        assert!(!is_video_file("photo.webp"));
+    }
+
+    #[test]
+    fn test_is_video_file_not_video_extension() {
+        assert!(!is_video_file("archive.tar.gz"));
+        assert!(!is_video_file("document.pdf"));
+    }
+
+    // ── aggregate_frame_results ─────────────────────────────────
+
+    #[test]
+    fn test_aggregate_objects_picks_highest_confidence() {
+        let f1 = PhotoResult {
+            objects: vec![("cat".into(), "0.80".into()), ("dog".into(), "0.60".into())],
+            ..Default::default()
+        };
+        let f2 = PhotoResult {
+            objects: vec![
+                ("cat".into(), "0.95".into()),
+                ("bird".into(), "0.70".into()),
+            ],
+            ..Default::default()
+        };
+        let merged = aggregate_frame_results(&[f1, f2], 2);
+
+        let cat = merged.objects.iter().find(|(c, _)| c == "cat").unwrap();
+        assert_eq!(cat.1, "0.95", "should pick highest confidence for cat");
+
+        let dog = merged.objects.iter().find(|(c, _)| c == "dog").unwrap();
+        assert_eq!(dog.1, "0.60");
+
+        let bird = merged.objects.iter().find(|(c, _)| c == "bird").unwrap();
+        assert_eq!(bird.1, "0.70");
+    }
+
+    #[test]
+    fn test_aggregate_aesthetics_averages() {
+        let f1 = PhotoResult {
+            aesthetics: Some(3.0),
+            ..Default::default()
+        };
+        let f2 = PhotoResult {
+            aesthetics: Some(5.0),
+            ..Default::default()
+        };
+        let f3 = PhotoResult {
+            aesthetics: None,
+            ..Default::default()
+        };
+        let merged = aggregate_frame_results(&[f1, f2, f3], 3);
+        assert_eq!(merged.aesthetics, Some(4.0));
+    }
+
+    #[test]
+    fn test_aggregate_aesthetics_all_none() {
+        let f1 = PhotoResult {
+            aesthetics: None,
+            ..Default::default()
+        };
+        let merged = aggregate_frame_results(&[f1], 1);
+        assert_eq!(merged.aesthetics, None);
+    }
+
+    #[test]
+    fn test_aggregate_nsfw_picks_max() {
+        let f1 = PhotoResult {
+            nsfw: Some("0.3".into()),
+            ..Default::default()
+        };
+        let f2 = PhotoResult {
+            nsfw: Some("0.9".into()),
+            ..Default::default()
+        };
+        let merged = aggregate_frame_results(&[f1, f2], 2);
+        assert_eq!(merged.nsfw, Some("0.9".into()));
+    }
+
+    #[test]
+    fn test_aggregate_nsfw_all_zero() {
+        let f1 = PhotoResult {
+            nsfw: Some("0.0".into()),
+            ..Default::default()
+        };
+        let f2 = PhotoResult {
+            nsfw: Some("0.0".into()),
+            ..Default::default()
+        };
+        let merged = aggregate_frame_results(&[f1, f2], 2);
+        assert_eq!(merged.nsfw, None, "all-zero nsfw should produce None");
+    }
+
+    #[test]
+    fn test_aggregate_ocr_unique_texts() {
+        let f1 = PhotoResult {
+            ocr: Some("Hello".into()),
+            ..Default::default()
+        };
+        let f2 = PhotoResult {
+            ocr: Some("Hello".into()),
+            ..Default::default()
+        };
+        let f3 = PhotoResult {
+            ocr: Some("World".into()),
+            ..Default::default()
+        };
+        let merged = aggregate_frame_results(&[f1, f2, f3], 3);
+        // Should keep first unique text
+        assert!(merged.ocr.is_some());
+        let ocr = merged.ocr.as_ref().unwrap();
+        assert!(ocr == "Hello" || ocr == "World");
+    }
+
+    #[test]
+    fn test_aggregate_ocr_empty_text_ignored() {
+        let f1 = PhotoResult {
+            ocr: Some("  ".into()),
+            ..Default::default()
+        };
+        let f2 = PhotoResult {
+            ocr: None,
+            ..Default::default()
+        };
+        let merged = aggregate_frame_results(&[f1, f2], 2);
+        assert_eq!(merged.ocr, None);
+    }
+
+    #[test]
+    fn test_aggregate_faces_dedup_identical_embeddings() {
+        let embedding = vec![1.0, 0.0, 0.0];
+        let face1 = FaceInfo {
+            face_id: "p1_f0_10_20".into(),
+            crop_path: "".into(),
+            encoded: "".into(),
+            embedding: embedding.clone(),
+            person_id: None,
+        };
+        let face2 = FaceInfo {
+            face_id: "p1_f1_30_40".into(),
+            crop_path: "".into(),
+            encoded: "".into(),
+            embedding: embedding.clone(),
+            person_id: None,
+        };
+        let f1 = PhotoResult {
+            faces: vec![face1],
+            ..Default::default()
+        };
+        let f2 = PhotoResult {
+            faces: vec![face2],
+            ..Default::default()
+        };
+        let merged = aggregate_frame_results(&[f1, f2], 2);
+        assert_eq!(
+            merged.faces.len(),
+            1,
+            "identical embeddings should be deduped"
+        );
+        assert_eq!(merged.face_count, 1);
+    }
+
+    #[test]
+    fn test_aggregate_faces_dedup_different_embeddings() {
+        let face1 = FaceInfo {
+            face_id: "p1_f0_10_20".into(),
+            crop_path: "".into(),
+            encoded: "".into(),
+            embedding: vec![1.0, 0.0, 0.0],
+            person_id: None,
+        };
+        let face2 = FaceInfo {
+            face_id: "p1_f1_30_40".into(),
+            crop_path: "".into(),
+            encoded: "".into(),
+            embedding: vec![0.0, 1.0, 0.0],
+            person_id: None,
+        };
+        let f1 = PhotoResult {
+            faces: vec![face1],
+            ..Default::default()
+        };
+        let f2 = PhotoResult {
+            faces: vec![face2],
+            ..Default::default()
+        };
+        let merged = aggregate_frame_results(&[f1, f2], 2);
+        assert_eq!(
+            merged.faces.len(),
+            2,
+            "orthogonal embeddings should not be deduped"
+        );
+    }
+
+    #[test]
+    fn test_aggregate_faces_similar_embeddings_dedup() {
+        let base = vec![1.0, 0.0, 0.0];
+        let similar: Vec<f32> = base.iter().map(|x| x * 0.99).collect();
+        // Normalize both
+        let norm_b: f32 = base.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let base: Vec<f32> = base.iter().map(|x| x / norm_b).collect();
+        let norm_s: f32 = similar.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let similar: Vec<f32> = similar.iter().map(|x| x / norm_s).collect();
+
+        let face1 = FaceInfo {
+            face_id: "p1_f0_10_20".into(),
+            crop_path: "".into(),
+            encoded: "".into(),
+            embedding: base,
+            person_id: None,
+        };
+        let face2 = FaceInfo {
+            face_id: "p1_f1_30_40".into(),
+            crop_path: "".into(),
+            encoded: "".into(),
+            embedding: similar,
+            person_id: None,
+        };
+        let f1 = PhotoResult {
+            faces: vec![face1],
+            ..Default::default()
+        };
+        let f2 = PhotoResult {
+            faces: vec![face2],
+            ..Default::default()
+        };
+        let merged = aggregate_frame_results(&[f1, f2], 2);
+        assert_eq!(
+            merged.faces.len(),
+            1,
+            "similar embeddings should be deduped"
+        );
+    }
+
+    #[test]
+    fn test_aggregate_empty_results() {
+        let merged = aggregate_frame_results(&[], 0);
+        assert!(merged.objects.is_empty());
+        assert_eq!(merged.aesthetics, None);
+        assert_eq!(merged.nsfw, None);
+        assert_eq!(merged.ocr, None);
+        assert_eq!(merged.face_count, 0);
+    }
+
+    #[test]
+    fn test_aggregate_completed_models() {
+        let f1 = PhotoResult {
+            objects: vec![("cat".into(), "0.9".into())],
+            ..Default::default()
+        };
+        let merged = aggregate_frame_results(&[f1], 1);
+        assert!(merged.completed_models.contains(&"clip"));
+        assert!(merged.completed_models.contains(&"yolo"));
+        assert!(merged.completed_models.contains(&"nsfw"));
+        assert!(merged.completed_models.contains(&"aesthetics"));
+    }
+
+    // ── analyze_video with no models (graceful no-op) ───────────
+
+    #[test]
+    fn test_analyze_video_no_models_no_crash() {
+        let mut models = empty_models();
+        let config = default_config();
+        let ai = AiStatus::default();
+        let tmp = tempfile::tempdir().unwrap();
+        let faces_dir = tmp.path().to_str().unwrap();
+
+        let result = analyze_video(
+            "test_id",
+            "/nonexistent/video.mp4",
+            &ai,
+            &mut models,
+            &config,
+            None,
+            faces_dir,
+        );
+        assert!(result.transcript.is_none());
+        assert!(result.objects.is_empty());
+    }
+
+    #[test]
+    fn test_analyze_video_nonexistent_file() {
+        let mut models = empty_models();
+        let config = default_config();
+        let ai = AiStatus::default();
+        let tmp = tempfile::tempdir().unwrap();
+        let faces_dir = tmp.path().to_str().unwrap();
+
+        let result = analyze_video(
+            "test_id",
+            "/nonexistent/video.mp4",
+            &ai,
+            &mut models,
+            &config,
+            None,
+            faces_dir,
+        );
+        assert!(result.transcript.is_none());
+    }
+
+    // ── analyze_photo with no models (graceful no-op) ───────────
+
+    #[test]
+    fn test_analyze_photo_nonexistent_file() {
+        let mut models = empty_models();
+        let config = default_config();
+        let ai = AiStatus::default();
+        let tmp = tempfile::tempdir().unwrap();
+        let faces_dir = tmp.path().to_str().unwrap();
+
+        let result = analyze_photo(
+            "test_id",
+            "/nonexistent/photo.jpg",
+            &ai,
+            &mut models,
+            &config,
+            None,
+            faces_dir,
+        );
+        assert!(result.objects.is_empty());
+    }
+
+    // ── analyze_video with real video ───────────────────────────
+
+    #[test]
+    fn test_analyze_video_real_video_no_models() {
+        let path = "/home/denzyl/Pictures/takeout-20260428T162732Z-3-001/Takeout/Google Photos/Moved to van der hoevenplein /VID_20171010_123456.mp4";
+        if !std::path::Path::new(path).exists() {
+            eprintln!("test video not found: {path}");
+            return;
+        }
+        let mut models = empty_models();
+        let config = default_config();
+        let ai = AiStatus::default();
+        let tmp = tempfile::tempdir().unwrap();
+        let faces_dir = tmp.path().to_str().unwrap();
+
+        let result = analyze_video(
+            "test_video",
+            path,
+            &ai,
+            &mut models,
+            &config,
+            None,
+            faces_dir,
+        );
+        // Without models, whisper should still run if ffmpeg is available
+        // (extract_audio returns Some), but no visual models run
+        assert!(result.objects.is_empty());
+    }
+
+    // ── PhotoResult defaults ────────────────────────────────────
+
+    #[test]
+    fn test_photo_result_default() {
+        let r = PhotoResult::default();
+        assert!(r.objects.is_empty());
+        assert_eq!(r.aesthetics, None);
+        assert_eq!(r.nsfw, None);
+        assert_eq!(r.ocr, None);
+        assert_eq!(r.transcript, None);
+        assert_eq!(r.face_count, 0);
+        assert!(r.faces.is_empty());
+        assert!(r.completed_models.is_empty());
+        assert!(r.model_timings.is_empty());
+    }
 }

@@ -113,8 +113,14 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                 let mut m = models.lock().unwrap();
                 if m.is_none() {
                     callbacks.on_log("Loading AI models...");
-                    let known_people = db.lock().unwrap().get_all_people_with_embeddings();
-                    let loaded = super::models::load_models(&db_path, known_people);
+                    let lock = db.lock().unwrap();
+                    let config = lock.get_state();
+                    let known_people = lock.get_all_people_with_embeddings();
+                    drop(lock);
+                    let loaded =
+                        super::models::load_models(&db_path, &config, known_people, &|msg| {
+                            callbacks.on_log(msg)
+                        });
                     callbacks.on_ep_selected(&loaded.selected_ep);
                     *m = Some(loaded);
                     callbacks.on_log("Models ready.");
@@ -130,11 +136,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                     (vec![id.clone()], Some(status_model.to_string()), None)
                 }
                 Job::ProcessModel(model_id) => {
-                    if model_id == "whisper" {
-                        callbacks.on_log("Video transcription not wired yet.");
-                        callbacks.on_model_status(model_id, "unavailable", 0, 0);
-                        (Vec::new(), None, None)
-                    } else if let Some(status_model) = ml_worker::job_status_model(model_id) {
+                    if let Some(status_model) = ml_worker::job_status_model(model_id) {
                         let lock = db.lock().unwrap();
                         (
                             lock.get_photos_missing_model(status_model),
@@ -193,7 +195,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
             if !has_enabled_model && target_model.is_none() {
                 let lock = db.lock().unwrap();
                 for pid in &photo_ids {
-                    lock.update_photo_indexed(pid, 2);
+                    lock.update_photo_indexed(pid, 1);
                 }
                 continue;
             }
@@ -236,18 +238,38 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                         };
 
                         if let Some(photo_entry) = photo_entry {
+                            let short_name = std::path::Path::new(&photo_entry.location)
+                                .file_name()
+                                .map(|n| n.to_string_lossy().to_string())
+                                .unwrap_or_else(|| photo_entry.id.clone());
+                            callbacks.on_log(&format!("Analyzing {short_name}..."));
+
+                            let is_video = pipeline::is_video_file(&photo_entry.location);
+
                             let mut result = {
                                 let mut m = models_ref.lock().unwrap();
                                 let models = m.as_mut().unwrap();
-                                pipeline::analyze_photo(
-                                    &photo_entry.id,
-                                    &photo_entry.location,
-                                    &photo_entry.ai_status,
-                                    models,
-                                    &config_ref,
-                                    target_model_ref.as_deref(),
-                                    &faces_dir_ref,
-                                )
+                                if is_video {
+                                    pipeline::analyze_video(
+                                        &photo_entry.id,
+                                        &photo_entry.location,
+                                        &photo_entry.ai_status,
+                                        models,
+                                        &config_ref,
+                                        target_model_ref.as_deref(),
+                                        &faces_dir_ref,
+                                    )
+                                } else {
+                                    pipeline::analyze_photo(
+                                        &photo_entry.id,
+                                        &photo_entry.location,
+                                        &photo_entry.ai_status,
+                                        models,
+                                        &config_ref,
+                                        target_model_ref.as_deref(),
+                                        &faces_dir_ref,
+                                    )
+                                }
                             };
 
                             let new_people: Vec<(String, Vec<f32>)> = {

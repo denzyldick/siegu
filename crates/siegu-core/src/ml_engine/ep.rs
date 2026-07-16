@@ -6,26 +6,28 @@ pub fn build_session(path: &std::path::Path) -> Result<Session, String> {
         .with_optimization_level(ort::session::builder::GraphOptimizationLevel::Disable)
         .map_err(|e| format!("Optimization level error: {e}"))?;
 
+    let mut eps: Vec<ort::ep::ExecutionProviderDispatch> = Vec::new();
+
     #[cfg(feature = "cuda")]
     {
-        builder = builder
-            .with_execution_providers([ort::ep::CUDA::default().build()])
-            .map_err(|e| format!("CUDA EP error: {e}"))?;
+        eps.push(ort::ep::CUDA::default().build());
     }
 
     #[cfg(all(not(feature = "cuda"), target_os = "windows"))]
     {
-        builder = builder
-            .with_execution_providers([ort::ep::DirectML::default().build()])
-            .map_err(|e| format!("DirectML EP error: {e}"))?;
+        eps.push(ort::ep::DirectML::default().build());
     }
 
     #[cfg(all(not(feature = "cuda"), target_os = "macos"))]
     {
-        builder = builder
-            .with_execution_providers([ort::ep::CoreML::default().build()])
-            .map_err(|e| format!("CoreML EP error: {e}"))?;
+        eps.push(ort::ep::CoreML::default().build());
     }
+
+    eps.push(ort::ep::CPU::default().build());
+
+    builder = builder
+        .with_execution_providers(eps)
+        .map_err(|e| format!("EP registration error: {e}"))?;
 
     builder
         .commit_from_file(path)

@@ -91,18 +91,75 @@ impl AnalysisCallbacks for TuiCallbacks {
 
 struct PhotoLine {
     short_name: String,
+    is_video: bool,
     timings: Vec<(String, f64)>,
     objects: Vec<(String, String)>,
     face_count: usize,
     nsfw: Option<String>,
     ocr: Option<String>,
+    transcript: Option<String>,
+    aesthetics: Option<f64>,
+}
+
+struct Findings {
+    object_counts: std::collections::HashMap<String, usize>,
+    total_faces: usize,
+    nsfw_items: usize,
+    ocr_texts: Vec<String>,
+    transcripts: Vec<String>,
+    aesthetics_sum: f64,
+    aesthetics_count: usize,
+    total_photos: usize,
+    total_videos: usize,
+}
+
+impl Findings {
+    fn new() -> Self {
+        Self {
+            object_counts: std::collections::HashMap::new(),
+            total_faces: 0,
+            nsfw_items: 0,
+            ocr_texts: Vec::new(),
+            transcripts: Vec::new(),
+            aesthetics_sum: 0.0,
+            aesthetics_count: 0,
+            total_photos: 0,
+            total_videos: 0,
+        }
+    }
+
+    fn update(&mut self, line: &PhotoLine) {
+        for (cls, _) in &line.objects {
+            *self.object_counts.entry(cls.clone()).or_insert(0) += 1;
+        }
+        self.total_faces += line.face_count;
+        if line.nsfw.is_some() {
+            self.nsfw_items += 1;
+        }
+        if let Some(ref ocr) = line.ocr {
+            if !ocr.trim().is_empty() && !self.ocr_texts.contains(ocr) {
+                self.ocr_texts.push(ocr.clone());
+            }
+        }
+        if let Some(ref t) = line.transcript {
+            if !t.trim().is_empty() && !self.transcripts.contains(t) {
+                self.transcripts.push(t.clone());
+            }
+        }
+        if let Some(a) = line.aesthetics {
+            self.aesthetics_sum += a;
+            self.aesthetics_count += 1;
+        }
+    }
 }
 
 struct App {
     photo_lines: Vec<PhotoLine>,
+    findings: Findings,
     completed: usize,
     total: usize,
     ep: String,
+    status: String,
     active_model: Option<String>,
     should_quit: bool,
     done: bool,
@@ -114,9 +171,11 @@ impl App {
     fn new(total: usize) -> Self {
         Self {
             photo_lines: Vec::new(),
+            findings: Findings::new(),
             completed: 0,
             total,
             ep: "CPU".to_string(),
+            status: "Starting...".to_string(),
             active_model: None,
             should_quit: false,
             done: false,
@@ -139,6 +198,8 @@ impl App {
                     .to_string_lossy()
                     .to_string();
 
+                let is_video = siegu_core::ml_engine::pipeline::is_video_file(&location);
+
                 let mut timings: Vec<(String, f64)> = result
                     .model_timings
                     .iter()
@@ -148,14 +209,25 @@ impl App {
 
                 let objects = result.objects.iter().take(5).cloned().collect();
 
-                self.photo_lines.push(PhotoLine {
+                if is_video {
+                    self.findings.total_videos += 1;
+                } else {
+                    self.findings.total_photos += 1;
+                }
+
+                let line = PhotoLine {
                     short_name,
+                    is_video,
                     timings,
                     objects,
                     face_count: result.face_count,
                     nsfw: result.nsfw.clone(),
                     ocr: result.ocr.clone(),
-                });
+                    transcript: result.transcript.clone(),
+                    aesthetics: result.aesthetics,
+                };
+                self.findings.update(&line);
+                self.photo_lines.push(line);
 
                 self.completed = self.total.saturating_sub(remaining);
                 if self.completed > 0 {
@@ -176,7 +248,11 @@ impl App {
                 }
             }
             TuiEvent::EpSelected(ep) => self.ep = ep,
-            TuiEvent::Log(_) => {}
+            TuiEvent::Log(msg) => {
+                if msg.contains("Loading") || msg.contains("Models ready") {
+                    self.status = msg;
+                }
+            }
             TuiEvent::ScanComplete => self.done = true,
         }
     }
@@ -200,7 +276,7 @@ impl App {
 fn ui(f: &mut ratatui::Frame, app: &App) {
     let size = f.area();
 
-    let chunks = Layout::default()
+    let vertical = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
@@ -209,9 +285,15 @@ fn ui(f: &mut ratatui::Frame, app: &App) {
         ])
         .split(size);
 
-    render_header(f, app, chunks[0]);
-    render_photos(f, app, chunks[1]);
-    render_progress(f, app, chunks[2]);
+    let horizontal = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(35), Constraint::Percentage(65)])
+        .split(vertical[1]);
+
+    render_header(f, app, vertical[0]);
+    render_findings(f, app, horizontal[0]);
+    render_photos(f, app, horizontal[1]);
+    render_progress(f, app, vertical[2]);
 }
 
 fn render_header(f: &mut ratatui::Frame, app: &App, area: Rect) {
@@ -231,12 +313,24 @@ fn render_header(f: &mut ratatui::Frame, app: &App, area: Rect) {
         ),
         Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
         Span::styled(
-            format!("{}/{} photos", app.completed, app.total),
-            Style::default().fg(Color::White),
+            format!("{}/{}", app.completed, app.total),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            format!("{}p", app.findings.total_photos),
+            Style::default().fg(Color::Yellow),
+        ),
+        Span::styled(" ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            format!("{}v", app.findings.total_videos),
+            Style::default().fg(Color::Magenta),
         ),
         Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
         Span::styled(
-            format!("{:.0}ms/photo", app.last_avg_ms),
+            format!("{:.0}ms", app.last_avg_ms),
             Style::default().fg(Color::Gray),
         ),
         Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
@@ -270,6 +364,131 @@ fn render_header(f: &mut ratatui::Frame, app: &App, area: Rect) {
     f.render_widget(paragraph, area);
 }
 
+fn render_findings(f: &mut ratatui::Frame, app: &App, area: Rect) {
+    let inner_height = area.height as usize;
+    if inner_height == 0 {
+        return;
+    }
+    let available = inner_height.saturating_sub(2);
+    let mut lines: Vec<Line> = Vec::new();
+
+    let title = if app.done {
+        " findings — done"
+    } else {
+        " findings"
+    };
+    let block = Block::default()
+        .title(Span::styled(
+            title,
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::DarkGray));
+
+    if app.findings.object_counts.is_empty()
+        && app.findings.total_faces == 0
+        && app.findings.transcripts.is_empty()
+        && app.findings.ocr_texts.is_empty()
+    {
+        lines.push(Line::from(Span::styled(
+            "  waiting for results...",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        let mut sorted_objects: Vec<(&String, &usize)> =
+            app.findings.object_counts.iter().collect();
+        sorted_objects.sort_by(|a, b| b.1.cmp(a.1));
+
+        if !sorted_objects.is_empty() {
+            lines.push(Line::from(Span::styled(
+                " Objects",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            )));
+            for (cls, count) in sorted_objects.iter().take(available.saturating_sub(1)) {
+                lines.push(Line::from(vec![
+                    Span::styled("  ", Style::default()),
+                    Span::styled(format!("{cls}"), Style::default().fg(Color::Green)),
+                    Span::styled(format!(" ×{count}"), Style::default().fg(Color::DarkGray)),
+                ]));
+            }
+        }
+
+        if app.findings.total_faces > 0 {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                format!(" Faces: {}", app.findings.total_faces),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )));
+        }
+
+        if app.findings.nsfw_items > 0 {
+            lines.push(Line::from(Span::styled(
+                format!(" NSFW:  {} items", app.findings.nsfw_items),
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            )));
+        }
+
+        if app.findings.aesthetics_count > 0 {
+            let avg = app.findings.aesthetics_sum / app.findings.aesthetics_count as f64;
+            lines.push(Line::from(Span::styled(
+                format!(" Aesthetic: {avg:.2} avg"),
+                Style::default().fg(Color::Magenta),
+            )));
+        }
+
+        if !app.findings.ocr_texts.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                " OCR",
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            )));
+            for text in app.findings.ocr_texts.iter().take(3) {
+                let preview = if text.len() > 28 {
+                    format!("  {}...", &text[..28])
+                } else {
+                    format!("  {text}")
+                };
+                lines.push(Line::from(Span::styled(
+                    preview,
+                    Style::default().fg(Color::DarkGray),
+                )));
+            }
+        }
+
+        if !app.findings.transcripts.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                " Transcripts",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )));
+            for t in app.findings.transcripts.iter().take(3) {
+                let preview = if t.len() > 28 {
+                    format!("  {}...", &t[..28])
+                } else {
+                    format!("  {t}")
+                };
+                lines.push(Line::from(Span::styled(
+                    preview,
+                    Style::default().fg(Color::Cyan),
+                )));
+            }
+        }
+    }
+
+    let paragraph = Paragraph::new(lines).block(block);
+    f.render_widget(paragraph, area);
+}
+
 fn render_photos(f: &mut ratatui::Frame, app: &App, area: Rect) {
     let inner_height = area.height as usize;
     if inner_height == 0 {
@@ -282,16 +501,21 @@ fn render_photos(f: &mut ratatui::Frame, app: &App, area: Rect) {
 
     if app.photo_lines.is_empty() && !app.done {
         lines.push(Line::from(Span::styled(
-            "  Waiting for first photo...",
+            format!("  {}", app.status),
             Style::default().fg(Color::DarkGray),
         )));
     }
 
-    for photo in app.photo_lines.iter().rev().take(available_lines / 3).rev() {
+    for photo in app.photo_lines.iter().rev().take(available_lines / 4).rev() {
+        let name_prefix = if photo.is_video { "  [video] " } else { "  " };
         lines.push(Line::from(Span::styled(
-            format!("  {}", photo.short_name),
+            format!("{}{}", name_prefix, photo.short_name),
             Style::default()
-                .fg(Color::Yellow)
+                .fg(if photo.is_video {
+                    Color::Magenta
+                } else {
+                    Color::Yellow
+                })
                 .add_modifier(Modifier::BOLD),
         )));
 
@@ -338,6 +562,18 @@ fn render_photos(f: &mut ratatui::Frame, app: &App, area: Rect) {
             )));
         }
 
+        if let Some(ref transcript) = photo.transcript {
+            let preview = if transcript.len() > 60 {
+                format!("{}...", &transcript[..60])
+            } else {
+                transcript.clone()
+            };
+            lines.push(Line::from(Span::styled(
+                format!("    🎤 \"{}\"", preview),
+                Style::default().fg(Color::Cyan),
+            )));
+        }
+
         lines.push(Line::from(""));
     }
 
@@ -359,7 +595,10 @@ fn render_progress(f: &mut ratatui::Frame, app: &App, area: Rect) {
     let label = if app.done {
         "Done! Press Ctrl+C to exit".to_string()
     } else {
-        format!("{}/{}", app.completed, app.total)
+        format!(
+            "{}/{} ({}p {}v)",
+            app.completed, app.total, app.findings.total_photos, app.findings.total_videos
+        )
     };
 
     let gauge = Gauge::default()
@@ -375,7 +614,7 @@ fn render_progress(f: &mut ratatui::Frame, app: &App, area: Rect) {
     f.render_widget(gauge, area);
 }
 
-fn run_tui(ml_context: MlContext, total: usize) {
+fn run_tui(ml_context: MlContext, rx: mpsc::Receiver<TuiEvent>, total: usize) {
     enable_raw_mode().unwrap();
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen).unwrap();
@@ -386,6 +625,10 @@ fn run_tui(ml_context: MlContext, total: usize) {
 
     loop {
         terminal.draw(|f| ui(f, &app)).unwrap();
+
+        while let Ok(event) = rx.try_recv() {
+            app.handle_event(event);
+        }
 
         if event::poll(Duration::from_millis(50)).unwrap_or(false) {
             if let Ok(Event::Key(key)) = event::read() {
@@ -420,22 +663,31 @@ pub fn run_analyze_all(config_dir: &Path) {
     }
 
     let db = Database::new(&config_dir.display().to_string());
+    let config = db.get_state();
+    if !siegu_core::ml_worker::any_model_enabled(&config) {
+        eprintln!("Error: no ML models enabled.");
+        eprintln!("Enable models first, e.g.:");
+        eprintln!("  siegu config set model_enabled_clip true");
+        eprintln!("  siegu config set model_enabled_face true");
+        std::process::exit(1);
+    }
+
     let unindexed = db.get_unindexed_photos_batch(0, 100000);
     let total = unindexed.len();
 
     if total == 0 {
-        println!("All photos already analyzed.");
+        println!("All media already analyzed.");
         return;
     }
 
     let config_path = config_dir.display().to_string();
-    let (tx, _rx) = mpsc::channel();
+    let (tx, rx) = mpsc::channel();
     let callbacks = TuiCallbacks { tx };
     let ml_context = start_worker(callbacks, config_path, 32);
 
     let _ = ml_context.tx.send(siegu_core::ml_worker::Job::ProcessAll);
 
-    run_tui(ml_context, total);
+    run_tui(ml_context, rx, total);
 }
 
 pub fn run_analyze_photo(config_dir: &Path, photo_id: &str) {
@@ -452,7 +704,7 @@ pub fn run_analyze_photo(config_dir: &Path, photo_id: &str) {
     }
 
     let config_path = config_dir.display().to_string();
-    let (tx, _rx) = mpsc::channel();
+    let (tx, rx) = mpsc::channel();
     let callbacks = TuiCallbacks { tx };
     let ml_context = start_worker(callbacks, config_path, 32);
 
@@ -462,7 +714,7 @@ pub fn run_analyze_photo(config_dir: &Path, photo_id: &str) {
             photo_id.to_string(),
         ));
 
-    run_tui(ml_context, 1);
+    run_tui(ml_context, rx, 1);
 }
 
 pub fn run_analyze_model(config_dir: &Path, model_id: &str) {
@@ -478,12 +730,12 @@ pub fn run_analyze_model(config_dir: &Path, model_id: &str) {
     let total = missing.len();
 
     if total == 0 {
-        println!("No photos need '{model_id}' analysis.");
+        println!("No media need '{model_id}' analysis.");
         return;
     }
 
     let config_path = config_dir.display().to_string();
-    let (tx, _rx) = mpsc::channel();
+    let (tx, rx) = mpsc::channel();
     let callbacks = TuiCallbacks { tx };
     let ml_context = start_worker(callbacks, config_path, 32);
 
@@ -491,5 +743,5 @@ pub fn run_analyze_model(config_dir: &Path, model_id: &str) {
         model_id.to_string(),
     ));
 
-    run_tui(ml_context, total);
+    run_tui(ml_context, rx, total);
 }

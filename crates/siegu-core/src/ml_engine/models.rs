@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -20,37 +21,141 @@ pub struct LoadedModels {
     pub yolo: Option<ModelEngine>,
     pub blip: Option<ModelEngine>,
     pub midas: Option<ModelEngine>,
-    pub whisper: Option<ModelEngine>,
+    pub whisper_encoder: Option<ModelEngine>,
+    pub whisper_decoder: Option<ModelEngine>,
+    pub whisper_tokenizer: Option<tokenizers::Tokenizer>,
     pub known_people: Vec<(String, Vec<f32>)>,
     pub selected_ep: String,
 }
 
-pub fn load_models(config_path: &str, known_people: Vec<(String, Vec<f32>)>) -> LoadedModels {
-    let models_dir = Path::new(config_path).join("models");
-    let is_ok = |p: &Path| p.exists() && p.metadata().map(|m| m.len()).unwrap_or(0) > 1024 * 1024;
+fn model_enabled(config: &HashMap<String, String>, name: &str) -> bool {
+    config
+        .get(&format!("model_enabled_{name}"))
+        .is_some_and(|v| v == "true")
+}
 
-    let clip_visual = load_model(&models_dir, "clip-vit-base-patch32-visual.onnx");
-    let face_detector = load_model(&models_dir, "version-RFB-320.onnx");
-    let arcface = load_model(&models_dir, "arcface.onnx");
-    let ocr_det = load_model(&models_dir, "ocr_det.onnx");
-    let ocr_rec = load_model(&models_dir, "ocr_rec.onnx");
-    let nsfw = load_model(&models_dir, "nsfw.onnx");
-    let aesthetics = load_model(&models_dir, "aesthetics.onnx");
-    let yolo = load_model(&models_dir, "yolov8.onnx");
-    let blip = load_model(&models_dir, "blip.onnx");
-    let midas = load_model(&models_dir, "midas.onnx");
-    let whisper = load_model(&models_dir, "whisper.onnx");
+pub fn load_models(
+    config_path: &str,
+    config: &HashMap<String, String>,
+    known_people: Vec<(String, Vec<f32>)>,
+    log: &dyn Fn(&str),
+) -> LoadedModels {
+    let models_dir = Path::new(config_path).join("models");
+
+    let clip_visual = if model_enabled(config, "clip") {
+        log("Loading CLIP visual model...");
+        let m = load_model(&models_dir, "clip-vit-base-patch32-visual.onnx");
+        log("CLIP visual ready.");
+        m
+    } else {
+        None
+    };
+    let face_detector = if model_enabled(config, "face") || model_enabled(config, "ultraface") {
+        log("Loading face detector...");
+        let m = load_model(&models_dir, "version-RFB-320.onnx");
+        log("Face detector ready.");
+        m
+    } else {
+        None
+    };
+    let arcface = if model_enabled(config, "arcface") {
+        log("Loading ArcFace model...");
+        let m = load_model(&models_dir, "arcface.onnx");
+        log("ArcFace ready.");
+        m
+    } else {
+        None
+    };
+    let ocr_det = if model_enabled(config, "ocr") {
+        log("Loading OCR detection model...");
+        let m = load_model(&models_dir, "ocr_det.onnx");
+        log("OCR detection ready.");
+        m
+    } else {
+        None
+    };
+    let ocr_rec = if model_enabled(config, "ocr") {
+        log("Loading OCR recognition model...");
+        let m = load_model(&models_dir, "ocr_rec.onnx");
+        log("OCR recognition ready.");
+        m
+    } else {
+        None
+    };
+    let nsfw = if model_enabled(config, "nsfw") {
+        log("Loading NSFW model...");
+        let m = load_model(&models_dir, "nsfw.onnx");
+        log("NSFW ready.");
+        m
+    } else {
+        None
+    };
+    let aesthetics = if model_enabled(config, "aesthetics") {
+        log("Loading aesthetics model (1.6 GB)...");
+        let m = load_model(&models_dir, "aesthetics.onnx");
+        log("Aesthetics ready.");
+        m
+    } else {
+        None
+    };
+    let yolo = if model_enabled(config, "yolo") {
+        log("Loading YOLO model...");
+        let m = load_model(&models_dir, "yolov8.onnx");
+        log("YOLO ready.");
+        m
+    } else {
+        None
+    };
+    let blip = if model_enabled(config, "blip") {
+        log("Loading BLIP model...");
+        let m = load_model(&models_dir, "blip.onnx");
+        log("BLIP ready.");
+        m
+    } else {
+        None
+    };
+    let midas = if model_enabled(config, "midas") {
+        log("Loading MiDaS depth model...");
+        let m = load_model(&models_dir, "midas.onnx");
+        log("MiDaS ready.");
+        m
+    } else {
+        None
+    };
+    let (whisper_encoder, whisper_decoder, whisper_tokenizer) = if model_enabled(config, "whisper")
+    {
+        log("Loading Whisper encoder...");
+        let enc = load_model(&models_dir, "whisper.onnx");
+        log("Whisper encoder ready.");
+        log("Loading Whisper decoder...");
+        let dec = load_model(&models_dir, "whisper-decoder.onnx");
+        log("Whisper decoder ready.");
+        let tok_path = models_dir.join("whisper-tokenizer.json");
+        let tok = if tok_path.exists() {
+            tokenizers::Tokenizer::from_file(&tok_path).ok()
+        } else {
+            None
+        };
+        (enc, dec, tok)
+    } else {
+        (None, None, None)
+    };
 
     let clip_text_path = models_dir.join("clip-vit-base-patch32-text.onnx");
     let tokenizer_path = models_dir.join("tokenizer.json");
     let ocr_dict_path = models_dir.join("en_dict.txt");
 
     let mut text_embeddings = Vec::new();
-    let clip_text = if is_ok(&clip_text_path) {
+    let clip_text = if model_enabled(config, "clip") && clip_text_path.exists() {
         if let Ok(tokenizer) = tokenizers::Tokenizer::from_file(&tokenizer_path) {
+            log("Loading CLIP text model & computing embeddings...");
             if let Some(mut text_model) = load_model(&models_dir, "clip-vit-base-patch32-text.onnx")
             {
                 text_embeddings = compute_text_embeddings(&mut text_model, &tokenizer);
+                log(&format!(
+                    "CLIP text ready ({} embeddings).",
+                    text_embeddings.len()
+                ));
                 Some(text_model)
             } else {
                 None
@@ -62,7 +167,7 @@ pub fn load_models(config_path: &str, known_people: Vec<(String, Vec<f32>)>) -> 
         None
     };
 
-    let ocr_alphabet = if ocr_dict_path.exists() {
+    let ocr_alphabet = if model_enabled(config, "ocr") && ocr_dict_path.exists() {
         let dict = std::fs::read_to_string(&ocr_dict_path).unwrap_or_default();
         let mut alphabet = vec!["blank".to_string()];
         alphabet.extend(dict.lines().map(|s| s.to_string()));
@@ -88,7 +193,9 @@ pub fn load_models(config_path: &str, known_people: Vec<(String, Vec<f32>)>) -> 
         yolo,
         blip,
         midas,
-        whisper,
+        whisper_encoder,
+        whisper_decoder,
+        whisper_tokenizer,
         known_people,
         selected_ep,
     }

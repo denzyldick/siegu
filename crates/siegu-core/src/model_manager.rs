@@ -108,8 +108,22 @@ pub const MODEL_REGISTRY: &[ModelFile] = &[
     ModelFile {
         model_name: "whisper",
         filename: "whisper.onnx",
-        url: "https://huggingface.co/Xenova/whisper-tiny.en/resolve/main/onnx/encoder_model.onnx",
-        expected_size: 10_000_000,
+        url: "https://huggingface.co/onnx-community/whisper-tiny-ONNX/resolve/main/onnx/encoder_model.onnx",
+        expected_size: 32_000_000,
+        sha256: "",
+    },
+    ModelFile {
+        model_name: "whisper",
+        filename: "whisper-decoder.onnx",
+        url: "https://huggingface.co/onnx-community/whisper-tiny-ONNX/resolve/main/onnx/decoder_model_merged.onnx",
+        expected_size: 118_000_000,
+        sha256: "",
+    },
+    ModelFile {
+        model_name: "whisper",
+        filename: "whisper-tokenizer.json",
+        url: "https://huggingface.co/onnx-community/whisper-tiny-ONNX/resolve/main/tokenizer.json",
+        expected_size: 3_800_000,
         sha256: "",
     },
 ];
@@ -189,15 +203,7 @@ pub fn check_models_downloaded(models_dir: &Path) -> Vec<String> {
         downloaded.push("ocr".to_string());
     }
 
-    for name in &[
-        "nsfw",
-        "aesthetics",
-        "yolo",
-        "blip",
-        "arcface",
-        "midas",
-        "whisper",
-    ] {
+    for name in &["nsfw", "aesthetics", "yolo", "blip", "arcface", "midas"] {
         let filename = match *name {
             "yolo" => "yolov8.onnx",
             _ => &format!("{name}.onnx"),
@@ -205,6 +211,16 @@ pub fn check_models_downloaded(models_dir: &Path) -> Vec<String> {
         if models_dir.join(filename).exists() {
             downloaded.push(name.to_string());
         }
+    }
+
+    let whisper_files = [
+        "whisper.onnx",
+        "whisper-decoder.onnx",
+        "whisper-tokenizer.json",
+    ];
+    let whisper_ok = whisper_files.iter().all(|f| models_dir.join(f).exists());
+    if whisper_ok {
+        downloaded.push("whisper".to_string());
     }
 
     downloaded
