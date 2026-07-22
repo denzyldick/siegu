@@ -38,6 +38,7 @@ reqwest = { workspace = true }
 rustfft = { workspace = true }
 anyhow = "1.0.102"
 lazy_static = "1.5.0"
+heic = { workspace = true }
 num_cpus = "1.16.0"
 warp = { workspace = true }
 mdns-sd = { workspace = true }

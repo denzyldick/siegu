@@ -7504,6 +7504,7 @@ dependencies = [
  "crossbeam-channel",
  "ffmpeg-next",
  "futures-util",
+ "heic",
  "hex",
  "image 0.25.10",
  "kamadak-exif",

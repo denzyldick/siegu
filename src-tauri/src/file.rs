@@ -251,6 +251,7 @@ pub fn read_file_base64(app: &tauri::AppHandle, path: String) -> String {
                 .to_lowercase();
             let mime = match ext.as_str() {
                 "png" => "image/png",
+                "heic" | "heif" => "image/heic",
                 "mp4" => "video/mp4",
                 "webm" => "video/webm",
                 "mov" => "video/quicktime",

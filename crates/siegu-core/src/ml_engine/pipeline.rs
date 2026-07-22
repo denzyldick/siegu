@@ -124,9 +124,9 @@ pub fn analyze_photo(
     target_model: Option<&str>,
     faces_dir: &str,
 ) -> PhotoResult {
-    let dynamic_img = match image::open(location) {
-        Ok(img) => img,
-        Err(_) => return PhotoResult::default(),
+    let dynamic_img = match thumbnail::open_image(location) {
+        Some(img) => img,
+        None => return PhotoResult::default(),
     };
 
     let orientation = thumbnail::read_exif_orientation(location);

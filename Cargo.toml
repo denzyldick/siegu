@@ -39,6 +39,7 @@ warp = { version = "0.4.3", features = ["server", "websocket"] }
 mdns-sd = "0.11"
 ffmpeg-next = "8.1.0"
 rustfft = "6.4.1"
+heic = "0.1.6"
 
 [patch.crates-io]
 esaxx-rs = { path = "src-tauri/vendor/esaxx-rs" }

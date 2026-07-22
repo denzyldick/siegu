@@ -5,6 +5,28 @@ use std::io::BufReader;
 
 const THUMB_SIZE: u32 = 320;
 
+fn is_heic_file(path: &str) -> bool {
+    let lower = path.to_lowercase();
+    lower.ends_with(".heic") || lower.ends_with(".heif")
+}
+
+fn open_image(path: &str) -> Option<DynamicImage> {
+    if is_heic_file(path) {
+        open_heic(path)
+    } else {
+        image::open(path).ok()
+    }
+}
+
+fn open_heic(path: &str) -> Option<DynamicImage> {
+    let data = std::fs::read(path).ok()?;
+    let output = heic::DecoderConfig::new()
+        .decode(&data, heic::PixelLayout::Rgba8)
+        .ok()?;
+    let img = image::RgbaImage::from_raw(output.width, output.height, output.data)?;
+    Some(DynamicImage::ImageRgba8(img))
+}
+
 pub fn read_exif_orientation(path: &str) -> u16 {
     let Ok(file) = File::open(path) else {
         return 1;
@@ -56,7 +78,7 @@ pub fn generate_thumbnail(path: &str) -> Option<String> {
 }
 
 fn generate_image_thumbnail(path: &str) -> Option<String> {
-    let img = image::open(path).ok()?;
+    let img = open_image(path)?;
     let orientation = read_exif_orientation(path);
     let img = apply_orientation(img, orientation);
     let thumb = img.thumbnail(THUMB_SIZE, THUMB_SIZE);
