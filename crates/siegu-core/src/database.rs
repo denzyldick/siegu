@@ -6,6 +6,7 @@ use std::{
 use rusqlite::Connection;
 use serde::Serialize;
 
+/// Autocomplete suggestion returned by search queries.
 #[derive(Debug, Clone, Serialize)]
 pub struct SearchSuggestion {
     pub title: String,
@@ -13,12 +14,14 @@ pub struct SearchSuggestion {
     pub suggestion_type: String,
 }
 
+/// SQLite-backed photo, face, and sync metadata store.
 pub struct Database {
     pub connection: Connection,
 }
 
 use crate::scanner;
 
+/// Build a SQL WHERE clause fragment matching all known video file extensions.
 fn video_sql_like() -> String {
     let parts: Vec<String> = scanner::VIDEO_EXTENSIONS
         .iter()
@@ -27,6 +30,7 @@ fn video_sql_like() -> String {
     format!("({})", parts.join(" OR "))
 }
 
+/// Build a SQL WHERE clause fragment excluding all known video file extensions.
 fn video_sql_not_like() -> String {
     format!(
         "NOT ({})",
@@ -53,6 +57,7 @@ const MONTH_NAMES: &[(u8, &str, &str)] = &[
     (12, "december", "dec"),
 ];
 
+/// Convert a month name (e.g. "january", "mar") to a SQL LIKE pattern for date matching.
 fn month_name_to_like(query: &str) -> Option<String> {
     let q_lower = query.to_lowercase();
     for &(num, full, abbr) in MONTH_NAMES {
@@ -62,6 +67,7 @@ fn month_name_to_like(query: &str) -> Option<String> {
     }
     None
 }
+/// Photo data for syncing between devices.
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct PhotoSyncInfo {
     pub id: String,
@@ -75,12 +81,14 @@ pub struct PhotoSyncInfo {
     pub aesthetics_score: Option<f64>,
 }
 
+/// A detected object class with its confidence score, used in sync payloads.
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct SyncObject {
     pub class: String,
     pub probability: String,
 }
 
+/// Face crop data for syncing between devices.
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct SyncFace {
     pub face_id: String,
@@ -89,6 +97,7 @@ pub struct SyncFace {
     pub person_id: Option<String>,
 }
 
+/// Borrowed photo data for importing into the database within a transaction.
 pub struct ImportedPhoto<'a> {
     pub id: &'a str,
     pub location: &'a str,
@@ -100,6 +109,7 @@ pub struct ImportedPhoto<'a> {
     pub encoded: &'a str,
 }
 
+/// A detected face with its associated person name (if any).
 #[derive(Debug, Clone, Serialize)]
 pub struct FaceWithPerson {
     pub photo_id: String,
@@ -111,6 +121,7 @@ pub struct FaceWithPerson {
 }
 
 impl Database {
+    /// Get all indexed photos with their detected objects and faces, for device sync.
     pub fn get_photo_sync_info(&self) -> Vec<PhotoSyncInfo> {
         let mut results = Vec::new();
         // Only select photos that have been indexed (have at least one entry in object or faces table)
@@ -182,6 +193,7 @@ impl Database {
         results
     }
 
+    /// Get sync info for a single photo by its ID.
     pub fn get_photo_sync_info_by_id(&self, photo_id: &str) -> Result<PhotoSyncInfo, String> {
         let sql = "SELECT id, location, created, latitude, longitude, caption, aesthetics_score FROM photo WHERE id = ?1";
         self.connection
@@ -240,6 +252,7 @@ impl Database {
             .map_err(|e| e.to_string())
     }
 
+    /// Open or create the database at the given config directory, running schema migrations.
     pub fn new(config_path: &str) -> Self {
         let path = format!("{config_path}/siegu.db");
         let _ = fs::create_dir_all(config_path);
@@ -339,6 +352,7 @@ impl Database {
         Self { connection: conn }
     }
 
+    /// Run `PRAGMA integrity_check` and return true if the database is healthy.
     pub fn check_integrity(&self) -> crate::Result<bool> {
         let result: String = self
             .connection
@@ -351,6 +365,7 @@ impl Database {
         }
     }
 
+    /// Read all config key-value pairs from the config table.
     pub fn get_state(&self) -> HashMap<String, String> {
         let mut map = HashMap::new();
         if let Ok(mut stmt) = self.connection.prepare("SELECT key, value FROM config") {
@@ -365,6 +380,7 @@ impl Database {
         map
     }
 
+    /// Insert a log entry with the given level and message.
     pub fn store_log(&self, level: &str, message: &str) {
         if let Err(e) = self.connection.execute(
             "INSERT INTO logs (level, message) VALUES (?1, ?2)",
@@ -374,6 +390,7 @@ impl Database {
         }
     }
 
+    /// Retrieve the most recent log entries, up to `limit`.
     pub fn get_logs(&self, limit: usize) -> Vec<LogEntry> {
         let mut logs = Vec::new();
         let sql = "SELECT timestamp, level, message FROM logs ORDER BY timestamp DESC LIMIT ?1";
@@ -393,12 +410,14 @@ impl Database {
         logs
     }
 
+    /// Delete all log entries from the logs table.
     pub fn clear_logs(&self) {
         if let Err(e) = self.connection.execute("DELETE FROM logs", ()) {
             tracing::warn!("clear_logs: {e}");
         }
     }
 
+    /// Write config key-value pairs, replacing any existing keys.
     pub fn set_state(&self, state: HashMap<String, String>) {
         for (key, value) in state {
             let _ = self
@@ -411,10 +430,12 @@ impl Database {
         }
     }
 
+    /// Get the timestamp of the last directory scan.
     pub fn get_last_scan_time(&self) -> Option<String> {
         self.get_state().get("last_scan_time").cloned()
     }
 
+    /// Set the timestamp of the last directory scan.
     pub fn set_last_scan_time(&self, timestamp: String) {
         let _ = self.connection.execute(
             "INSERT OR REPLACE INTO config (key, value) VALUES('last_scan_time', ?1)",
@@ -422,6 +443,7 @@ impl Database {
         );
     }
 
+    /// Search for object tags, location names, people, and month suggestions matching the query.
     pub fn list_objects(&self, query: &str) -> Vec<SearchSuggestion> {
         let mut objects = Vec::new();
         let sql = "SELECT class, 'tag' FROM object WHERE class LIKE ?1 \
@@ -550,6 +572,7 @@ impl Database {
         }
     }
 
+    /// List photos with search, pagination, and optional favorite/video filters.
     pub fn list_photos(
         &self,
         query: &str,
@@ -657,6 +680,7 @@ impl Database {
         photos
     }
 
+    /// Toggle the favorite status of a photo. Returns true if now favorited.
     pub fn toggle_favorite(&self, photo_id: &str) -> bool {
         let exists = self
             .connection
@@ -681,6 +705,7 @@ impl Database {
         }
     }
 
+    /// Get all photos that have non-zero GPS coordinates, for map heatmap display.
     pub fn get_heatmap_points(&self) -> Vec<MapPoint> {
         let mut points = Vec::new();
         let sql =
@@ -701,6 +726,7 @@ impl Database {
         points
     }
 
+    /// Fetch multiple photos by their IDs in a single query.
     pub fn get_photos_by_ids(&self, photo_ids: &[String]) -> Vec<Photo> {
         if photo_ids.is_empty() {
             return Vec::new();
@@ -762,6 +788,7 @@ impl Database {
         photos
     }
 
+    /// Fetch a single photo by its ID, with objects and properties populated.
     pub fn get_photo_by_id(&self, photo_id: &str) -> Option<Photo> {
         let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, \
              s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres \
@@ -805,6 +832,7 @@ impl Database {
         Some(photo)
     }
 
+    /// Get base64-encoded thumbnails for a batch of photo IDs.
     pub fn get_photo_encoded_batch(&self, photo_ids: &[String]) -> HashMap<String, String> {
         let mut result = HashMap::new();
         if photo_ids.is_empty() {
@@ -835,6 +863,7 @@ impl Database {
         result
     }
 
+    /// Store or replace a detected face with its embedding and optional person assignment.
     pub fn store_face(&self, face: Face) {
         let embedding_bytes: Vec<u8> = face
             .embedding
@@ -846,6 +875,7 @@ impl Database {
         }
     }
 
+    /// List all named people with a representative face and face count.
     pub fn get_people(&self) -> Vec<PersonWithFace> {
         let mut people = Vec::new();
         if let Ok(mut stmt) = self.connection.prepare("SELECT p.id, p.name, f.crop_path, f.face_id, f.encoded, p.embedding, (SELECT COUNT(*) FROM faces WHERE person_id = p.id) FROM people p LEFT JOIN faces f ON p.id = f.person_id WHERE p.name IS NOT NULL GROUP BY p.id") {
@@ -859,6 +889,7 @@ impl Database {
         people
     }
 
+    /// Assign a name to a face, creating or merging people as needed. Returns the person ID.
     pub fn assign_name_to_face(&self, face_id: &str, name: &str) -> String {
         let existing_id: Option<String> = self
             .connection
@@ -920,6 +951,7 @@ impl Database {
         target_id
     }
 
+    /// Create an unnamed person record from a face embedding. Returns the new person ID.
     pub fn create_anonymous_person(&self, embedding: &[f32]) -> String {
         let id = uuid::Uuid::new_v4().to_string();
         let embedding_bytes: Vec<u8> = embedding.iter().flat_map(|f| f.to_le_bytes()).collect();
@@ -930,6 +962,7 @@ impl Database {
         id
     }
 
+    /// Recompute the average face embedding (centroid) for a person.
     pub fn update_person_centroid(&self, person_id: &str) {
         let mut embeddings = Vec::new();
         if let Ok(mut stmt) = self
@@ -978,6 +1011,7 @@ impl Database {
         );
     }
 
+    /// List all unnamed people grouped by face similarity, ordered by face count.
     pub fn get_anonymous_people_groups(&self) -> Vec<PersonWithFace> {
         let mut results = Vec::new();
         if let Ok(mut stmt) = self.connection.prepare("SELECT p.id, f.crop_path, f.face_id, f.encoded, p.embedding, (SELECT COUNT(*) FROM faces WHERE person_id = p.id) FROM people p JOIN faces f ON p.id = f.person_id WHERE p.name IS NULL GROUP BY p.id ORDER BY (SELECT COUNT(*) FROM faces WHERE person_id = p.id) DESC") {
@@ -999,6 +1033,7 @@ impl Database {
         results
     }
 
+    /// Get all detected faces in a photo, with person names if assigned.
     pub fn get_faces_for_photo(&self, photo_id: &str) -> Vec<FaceWithPerson> {
         let mut faces = Vec::new();
         let sql = "SELECT f.photo_id, f.face_id, f.crop_path, f.encoded, f.person_id, p.name FROM faces f LEFT JOIN people p ON f.person_id = p.id WHERE f.photo_id = ?1";
@@ -1021,6 +1056,7 @@ impl Database {
         faces
     }
 
+    /// Get all face records belonging to a person.
     pub fn get_person_faces(&self, person_id: &str) -> Vec<Face> {
         let mut faces = Vec::new();
         if let Ok(mut stmt) = self.connection.prepare("SELECT photo_id, face_id, crop_path, encoded, person_id FROM faces WHERE person_id = ?1") {
@@ -1040,6 +1076,7 @@ impl Database {
         faces
     }
 
+    /// Get all photos that contain a given person.
     pub fn get_photos_for_person(&self, person_id: &str) -> Vec<Photo> {
         let mut photos = Vec::new();
         let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, 
@@ -1084,6 +1121,7 @@ impl Database {
         photos
     }
 
+    /// List all monitored directory paths.
     pub fn list_directories(&self) -> Vec<String> {
         let mut results = Vec::new();
         if let Ok(mut stm) = self.connection.prepare("SELECT name FROM directory") {
@@ -1096,6 +1134,7 @@ impl Database {
         results
     }
 
+    /// Remove a monitored directory path from the config.
     pub fn remove_directory(&self, path: String) {
         if let Err(e) = self
             .connection
@@ -1105,6 +1144,7 @@ impl Database {
         }
     }
 
+    /// Add a directory path to the monitored directories list.
     pub fn add_directory(&self, path: &str) {
         if let Err(e) = self
             .connection
@@ -1114,6 +1154,7 @@ impl Database {
         }
     }
 
+    /// Merge all faces from `from_id` into `to_id`, then delete the source person.
     pub fn merge_people(&self, from_id: &str, to_id: &str) {
         if let Err(e) = self.connection.execute(
             "UPDATE faces SET person_id = ?1 WHERE person_id = ?2",
@@ -1132,6 +1173,7 @@ impl Database {
         self.update_person_centroid(to_id);
     }
 
+    /// Rename a person record.
     pub fn rename_person(&self, id: &str, new_name: &str) {
         if let Err(e) = self
             .connection
@@ -1141,6 +1183,7 @@ impl Database {
         }
     }
 
+    /// Remove a directory and all its photos, objects, faces, and properties in a transaction.
     pub fn remove_directory_full(&mut self, path: &str) {
         let tx = match self.connection.transaction() {
             Ok(t) => t,
@@ -1170,6 +1213,7 @@ impl Database {
         }
     }
 
+    /// Import a photo with its objects and faces within a transaction (for device sync).
     pub fn import_photo(&mut self, photo: ImportedPhoto<'_>) {
         let tx = match self.connection.transaction() {
             Ok(t) => t,
@@ -1230,6 +1274,7 @@ impl Database {
         }
     }
 
+    /// Return (photo_count, video_count) based on file extensions.
     pub fn get_media_counts(&self) -> (i64, i64) {
         let not_video = video_sql_not_like();
         let is_video = video_sql_like();
@@ -1252,6 +1297,7 @@ impl Database {
         (photo_count, video_count)
     }
 
+    /// List all paired devices.
     pub fn list_devices(&self) -> Vec<DeviceInfo> {
         let mut results = Vec::new();
         if let Ok(mut stmt) = self.connection.prepare("SELECT ip, name FROM device") {
@@ -1275,6 +1321,7 @@ impl Database {
         results
     }
 
+    /// Get all named people with their stored face embeddings.
     pub fn get_all_people_with_embeddings(&self) -> Vec<(String, Vec<f32>)> {
         let mut results = Vec::new();
         if let Ok(mut stmt) = self
@@ -1298,6 +1345,7 @@ impl Database {
         results
     }
 
+    /// Batch-insert photos with their properties, ignoring duplicates.
     pub fn store_photo_batch(&mut self, photos: &[Photo]) -> Result<(), String> {
         let tx = self.connection.transaction().map_err(|e| e.to_string())?;
         {
@@ -1328,6 +1376,7 @@ impl Database {
         tx.commit().map_err(|e| e.to_string())
     }
 
+    /// Set the indexed level for a photo (0=new, 1=metadata, 2=fully processed).
     pub fn update_photo_indexed(&self, id: &str, indexed: i32) {
         if let Err(e) = self
             .connection
@@ -1337,6 +1386,7 @@ impl Database {
         }
     }
 
+    /// Record that a specific ML model has processed a photo.
     pub fn update_ai_status(&self, photo_id: &str, model: &str, status: i32) {
         match model {
             "clip" | "face" | "ocr" | "nsfw" | "aesthetics" | "yolo" | "blip" | "arcface"
@@ -1350,6 +1400,7 @@ impl Database {
         let _ = self.connection.execute(&sql, (photo_id, status));
     }
 
+    /// Get up to 50 photos that have not yet been fully AI-processed.
     pub fn get_unindexed_photos(&self) -> Vec<Photo> {
         let mut photos = Vec::new();
         let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, p.indexed, p.caption, p.aesthetics_score, 
@@ -1394,6 +1445,7 @@ impl Database {
         photos
     }
 
+    /// Get a paginated batch of unindexed photos.
     pub fn get_unindexed_photos_batch(&self, offset: usize, limit: usize) -> Vec<Photo> {
         let mut photos = Vec::new();
         let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, p.indexed, p.caption, p.aesthetics_score, 
@@ -1440,6 +1492,7 @@ impl Database {
         photos
     }
 
+    /// Get photo IDs that have not been processed by the given model.
     pub fn get_photos_missing_model(&self, model: &str) -> Vec<String> {
         let mut ids = Vec::new();
         match model {
