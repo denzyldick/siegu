@@ -1,0 +1,314 @@
+use crate::common::get_config_path;
+use crate::database;
+use crate::database::{Database, Photo};
+
+/// Pure business logic — testable without Tauri.
+pub fn do_list_files(
+    db: &Database,
+    query: &str,
+    offset: usize,
+    limit: usize,
+    favorites_only: bool,
+    videos_only: bool,
+) -> Vec<Photo> {
+    db.list_photos(query, offset, limit, favorites_only, videos_only)
+}
+
+/// Pure business logic — testable without Tauri.
+pub fn do_toggle_favorite(db: &Database, id: &str) -> bool {
+    db.toggle_favorite(id)
+}
+
+/// Pure business logic — testable without Tauri.
+pub fn do_get_photo_by_id(db: &Database, id: &str) -> Option<Photo> {
+    db.get_photo_by_id(id)
+}
+
+/// Pure business logic — testable without Tauri.
+pub fn do_get_photo_encoded_batch(
+    db: &Database,
+    ids: &[String],
+) -> std::collections::HashMap<String, String> {
+    db.get_photo_encoded_batch(ids)
+}
+
+/// Pure business logic — testable without Tauri.
+pub fn do_get_photos_for_map_click(db: &Database, ids: &[String]) -> Vec<Photo> {
+    db.get_photos_by_ids(ids)
+}
+
+/// Pure business logic — testable without Tauri.
+pub fn do_get_heatmap_data(db: &Database) -> Vec<crate::database::MapPoint> {
+    db.get_heatmap_points()
+}
+
+#[tauri::command]
+pub async fn list_files(
+    app: tauri::AppHandle,
+    offset: usize,
+    limit: usize,
+    query: String,
+    scan: bool,
+    favorites_only: bool,
+    videos_only: bool,
+) -> Result<String, String> {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return Ok("[]".to_string());
+    }
+    if scan {
+        crate::commands::scan::scan_files(app.clone());
+    }
+    let database = database::Database::new(&path);
+    Ok(serde_json::to_string(&do_list_files(
+        &database,
+        &query,
+        offset,
+        limit,
+        favorites_only,
+        videos_only,
+    ))
+    .unwrap_or("[]".to_string()))
+}
+
+#[tauri::command]
+pub async fn toggle_favorite(app: tauri::AppHandle, id: String) -> bool {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return false;
+    }
+    let database = database::Database::new(&path);
+    do_toggle_favorite(&database, &id)
+}
+
+#[tauri::command]
+pub async fn get_photo_by_id(app: tauri::AppHandle, id: String) -> String {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return "null".to_string();
+    }
+    let database = database::Database::new(&path);
+    match do_get_photo_by_id(&database, &id) {
+        Some(photo) => serde_json::to_string(&photo).unwrap_or("null".to_string()),
+        None => "null".to_string(),
+    }
+}
+
+#[tauri::command]
+pub async fn get_photo_encoded_batch(
+    app: tauri::AppHandle,
+    ids: Vec<String>,
+) -> std::collections::HashMap<String, String> {
+    let path = get_config_path(&app);
+    if path.is_empty() || ids.is_empty() {
+        return std::collections::HashMap::new();
+    }
+    let database = database::Database::new(&path);
+    do_get_photo_encoded_batch(&database, &ids)
+}
+
+#[tauri::command]
+pub async fn get_photos_for_map_click(app: tauri::AppHandle, ids: Vec<String>) -> String {
+    let path = get_config_path(&app);
+    if path.is_empty() || ids.is_empty() {
+        return "[]".to_string();
+    }
+    let database = database::Database::new(&path);
+    let photos = do_get_photos_for_map_click(&database, &ids);
+    serde_json::to_string(&photos).unwrap_or("[]".to_string())
+}
+
+#[tauri::command]
+pub async fn get_heatmap_data(app: tauri::AppHandle) -> String {
+    use crate::common::emit_log;
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return "[]".to_string();
+    }
+    let database = database::Database::new(&path);
+    let points = do_get_heatmap_data(&database);
+    emit_log(
+        &app,
+        format!("DEBUG: Found {} photos with GPS for heatmap", points.len()),
+    );
+    serde_json::to_string(&points).unwrap_or("[]".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_helpers::*;
+
+    #[test]
+    fn list_files_empty_db() {
+        let (db, _dir) = test_db();
+        let result = do_list_files(&db, "", 0, 10, false, false);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn list_files_with_photos() {
+        let (mut db, _dir) = test_db();
+        db.store_photo_batch(&[make_photo("p1", "/a.jpg"), make_photo("p2", "/b.jpg")])
+            .unwrap();
+        let result = do_list_files(&db, "", 0, 10, false, false);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn list_files_pagination() {
+        let (mut db, _dir) = test_db();
+        let photos: Vec<_> = (0..5)
+            .map(|i| make_photo(&format!("p{i}"), &format!("/{i}.jpg")))
+            .collect();
+        db.store_photo_batch(&photos).unwrap();
+        assert_eq!(do_list_files(&db, "", 0, 2, false, false).len(), 2);
+        assert_eq!(do_list_files(&db, "", 2, 10, false, false).len(), 3);
+    }
+
+    #[test]
+    fn list_files_favorites_only() {
+        let (mut db, _dir) = test_db();
+        db.store_photo_batch(&[make_photo("a", "/a.jpg"), make_photo("b", "/b.jpg")])
+            .unwrap();
+        db.toggle_favorite("a");
+        let favs = do_list_files(&db, "", 0, 10, true, false);
+        assert_eq!(favs.len(), 1);
+        assert_eq!(favs[0].id, "a");
+        let all = do_list_files(&db, "", 0, 10, false, false);
+        assert_eq!(all.len(), 2);
+    }
+
+    #[test]
+    fn list_files_query_search() {
+        let (mut db, _dir) = test_db();
+        db.store_photo_batch(&[
+            make_photo("ph_beach", "/beach/sunset.jpg"),
+            make_photo("ph_city", "/city/street.jpg"),
+        ])
+        .unwrap();
+        let result = do_list_files(&db, "beach", 0, 10, false, false);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "ph_beach");
+    }
+
+    #[test]
+    fn toggle_favorite_adds_and_removes() {
+        let (db, _dir) = test_db();
+        assert!(do_toggle_favorite(&db, "photo1"));
+        assert!(!do_toggle_favorite(&db, "photo1"));
+    }
+
+    #[test]
+    fn get_photo_by_id_found() {
+        let (mut db, _dir) = test_db();
+        db.store_photo_batch(&[make_photo("p1", "/img.jpg")])
+            .unwrap();
+        let photo = do_get_photo_by_id(&db, "p1");
+        assert!(photo.is_some());
+        assert_eq!(photo.unwrap().location, "/img.jpg");
+    }
+
+    #[test]
+    fn get_photo_by_id_not_found() {
+        let (db, _dir) = test_db();
+        assert!(do_get_photo_by_id(&db, "nonexistent").is_none());
+    }
+
+    #[test]
+    fn get_photo_encoded_batch_basic() {
+        let (mut db, _dir) = test_db();
+        let mut p = make_photo("x1", "/x.jpg");
+        p.encoded = "base64data".to_string();
+        db.store_photo_batch(&[p]).unwrap();
+        let result = do_get_photo_encoded_batch(&db, &["x1".to_string()]);
+        assert_eq!(result.get("x1").unwrap(), "base64data");
+    }
+
+    #[test]
+    fn get_photo_encoded_batch_empty_ids() {
+        let (db, _dir) = test_db();
+        let result = do_get_photo_encoded_batch(&db, &[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn get_photo_encoded_batch_missing() {
+        let (db, _dir) = test_db();
+        let result = do_get_photo_encoded_batch(&db, &["nope".to_string()]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn get_photos_for_map_click_basic() {
+        let (mut db, _dir) = test_db();
+        let mut p = make_photo("m1", "/map.jpg");
+        p.latitude = 40.7;
+        p.longitude = -74.0;
+        db.store_photo_batch(&[p]).unwrap();
+        let result = do_get_photos_for_map_click(&db, &["m1".to_string()]);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].latitude, 40.7);
+    }
+
+    #[test]
+    fn get_photos_for_map_click_empty_ids() {
+        let (db, _dir) = test_db();
+        let result = do_get_photos_for_map_click(&db, &[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn get_heatmap_data_empty() {
+        let (db, _dir) = test_db();
+        let result = do_get_heatmap_data(&db);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn get_heatmap_data_with_gps() {
+        let (mut db, _dir) = test_db();
+        db.store_photo_batch(&[
+            make_photo_gps("g1", 40.7, -74.0),
+            make_photo_gps("g2", 34.0, -118.2),
+            make_photo("g3", "/no-gps.jpg"),
+        ])
+        .unwrap();
+        let result = do_get_heatmap_data(&db);
+        assert_eq!(result.len(), 2);
+        let ids: Vec<_> = result.iter().map(|p| p.id.as_str()).collect();
+        assert!(ids.contains(&"g1"));
+        assert!(ids.contains(&"g2"));
+    }
+
+    #[test]
+    fn get_heatmap_data_zero_gps_excluded() {
+        let (mut db, _dir) = test_db();
+        db.store_photo_batch(&[make_photo("z1", "/zero.jpg")])
+            .unwrap();
+        let result = do_get_heatmap_data(&db);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn list_files_ordered_by_created_desc() {
+        let (mut db, _dir) = test_db();
+        let mut p1 = make_photo("ph1", "/a.jpg");
+        p1.created = "2026-01-01 10:00:00".to_string();
+        let mut p2 = make_photo("ph2", "/b.jpg");
+        p2.created = "2026-01-02 10:00:00".to_string();
+        db.store_photo_batch(&[p1, p2]).unwrap();
+        let result = do_list_files(&db, "", 0, 10, false, false);
+        assert_eq!(result[0].id, "ph2");
+        assert_eq!(result[1].id, "ph1");
+    }
+
+    #[test]
+    fn list_files_offset_beyond_total() {
+        let (mut db, _dir) = test_db();
+        db.store_photo_batch(&[make_photo("ph_a", "/a.jpg")])
+            .unwrap();
+        let result = do_list_files(&db, "", 100, 10, false, false);
+        assert!(result.is_empty());
+    }
+}

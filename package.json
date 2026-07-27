@@ -14,6 +14,7 @@
     "format:check": "prettier --check \"src/**/*.{js,vue,ts,css,json}\" && cargo fmt --check --manifest-path src-tauri/Cargo.toml",
     "test": "vitest run",
     "test:watch": "vitest",
+    "typecheck": "vue-tsc --noEmit",
     "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
@@ -31,6 +32,8 @@
     "leaflet": "^1.9.4",
     "leaflet.heat": "^0.2.0",
     "leaflet.markercluster": "^1.5.3",
+    "pinia": "^4.0.2",
+    "pinia-plugin-persistedstate": "^4.7.1",
     "qrcode.vue": "^3.9.1",
     "vue": "^3.5.35",
     "vue-i18n": "^11.4.5",
@@ -40,12 +43,17 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.2",
+    "@types/leaflet": "^1.9.21",
+    "@types/leaflet.markercluster": "^1.5.6",
+    "@types/node": "^26.1.1",
     "@vitejs/plugin-vue": "^6.0.7",
     "@vue/test-utils": "^2.4.11",
     "happy-dom": "^20.10.2",
     "prettier": "^3.9.5",
     "prettier-plugin-vue": "^1.1.6",
+    "typescript": "^5.8.3",
     "vite": "^8.0.16",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.8",
+    "vue-tsc": "^3.3.8"
   }
 }

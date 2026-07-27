@@ -19,7 +19,6 @@
     </div>
 
     <l-map
-      ref="map"
       v-model:zoom="zoom"
       :center="initialCenter"
       @ready="onMapReady"
@@ -41,7 +40,7 @@
       />
     </l-map>
 
-    <PhotoViewer
+    <MediaViewer
       v-model="viewerOpen"
       :photos="viewerPhotos"
       v-model:index="currentPhotoIndex"
@@ -50,190 +49,189 @@
   </div>
 </template>
 
-<script>
-import 'leaflet/dist/leaflet.css';
-import { LMap, LTileLayer } from '@vue-leaflet/vue-leaflet';
-import L from 'leaflet';
+<script setup lang="ts">
+import 'leaflet/dist/leaflet.css'
+import { LMap, LTileLayer } from '@vue-leaflet/vue-leaflet'
+import L from 'leaflet'
 if (typeof window !== 'undefined') {
-  window.L = L;
+  window.L = L
 }
-import 'leaflet.markercluster';
-import { invoke } from '@tauri-apps/api/core';
-import PhotoViewer from './PhotoViewer.vue';
+import 'leaflet.markercluster'
+import { ref, nextTick, watch } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import type { Map as LeafletMap } from 'leaflet'
+import MediaViewer from './MediaViewer.vue'
+import type { MediaItem } from '@/types/media'
 
-export default {
-  components: {
-    LMap,
-    LTileLayer,
-    PhotoViewer,
-  },
-  data() {
-    return {
-      zoom: 2,
-      initialCenter: [20, 0],
-      map: null,
-      mapPoints: [],
-      clusterGroup: null,
-      loading: true,
-      viewerOpen: false,
-      viewerPhotos: [],
-      currentPhotoIndex: 0,
-    };
-  },
-  methods: {
-    async onMapReady(map) {
-      this.map = map;
-      this.$nextTick(async () => {
-        setTimeout(async () => {
-          if (this.map) {
-            this.map.invalidateSize();
-            await this.loadMapData();
+interface MapPoint {
+  id: number
+  latitude: number
+  longitude: number
+}
+
+const zoom = ref(2)
+const initialCenter: [number, number] = [20, 0]
+const mapPoints = ref<MapPoint[]>([])
+const loading = ref(true)
+const viewerOpen = ref(false)
+const viewerPhotos = ref<MediaItem[]>([])
+const currentPhotoIndex = ref(0)
+
+let leafletMap: LeafletMap | null = null
+let clusterGroup: L.MarkerClusterGroup | null = null
+
+function nearestPoints(lat: number, lng: number, count: number): MapPoint[] {
+  return mapPoints.value
+    .map((p) => ({
+      ...p,
+      dist: Math.sqrt(Math.pow(p.latitude - lat, 2) + Math.pow(p.longitude - lng, 2)),
+    }))
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, count)
+}
+
+async function openCarouselForIds(ids: number[]) {
+  if (ids.length === 0) return
+  try {
+    const photosJson = await invoke<string>('get_photos_for_map_click', { ids })
+    viewerPhotos.value = JSON.parse(photosJson)
+    if (viewerPhotos.value.length > 0) {
+      currentPhotoIndex.value = 0
+      viewerOpen.value = true
+    }
+  } catch (e) {
+    console.error('Failed to load photo details', e)
+  }
+}
+
+async function openCarouselForPoint(point: MapPoint) {
+  const nearest = nearestPoints(point.latitude, point.longitude, 50)
+  const ids = nearest.map((p) => p.id)
+  await openCarouselForIds(ids)
+}
+
+async function loadMapData() {
+  if (!leafletMap) return
+
+  try {
+    const pointsJson = await invoke<string>('get_heatmap_data')
+    mapPoints.value = JSON.parse(pointsJson)
+
+    if (mapPoints.value.length === 0) {
+      loading.value = false
+      return
+    }
+
+    let size = leafletMap.getSize()
+    let retries = 0
+    while ((size.x === 0 || size.y === 0) && retries < 15) {
+      await new Promise((r) => setTimeout(r, 300))
+      leafletMap.invalidateSize()
+      size = leafletMap.getSize()
+      retries++
+    }
+
+    clusterGroup = L.markerClusterGroup({
+      chunkedLoading: true,
+      maxClusterRadius: 60,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true,
+      iconCreateFunction: (cluster: L.MarkerCluster) => {
+        const count = cluster.getChildCount()
+        const size = count < 10 ? 'sm' : count < 100 ? 'md' : 'lg'
+        return L.divIcon({
+          html: `<div class="cluster-icon cluster-${size}"><span>${count}</span></div>`,
+          className: 'custom-cluster',
+          iconSize: L.point(44, 44),
+        })
+      },
+    })
+
+    const bounds: [number, number][] = []
+    for (const p of mapPoints.value) {
+      const marker = L.circleMarker([p.latitude, p.longitude], {
+        radius: 5,
+        fillColor: '#2563eb',
+        color: '#ffffff',
+        weight: 1.5,
+        opacity: 0.9,
+        fillOpacity: 0.5,
+      })
+      marker.on('click', () => openCarouselForPoint(p))
+      marker.on('mouseover', () => {
+        const thumbnailDiv = L.DomUtil.create('div', 'map-thumb-popup')
+        thumbnailDiv.innerHTML = '<div class="thumb-loading"></div>'
+        marker
+          .bindPopup(thumbnailDiv, {
+            closeButton: false,
+            offset: L.point(0, -10),
+          })
+          .openPopup()
+        invoke<Record<string, string>>('get_photo_encoded_batch', { ids: [p.id] }).then((thumbnails) => {
+          const encoded = thumbnails[p.id]
+          if (encoded && encoded.startsWith('data:image/')) {
+            thumbnailDiv.innerHTML = `<img src="${encoded}" class="thumb-img">`
+            marker.setRadius(7)
+            marker.setStyle({ fillOpacity: 0.8 })
           }
-        }, 100);
-      });
-    },
-    async loadMapData() {
-      if (!this.map) return;
+        })
+      })
+      marker.on('mouseout', () => {
+        marker.closePopup()
+      })
+      clusterGroup.addLayer(marker)
+      bounds.push([p.latitude, p.longitude])
+    }
 
-      try {
-        const pointsJson = await invoke('get_heatmap_data');
-        this.mapPoints = JSON.parse(pointsJson);
+    leafletMap.addLayer(clusterGroup)
 
-        if (this.mapPoints.length === 0) {
-          this.loading = false;
-          return;
-        }
+    if (bounds.length > 1) {
+      leafletMap.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 })
+    } else {
+      leafletMap.setView(bounds[0], 4)
+    }
 
-        let size = this.map.getSize();
-        let retries = 0;
-        while ((size.x === 0 || size.y === 0) && retries < 15) {
-          await new Promise((r) => setTimeout(r, 300));
-          this.map.invalidateSize();
-          size = this.map.getSize();
-          retries++;
-        }
+    leafletMap.on('click', (e: L.LeafletMouseEvent) => {
+      const nearest = nearestPoints(e.latlng.lat, e.latlng.lng, 50)
+      if (nearest.length === 0) return
+      const ids = nearest.map((p) => p.id)
+      openCarouselForIds(ids)
+    })
+  } catch (e) {
+    console.error('Failed to load map data', e)
+  } finally {
+    loading.value = false
+  }
+}
 
-        this.clusterGroup = L.markerClusterGroup({
-          chunkedLoading: true,
-          maxClusterRadius: 60,
-          spiderfyOnMaxZoom: true,
-          showCoverageOnHover: false,
-          zoomToBoundsOnClick: true,
-          iconCreateFunction: (cluster) => {
-            const count = cluster.getChildCount();
-            const size = count < 10 ? 'sm' : count < 100 ? 'md' : 'lg';
-            return L.divIcon({
-              html: `<div class="cluster-icon cluster-${size}"><span>${count}</span></div>`,
-              className: 'custom-cluster',
-              iconSize: L.point(44, 44),
-            });
-          },
-        });
+function handlePhotoUpdated(updatedPhoto: MediaItem) {
+  const idx = viewerPhotos.value.findIndex((p) => p.id === updatedPhoto.id)
+  if (idx !== -1) {
+    viewerPhotos.value[idx] = updatedPhoto
+  }
+}
 
-        const bounds = [];
-        for (const p of this.mapPoints) {
-          const marker = L.circleMarker([p.latitude, p.longitude], {
-            radius: 5,
-            fillColor: '#2563eb',
-            color: '#ffffff',
-            weight: 1.5,
-            opacity: 0.9,
-            fillOpacity: 0.5,
-          });
-          marker._mapPointId = p.id;
-          marker.on('click', () => this.openCarouselForPoint(p));
-          marker.on('mouseover', (e) => {
-            const thumbnailDiv = L.DomUtil.create('div', 'map-thumb-popup');
-            thumbnailDiv.innerHTML = '<div class="thumb-loading"></div>';
-            marker
-              .bindPopup(thumbnailDiv, {
-                closeButton: false,
-                offset: L.point(0, -10),
-              })
-              .openPopup();
-            invoke('get_photo_encoded_batch', { ids: [p.id] }).then((thumbnails) => {
-              const encoded = thumbnails[p.id];
-              if (encoded && encoded.startsWith('data:image/')) {
-                thumbnailDiv.innerHTML = `<img src="${encoded}" class="thumb-img">`;
-                marker.setRadius(7);
-                marker.setStyle({ fillOpacity: 0.8 });
-              }
-            });
-          });
-          marker.on('mouseout', () => {
-            marker.closePopup();
-          });
-          this.clusterGroup.addLayer(marker);
-          bounds.push([p.latitude, p.longitude]);
-        }
+async function onMapReady(map: LeafletMap) {
+  leafletMap = map
+  await nextTick()
+  setTimeout(async () => {
+    if (leafletMap) {
+      leafletMap.invalidateSize()
+      await loadMapData()
+    }
+  }, 100)
+}
 
-        this.map.addLayer(this.clusterGroup);
-
-        if (bounds.length > 1) {
-          this.map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
-        } else {
-          this.map.setView(bounds[0], 4);
-        }
-
-        this.map.on('click', (e) => this.handleMapClick(e));
-      } catch (e) {
-        console.error('Failed to load map data', e);
-      } finally {
-        this.loading = false;
-      }
-    },
-    async openCarouselForIds(ids) {
-      if (ids.length === 0) return;
-      try {
-        const photosJson = await invoke('get_photos_for_map_click', { ids });
-        this.viewerPhotos = JSON.parse(photosJson);
-        if (this.viewerPhotos.length > 0) {
-          this.currentPhotoIndex = 0;
-          this.viewerOpen = true;
-        }
-      } catch (e) {
-        console.error('Failed to load photo details', e);
-      }
-    },
-    async openCarouselForPoint(point) {
-      const nearest = this.nearestPoints(point.latitude, point.longitude, 50);
-      const ids = nearest.map((p) => p.id);
-      await this.openCarouselForIds(ids);
-    },
-    nearestPoints(lat, lng, count) {
-      return this.mapPoints
-        .map((p) => ({
-          ...p,
-          dist: Math.sqrt(Math.pow(p.latitude - lat, 2) + Math.pow(p.longitude - lng, 2)),
-        }))
-        .sort((a, b) => a.dist - b.dist)
-        .slice(0, count);
-    },
-    async handleMapClick(e) {
-      const nearest = this.nearestPoints(e.latlng.lat, e.latlng.lng, 50);
-      if (nearest.length === 0) return;
-      const ids = nearest.map((p) => p.id);
-      await this.openCarouselForIds(ids);
-    },
-    handlePhotoUpdated(updatedPhoto) {
-      const idx = this.viewerPhotos.findIndex((p) => p.id === updatedPhoto.id);
-      if (idx !== -1) {
-        this.viewerPhotos[idx] = updatedPhoto;
-      }
-    },
-  },
-  watch: {
-    currentPhotoIndex(idx) {
-      const photo = this.viewerPhotos[idx];
-      if (!photo || !this.map) return;
-      const lat = photo.latitude;
-      const lng = photo.longitude;
-      if (lat && lng) {
-        this.map.panTo([lat, lng], { animate: true, duration: 0.5 });
-      }
-    },
-  },
-};
+watch(currentPhotoIndex, (idx) => {
+  const photo = viewerPhotos.value[idx]
+  if (!photo || !leafletMap) return
+  const lat = photo.latitude
+  const lng = photo.longitude
+  if (lat && lng) {
+    leafletMap.panTo([lat, lng], { animate: true, duration: 0.5 })
+  }
+})
 </script>
 
 <style scoped>

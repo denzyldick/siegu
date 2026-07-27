@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
-import Image from '../components/Image.vue';
+import Image from '../components/MediaCard.vue';
 
-describe('Image.vue', () => {
+describe('MediaCard.vue', () => {
   function mountImage(pathData) {
     return mount(Image, {
       props: { path: pathData },
@@ -22,7 +22,7 @@ describe('Image.vue', () => {
       properties: {},
       location: '/test/photo.jpg',
     });
-    expect(wrapper.html()).toContain('image-item-container');
+    expect(wrapper.html()).toContain('media-card-container');
   });
 
   it('renders tags when objects are present', () => {
@@ -62,7 +62,7 @@ describe('Image.vue', () => {
       aesthetics_score: 0.75,
       location: '/test/photo.jpg',
     });
-    expect(wrapper.text()).toContain('0.75');
+    expect(wrapper.text()).toContain('75%');
   });
 
   it('hasResults is true when indexed=2 even without objects', () => {

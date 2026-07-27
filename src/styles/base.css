@@ -1,0 +1,167 @@
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+.v-application .siegu-btn,
+.siegu-btn {
+  background: var(--color-bg-btn) !important;
+  border: none;
+  border-radius: 16px;
+  color: var(--color-text-btn) !important;
+  text-transform: none;
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: none;
+}
+
+.v-application .siegu-btn:hover,
+.siegu-btn:hover {
+  transform: scale(1.02) translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.v-application .siegu-btn:active,
+.siegu-btn:active {
+  transform: scale(0.98);
+}
+
+.siegu-btn-sm {
+  background: var(--color-bg-btn) !important;
+  border: none;
+  border-radius: 16px;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--color-text-btn) !important;
+  text-transform: none !important;
+  height: 40px !important;
+}
+
+.siegu-btn-sm:hover {
+  transform: scale(1.02) translateY(-1px);
+}
+
+.v-application .siegu-field :deep(.v-field),
+.v-application .siegu-field.v-field,
+.siegu-field :deep(.v-field),
+.siegu-field.v-field {
+  background: var(--color-bg-field);
+  border: 1px solid var(--color-border-default);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.v-application .v-field--focused,
+.v-field--focused {
+  border-color: var(--color-border-hover);
+  background: var(--color-bg-field);
+}
+
+.border-subtle {
+  border: 1px solid var(--color-border-subtle);
+}
+
+.bg-success-light {
+  background-color: #f0fdf4 !important;
+}
+
+.border-success {
+  border: 1px solid #bbf7d0 !important;
+}
+
+.text-success {
+  color: #166534 !important;
+}
+
+.border-bottom-subtle {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.v-application .text-zinc-primary,
+.text-zinc-primary {
+  color: var(--color-text-primary);
+}
+
+.v-application .text-zinc-secondary,
+.text-zinc-secondary {
+  color: var(--color-text-secondary);
+}
+
+.v-application .text-zinc-muted,
+.text-zinc-muted {
+  color: var(--color-text-muted);
+}
+
+.v-application .v-card,
+.v-application .v-sheet,
+.v-card,
+.v-sheet {
+  background-color: var(--color-bg-surface);
+}
+
+.v-application .siegu-list,
+.siegu-list {
+  background: var(--color-bg-list);
+  border: 1px solid var(--color-border-default);
+  border-radius: 12px;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-scrollbar);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar-thumb);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-scrollbar-hover);
+}
+
+.siegu-icon-circle-dark {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-text-primary);
+}
+
+.v-theme--light .bg-zinc-100 {
+  background-color: #f4f4f5;
+}
+
+.v-theme--dark .bg-zinc-100 {
+  background-color: #27272a;
+}
+
+.v-theme--dark .v-card-item.bg-zinc-100 {
+  background-color: #27272a !important;
+}
+
+.v-theme--dark .v-card-actions.bg-zinc-50 {
+  background-color: #18181b !important;
+}
+
+.glass-panel {
+  background: var(--color-bg-glass) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.v-theme--light .bg-siegu-main {
+  background-color: #fafafa !important;
+}
+
+.v-theme--dark .bg-siegu-main {
+  background-color: #09090b !important;
+}

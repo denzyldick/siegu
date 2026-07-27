@@ -1,0 +1,107 @@
+<script setup lang="ts">
+import { ref, watch } from 'vue'
+import type { Person } from '@/types/person'
+import { getFaceImageSrc } from '@/composables/useMediaUtils'
+
+const props = defineProps<{
+  modelValue: boolean
+  activeFace: Person | null
+  people: Person[]
+}>()
+
+const emit = defineEmits<{
+  'update:modelValue': [value: boolean]
+  save: [faceId: number, name: string]
+}>()
+
+const newName = ref('')
+
+watch(() => props.modelValue, (open) => {
+  if (open) newName.value = ''
+})
+
+function handleSave(): void {
+  if (!newName.value || !props.activeFace) return
+  if (props.activeFace.representative_face_id === null) return
+  emit('save', props.activeFace.representative_face_id, newName.value)
+}
+</script>
+
+<template>
+  <v-dialog
+    :model-value="modelValue"
+    max-width="440"
+    transition="dialog-bottom-transition"
+    @update:model-value="(v: boolean) => emit('update:modelValue', v)"
+  >
+    <v-card class="rounded-xl pa-2 elevation-24 border-subtle" color="surface">
+      <div class="pa-6">
+        <div class="d-flex align-center justify-space-between mb-8">
+          <h3 class="text-h5 font-weight-black text-zinc-primary">
+            {{ $t('people.who_is_this') }}
+          </h3>
+          <v-btn icon="mdi-close" variant="text" size="small" @click="emit('update:modelValue', false)"></v-btn>
+        </div>
+
+        <div class="d-flex justify-center mb-8">
+          <v-avatar size="160" class="border-subtle shadow-xl elevation-2 bg-zinc-100">
+            <v-img
+              v-if="activeFace"
+              :src="getFaceImageSrc(activeFace.representative_crop, activeFace.encoded)"
+              cover
+            ></v-img>
+          </v-avatar>
+        </div>
+
+        <v-combobox
+          v-model="newName"
+          :items="people"
+          item-title="name"
+          item-value="name"
+          :return-object="false"
+          :placeholder="$t('people.name_placeholder')"
+          variant="outlined"
+          density="comfortable"
+          class="name-field-modern mb-6"
+          persistent-placeholder
+          autofocus
+          hide-details
+          @keyup.enter="handleSave"
+        >
+          <template v-slot:item="{ props: itemProps, item }">
+            <v-list-item v-bind="itemProps" class="py-2">
+              <template v-slot:prepend>
+                <v-avatar size="32" class="mr-2 border-subtle">
+                  <v-img
+                    :src="getFaceImageSrc(item.raw.representative_crop, item.raw.encoded)"
+                  ></v-img>
+                </v-avatar>
+              </template>
+            </v-list-item>
+          </template>
+        </v-combobox>
+
+        <v-btn
+          block
+          size="x-large"
+          variant="flat"
+          class="siegu-btn rounded-xl text-none font-weight-bold shadow-lg py-7"
+          :disabled="!newName"
+          @click="handleSave"
+        >
+          {{ $t('people.confirm_identity') }}
+        </v-btn>
+      </div>
+    </v-card>
+  </v-dialog>
+</template>
+
+<style scoped>
+.name-field-modern :deep(.v-field) {
+  border-radius: 12px !important;
+  background: white !important;
+}
+.name-field-modern :deep(.v-field__outline) {
+  --v-field-border-opacity: 0.15 !important;
+}
+</style>

@@ -1,15 +1,13 @@
-<script>
+<script setup lang="ts">
+import { ref } from 'vue';
 import logo from '../assets/logo.png';
 
-export default {
-  name: 'Greet',
-  data() {
-    return {
-      active: true,
-      logoUrl: logo,
-    };
-  },
-};
+const emit = defineEmits<{
+  'setup-local': [];
+  'setup-sync': [];
+}>();
+
+const logoUrl = ref(logo);
 </script>
 
 <template>
@@ -27,7 +25,7 @@ export default {
           </p>
 
           <div class="d-flex flex-column ga-4">
-            <v-card variant="flat" class="siegu-btn py-4 px-6" @click="$emit('setup-local')">
+            <v-card variant="flat" class="siegu-btn py-4 px-6" @click="emit('setup-local')">
               <div class="d-flex align-center">
                 <div class="siegu-icon-circle mr-4">
                   <v-icon>mdi-folder-plus</v-icon>
@@ -41,7 +39,7 @@ export default {
               </div>
             </v-card>
 
-            <v-card variant="flat" class="siegu-btn py-4 px-6" @click="$emit('setup-sync')">
+            <v-card variant="flat" class="siegu-btn py-4 px-6" @click="emit('setup-sync')">
               <div class="d-flex align-center">
                 <div class="siegu-icon-circle mr-4">
                   <v-icon>mdi-sync</v-icon>

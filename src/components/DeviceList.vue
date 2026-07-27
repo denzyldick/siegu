@@ -104,7 +104,7 @@
                   >mdi-image-multiple-outline</v-icon
                 >
                 <span class="text-caption text-zinc-secondary">{{
-                  $t('photos.label_photos')
+                  $t('media.label_photos')
                 }}</span>
                 <v-spacer></v-spacer>
                 <span class="text-caption text-zinc-primary font-weight-bold">{{
@@ -114,7 +114,7 @@
               <div class="d-flex align-center">
                 <v-icon size="14" color="zinc-muted" class="mr-2">mdi-video-outline</v-icon>
                 <span class="text-caption text-zinc-secondary">{{
-                  $t('photos.label_videos')
+                  $t('media.label_videos')
                 }}</span>
                 <v-spacer></v-spacer>
                 <span class="text-caption text-zinc-primary font-weight-bold">{{
@@ -216,7 +216,7 @@
   background: #ef4444;
   border-radius: 50%;
   display: flex;
-  align-center: center;
+  align-items: center;
   justify-content: center;
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
 }
@@ -261,95 +261,109 @@
 }
 </style>
 
-<script>
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-import Connect from './Connect.vue';
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import Connect from './Connect.vue'
+import { listDevices, removeDevice as removeDeviceApi, requestStartSync } from '@/services/tauri'
 
-export default {
-  name: 'DeviceList',
-  components: {
-    Connect,
-  },
-  data: () => ({
-    devices: [],
-    deleteDialog: false,
-    deviceToDelete: '',
-    deleting: false,
-    unlistenRefresh: null,
-    unlistenSync: null,
-  }),
-  async mounted() {
-    await this.list_devices();
+interface DeviceWithSync {
+  title: string
+  icon: string
+  os: string
+  photo_count: number
+  video_count: number
+  host: string
+  subtitle: string
+  syncing: boolean
+  progress: number
+  syncStatus: string
+  items_completed: number
+  items_total: number
+}
 
-    this.unlistenRefresh = await listen('refresh-devices', () => {
-      this.list_devices();
-    });
+const devices = ref<DeviceWithSync[]>([])
+const deleteDialog = ref(false)
+const deviceToDelete = ref('')
+const deleting = ref(false)
 
-    this.unlistenSync = await listen('sync-progress', (event) => {
-      const payload = event.payload;
-      // We assume 'peer' refers to any connected device for now
-      // (multi-device support would need device_id mapping)
-      this.devices.forEach((d) => {
-        if (!d.host) {
-          d.syncing =
-            payload.status !== 'idle' &&
-            !payload.status.includes('Finished') &&
-            !payload.status.includes('Up to date');
-          d.progress = payload.progress;
-          d.syncStatus = payload.status;
-          d.items_completed = payload.items_completed;
-          d.items_total = payload.items_total;
-        }
-      });
-    });
-  },
-  beforeUnmount() {
-    if (this.unlistenRefresh) this.unlistenRefresh();
-    if (this.unlistenSync) this.unlistenSync();
-  },
-  methods: {
-    async list_devices() {
-      try {
-        const realDevicesStr = await invoke('list_devices');
-        const realDevices = JSON.parse(realDevicesStr);
+let unlistenRefresh: UnlistenFn | null = null
+let unlistenSync: UnlistenFn | null = null
 
-        this.devices = (realDevices || []).map((d) => ({
-          ...d,
-          syncing: false,
-          progress: 0,
-          syncStatus: '',
-          items_completed: 0,
-          items_total: 0,
-        }));
-      } catch (err) {
-        console.error('Failed to list devices:', err);
+async function loadDevices() {
+  try {
+    const realDevices = await listDevices()
+    devices.value = (realDevices || []).map((d) => ({
+      ...d,
+      syncing: false,
+      progress: 0,
+      syncStatus: '',
+      items_completed: 0,
+      items_total: 0,
+    }))
+  } catch (err) {
+    console.error('Failed to list devices:', err)
+  }
+}
+
+async function startSync() {
+  try {
+    await requestStartSync()
+  } catch (err) {
+    console.error('Failed to request sync:', err)
+  }
+}
+
+function removeDevice(name: string) {
+  deviceToDelete.value = name
+  deleteDialog.value = true
+}
+
+async function confirmDelete() {
+  deleting.value = true
+  try {
+    await removeDeviceApi(deviceToDelete.value)
+    await loadDevices()
+    deleteDialog.value = false
+  } catch (err) {
+    console.error('Failed to remove device:', err)
+  } finally {
+    deleting.value = false
+    deviceToDelete.value = ''
+  }
+}
+
+onMounted(async () => {
+  await loadDevices()
+
+  unlistenRefresh = await listen('refresh-devices', () => {
+    loadDevices()
+  })
+
+  unlistenSync = await listen('sync-progress', (event) => {
+    const payload = event.payload as {
+      status: string
+      progress: number
+      items_completed: number
+      items_total: number
+    }
+    devices.value.forEach((d) => {
+      if (!d.host) {
+        d.syncing =
+          payload.status !== 'idle' &&
+          !payload.status.includes('Finished') &&
+          !payload.status.includes('Up to date')
+        d.progress = payload.progress
+        d.syncStatus = payload.status
+        d.items_completed = payload.items_completed
+        d.items_total = payload.items_total
       }
-    },
-    async startSync() {
-      try {
-        await invoke('request_start_sync');
-      } catch (err) {
-        console.error('Failed to request sync:', err);
-      }
-    },
-    removeDevice(name) {
-      this.deviceToDelete = name;
-      this.deleteDialog = true;
-    },
-    async confirmDelete() {
-      this.deleting = true;
-      try {
-        await invoke('remove_device', { name: this.deviceToDelete });
-        await this.list_devices();
-        this.deleteDialog = false;
-      } catch (err) {
-        console.error('Failed to remove device:', err);
-      } finally {
-        this.deleting = false;
-        this.deviceToDelete = '';
-      }
-    },
-  },
-};
+    })
+  })
+})
+
+onUnmounted(() => {
+  if (unlistenRefresh) unlistenRefresh()
+  if (unlistenSync) unlistenSync()
+})
 </script>

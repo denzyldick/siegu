@@ -89,7 +89,7 @@
     "all_folders": "Alle Ordner",
     "reset": "Filter zurücksetzen"
   },
-  "photos": {
+  "media": {
     "items_count": "{count} Elemente",
     "your_library_empty": "Deine Bibliothek ist leer",
     "add_folder_hint": "Füge in den Einstellungen einen Ordner hinzu, um deine Erinnerungen zu indizieren",
@@ -282,13 +282,13 @@
     "save": "Speichern",
     "loading": "Laden..."
   },
-  "image": {
+  "media_card": {
     "alt_photo": "Foto",
     "aesthetics_score": "Ästhetikbewertung",
     "faces_detected": "Gesichter erkannt",
     "fully_indexed": "Vollständig indiziert"
   },
-  "rail": {
+  "media_thumbnail": {
     "alt_thumb": "Fotominiatur"
   },
   "connect": {
@@ -318,7 +318,7 @@
     "start_syncing": "Sync starten",
     "awaiting_webrtc_receiver": "Signalisierungskanal angefordert. Warte auf WebRTC-Empfängerverbindung."
   },
-  "photo_viewer": {
+  "media_viewer": {
     "metadata": "Metadaten",
     "analyze": "Foto analysieren",
     "analyzing": "Analysiere",

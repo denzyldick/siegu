@@ -1,11 +1,11 @@
 <template>
-  <div class="tour-overlay" v-if="active" @click="skip">
+  <div class="tour-overlay" v-if="props.active" @click="skip">
     <div class="tour-spotlight" :style="spotlightStyle" v-if="targetRect"></div>
     <div class="tour-card" :class="cardPosition" @click.stop>
       <div class="tour-card-inner">
         <v-icon size="32" color="black" class="mb-3">{{ currentStep.icon }}</v-icon>
-        <h3 class="text-h6 font-weight-bold text-zinc-primary mb-1">{{ currentTitle }}</h3>
-        <p class="text-body-2 text-zinc-secondary mb-6">{{ currentDescription }}</p>
+        <h3 class="text-h6 font-weight-bold text-zinc-primary mb-1">{{ $t(currentStep.titleKey) }}</h3>
+        <p class="text-body-2 text-zinc-secondary mb-6">{{ $t(currentStep.descKey) }}</p>
         <div class="d-flex align-center justify-space-between">
           <v-btn
             variant="text"
@@ -16,7 +16,7 @@
           >
           <div class="d-flex align-center ga-1">
             <span
-              v-for="(s, i) in steps"
+              v-for="(_, i) in steps"
               :key="i"
               class="tour-dot"
               :class="{ 'tour-dot--active': i === step }"
@@ -48,175 +48,199 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: 'GuidedTour',
-  props: {
-    active: Boolean,
-    target: String,
+<script setup lang="ts">
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
+
+interface Step {
+  icon: string
+  titleKey: string
+  descKey: string
+  target: string | null
+  position: string
+}
+
+const props = withDefaults(defineProps<{
+  active: boolean
+  target?: string
+}>(), {
+  target: '',
+})
+
+const emit = defineEmits<{
+  (e: 'finish'): void
+  (e: 'skip'): void
+  (e: 'update:target', value: string): void
+}>()
+
+const step = ref(0)
+const targetRects = ref<Record<string, DOMRect>>({})
+const observer = ref<ResizeObserver | null>(null)
+
+const steps: Step[] = [
+  {
+    icon: 'mdi-walk',
+    titleKey: 'guided_tour.welcome_title',
+    descKey: 'guided_tour.welcome_desc',
+    target: null,
+    position: 'bottom',
   },
-  emits: ['finish', 'skip', 'update:target'],
-  data: () => ({
-    step: 0,
-    targetRects: {},
-    observer: null,
-    steps: [
-      {
-        icon: 'mdi-walk',
-        titleKey: 'guided_tour.welcome_title',
-        descKey: 'guided_tour.welcome_desc',
-        target: null,
-        position: 'bottom',
-      },
-      {
-        icon: 'mdi-magnify',
-        titleKey: 'guided_tour.search_title',
-        descKey: 'guided_tour.search_desc',
-        target: "[data-tour='search']",
-        position: 'top',
-      },
-      {
-        icon: 'mdi-image-multiple-outline',
-        titleKey: 'guided_tour.library_title',
-        descKey: 'guided_tour.library_desc',
-        target: "[data-tour='photos']",
-        position: 'bottom',
-      },
-      {
-        icon: 'mdi-magnify-scan',
-        titleKey: 'guided_tour.scan_button_title',
-        descKey: 'guided_tour.scan_button_desc',
-        target: "[data-tour='scan-button']",
-        position: 'bottom',
-      },
-      {
-        icon: 'mdi-progress-check',
-        titleKey: 'guided_tour.scan_progress_title',
-        descKey: 'guided_tour.scan_progress_desc',
-        target: "[data-tour='scan-progress']",
-        position: 'bottom',
-      },
-      {
-        icon: 'mdi-account-group-outline',
-        titleKey: 'guided_tour.people_title',
-        descKey: 'guided_tour.people_desc',
-        target: "[data-tour='dock-people']",
-        position: 'top',
-      },
-      {
-        icon: 'mdi-map-outline',
-        titleKey: 'guided_tour.map_title',
-        descKey: 'guided_tour.map_desc',
-        target: "[data-tour='dock-map']",
-        position: 'top',
-      },
-      {
-        icon: 'mdi-laptop',
-        titleKey: 'guided_tour.devices_title',
-        descKey: 'guided_tour.devices_desc',
-        target: "[data-tour='dock-devices']",
-        position: 'top',
-      },
-      {
-        icon: 'mdi-cog-outline',
-        titleKey: 'guided_tour.settings_title',
-        descKey: 'guided_tour.settings_desc',
-        target: "[data-tour='dock-settings']",
-        position: 'top',
-      },
-      {
-        icon: 'mdi-check-decagram',
-        titleKey: 'guided_tour.done_title',
-        descKey: 'guided_tour.done_desc',
-        target: null,
-        position: 'bottom',
-      },
-    ],
-  }),
-  computed: {
-    currentStep() {
-      return this.steps[this.step];
-    },
-    currentTitle() {
-      return this.$t(this.currentStep.titleKey);
-    },
-    currentDescription() {
-      return this.$t(this.currentStep.descKey);
-    },
-    targetRect() {
-      const t = this.currentStep.target;
-      return t ? this.targetRects[t] : null;
-    },
-    pad() {
-      return 8;
-    },
-    spotlightStyle() {
-      if (!this.targetRect) return { display: 'none' };
-      const r = this.targetRect;
-      const p = this.pad;
-      return {
-        left: r.left - p + 'px',
-        top: r.top - p + 'px',
-        width: r.width + p * 2 + 'px',
-        height: r.height + p * 2 + 'px',
-      };
-    },
-    cardPosition() {
-      return this.currentStep.position === 'top' ? 'tour-card--top' : 'tour-card--bottom';
-    },
+  {
+    icon: 'mdi-magnify',
+    titleKey: 'guided_tour.search_title',
+    descKey: 'guided_tour.search_desc',
+    target: "[data-tour='search']",
+    position: 'top',
   },
-  watch: {
-    step() {
-      this.$nextTick(() => this.measureTarget());
-    },
-    active(val) {
-      if (val) {
-        this.step = 0;
-        this.$nextTick(() => this.measureTarget());
-        this.startObserver();
-      } else {
-        this.stopObserver();
-      }
-    },
+  {
+    icon: 'mdi-image-multiple-outline',
+    titleKey: 'guided_tour.library_title',
+    descKey: 'guided_tour.library_desc',
+    target: "[data-tour='photos']",
+    position: 'bottom',
   },
-  methods: {
-    measureTarget() {
-      const t = this.currentStep.target;
-      if (!t) return;
-      const el = document.querySelector(t);
-      if (el) {
-        this.targetRects[t] = el.getBoundingClientRect();
-      }
-    },
-    startObserver() {
-      this.observer = new ResizeObserver(() => this.measureTarget());
-      const t = this.currentStep.target;
-      if (t) {
-        const el = document.querySelector(t);
-        if (el) this.observer.observe(el);
-      }
-    },
-    stopObserver() {
-      if (this.observer) {
-        this.observer.disconnect();
-        this.observer = null;
-      }
-    },
-    next() {
-      if (this.step < this.steps.length - 1) {
-        this.step++;
-      }
-    },
-    finish() {
-      this.stopObserver();
-      this.$emit('finish');
-    },
-    skip() {
-      this.stopObserver();
-      this.$emit('skip');
-    },
+  {
+    icon: 'mdi-magnify-scan',
+    titleKey: 'guided_tour.scan_button_title',
+    descKey: 'guided_tour.scan_button_desc',
+    target: "[data-tour='scan-button']",
+    position: 'bottom',
   },
-};
+  {
+    icon: 'mdi-progress-check',
+    titleKey: 'guided_tour.scan_progress_title',
+    descKey: 'guided_tour.scan_progress_desc',
+    target: "[data-tour='scan-progress']",
+    position: 'bottom',
+  },
+  {
+    icon: 'mdi-account-group-outline',
+    titleKey: 'guided_tour.people_title',
+    descKey: 'guided_tour.people_desc',
+    target: "[data-tour='dock-people']",
+    position: 'top',
+  },
+  {
+    icon: 'mdi-map-outline',
+    titleKey: 'guided_tour.map_title',
+    descKey: 'guided_tour.map_desc',
+    target: "[data-tour='dock-map']",
+    position: 'top',
+  },
+  {
+    icon: 'mdi-laptop',
+    titleKey: 'guided_tour.devices_title',
+    descKey: 'guided_tour.devices_desc',
+    target: "[data-tour='dock-devices']",
+    position: 'top',
+  },
+  {
+    icon: 'mdi-cog-outline',
+    titleKey: 'guided_tour.settings_title',
+    descKey: 'guided_tour.settings_desc',
+    target: "[data-tour='dock-settings']",
+    position: 'top',
+  },
+  {
+    icon: 'mdi-check-decagram',
+    titleKey: 'guided_tour.done_title',
+    descKey: 'guided_tour.done_desc',
+    target: null,
+    position: 'bottom',
+  },
+]
+
+const currentStep = computed(() => steps[step.value])
+
+const targetRect = computed(() => {
+  const t = currentStep.value.target
+  return t ? targetRects.value[t] ?? null : null
+})
+
+const pad = 8
+
+const spotlightStyle = computed(() => {
+  if (!targetRect.value) return { display: 'none' }
+  const r = targetRect.value
+  return {
+    left: r.left - pad + 'px',
+    top: r.top - pad + 'px',
+    width: r.width + pad * 2 + 'px',
+    height: r.height + pad * 2 + 'px',
+  }
+})
+
+const cardPosition = computed(() => {
+  return currentStep.value.position === 'top' ? 'tour-card--top' : 'tour-card--bottom'
+})
+
+function measureTarget() {
+  const t = currentStep.value.target
+  if (!t) return
+  const el = document.querySelector(t)
+  if (el) {
+    targetRects.value[t] = el.getBoundingClientRect()
+  }
+}
+
+function stopObserver() {
+  if (observer.value) {
+    observer.value.disconnect()
+    observer.value = null
+  }
+}
+
+function startObserver() {
+  stopObserver()
+  if (typeof ResizeObserver === 'undefined') return
+  observer.value = new ResizeObserver(() => measureTarget())
+  const t = currentStep.value.target
+  if (t) {
+    const el = document.querySelector(t)
+    if (el) observer.value.observe(el)
+  }
+}
+
+function next() {
+  if (step.value < steps.length - 1) {
+    step.value++
+  }
+}
+
+function finish() {
+  stopObserver()
+  emit('finish')
+}
+
+function skip() {
+  stopObserver()
+  emit('skip')
+}
+
+watch(step, () => {
+  nextTick(() => {
+    measureTarget()
+    startObserver()
+  })
+})
+
+watch(
+  () => props.active,
+  (val) => {
+    if (val) {
+      step.value = 0
+      nextTick(() => {
+        measureTarget()
+        startObserver()
+      })
+    } else {
+      stopObserver()
+    }
+  },
+)
+
+onUnmounted(() => {
+  stopObserver()
+})
 </script>
 
 <style scoped>

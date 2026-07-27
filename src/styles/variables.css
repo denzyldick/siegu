@@ -1,0 +1,55 @@
+:root {
+  font-family: 'Outfit', Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+.v-theme--light {
+  --color-bg-primary: #fafafa;
+  --color-bg-surface: #ffffff;
+  --color-bg-zinc-100: #f4f4f5;
+  --color-text-primary: #18181b;
+  --color-text-secondary: #52525b;
+  --color-text-muted: #71717a;
+  --color-border-subtle: rgba(0, 0, 0, 0.05);
+  --color-border-default: rgba(0, 0, 0, 0.1);
+  --color-border-hover: rgba(0, 0, 0, 0.2);
+  --color-bg-hover: #f4f4f5;
+  --color-bg-field: #000000;
+  --color-bg-scrollbar: #fafafa;
+  --color-scrollbar-thumb: rgba(0, 0, 0, 0.1);
+  --color-scrollbar-hover: rgba(0, 0, 0, 0.2);
+  --color-bg-list: #ffffff;
+  --color-bg-btn: #000000;
+  --color-text-btn: #ffffff;
+  --color-bg-glass: rgba(255, 255, 255, 0.6);
+  --color-bg-rail: rgba(255, 255, 255, 0.8);
+}
+
+.v-theme--dark {
+  --color-bg-primary: #09090b;
+  --color-bg-surface: #18181b;
+  --color-bg-zinc-100: #27272a;
+  --color-text-primary: #fafafa;
+  --color-text-secondary: #a1a1aa;
+  --color-text-muted: #71717a;
+  --color-border-subtle: rgba(255, 255, 255, 0.06);
+  --color-border-default: rgba(255, 255, 255, 0.1);
+  --color-border-hover: rgba(255, 255, 255, 0.18);
+  --color-bg-hover: #27272a;
+  --color-bg-field: #000000;
+  --color-bg-scrollbar: #09090b;
+  --color-scrollbar-thumb: rgba(255, 255, 255, 0.12);
+  --color-scrollbar-hover: rgba(255, 255, 255, 0.2);
+  --color-bg-list: #18181b;
+  --color-bg-btn: #000000;
+  --color-text-btn: #ffffff;
+  --color-bg-glass: rgba(24, 24, 27, 0.6);
+  --color-bg-rail: rgba(9, 9, 11, 0.85);
+}

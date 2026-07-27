@@ -163,7 +163,7 @@ jobs:
 
       - uses: android-actions/setup-android@v3
         with:
-          packages: "platforms;android-34 build-tools;34.0.0 ndk;26.1.10909125"
+          packages: "platforms;android-34 build-tools;34.0.0 ndk;27.0.12077973"
 
       - uses: actions/setup-node@v4
         with:
@@ -171,7 +171,6 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
           targets: aarch64-linux-android, x86_64-linux-android
           components: rustfmt
 
@@ -183,83 +182,58 @@ jobs:
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y nasm
 
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
       - name: Ensure rust targets are installed
         run: rustup target add aarch64-linux-android x86_64-linux-android || true
 
-      - name: Set NDK cross-compilation env vars
+      - name: Patch ffmpeg-sys-next for Android cross-compilation
         run: |
-          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
-          NDK_VERSION="26.1.10909125"
-          NDK_ROOT="$SDK_ROOT/ndk/$NDK_VERSION"
-          TOOLCHAIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64"
-          SYSROOT="$TOOLCHAIN/sysroot"
-          NDK_BIN="$TOOLCHAIN/bin"
-
-          echo "SDK_ROOT=$SDK_ROOT"
-          echo "NDK_ROOT=$NDK_ROOT"
-          echo "TOOLCHAIN=$TOOLCHAIN"
-          echo "SYSROOT=$SYSROOT"
-          echo "NDK_BIN=$NDK_BIN"
-
-          if [ ! -f "$NDK_BIN/aarch64-linux-android26-clang" ]; then
-            echo "Error: aarch64 clang not found at $NDK_BIN/aarch64-linux-android26-clang"
-            echo "Listing NDK bin:"
-            ls "$NDK_BIN/" | head -20
-            exit 1
+          cargo fetch --manifest-path src-tauri/Cargo.toml
+          BUILD_RS=$(find ~/.cargo/registry/src -path "*/ffmpeg-sys-next-*/build.rs" -print -quit 2>/dev/null || true)
+          if [ -z "$BUILD_RS" ]; then
+            echo "ffmpeg-sys-next build.rs not found, skipping patch"
+            exit 0
           fi
+          echo "Patching $BUILD_RS"
+          python3 -c "
+import sys, re
+path = sys.argv[1]
+with open(path) as f:
+    content = f.read()
 
-          echo "CC_aarch64-linux-android=$NDK_BIN/aarch64-linux-android26-clang" >> $GITHUB_ENV
-          echo "CC_x86_64-linux-android=$NDK_BIN/x86_64-linux-android26-clang" >> $GITHUB_ENV
-          echo "AR_aarch64-linux-android=$NDK_BIN/llvm-ar" >> $GITHUB_ENV
-          echo "AR_x86_64-linux-android=$NDK_BIN/llvm-ar" >> $GITHUB_ENV
-          echo "CARGO_NDK_SYSROOT_PATH=$SYSROOT" >> $GITHUB_ENV
-          echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
-          echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
+# Fix 1: nm/strip path resolution (parent().join(\"..\").join(...) → parent() + fallback)
+old = 'let android_cc_dir = android_cc_path.parent().unwrap().join(\"..\").join(format!(\"llvm-{tool}\")).canonicalize()'
+new = '''let android_cc_dir = android_cc_path.parent().unwrap_or(android_cc_path);
+            let tool_path = android_cc_dir.join(format!(\"llvm-{tool}\"));
+            let resolved = if tool_path.exists() {
+                tool_path.canonicalize().unwrap_or(tool_path)
+            } else {
+                PathBuf::from(format!(\"llvm-{}\", tool))
+            }'''
+content = content.replace(old, new)
 
-      - run: npm install
+# Fix 2: use resolved instead of android_cc_dir for configure arg
+old2 = 'configure.arg(format!(\"--{tool}={}\", android_cc_dir.display()));'
+new2 = 'configure.arg(format!(\"--{tool}={}\", resolved.display()));'
+content = content.replace(old2, new2)
+
+with open(path, 'w') as f:
+    f.write(content)
+print('Patched ffmpeg-sys-next build.rs successfully')
+" "$BUILD_RS"
 
       - run: cargo fmt --check
         working-directory: src-tauri
 
-      - name: Ensure llvm-nm and llvm-strip exist in NDK
-        run: |
-          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
-          NDK_BIN="$SDK_ROOT/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/bin"
-
-          echo "NDK_BIN=$NDK_BIN"
-          echo "Checking if llvm-nm exists..."
-          ls -la "$NDK_BIN/llvm-nm"* 2>/dev/null || echo "No llvm-nm found"
-          ls -la "$NDK_BIN/llvm-strip"* 2>/dev/null || echo "No llvm-strip found"
-          echo "All nm/strip related files:"
-          ls "$NDK_BIN/" | grep -iE 'nm|strip' || echo "None found"
-
-          for TOOL in nm strip; do
-            if [ ! -f "$NDK_BIN/llvm-$TOOL" ]; then
-              echo "llvm-$TOOL missing, searching NDK..."
-              FOUND=$(find "$SDK_ROOT/ndk/26.1.10909125" -name "llvm-$TOOL" 2>/dev/null | head -1)
-              if [ -n "$FOUND" ]; then
-                ln -sf "$(realpath "$FOUND")" "$NDK_BIN/llvm-$TOOL"
-                echo "Created llvm-$TOOL -> $(realpath "$FOUND")"
-              else
-                echo "ERROR: No llvm-$TOOL found anywhere in NDK"
-                exit 1
-              fi
-            else
-              echo "llvm-$TOOL already exists at $NDK_BIN/llvm-$TOOL"
-            fi
-          done
-
-          ls -la "$NDK_BIN"/llvm-nm* "$NDK_BIN"/llvm-strip*
-
-      - run: cargo check --target aarch64-linux-android
+      - name: Check Rust lib for Android (aarch64)
         working-directory: src-tauri
-        env:
-          CARGO_NDK_SYSROOT_PATH: ${{ env.CARGO_NDK_SYSROOT_PATH }}
+        run: cargo ndk -t aarch64-linux-android -P 24 check
 
-      - run: cargo check --target x86_64-linux-android
+      - name: Check Rust lib for Android (x86_64)
         working-directory: src-tauri
-        env:
-          CARGO_NDK_SYSROOT_PATH: ${{ env.CARGO_NDK_SYSROOT_PATH }}
+        run: cargo ndk -t x86_64-linux-android -P 24 check
 
   test-ios:
     if: github.event_name != 'release'
@@ -373,7 +347,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'MediaSafe v__VERSION__'
+          releaseName: 'Siegu v__VERSION__'
           releaseBody: 'See the attached assets for the latest release versions.'
           releaseDraft: true
           prerelease: false
@@ -396,7 +370,7 @@ jobs:
 
       - uses: android-actions/setup-android@v3
         with:
-          packages: "platforms;android-34 build-tools;34.0.0 ndk;26.1.10909125"
+          packages: "platforms;android-34 build-tools;34.0.0 ndk;27.0.12077973"
 
       - uses: actions/setup-node@v4
         with:
@@ -404,7 +378,6 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
           targets: aarch64-linux-android, x86_64-linux-android
           components: rustfmt
 
@@ -416,44 +389,82 @@ jobs:
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y nasm
 
-      - name: Set up cargo-ndk
+      - name: Install cargo-ndk
         run: cargo install cargo-ndk
 
       - name: Ensure rust targets are installed
         run: rustup target add aarch64-linux-android x86_64-linux-android || true
 
-      - name: Set NDK cross-compilation env vars
+      - name: Patch ffmpeg-sys-next for Android cross-compilation
         run: |
-          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
-          NDK_VERSION="26.1.10909125"
-          NDK_ROOT="$SDK_ROOT/ndk/$NDK_VERSION"
-          TOOLCHAIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64"
-
-          CC_AARCH64="$TOOLCHAIN/bin/aarch64-linux-android26-clang"
-          CC_X86_64="$TOOLCHAIN/bin/x86_64-linux-android26-clang"
-
-          if [ ! -f "$CC_AARCH64" ]; then
-            echo "Error: aarch64 clang not found at $CC_AARCH64"
-            exit 1
+          cargo fetch --manifest-path src-tauri/Cargo.toml
+          BUILD_RS=$(find ~/.cargo/registry/src -path "*/ffmpeg-sys-next-*/build.rs" -print -quit 2>/dev/null || true)
+          if [ -z "$BUILD_RS" ]; then
+            echo "ffmpeg-sys-next build.rs not found, skipping patch"
+            exit 0
           fi
+          echo "Patching $BUILD_RS"
+          python3 -c "
+import sys
+path = sys.argv[1]
+with open(path) as f:
+    content = f.read()
 
-          echo "CC_aarch64-linux-android=$CC_AARCH64" >> $GITHUB_ENV
-          echo "CC_x86_64-linux-android=$CC_X86_64" >> $GITHUB_ENV
-          echo "AR_aarch64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
-          echo "AR_x86_64-linux-android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
-          echo "ANDROID_NDK_HOME=$NDK_ROOT" >> $GITHUB_ENV
-          echo "ANDROID_NDK_ROOT=$NDK_ROOT" >> $GITHUB_ENV
+old = 'let android_cc_dir = android_cc_path.parent().unwrap().join(\"..\").join(format!(\"llvm-{tool}\")).canonicalize()'
+new = '''let android_cc_dir = android_cc_path.parent().unwrap_or(android_cc_path);
+            let tool_path = android_cc_dir.join(format!(\"llvm-{tool}\"));
+            let resolved = if tool_path.exists() {
+                tool_path.canonicalize().unwrap_or(tool_path)
+            } else {
+                PathBuf::from(format!(\"llvm-{}\", tool))
+            }'''
+content = content.replace(old, new)
+
+old2 = 'configure.arg(format!(\"--{tool}={}\", android_cc_dir.display()));'
+new2 = 'configure.arg(format!(\"--{tool}={}\", resolved.display()));'
+content = content.replace(old2, new2)
+
+with open(path, 'w') as f:
+    f.write(content)
+print('Patched ffmpeg-sys-next build.rs successfully')
+" "$BUILD_RS"
 
       - run: npm install
 
-      - name: Add NDK to local.properties
-        run: |
-          ANDROID_NDK_PATH="$ANDROID_HOME/ndk/26.1.10909125"
-          echo "ndk.dir=$ANDROID_NDK_PATH" >> src-tauri/gen/android/local.properties
-          echo "NDK_HOME=$ANDROID_NDK_PATH" >> $GITHUB_ENV
+      - name: Build frontend
+        run: yarn build
 
-      - name: Build Android APK
-        run: npm run tauri android build -- --apk
+      - name: Build Rust lib for aarch64
+        run: |
+          cargo ndk -t aarch64-linux-android -P 24 \
+            --manifest-path src-tauri/Cargo.toml \
+            build --features "tauri/custom-protocol tauri/custom-protocol" --lib --release
+
+      - name: Build Rust lib for x86_64
+        run: |
+          cargo ndk -t x86_64-linux-android -P 24 \
+            --manifest-path src-tauri/Cargo.toml \
+            build --features "tauri/custom-protocol tauri/custom-protocol" --lib --release
+
+      - name: Copy .so to jniLibs
+        run: |
+          mkdir -p src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a
+          mkdir -p src-tauri/gen/android/app/src/main/jniLibs/x86_64
+          cp target/aarch64-linux-android/release/libsiegu_lib.so \
+             src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a/
+          cp target/x86_64-linux-android/release/libsiegu_lib.so \
+             src-tauri/gen/android/app/src/main/jniLibs/x86_64/
+
+      - name: Generate tauri.build.gradle.kts
+        working-directory: src-tauri/gen/android
+        run: |
+          if [ ! -f app/tauri.build.gradle.kts ]; then
+            timeout 15 npx tauri android android-studio-script 2>&1 || true
+          fi
+
+      - name: Build APK
+        working-directory: src-tauri/gen/android
+        run: ./gradlew assembleUniversalRelease
 
       - name: Upload APK to Release
         if: github.event_name == 'release'

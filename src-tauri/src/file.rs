@@ -1,5 +1,5 @@
+use crate::common::{emit_log, get_config_path};
 use crate::database;
-use crate::emit_log;
 use base64::{engine::general_purpose, Engine as _};
 use rand::{distributions::Alphanumeric, Rng};
 
@@ -26,7 +26,7 @@ pub async fn start_watcher(app: tauri::AppHandle) {
         Err(_) => return,
     };
 
-    let config_path = crate::get_config_path(&app);
+    let config_path = get_config_path(&app);
     if !config_path.is_empty() {
         let database = crate::database::Database::new(&config_path);
         let folders = database.list_directories();
@@ -63,7 +63,7 @@ pub async fn start_watcher(app: tauri::AppHandle) {
                             .body("New media detected, scanning...")
                             .show();
 
-                        crate::scan_files(app_clone.clone());
+                        crate::commands::scan::scan_files(app_clone.clone());
                     }
                 }
                 _ => {}
@@ -216,7 +216,12 @@ pub fn scan_folder(
     emit_log(app, "Done with Discovery Pass".to_string());
 }
 
-pub fn read_file_base64(app: &tauri::AppHandle, path: String) -> String {
+#[tauri::command]
+pub async fn read_file_base64(app: tauri::AppHandle, path: String) -> String {
+    read_file_base64_inner(&app, path)
+}
+
+fn read_file_base64_inner(app: &tauri::AppHandle, path: String) -> String {
     let canonical = std::fs::canonicalize(&path).unwrap_or_default();
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))

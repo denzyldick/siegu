@@ -65,6 +65,8 @@ pub fn is_video_ext(path: &str) -> bool {
         || lower.ends_with(".mov")
         || lower.ends_with(".avi")
         || lower.ends_with(".webm")
+        || lower.ends_with(".flv")
+        || lower.ends_with(".wmv")
         || lower.ends_with(".m4v")
         || lower.ends_with(".3gp")
 }

@@ -89,7 +89,7 @@
     "all_folders": "Alle mappen",
     "reset": "Filters resetten"
   },
-  "photos": {
+  "media": {
     "items_count": "{count} items",
     "your_library_empty": "Je bibliotheek is leeg",
     "add_folder_hint": "Voeg een map toe in instellingen om je herinneringen te indexeren",
@@ -282,13 +282,13 @@
     "save": "Opslaan",
     "loading": "Laden..."
   },
-  "image": {
+  "media_card": {
     "alt_photo": "Foto",
     "aesthetics_score": "Esthetiekscore",
     "faces_detected": "Gezichten gedetecteerd",
     "fully_indexed": "Volledig geïndexeerd"
   },
-  "rail": {
+  "media_thumbnail": {
     "alt_thumb": "Fotominiatuur"
   },
   "connect": {
@@ -318,7 +318,7 @@
     "start_syncing": "Start synchronisatie",
     "awaiting_webrtc_receiver": "Signaleringskanaal aangevraagd. Wachten op WebRTC-ontvanger."
   },
-  "photo_viewer": {
+  "media_viewer": {
     "metadata": "Metadata",
     "analyze": "Foto analyseren",
     "analyzing": "Analyseren",

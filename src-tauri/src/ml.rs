@@ -1,4 +1,4 @@
-use crate::emit_log;
+use crate::common::emit_log;
 use tauri::AppHandle;
 use tauri::Emitter;
 

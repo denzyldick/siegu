@@ -89,7 +89,7 @@
     "all_folders": "Todas las carpetas",
     "reset": "Restablecer filtros"
   },
-  "photos": {
+  "media": {
     "items_count": "{count} elementos",
     "your_library_empty": "Tu biblioteca está vacía",
     "add_folder_hint": "Añade una carpeta en los ajustes para empezar a indexar tus recuerdos",
@@ -282,13 +282,13 @@
     "save": "Guardar",
     "loading": "Cargando..."
   },
-  "image": {
+  "media_card": {
     "alt_photo": "Foto",
     "aesthetics_score": "Puntuación estética",
     "faces_detected": "Rostros detectados",
     "fully_indexed": "Totalmente indexado"
   },
-  "rail": {
+  "media_thumbnail": {
     "alt_thumb": "Miniatura de foto"
   },
   "connect": {
@@ -318,7 +318,7 @@
     "start_syncing": "Iniciar sincronización",
     "awaiting_webrtc_receiver": "Canal de señalización solicitado. Esperando conexión del receptor WebRTC."
   },
-  "photo_viewer": {
+  "media_viewer": {
     "metadata": "Metadatos",
     "analyze": "Analizar foto",
     "analyzing": "Analizando",

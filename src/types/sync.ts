@@ -1,0 +1,26 @@
+export type SyncStatus = 'idle' | 'connecting' | 'connected' | 'syncing' | 'completed' | 'error'
+
+export type ConnectionMode = 'lan' | 'internet'
+
+export interface SyncProgress {
+  total: number
+  received: number
+  current_file: string | null
+}
+
+export interface Device {
+  id: string
+  name: string
+  photo_count: number
+  last_seen: string
+}
+
+export interface PairingCodes {
+  uuid: string
+  passphrase: string[]
+}
+
+export interface SyncError {
+  message: string
+  code?: string
+}

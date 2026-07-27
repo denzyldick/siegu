@@ -56,6 +56,58 @@ pub struct PhotoMetadata {
     pub properties: HashMap<String, String>,
 }
 
+fn created_from_mtime(path: &Path) -> String {
+    let meta = match std::fs::metadata(path) {
+        Ok(m) => m,
+        Err(_) => return String::new(),
+    };
+    let modified = match meta.modified() {
+        Ok(t) => t,
+        Err(_) => return String::new(),
+    };
+    let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH) else {
+        return String::new();
+    };
+    let secs = duration.as_secs();
+    let days = secs / 86400;
+    let time_of_day = secs % 86400;
+    let hours = time_of_day / 3600;
+    let minutes = (time_of_day % 3600) / 60;
+    let seconds = time_of_day % 60;
+
+    let mut y = 1970i64;
+    let mut remaining = days as i64;
+    loop {
+        let days_in_year = if is_leap(y) { 366 } else { 365 };
+        if remaining < days_in_year {
+            break;
+        }
+        remaining -= days_in_year;
+        y += 1;
+    }
+    let leap = is_leap(y);
+    let month_days: &[i64] = if leap {
+        &[31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    } else {
+        &[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    };
+    let mut m = 1u32;
+    for &md in month_days {
+        if remaining < md {
+            break;
+        }
+        remaining -= md;
+        m += 1;
+    }
+    let d = remaining + 1;
+
+    format!("{y:04}-{m:02}-{d:02} {hours:02}:{minutes:02}:{seconds:02}")
+}
+
+fn is_leap(y: i64) -> bool {
+    (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
+}
+
 pub fn extract_photo_metadata(path: &Path) -> PhotoMetadata {
     let mut meta = PhotoMetadata::default();
 
@@ -66,7 +118,10 @@ pub fn extract_photo_metadata(path: &Path) -> PhotoMetadata {
     let mut buff = BufReader::new(&file);
     let exif = match exif::Reader::new().read_from_container(&mut buff) {
         Ok(e) => e,
-        Err(_) => return meta,
+        Err(_) => {
+            meta.created = created_from_mtime(path);
+            return meta;
+        }
     };
 
     if let Some(date_field) = exif
@@ -74,6 +129,8 @@ pub fn extract_photo_metadata(path: &Path) -> PhotoMetadata {
         .or_else(|| exif.get_field(exif::Tag::DateTime, exif::In::PRIMARY))
     {
         meta.created = format!("{}", date_field.display_value());
+    } else {
+        meta.created = created_from_mtime(path);
     }
 
     if let (Some(lat_field), Some(lat_ref)) = (
@@ -274,7 +331,7 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_photo_metadata_non_exif_file() {
+    fn test_extract_photo_metadata_non_exif_file_uses_mtime() {
         let dir = TempDir::new().unwrap();
         let file_path = dir.path().join("plain.txt");
         fs::write(&file_path, "hello world").unwrap();
@@ -282,7 +339,14 @@ mod tests {
         let meta = extract_photo_metadata(&file_path);
         assert_eq!(meta.latitude, 0.0);
         assert_eq!(meta.longitude, 0.0);
-        assert!(meta.created.is_empty());
+        assert!(
+            !meta.created.is_empty(),
+            "non-exif file should get created from mtime"
+        );
+        assert!(
+            meta.created.starts_with("20"),
+            "created should be a date string"
+        );
     }
 
     #[test]

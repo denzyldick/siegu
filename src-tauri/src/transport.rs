@@ -20,8 +20,8 @@ use webrtc::{
     },
 };
 
+use crate::common::emit_log;
 use crate::database::{Database, ImportedPhoto, PhotoSyncInfo};
-use crate::emit_log;
 use std::collections::HashMap;
 use tauri::Emitter;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -666,7 +666,8 @@ impl WebRtcClient {
                                             let faces_thumb = file_state.faces.clone();
 
                                             tokio::task::spawn_blocking(move || {
-                                                let thumb = String::new();
+                                                let thumb = siegu_core::thumbnail::generate_thumbnail(&path_thumb)
+                                                    .unwrap_or_default();
                                                 let mut db = Database::new(&config_path_thumb);
 
                                                 // Now import with thumbnail included - only now it becomes visible in library
@@ -1009,7 +1010,8 @@ impl WebRtcClient {
                                             let faces_thumb = file_state.faces.clone();
 
                                             tokio::task::spawn_blocking(move || {
-                                                let thumb = String::new();
+                                                let thumb = siegu_core::thumbnail::generate_thumbnail(&path_thumb)
+                                                    .unwrap_or_default();
                                                 let mut db = Database::new(&config_path_thumb);
 
                                                 // Now import with thumbnail included - only now it becomes visible in library
@@ -1378,7 +1380,8 @@ impl WebRtcClient {
                                             let faces_thumb = file_state.faces.clone();
 
                                             tokio::task::spawn_blocking(move || {
-                                                let thumb = String::new();
+                                                let thumb = siegu_core::thumbnail::generate_thumbnail(&path_thumb)
+                                                    .unwrap_or_default();
                                                 let mut db = Database::new(&config_path_thumb);
 
                                                 db.import_photo(ImportedPhoto {
@@ -1714,7 +1717,8 @@ impl WebRtcClient {
                                             let faces_thumb = file_state.faces.clone();
 
                                             tokio::task::spawn_blocking(move || {
-                                                let thumb = String::new();
+                                                let thumb = siegu_core::thumbnail::generate_thumbnail(&path_thumb)
+                                                    .unwrap_or_default();
                                                 let mut db = Database::new(&config_path_thumb);
 
                                                 db.import_photo(ImportedPhoto {

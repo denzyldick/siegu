@@ -12,13 +12,13 @@
     "save": "Save",
     "loading": "Loading..."
   },
-  "image": {
+  "media_card": {
     "alt_photo": "Photo",
     "aesthetics_score": "Aesthetics score",
     "faces_detected": "Faces detected",
     "fully_indexed": "Fully indexed"
   },
-  "rail": {
+  "media_thumbnail": {
     "alt_thumb": "Photo thumbnail"
   },
   "search": {
@@ -77,7 +77,7 @@
     "name_this_group": "Name this group",
     "confirm_remove_face": "Remove this face from the group?"
   },
-  "photos": {
+  "media": {
     "items_count": "{count} items",
     "your_library_empty": "Your library is empty",
     "add_folder_hint": "Add a folder in settings to start indexing your memories",
@@ -175,7 +175,7 @@
     "start_syncing": "Start Syncing",
     "awaiting_webrtc_receiver": "Signaling channel requested. Awaiting WebRTC Receiver connection."
   },
-  "photo_viewer": {
+  "media_viewer": {
     "metadata": "Metadata",
     "analyze": "Analyze Photo",
     "analyzing": "Analyzing",

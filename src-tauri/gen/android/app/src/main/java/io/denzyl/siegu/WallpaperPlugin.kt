@@ -14,8 +14,8 @@ import java.io.File
 class WallpaperPlugin(private val activity: Activity): Plugin(activity) {
     @Command
     fun setWallpaper(invoke: Invoke) {
-        val path = invoke.getString("path")
-        if (path == null) {
+        val path = invoke.getArgs().getString("path")
+        if (path == null || path.isEmpty()) {
             invoke.reject("Missing path argument")
             return
         }

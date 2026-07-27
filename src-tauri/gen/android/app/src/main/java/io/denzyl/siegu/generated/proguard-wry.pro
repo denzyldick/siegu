@@ -13,7 +13,9 @@
 
   void setWebView(io.denzyl.siegu.RustWebView);
   java.lang.Class getAppClass(...);
+  int getId();
   java.lang.String getVersion();
+  int startActivity(...);
 }
 
 -keep class io.denzyl.siegu.Ipc {

@@ -89,7 +89,7 @@
     "all_folders": "Tur karpeta",
     "reset": "Reinisiá Filtronan"
   },
-  "photos": {
+  "media": {
     "items_count": "{count} artíkulo",
     "your_library_empty": "Bo biblioteka ta bashí",
     "add_folder_hint": "Añadí un karpeta den ajustenan pa inisiá indeksashon di bo memorianan",
@@ -282,13 +282,13 @@
     "save": "Wardá",
     "loading": "Kargando..."
   },
-  "image": {
+  "media_card": {
     "alt_photo": "Foto",
     "aesthetics_score": "Puntuashon estétiko",
     "faces_detected": "Karanan detectá",
     "fully_indexed": "Kompletamente indeksá"
   },
-  "rail": {
+  "media_thumbnail": {
     "alt_thumb": "Miniatura di foto"
   },
   "connect": {
@@ -318,7 +318,7 @@
     "start_syncing": "Inisiá Sinkronisashon",
     "awaiting_webrtc_receiver": "Canal di señalishon solicitá. Esperando conexion di receptor WebRTC."
   },
-  "photo_viewer": {
+  "media_viewer": {
     "metadata": "Metadato",
     "analyze": "Analisá Foto",
     "analyzing": "Analisando",

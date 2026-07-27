@@ -15,7 +15,6 @@
       </v-toolbar>
 
       <v-card-text class="pa-0">
-        <!-- Current Path Breadcrumb/Display -->
         <div class="pa-4 border-bottom">
           <div class="text-caption text-medium-emphasis mb-1">
             {{ $t('folder_picker.current_path') }}
@@ -32,7 +31,6 @@
         </v-list>
 
         <v-list v-else lines="one">
-          <!-- Go Up Option -->
           <v-list-item v-if="canGoUp" @click="goUp" color="primary">
             <template v-slot:prepend>
               <v-icon color="grey-darken-1">mdi-arrow-up-bold</v-icon>
@@ -43,7 +41,6 @@
 
           <v-divider v-if="canGoUp"></v-divider>
 
-          <!-- Directories -->
           <template v-if="folders.length > 0">
             <v-list-item
               v-for="folder in folders"
@@ -70,103 +67,89 @@
   </v-dialog>
 </template>
 
-<script>
-import { readDir } from '@tauri-apps/plugin-fs';
+<script setup lang="ts">
+import { ref, computed, watch, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { readDir } from '@tauri-apps/plugin-fs'
+import type { DirEntry } from '@tauri-apps/plugin-fs'
 
-export default {
-  props: {
-    modelValue: Boolean,
-    initialPath: {
-      type: String,
-      default: '/storage/emulated/0',
-    },
-  },
-  data() {
-    return {
-      currentPath: '/storage/emulated/0',
-      folders: [],
-      loading: false,
-      error: null,
-    };
-  },
-  computed: {
-    show: {
-      get() {
-        return this.modelValue;
-      },
-      set(val) {
-        this.$emit('update:modelValue', val);
-      },
-    },
-    canGoUp() {
-      return this.currentPath !== '/' && this.currentPath !== '/storage/emulated/0';
-    },
-  },
-  watch: {
-    show(val) {
-      if (val) {
-        this.loadDirectory(this.currentPath);
-      }
-    },
-  },
-  async mounted() {
-    // Set initial path if provided, else default to Android root
-    if (this.initialPath) {
-      this.currentPath = this.initialPath;
-    }
-  },
-  methods: {
-    async loadDirectory(path) {
-      this.loading = true;
-      this.error = null;
-      try {
-        console.log('Reading directory:', path);
-        const entries = await readDir(path);
+const { t } = useI18n()
 
-        // Filter only directories and sort them
-        this.folders = entries
-          .filter((entry) => entry.isDirectory)
-          .sort((a, b) => a.name.localeCompare(b.name));
+const props = defineProps<{
+  modelValue: boolean
+  initialPath?: string
+}>()
 
-        this.currentPath = path;
-      } catch (err) {
-        console.error('Error reading directory:', err);
-        this.error = this.$t('folder_picker.access_denied');
-        alert(this.$t('folder_picker.permission_error'));
-      } finally {
-        this.loading = false;
-      }
-    },
-    async navigate(folderName) {
-      const newPath = this.currentPath.endsWith('/')
-        ? this.currentPath + folderName
-        : this.currentPath + '/' + folderName;
+const emit = defineEmits<{
+  'update:modelValue': [value: boolean]
+  select: [path: string]
+}>()
 
-      // Or better use join API if available and reliable,
-      // but simple string concat is often safer for known Android paths
-      // await join(this.currentPath, folderName);
+const DEFAULT_PATH = '/storage/emulated/0'
 
-      await this.loadDirectory(newPath);
-    },
-    async goUp() {
-      // Simple string manipulation for path parent to avoid async mess with path module for now
-      // if this.currentPath is /storage/emulated/0/DCIM, we want /storage/emulated/0
-      const parts = this.currentPath.split('/');
-      if (parts.length > 1) {
-        parts.pop();
-        // Handle root case if "pop" makes it empty string (should happen if path was /foo)
-        let newPath = parts.join('/');
-        if (newPath === '') newPath = '/';
-        await this.loadDirectory(newPath);
-      }
-    },
-    selectCurrent() {
-      this.$emit('select', this.currentPath);
-      this.close();
-    },
-    close() {
-      this.$emit('update:modelValue', false);
-    },
-  },
-};
+const currentPath = ref(props.initialPath ?? DEFAULT_PATH)
+const folders = ref<DirEntry[]>([])
+const loading = ref(false)
+
+const show = computed({
+  get: () => props.modelValue,
+  set: (val: boolean) => emit('update:modelValue', val),
+})
+
+const canGoUp = computed(() => {
+  return currentPath.value !== '/' && currentPath.value !== DEFAULT_PATH
+})
+
+watch(show, (val) => {
+  if (val) {
+    loadDirectory(currentPath.value)
+  }
+})
+
+onMounted(() => {
+  if (props.initialPath) {
+    currentPath.value = props.initialPath
+  }
+})
+
+async function loadDirectory(path: string) {
+  loading.value = true
+  try {
+    const entries = await readDir(path)
+    folders.value = entries
+      .filter((entry): entry is DirEntry & { isDirectory: true; name: string } => entry.isDirectory === true && entry.name != null)
+      .sort((a, b) => a.name.localeCompare(b.name))
+    currentPath.value = path
+  } catch {
+    alert(t('folder_picker.permission_error'))
+  } finally {
+    loading.value = false
+  }
+}
+
+async function navigate(folderName: string) {
+  const newPath = currentPath.value.endsWith('/')
+    ? currentPath.value + folderName
+    : currentPath.value + '/' + folderName
+  await loadDirectory(newPath)
+}
+
+async function goUp() {
+  const parts = currentPath.value.split('/')
+  if (parts.length > 1) {
+    parts.pop()
+    let newPath = parts.join('/')
+    if (newPath === '') newPath = '/'
+    await loadDirectory(newPath)
+  }
+}
+
+function selectCurrent() {
+  emit('select', currentPath.value)
+  close()
+}
+
+function close() {
+  emit('update:modelValue', false)
+}
 </script>

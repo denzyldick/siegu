@@ -56,6 +56,37 @@ npm install
 npm run tauri dev
 ```
 
+### Neovim Debugging
+
+If you want to use Neovim with `nvim-dap` and `codelldb`, this repo includes a
+project-local config in [`.nvim.lua`](./.nvim.lua).
+
+Enable local config loading in your own Neovim setup:
+
+```lua
+vim.o.exrc = true
+vim.o.secure = true
+```
+
+Then open the repo root in Neovim and use:
+
+```vim
+:SieguTauriDev
+:SieguDebugAttach
+```
+
+Workflow:
+
+1. Run `:SieguTauriDev` to start the Tauri dev session.
+2. Wait for the app window to open.
+3. Run `:SieguDebugAttach` to attach CodeLLDB to the Rust backend and step through code.
+
+Requirements:
+
+- `nvim-dap`
+- `codelldb` on your `PATH`
+- Neovim with local `exrc` enabled
+
 ### CLI Installation
 
 ```bash
