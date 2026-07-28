@@ -6,6 +6,8 @@ pub mod face_detector;
 pub mod geocode;
 pub mod lan_server;
 pub mod mdns;
+pub mod mesh;
+pub mod mesh_transport;
 pub mod ml_engine;
 pub mod ml_worker;
 pub mod model_manager;
@@ -17,11 +19,12 @@ pub mod sync_transport;
 pub mod thumbnail;
 
 pub use database::{
-    AiStatus, Database, DeviceInfo, Face, ImportedPhoto, LogEntry, MapPoint, PersonWithFace, Photo,
-    PhotoSyncInfo, SearchSuggestion,
+    AiStatus, Database, DeviceInfo, Face, ImportedPhoto, LogEntry, MapPoint, PeerDevice,
+    PersonWithFace, Photo, PhotoSyncInfo, SavedSession, SearchSuggestion,
 };
 pub use error::{Result, SieguError};
 pub use event_bus::{ArcEventBus, CallbackEventBus, EventBus, Level, LogCollector, NullEventBus};
+pub use mesh::{MeshManager, SyncEvent, SyncMessage, SyncProgress};
 pub use ml_worker::MlContext;
 pub use scanner::{extract_photo_metadata, is_media_file, ScanGuard};
 pub use server::{generate_pairing_codes, hash_pairing_code, PairingCodes};
