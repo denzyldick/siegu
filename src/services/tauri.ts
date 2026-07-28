@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { MediaItem, ListFilesOptions } from '@/types/media'
 import type { Person, UnnamedFace } from '@/types/person'
-import type { PairingCodes } from '@/types/sync'
+import type { PairingCodes, DiscoveredHost } from '@/types/sync'
 
 
 export class TauriError extends Error {
@@ -269,12 +269,12 @@ export async function stopWebrtcSession(): Promise<void> {
   await call<unknown>('stop_webrtc_session')
 }
 
-export async function startLanHost(): Promise<void> {
-  await call<unknown>('start_lan_host')
+export async function startLanHost(roomId: string, isInitiator: boolean): Promise<void> {
+  await call<unknown>('start_lan_host', { roomId, isInitiator })
 }
 
-export async function discoverLanDevices(): Promise<void> {
-  await call<unknown>('discover_lan_devices')
+export async function discoverLanDevices(timeoutSecs: number = 3): Promise<DiscoveredHost[]> {
+  return call<DiscoveredHost[]>('discover_lan_devices', { timeoutSecs })
 }
 
 export async function joinNetwork(roomId: string): Promise<void> {

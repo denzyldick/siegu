@@ -173,7 +173,14 @@
     "joining_room": "Joining room...",
     "error_joining": "Error joining: {error}",
     "start_syncing": "Start Syncing",
-    "awaiting_webrtc_receiver": "Signaling channel requested. Awaiting WebRTC Receiver connection."
+    "syncing": "Syncing...",
+    "sync_complete": "Sync complete",
+    "awaiting_webrtc_receiver": "Signaling channel requested. Awaiting WebRTC Receiver connection.",
+    "searching_network": "Searching for devices on your network...",
+    "no_devices_found": "No devices found nearby",
+    "select_device": "Select a device to connect to",
+    "device_on_network": "On your network",
+    "connect_fromAnywhere": "Connect from anywhere with Internet Sync — coming soon"
   },
   "media_viewer": {
     "metadata": "Metadata",
@@ -362,6 +369,8 @@
     "link_device": "Link a Device",
     "skip": "Skip for now",
     "start_syncing": "Start Syncing",
+    "syncing": "Syncing...",
+    "sync_complete": "Sync complete",
     "ready_title": "You're all set!",
     "ready_desc": "Siegu is ready to start indexing your photos. You can adjust settings anytime.",
     "finish_setup": "Finish Setup & Sync",

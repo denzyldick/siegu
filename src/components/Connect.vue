@@ -45,7 +45,7 @@
         />
 
         <ConnectJoinView
-          v-if="mode === 'join'"
+          v-if="mode === 'join' && selectedLanHost"
           v-model="joinPassphrase"
           :loading="loading"
           :is-connected="isConnected"
@@ -55,11 +55,21 @@
           @sync="triggerSync"
         />
 
-        <ConnectSyncButton
-          v-if="mode === 'host' && isConnected"
-          :loading="syncing"
-          @click="triggerSync"
+        <ConnectLanDiscovery
+          v-if="mode === 'join' && !selectedLanHost && !isConnected"
+          @select="selectLanHost"
         />
+
+        <div
+          v-if="mode === 'host' && isConnected && syncing"
+          class="d-flex justify-center mb-6"
+        >
+          <v-progress-linear
+            indeterminate
+            color="success"
+            height="4"
+          />
+        </div>
 
         <ConnectStatusBar
           :status="connectionStatus"
@@ -97,7 +107,7 @@
       />
 
       <ConnectJoinView
-        v-if="mode === 'join'"
+        v-if="mode === 'join' && selectedLanHost"
         v-model="joinPassphrase"
         :loading="loading"
         :is-connected="isConnected"
@@ -105,6 +115,11 @@
         :syncing="syncing"
         @join="joinWebRTC"
         @sync="triggerSync"
+      />
+
+      <ConnectLanDiscovery
+        v-if="mode === 'join' && !selectedLanHost && !isConnected"
+        @select="selectLanHost"
       />
 
       <div class="text-caption text-zinc-muted mb-1 text-center py-2" v-if="connectionStatus">
@@ -129,6 +144,7 @@ import { useConnect } from '@/composables/useConnect'
 import ConnectModeToggle from '@/components/connect/ConnectModeToggle.vue'
 import ConnectHostView from '@/components/connect/ConnectHostView.vue'
 import ConnectJoinView from '@/components/connect/ConnectJoinView.vue'
+import ConnectLanDiscovery from '@/components/connect/ConnectLanDiscovery.vue'
 import ConnectSyncButton from '@/components/connect/ConnectSyncButton.vue'
 import ConnectStatusBar from '@/components/connect/ConnectStatusBar.vue'
 
@@ -164,7 +180,9 @@ const {
   syncing,
   disconnecting,
   syncProgress,
+  selectedLanHost,
   initialize,
+  selectLanHost,
   joinWebRTC,
   triggerSync,
   disconnectSession,

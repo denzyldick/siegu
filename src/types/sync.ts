@@ -24,3 +24,9 @@ export interface SyncError {
   message: string
   code?: string
 }
+
+export interface DiscoveredHost {
+  name: string
+  ip: string
+  port: number
+}

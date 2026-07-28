@@ -128,22 +128,26 @@ function stopScanner(): void {
       </div>
     </v-btn>
 
-    <v-btn
-      v-else
-      variant="flat"
-      color="success"
-      @click="emit('sync')"
-      class="siegu-btn py-6"
-      block
-      :loading="syncing"
+    <div
+      v-else-if="syncing"
+      class="d-flex align-center justify-center py-4"
     >
-      <div class="d-flex align-center">
-        <div class="siegu-icon-circle mr-3">
-          <v-icon size="14">mdi-sync</v-icon>
-        </div>
-        <span>{{ $t('connect.start_syncing') }}</span>
-      </div>
-    </v-btn>
+      <v-progress-linear
+        indeterminate
+        color="success"
+        height="4"
+        class="w-100"
+      />
+      <span class="text-caption text-success ml-3">{{ $t('connect.syncing') }}</span>
+    </div>
+
+    <div
+      v-else-if="isConnected"
+      class="d-flex align-center justify-center py-4"
+    >
+      <v-icon size="16" color="success" class="mr-2">mdi-check-circle</v-icon>
+      <span class="text-caption text-success">{{ $t('connect.sync_complete') }}</span>
+    </div>
   </div>
 </template>
 

@@ -5,9 +5,11 @@ import {
   generatePairingCodes,
   hashPairingCode,
   startWebrtcSession,
+  startLanHost,
   stopWebrtcSession,
   requestStartSync,
 } from '@/services/tauri'
+import type { DiscoveredHost } from '@/types/sync'
 
 export type ConnectMode = 'host' | 'join'
 
@@ -30,6 +32,7 @@ export function useConnect() {
   const syncing = ref(false)
   const disconnecting = ref(false)
   const syncProgress = ref<SyncProgressState>({ status: '', progress: 0 })
+  const selectedLanHost = ref<DiscoveredHost | null>(null)
 
   let unlistenWebRtc: UnlistenFn | null = null
   let unlistenSync: UnlistenFn | null = null
@@ -71,9 +74,16 @@ export function useConnect() {
     uuid.value = payload
   }
 
+  function getSignalingUrl(): string {
+    if (selectedLanHost.value) {
+      return `ws://${selectedLanHost.value.ip}:${selectedLanHost.value.port}`
+    }
+    return import.meta.env.VITE_SIGNALING_URL || 'wss://siegu.io/ws'
+  }
+
   async function startListening(roomId: string): Promise<void> {
     connectionStatus.value = t('connect.waiting_for_partner')
-    const signalingUrl = import.meta.env.VITE_SIGNALING_URL || 'wss://siegu.io/ws'
+    const signalingUrl = getSignalingUrl()
     try {
       await startWebrtcSession(roomId, false, signalingUrl)
       connectionStatus.value = t('connect.awaiting_webrtc')
@@ -89,18 +99,26 @@ export function useConnect() {
       uuid.value = codes.uuid
       passphrase.value = codes.passphrase
       const roomId = await hashPairingCode(codes.uuid)
-      await startListening(roomId)
+      if (mode.value === 'host') {
+        await startLanHost(roomId, false)
+      } else {
+        await startListening(roomId)
+      }
     } catch (error) {
       console.error('Pairing Error:', error)
       connectionStatus.value = t('connect.pairing_error')
     }
   }
 
+  function selectLanHost(host: DiscoveredHost): void {
+    selectedLanHost.value = host
+  }
+
   async function joinWebRTC(): Promise<void> {
     if (!joinPassphrase.value || loading.value) return
     loading.value = true
     connectionStatus.value = t('connect.joining_room')
-    const signalingUrl = import.meta.env.VITE_SIGNALING_URL || 'wss://siegu.io/ws'
+    const signalingUrl = getSignalingUrl()
     try {
       const roomId = await hashPairingCode(joinPassphrase.value)
       await startWebrtcSession(roomId, true, signalingUrl)
@@ -129,6 +147,7 @@ export function useConnect() {
       isConnected.value = false
       peerJoined.value = false
       syncProgress.value = { status: '', progress: 0 }
+      selectedLanHost.value = null
     } catch (error) {
       console.error('Disconnect Error:', error)
     } finally {
@@ -167,6 +186,7 @@ export function useConnect() {
     connectionStatus.value = ''
     peerJoined.value = false
     syncProgress.value = { status: '', progress: 0 }
+    selectedLanHost.value = null
   }
 
   onUnmounted(() => {
@@ -185,7 +205,9 @@ export function useConnect() {
     syncing,
     disconnecting,
     syncProgress,
+    selectedLanHost,
     initialize,
+    selectLanHost,
     joinWebRTC,
     triggerSync,
     disconnectSession,
