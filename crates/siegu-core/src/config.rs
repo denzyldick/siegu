@@ -53,6 +53,7 @@ pub const ALLOWED_CONFIG_KEYS: &[&str] = &[
     "last_scan_completed",
     "auto_scan",
     "sync_enabled",
+    "max_storage_mb",
 ];
 
 pub fn is_valid_config_key(key: &str) -> bool {
@@ -99,6 +100,20 @@ pub fn validate_config_value(key: &str, value: &str) -> Result<(), ConfigError> 
                 expected: "free|paid".to_string(),
                 got: value.to_string(),
             });
+        }
+        "max_storage_mb" => {
+            let n: u64 = value.parse().map_err(|_| ConfigError::InvalidType {
+                key: key.to_string(),
+                expected: "u64".to_string(),
+                got: value.to_string(),
+            })?;
+            if n == 0 || n > 1_000_000 {
+                return Err(ConfigError::OutOfRange {
+                    key: key.to_string(),
+                    min: 1,
+                    max: 1_000_000,
+                });
+            }
         }
         _ => {}
     }

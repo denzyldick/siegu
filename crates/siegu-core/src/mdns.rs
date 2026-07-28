@@ -1,8 +1,9 @@
-#![allow(dead_code)]
-
 use mdns_sd::{ServiceDaemon, ServiceEvent, ServiceInfo};
+pub use mdns_sd::ServiceDaemon as DaemonHandle;
 use std::collections::HashMap;
 use std::time::Duration;
+
+use crate::mesh::PROTOCOL_VERSION;
 
 const SERVICE_TYPE: &str = "_siegu._tcp.local.";
 
@@ -13,20 +14,28 @@ pub struct DiscoveredHost {
     pub port: u16,
 }
 
+#[derive(Debug, Clone)]
+pub enum DiscoveryEvent {
+    Added(DiscoveredHost),
+    Removed(String),
+}
+
 /// Creates a new mDNS daemon.
 pub fn create_daemon() -> Result<ServiceDaemon, Box<dyn std::error::Error>> {
     Ok(ServiceDaemon::new()?)
 }
 
 /// Registers a Siegu service on the local network via mDNS.
-/// Other Siegu devices on the same LAN will discover this host.
 pub fn register_service(
     daemon: &ServiceDaemon,
     hostname: &str,
     port: u16,
     room_id: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let properties: &[(&str, &str)] = &[("room", room_id)];
+    let properties: &[(&str, &str)] = &[
+        ("room", room_id),
+        ("version", &PROTOCOL_VERSION.to_string()),
+    ];
     let service_info = ServiceInfo::new(
         SERVICE_TYPE,
         hostname,
@@ -37,6 +46,12 @@ pub fn register_service(
     )?;
     daemon.register(service_info)?;
     Ok(())
+}
+
+/// Unregisters a previously registered service.
+pub fn unregister_service(daemon: &ServiceDaemon, hostname: &str) {
+    let full_name = format!("{}.{SERVICE_TYPE}", hostname.trim_end_matches('.'));
+    daemon.unregister(&full_name).ok();
 }
 
 /// Discovers Siegu hosts on the local network.
@@ -65,6 +80,43 @@ pub fn discover_hosts(
     }
 
     Ok(hosts.into_values().collect())
+}
+
+/// Continuously monitors mDNS for hosts being added or removed.
+/// Sends events through the returned receiver until the daemon shuts down.
+pub fn watch_hosts(
+    daemon: &ServiceDaemon,
+) -> Result<std::sync::mpsc::Receiver<DiscoveryEvent>, Box<dyn std::error::Error>> {
+    let receiver = daemon.browse(SERVICE_TYPE)?;
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    std::thread::spawn(move || {
+        loop {
+            match receiver.recv_timeout(Duration::from_secs(1)) {
+                Ok(ServiceEvent::ServiceResolved(info)) => {
+                    for addr in info.get_addresses().iter() {
+                        let host = DiscoveredHost {
+                            name: info.get_hostname().trim_end_matches('.').to_string(),
+                            ip: addr.to_string(),
+                            port: info.get_port(),
+                        };
+                        if tx.send(DiscoveryEvent::Added(host)).is_err() {
+                            return;
+                        }
+                    }
+                }
+                Ok(ServiceEvent::ServiceRemoved(_, full_name)) => {
+                    if tx.send(DiscoveryEvent::Removed(full_name)).is_err() {
+                        return;
+                    }
+                }
+                Ok(_) => continue,
+                Err(_) => continue,
+            }
+        }
+    });
+
+    Ok(rx)
 }
 
 #[cfg(test)]
