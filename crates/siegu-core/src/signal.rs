@@ -37,6 +37,13 @@ pub enum SignalMessage {
         from: Option<String>,
         payload: serde_json::Value,
     },
+    #[serde(rename = "peer_list")]
+    PeerList { peers: Vec<String> },
+    #[serde(rename = "device_announce")]
+    DeviceAnnounce {
+        device_id: String,
+        metadata: serde_json::Value,
+    },
     #[serde(rename = "room_closed")]
     RoomClosed,
 }

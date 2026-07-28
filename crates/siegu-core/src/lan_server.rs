@@ -8,6 +8,7 @@ use tokio::net::TcpListener;
 use tokio::sync::{mpsc, RwLock};
 use warp::Filter;
 
+use crate::mesh::MAX_MESH_DEVICES;
 use crate::signal::SignalMessage;
 
 type Tx = mpsc::UnboundedSender<warp::ws::Message>;
@@ -78,9 +79,12 @@ async fn handle_connection(socket: warp::ws::WebSocket, room_id: String, rooms: 
                                 clients: HashMap::new(),
                             });
 
-                            if room.clients.len() >= 2 {
+                            if room.clients.len() >= MAX_MESH_DEVICES {
                                 let err = SignalMessage::Error {
-                                    message: "Room is full".to_string(),
+                                    message: format!(
+                                        "Room is full (max {} devices)",
+                                        MAX_MESH_DEVICES
+                                    ),
                                 };
                                 let _ = tx_write.send(warp::ws::Message::text(
                                     serde_json::to_string(&err).unwrap(),
@@ -89,6 +93,15 @@ async fn handle_connection(socket: warp::ws::WebSocket, room_id: String, rooms: 
                             }
 
                             room.clients.insert(id.clone(), tx_write.clone());
+
+                            let existing_peers: Vec<String> =
+                                room.clients.keys().filter(|k| *k != &id).cloned().collect();
+                            let peer_list = SignalMessage::PeerList {
+                                peers: existing_peers,
+                            };
+                            let _ = tx_write.send(warp::ws::Message::text(
+                                serde_json::to_string(&peer_list).unwrap(),
+                            ));
 
                             for (other_id, client) in room.clients.iter() {
                                 if other_id != &id {
@@ -134,6 +147,26 @@ async fn handle_connection(socket: warp::ws::WebSocket, room_id: String, rooms: 
                                 target: target.clone(),
                             };
                             relay(&rooms_write, &room_id_write, &d_id, &target, msg).await;
+                        }
+                        SignalMessage::DeviceAnnounce {
+                            device_id: id,
+                            metadata,
+                        } => {
+                            let d_id = did.read().await.clone();
+                            let msg = SignalMessage::DeviceAnnounce {
+                                device_id: d_id,
+                                metadata,
+                            };
+                            let rooms = rooms_write.read().await;
+                            if let Some(room) = rooms.get(&room_id_write) {
+                                for (peer_id, client) in &room.clients {
+                                    if peer_id != &id {
+                                        let _ = client.send(warp::ws::Message::text(
+                                            serde_json::to_string(&msg).unwrap(),
+                                        ));
+                                    }
+                                }
+                            }
                         }
                         _ => {}
                     }
@@ -220,6 +253,17 @@ mod tests {
         serde_json::from_str(&text).unwrap()
     }
 
+    async fn recv_until_joined(ws: &mut TestStream) -> SignalMessage {
+        loop {
+            let msg = recv_signal(ws).await;
+            match &msg {
+                SignalMessage::Joined { .. } => return msg,
+                SignalMessage::Error { .. } => return msg,
+                _ => continue,
+            }
+        }
+    }
+
     #[tokio::test]
     async fn test_server_starts_and_listens() {
         let port = start(0).await;
@@ -237,7 +281,7 @@ mod tests {
         let mut ws_a = connect_client(port, "room1").await;
         send_join(&mut ws_a, "device-a").await;
 
-        let response = recv_signal(&mut ws_a).await;
+        let response = recv_until_joined(&mut ws_a).await;
         match response {
             SignalMessage::Joined {
                 device_id,
@@ -254,7 +298,7 @@ mod tests {
         let mut ws_b = connect_client(port, "room1").await;
         send_join(&mut ws_b, "device-b").await;
 
-        let response_b = recv_signal(&mut ws_b).await;
+        let response_b = recv_until_joined(&mut ws_b).await;
         match response_b {
             SignalMessage::Joined {
                 device_id,
@@ -278,7 +322,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_third_client_rejected() {
+    async fn test_sixth_client_rejected() {
         let port = start(0).await;
 
         let mut ws_a = connect_client(port, "room2").await;
@@ -292,11 +336,35 @@ mod tests {
 
         let mut ws_c = connect_client(port, "room2").await;
         send_join(&mut ws_c, "device-c").await;
+        recv_signal(&mut ws_c).await;
+        recv_signal(&mut ws_a).await;
+        recv_signal(&mut ws_b).await;
 
-        let response = recv_signal(&mut ws_c).await;
+        let mut ws_d = connect_client(port, "room2").await;
+        send_join(&mut ws_d, "device-d").await;
+        recv_signal(&mut ws_d).await;
+        recv_signal(&mut ws_a).await;
+        recv_signal(&mut ws_b).await;
+        recv_signal(&mut ws_c).await;
+
+        let mut ws_e = connect_client(port, "room2").await;
+        send_join(&mut ws_e, "device-e").await;
+        recv_signal(&mut ws_e).await;
+        recv_signal(&mut ws_a).await;
+        recv_signal(&mut ws_b).await;
+        recv_signal(&mut ws_c).await;
+        recv_signal(&mut ws_d).await;
+
+        let mut ws_f = connect_client(port, "room2").await;
+        send_join(&mut ws_f, "device-f").await;
+
+        let response = recv_signal(&mut ws_f).await;
         match response {
             SignalMessage::Error { message } => {
-                assert_eq!(message, "Room is full");
+                assert!(
+                    message.contains("Room is full"),
+                    "Expected room full error, got: {message}"
+                );
             }
             other => panic!("Expected Error, got {other:?}"),
         }
@@ -308,11 +376,11 @@ mod tests {
 
         let mut ws_a = connect_client(port, "room3").await;
         send_join(&mut ws_a, "device-a").await;
-        recv_signal(&mut ws_a).await;
+        recv_until_joined(&mut ws_a).await;
 
         let mut ws_b = connect_client(port, "room3").await;
         send_join(&mut ws_b, "device-b").await;
-        recv_signal(&mut ws_b).await;
+        recv_until_joined(&mut ws_b).await;
         recv_signal(&mut ws_a).await;
 
         let offer = SignalMessage::Offer {
@@ -339,11 +407,11 @@ mod tests {
 
         let mut ws_a = connect_client(port, "room4").await;
         send_join(&mut ws_a, "device-a").await;
-        recv_signal(&mut ws_a).await;
+        recv_until_joined(&mut ws_a).await;
 
         let mut ws_b = connect_client(port, "room4").await;
         send_join(&mut ws_b, "device-b").await;
-        recv_signal(&mut ws_b).await;
+        recv_until_joined(&mut ws_b).await;
         recv_signal(&mut ws_a).await;
 
         let answer = SignalMessage::Answer {
@@ -372,11 +440,11 @@ mod tests {
 
         let mut ws_a = connect_client(port, "room5").await;
         send_join(&mut ws_a, "device-a").await;
-        recv_signal(&mut ws_a).await;
+        recv_until_joined(&mut ws_a).await;
 
         let mut ws_b = connect_client(port, "room5").await;
         send_join(&mut ws_b, "device-b").await;
-        recv_signal(&mut ws_b).await;
+        recv_until_joined(&mut ws_b).await;
         recv_signal(&mut ws_a).await;
 
         let ice = SignalMessage::IceCandidate {
@@ -404,11 +472,11 @@ mod tests {
 
         let mut ws_a = connect_client(port, "room6").await;
         send_join(&mut ws_a, "device-a").await;
-        recv_signal(&mut ws_a).await;
+        recv_until_joined(&mut ws_a).await;
 
         let mut ws_b = connect_client(port, "room6").await;
         send_join(&mut ws_b, "device-b").await;
-        let joined = recv_signal(&mut ws_b).await;
+        let joined = recv_until_joined(&mut ws_b).await;
         match &joined {
             SignalMessage::Joined { peer_count, .. } => assert_eq!(*peer_count, 2),
             other => panic!("Expected Joined, got {other:?}"),
@@ -431,20 +499,20 @@ mod tests {
 
         let mut ws_a = connect_client(port, "alpha").await;
         send_join(&mut ws_a, "device-a").await;
-        recv_signal(&mut ws_a).await;
+        recv_until_joined(&mut ws_a).await;
 
         let mut ws_b = connect_client(port, "alpha").await;
         send_join(&mut ws_b, "device-b").await;
-        recv_signal(&mut ws_b).await;
+        recv_until_joined(&mut ws_b).await;
         recv_signal(&mut ws_a).await;
 
         let mut ws_c = connect_client(port, "beta").await;
         send_join(&mut ws_c, "device-c").await;
-        recv_signal(&mut ws_c).await;
+        recv_until_joined(&mut ws_c).await;
 
         let mut ws_d = connect_client(port, "beta").await;
         send_join(&mut ws_d, "device-d").await;
-        recv_signal(&mut ws_d).await;
+        recv_until_joined(&mut ws_d).await;
         recv_signal(&mut ws_c).await;
 
         let offer = SignalMessage::Offer {
@@ -488,14 +556,14 @@ mod tests {
 
         let mut ws_a = connect_client(port, "cleanup-room").await;
         send_join(&mut ws_a, "device-a").await;
-        recv_signal(&mut ws_a).await;
+        recv_until_joined(&mut ws_a).await;
         drop(ws_a);
 
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
         let mut ws_b = connect_client(port, "cleanup-room").await;
         send_join(&mut ws_b, "device-b").await;
-        let response = recv_signal(&mut ws_b).await;
+        let response = recv_until_joined(&mut ws_b).await;
         match response {
             SignalMessage::Joined { peer_count, .. } => {
                 assert_eq!(peer_count, 1, "Room should be fresh after cleanup");

@@ -7492,15 +7492,18 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
 name = "siegu-core"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm",
  "anyhow",
  "base64 0.22.1",
  "bip39",
+ "bytes",
  "crossbeam-channel",
  "ffmpeg-next",
  "futures-util",
@@ -7534,6 +7537,7 @@ dependencies = [
  "url",
  "uuid",
  "warp",
+ "webrtc",
  "zeroize",
 ]
 

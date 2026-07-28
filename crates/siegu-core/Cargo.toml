@@ -42,6 +42,9 @@ heic = { workspace = true }
 num_cpus = "1.16.0"
 warp = { workspace = true }
 mdns-sd = { workspace = true }
+webrtc = { rev = "5aa49c0", git = "https://github.com/webrtc-rs/webrtc" }
+bytes = "1.11.1"
+aes-gcm = { workspace = true }
 
 [features]
 default = ["ml"]

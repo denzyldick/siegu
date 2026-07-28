@@ -1,10 +1,8 @@
-use std::{
-    collections::HashMap,
-    fs::{self},
-};
+use std::collections::HashMap;
+use std::fs;
 
 use rusqlite::Connection;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Autocomplete suggestion returned by search queries.
 #[derive(Debug, Clone, Serialize)]
@@ -12,6 +10,81 @@ pub struct SearchSuggestion {
     pub title: String,
     #[serde(rename = "type")]
     pub suggestion_type: String,
+}
+
+/// Persisted sync session for auto-reconnect on app restart.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SavedSession {
+    pub room_id: String,
+    pub signaling_url: String,
+    pub port: u16,
+    pub is_initiator: bool,
+    pub passphrase: String,
+}
+
+impl SavedSession {
+    /// Encrypt the passphrase using AES-256-GCM with a device-derived key.
+    /// Returns a base64-encoded string of nonce + ciphertext.
+    pub fn encrypt(&self) -> String {
+        use aes_gcm::{
+            aead::{Aead, KeyInit, OsRng},
+            Aes256Gcm, Nonce,
+        };
+        use base64::{engine::general_purpose::STANDARD as B64, Engine};
+        use rand::RngCore;
+
+        let key = Self::derive_key();
+        let cipher = Aes256Gcm::new(&key.into());
+
+        let mut nonce_bytes = [0u8; 12];
+        OsRng.fill_bytes(&mut nonce_bytes);
+        let nonce = Nonce::from_slice(&nonce_bytes);
+
+        let plaintext = self.passphrase.as_bytes();
+        match cipher.encrypt(nonce, plaintext) {
+            Ok(ciphertext) => {
+                let mut combined = nonce_bytes.to_vec();
+                combined.extend_from_slice(&ciphertext);
+                B64.encode(combined)
+            }
+            Err(_) => String::new(),
+        }
+    }
+
+    /// Decrypt a base64-encoded nonce + ciphertext string back to the passphrase.
+    pub fn decrypt(encrypted: &str) -> Result<String, Box<dyn std::error::Error>> {
+        use aes_gcm::{
+            aead::{Aead, KeyInit},
+            Aes256Gcm, Nonce,
+        };
+        use base64::{engine::general_purpose::STANDARD as B64, Engine};
+
+        let key = Self::derive_key();
+        let cipher = Aes256Gcm::new(&key.into());
+
+        let combined = B64.decode(encrypted)?;
+        if combined.len() < 12 {
+            return Err("Invalid encrypted data".into());
+        }
+        let (nonce_bytes, ciphertext) = combined.split_at(12);
+        let nonce = Nonce::from_slice(nonce_bytes);
+
+        let plaintext = cipher.decrypt(nonce, ciphertext)?;
+        Ok(String::from_utf8(plaintext)?)
+    }
+
+    /// Derive a 256-bit key from a machine-specific seed.
+    /// Uses the hostname + a hardcoded salt for simplicity.
+    fn derive_key() -> [u8; 32] {
+        use sha2::{Digest, Sha256};
+        let hostname = sysinfo::System::name().unwrap_or_else(|| "siegu-default".to_string());
+        let mut hasher = Sha256::new();
+        hasher.update(format!("siegu-session-key-v1-{hostname}"));
+        let result = hasher.finalize();
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&result);
+        key
+    }
 }
 
 /// SQLite-backed photo, face, and sync metadata store.
@@ -107,6 +180,8 @@ pub struct ImportedPhoto<'a> {
     pub objects_json: &'a str,
     pub faces_json: &'a str,
     pub encoded: &'a str,
+    pub caption: Option<&'a str>,
+    pub aesthetics_score: Option<f64>,
 }
 
 /// A detected face with its associated person name (if any).
@@ -336,6 +411,16 @@ impl Database {
             "CREATE TABLE IF NOT EXISTS device(ip STRING, name STRING, offer STRING);",
             (),
         );
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS peer_device(\
+             device_id TEXT PRIMARY KEY, name TEXT, ip TEXT, port INTEGER DEFAULT 0, \
+             device_type TEXT DEFAULT '', os TEXT DEFAULT '', \
+             models_enabled TEXT DEFAULT '[]', protocol_version INTEGER DEFAULT 1, \
+             storage_used INTEGER DEFAULT 0, storage_capacity INTEGER DEFAULT 0, \
+             last_seen TEXT DEFAULT (datetime('now'))\
+             );",
+            (),
+        );
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS faces (photo_id STRING, face_id STRING PRIMARY KEY, crop_path STRING, encoded STRING, embedding BLOB, person_id STRING);", ());
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS people (id STRING PRIMARY KEY, name STRING, embedding BLOB);", ());
         let _ = conn.execute(
@@ -441,6 +526,60 @@ impl Database {
             "INSERT OR REPLACE INTO config (key, value) VALUES('last_scan_time', ?1)",
             [&timestamp],
         );
+    }
+
+    /// Save a sync session for auto-reconnect on next startup.
+    /// The passphrase is encrypted with AES-256-GCM using a device-derived key.
+    pub fn save_session(&self, session: &SavedSession) {
+        let encrypted = session.encrypt();
+        let mut state = self.get_state();
+        state.insert("session_room_id".to_string(), session.room_id.clone());
+        state.insert(
+            "session_signaling_url".to_string(),
+            session.signaling_url.clone(),
+        );
+        state.insert("session_port".to_string(), session.port.to_string());
+        state.insert(
+            "session_is_initiator".to_string(),
+            session.is_initiator.to_string(),
+        );
+        state.insert("session_encrypted_passphrase".to_string(), encrypted);
+        self.set_state(state);
+    }
+
+    /// Load the saved session, if any. Returns None if no session exists or decryption fails.
+    pub fn load_session(&self) -> Option<SavedSession> {
+        let state = self.get_state();
+        let room_id = state.get("session_room_id")?.clone();
+        let signaling_url = state.get("session_signaling_url")?.clone();
+        let port = state
+            .get("session_port")
+            .and_then(|v| v.parse::<u16>().ok())
+            .unwrap_or(0);
+        let is_initiator = state
+            .get("session_is_initiator")
+            .and_then(|v| v.parse::<bool>().ok())
+            .unwrap_or(false);
+        let encrypted = state.get("session_encrypted_passphrase")?.clone();
+        let passphrase = SavedSession::decrypt(&encrypted).ok()?;
+        Some(SavedSession {
+            room_id,
+            signaling_url,
+            port,
+            is_initiator,
+            passphrase,
+        })
+    }
+
+    /// Clear any saved session.
+    pub fn clear_session(&self) {
+        let mut state = self.get_state();
+        state.remove("session_room_id");
+        state.remove("session_signaling_url");
+        state.remove("session_port");
+        state.remove("session_is_initiator");
+        state.remove("session_encrypted_passphrase");
+        self.set_state(state);
     }
 
     /// Search for object tags, location names, people, and month suggestions matching the query.
@@ -1224,8 +1363,8 @@ impl Database {
         };
 
         if let Err(e) = tx.execute(
-            "INSERT OR REPLACE INTO photo (id, location, created, latitude, longitude, encoded) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            (photo.id, photo.location, photo.created, photo.latitude, photo.longitude, photo.encoded),
+            "INSERT OR REPLACE INTO photo (id, location, created, latitude, longitude, encoded, caption, aesthetics_score) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            (photo.id, photo.location, photo.created, photo.latitude, photo.longitude, photo.encoded, photo.caption, photo.aesthetics_score),
         ) {
             tracing::warn!("import_photo: failed to upsert photo {}: {e}", photo.id);
             return;
@@ -1383,6 +1522,22 @@ impl Database {
             .execute("UPDATE photo SET indexed = ?1 WHERE id = ?2", (indexed, id))
         {
             tracing::warn!("update_photo_indexed: failed for {id}: {e}");
+        }
+    }
+
+    /// Update caption, aesthetics_score, and indexed level for a photo.
+    pub fn update_photo_metadata(
+        &self,
+        id: &str,
+        caption: Option<&str>,
+        aesthetics_score: Option<f64>,
+        indexed: i32,
+    ) {
+        if let Err(e) = self.connection.execute(
+            "UPDATE photo SET caption = ?1, aesthetics_score = ?2, indexed = ?3 WHERE id = ?4",
+            (caption, aesthetics_score, indexed, id),
+        ) {
+            tracing::warn!("update_photo_metadata: failed for {id}: {e}");
         }
     }
 
@@ -1593,6 +1748,119 @@ pub struct DeviceInfo {
     pub photo_count: i64,
     pub video_count: i64,
     pub os: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PeerDevice {
+    pub device_id: String,
+    pub name: String,
+    pub ip: String,
+    pub port: u16,
+    pub device_type: String,
+    pub os: String,
+    pub models_enabled: Vec<String>,
+    pub protocol_version: u8,
+    pub storage_used: i64,
+    pub storage_capacity: i64,
+    pub last_seen: String,
+}
+
+impl Database {
+    pub fn upsert_peer_device(&self, device: &PeerDevice) {
+        let _ = self.connection.execute(
+            "INSERT INTO peer_device(device_id, name, ip, port, device_type, os, models_enabled, protocol_version, storage_used, storage_capacity, last_seen) \
+             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, datetime('now')) \
+             ON CONFLICT(device_id) DO UPDATE SET \
+             name=excluded.name, ip=excluded.ip, port=excluded.port, \
+             device_type=excluded.device_type, os=excluded.os, \
+             models_enabled=excluded.models_enabled, protocol_version=excluded.protocol_version, \
+             storage_used=excluded.storage_used, storage_capacity=excluded.storage_capacity, \
+             last_seen=datetime('now')",
+            rusqlite::params![
+                device.device_id, device.name, device.ip, device.port as i32,
+                device.device_type, device.os,
+                serde_json::to_string(&device.models_enabled).unwrap_or_else(|_| "[]".to_string()),
+                device.protocol_version as i32, device.storage_used, device.storage_capacity,
+            ],
+        );
+    }
+
+    pub fn update_peer_device_seen(&self, device_id: &str) {
+        let _ = self.connection.execute(
+            "UPDATE peer_device SET last_seen = datetime('now') WHERE device_id = ?1",
+            rusqlite::params![device_id],
+        );
+    }
+
+    pub fn update_peer_device_storage(&self, device_id: &str, used: i64, capacity: i64) {
+        let _ = self.connection.execute(
+            "UPDATE peer_device SET storage_used = ?2, storage_capacity = ?3 WHERE device_id = ?1",
+            rusqlite::params![device_id, used, capacity],
+        );
+    }
+
+    pub fn list_peer_devices(&self) -> Vec<PeerDevice> {
+        let mut results = Vec::new();
+        if let Ok(mut stmt) = self.connection.prepare(
+            "SELECT device_id, name, ip, port, device_type, os, models_enabled, protocol_version, storage_used, storage_capacity, last_seen \
+             FROM peer_device ORDER BY last_seen DESC"
+        ) {
+            if let Ok(iter) = stmt.query_map([], |row| {
+                let models_str: String = row.get(6).unwrap_or_else(|_| "[]".to_string());
+                let models: Vec<String> = serde_json::from_str(&models_str).unwrap_or_default();
+                Ok(PeerDevice {
+                    device_id: row.get(0)?,
+                    name: row.get(1)?,
+                    ip: row.get(2)?,
+                    port: row.get::<_, i32>(3).unwrap_or(0) as u16,
+                    device_type: row.get(4)?,
+                    os: row.get(5)?,
+                    models_enabled: models,
+                    protocol_version: row.get::<_, i32>(7).unwrap_or(1) as u8,
+                    storage_used: row.get(8)?,
+                    storage_capacity: row.get(9)?,
+                    last_seen: row.get(10)?,
+                })
+            }) {
+                for d in iter.flatten() {
+                    results.push(d);
+                }
+            }
+        }
+        results
+    }
+
+    pub fn get_peer_device(&self, device_id: &str) -> Option<PeerDevice> {
+        self.connection.query_row(
+            "SELECT device_id, name, ip, port, device_type, os, models_enabled, protocol_version, storage_used, storage_capacity, last_seen \
+             FROM peer_device WHERE device_id = ?1",
+            rusqlite::params![device_id],
+            |row| {
+                let models_str: String = row.get(6).unwrap_or_else(|_| "[]".to_string());
+                let models: Vec<String> = serde_json::from_str(&models_str).unwrap_or_default();
+                Ok(PeerDevice {
+                    device_id: row.get(0)?,
+                    name: row.get(1)?,
+                    ip: row.get(2)?,
+                    port: row.get::<_, i32>(3).unwrap_or(0) as u16,
+                    device_type: row.get(4)?,
+                    os: row.get(5)?,
+                    models_enabled: models,
+                    protocol_version: row.get::<_, i32>(7).unwrap_or(1) as u8,
+                    storage_used: row.get(8)?,
+                    storage_capacity: row.get(9)?,
+                    last_seen: row.get(10)?,
+                })
+            },
+        ).ok()
+    }
+
+    pub fn remove_peer_device(&self, device_id: &str) {
+        let _ = self.connection.execute(
+            "DELETE FROM peer_device WHERE device_id = ?1",
+            rusqlite::params![device_id],
+        );
+    }
 }
 
 #[cfg(test)]
