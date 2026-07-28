@@ -3,6 +3,8 @@ use crate::database;
 use crate::transport;
 
 use crate::common::emit_log;
+use siegu_core::mesh_transport::MeshTransport;
+use siegu_core::SavedSession;
 use std::sync::Arc;
 use tauri::Manager;
 
@@ -25,6 +27,19 @@ pub fn do_remove_device(db: &database::Database, name: &str) -> Result<(), Strin
 /// Pure business logic — lists devices and prepends the host device.
 pub fn do_list_devices(db: &database::Database) -> Vec<database::DeviceInfo> {
     let mut devices = db.list_devices();
+
+    for peer in db.list_peer_devices() {
+        devices.push(database::DeviceInfo {
+            id: peer.device_id,
+            title: peer.name,
+            icon: "mdi-cellphone".to_string(),
+            up_to_date: true,
+            host: false,
+            photo_count: 0,
+            video_count: 0,
+            os: peer.os,
+        });
+    }
 
     let hostname = std::env::var("HOSTNAME").unwrap_or_else(|_| "localhost".to_string());
     let (photo_count, video_count) = db.get_media_counts();
@@ -70,27 +85,41 @@ pub async fn start_webrtc_session(
         return Err("Free tier does not support remote sync. Use LAN sync instead.".to_string());
     }
 
+    let sync_tx = Arc::clone(&state.sync_tx);
+
     if let Ok(mut session) = state.active_session.lock() {
         if let Some(handle) = session.take() {
             emit_log(&app, "Aborting previous WebRTC session".to_string());
             handle.abort();
         }
 
-        let sync_tx_inner = Arc::clone(&state.sync_tx);
+        let config_path_clone = config_path.clone();
+        let room_id_clone = roomId.clone();
+        let signaling_url_clone = signalingUrl.clone();
+        let is_initiator_clone = isInitiator;
 
         let handle = tauri::async_runtime::spawn(async move {
-            let client = transport::WebRtcClient {
-                room_id: roomId,
-                is_initiator: isInitiator,
-                signaling_url: signalingUrl,
-                app_handle: Some(app_handle),
+            let transport = transport::create_transport(
+                roomId,
+                isInitiator,
+                signalingUrl,
                 config_path,
-                sync_tx: sync_tx_inner,
-            };
-            let _ = client.start().await;
+                app_handle,
+                Some(sync_tx),
+            );
+            let _ = transport.start().await;
         });
 
         *session = Some(handle);
+
+        let db2 = database::Database::new(&config_path_clone);
+        db2.save_session(&SavedSession {
+            room_id: room_id_clone,
+            signaling_url: signaling_url_clone,
+            port: 0,
+            is_initiator: is_initiator_clone,
+            passphrase: String::new(),
+        });
     }
 
     Ok(())
@@ -100,6 +129,7 @@ pub async fn start_webrtc_session(
 pub async fn start_lan_host(
     app: tauri::AppHandle,
     state: tauri::State<'_, crate::WebRtcState>,
+    mdns_state: tauri::State<'_, crate::MdnsState>,
     room_id: String,
     is_initiator: bool,
 ) -> Result<(), String> {
@@ -109,27 +139,68 @@ pub async fn start_lan_host(
         return Err("Config error".to_string());
     }
 
+    let hostname = std::env::var("HOSTNAME")
+        .or_else(|_| std::env::var("COMPUTERNAME"))
+        .unwrap_or_else(|_| "siegu-host".to_string());
+
+    let daemon = siegu_core::mdns::create_daemon().map_err(|e| e.to_string())?;
+    {
+        let mut d = mdns_state.daemon.lock().map_err(|e| e.to_string())?;
+        *d = Some(daemon.clone());
+    }
+
+    let port = MeshTransport::start_lan_server(0)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let sync_tx = Arc::clone(&state.sync_tx);
+
     if let Ok(mut session) = state.active_session.lock() {
         if let Some(handle) = session.take() {
             emit_log(&app, "Aborting previous WebRTC session".to_string());
             handle.abort();
         }
 
-        let sync_tx_inner = Arc::clone(&state.sync_tx);
+        let config_path_for_session = config_path.clone();
+        let room_id_for_session = room_id.clone();
+        let hostname_for_task = hostname.clone();
 
         let handle = tauri::async_runtime::spawn(async move {
-            let client = transport::WebRtcClient {
-                room_id,
+            let mut transport = transport::create_transport(
+                room_id.clone(),
                 is_initiator,
-                signaling_url: String::new(),
-                app_handle: Some(app_handle),
+                String::new(),
                 config_path,
-                sync_tx: sync_tx_inner,
-            };
-            let _ = client.start_lan(0).await;
+                app_handle.clone(),
+                Some(sync_tx),
+            );
+
+            if let Err(e) =
+                siegu_core::mdns::register_service(&daemon, &hostname_for_task, port, &room_id)
+            {
+                emit_log(&app_handle, format!("mDNS registration failed: {e}"));
+            } else {
+                emit_log(
+                    &app_handle,
+                    format!("mDNS registered: {hostname_for_task} on port {port}"),
+                );
+            }
+            transport.signaling_url = format!("ws://127.0.0.1:{port}");
+            if let Err(e) = transport.start().await {
+                emit_log(&app_handle, format!("WebRTC start failed: {e}"));
+            }
         });
 
         *session = Some(handle);
+
+        let db2 = database::Database::new(&config_path_for_session);
+        db2.save_session(&SavedSession {
+            room_id: room_id_for_session,
+            signaling_url: format!("ws://127.0.0.1:{port}"),
+            port,
+            is_initiator,
+            passphrase: String::new(),
+        });
     }
 
     Ok(())
@@ -151,6 +222,7 @@ pub async fn discover_lan_devices(
 pub async fn stop_webrtc_session(
     app: tauri::AppHandle,
     state: tauri::State<'_, crate::WebRtcState>,
+    mdns_state: tauri::State<'_, crate::MdnsState>,
 ) -> Result<(), String> {
     if let Ok(mut session) = state.active_session.lock() {
         if let Some(handle) = session.take() {
@@ -161,6 +233,17 @@ pub async fn stop_webrtc_session(
     {
         let mut tx = state.sync_tx.lock().await;
         *tx = None;
+    }
+    if let Ok(mut d) = mdns_state.daemon.lock() {
+        if let Some(daemon) = d.take() {
+            let _ = daemon.shutdown();
+            emit_log(&app, "mDNS daemon shut down".to_string());
+        }
+    }
+    let config_path = get_config_path(&app);
+    if !config_path.is_empty() {
+        let db = database::Database::new(&config_path);
+        db.clear_session();
     }
     Ok(())
 }
@@ -233,6 +316,67 @@ pub async fn generate_pairing_codes() -> Result<siegu_core::PairingCodes, String
 #[tauri::command]
 pub async fn hash_pairing_code(input: String) -> Result<String, String> {
     siegu_core::hash_pairing_code(input)
+}
+
+#[tauri::command]
+pub async fn auto_reconnect(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::WebRtcState>,
+) -> Result<bool, String> {
+    let config_path = get_config_path(&app);
+    if config_path.is_empty() {
+        return Ok(false);
+    }
+    let db = database::Database::new(&config_path);
+    match db.load_session() {
+        Some(session) => {
+            emit_log(
+                &app,
+                format!("Auto-reconnecting to room {}", session.room_id),
+            );
+            let app_handle = app.clone();
+            let sync_tx = Arc::clone(&state.sync_tx);
+
+            if let Ok(mut active) = state.active_session.lock() {
+                let handle = tauri::async_runtime::spawn(async move {
+                    let transport = transport::create_transport(
+                        session.room_id,
+                        session.is_initiator,
+                        session.signaling_url,
+                        config_path,
+                        app_handle,
+                        Some(sync_tx),
+                    );
+                    let _ = transport.start().await;
+                });
+                *active = Some(handle);
+            }
+            Ok(true)
+        }
+        None => Ok(false),
+    }
+}
+
+#[tauri::command]
+pub async fn clear_saved_session(app: tauri::AppHandle) -> Result<(), String> {
+    let config_path = get_config_path(&app);
+    if config_path.is_empty() {
+        return Err("Config error".to_string());
+    }
+    let db = database::Database::new(&config_path);
+    db.clear_session();
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn list_peer_devices(app: tauri::AppHandle) -> String {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return "[]".to_string();
+    }
+    let db = database::Database::new(&path);
+    let peers = db.list_peer_devices();
+    serde_json::to_string(&peers).unwrap_or("[]".to_string())
 }
 
 #[cfg(test)]

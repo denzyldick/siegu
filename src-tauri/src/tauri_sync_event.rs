@@ -1,0 +1,104 @@
+use std::sync::Arc;
+use tauri::Emitter;
+
+use siegu_core::{Database, PeerDevice, SyncEvent, SyncProgress};
+
+pub struct TauriSyncEvent {
+    pub app: tauri::AppHandle,
+    pub config_path: String,
+}
+
+impl SyncEvent for TauriSyncEvent {
+    fn on_state_change(&self, state: &str) {
+        let _ = self.app.emit("webrtc-state", state);
+    }
+
+    fn on_log(&self, message: &str) {
+        crate::common::emit_log(&self.app, message.to_string());
+    }
+
+    fn on_sync_progress(&self, progress: SyncProgress) {
+        let _ = self.app.emit("sync-progress", progress);
+    }
+
+    fn on_photo_received(&self, photo_id: String, path: String) {
+        use crate::database::Photo;
+        use std::collections::HashMap;
+        let _ = self.app.emit(
+            "photo-received",
+            Photo {
+                id: photo_id,
+                encoded: String::new(),
+                location: path,
+                created: String::new(),
+                objects: HashMap::new(),
+                properties: HashMap::new(),
+                latitude: 0.0,
+                longitude: 0.0,
+                favorite: false,
+                indexed: 2,
+                caption: None,
+                aesthetics_score: None,
+                ai_status: crate::database::AiStatus::default(),
+            },
+        );
+    }
+
+    fn on_sync_error(&self, error: String) {
+        let _ = self.app.emit("sync-error", error);
+    }
+
+    fn on_peer_connected(
+        &self,
+        device_id: String,
+        device_name: String,
+        models_enabled: Vec<String>,
+        protocol_version: u8,
+    ) {
+        let db = Database::new(&self.config_path);
+        let device = PeerDevice {
+            device_id: device_id.clone(),
+            name: device_name,
+            ip: String::new(),
+            port: 0,
+            device_type: String::new(),
+            os: String::new(),
+            models_enabled,
+            protocol_version,
+            storage_used: 0,
+            storage_capacity: 0,
+            last_seen: String::new(),
+        };
+        db.upsert_peer_device(&device);
+        self.on_log(&format!("Peer registered: {device_id}"));
+        let _ = self.app.emit("webrtc-state", "Peer Connected");
+        let _ = self.app.emit("peer-connected", &device);
+    }
+
+    fn on_peer_disconnected(&self, peer_id: String) {
+        let db = Database::new(&self.config_path);
+        db.update_peer_device_seen(&peer_id);
+        self.on_log(&format!("Peer disconnected: {peer_id}"));
+        let _ = self.app.emit("webrtc-state", "Peer Disconnected");
+        let _ = self.app.emit("peer-disconnected", &peer_id);
+    }
+
+    fn on_device_registered(&self, db: &Database) {
+        let _ = self.app.emit("refresh-devices", ());
+        let _ = db;
+    }
+
+    fn get_config_path(&self) -> String {
+        self.config_path.clone()
+    }
+
+    fn get_sync_path(&self) -> Option<String> {
+        let db = Database::new(&self.config_path);
+        db.get_state().get("sync_path").cloned()
+    }
+
+    fn get_directories(&self) -> Vec<String> {
+        let db = Database::new(&self.config_path);
+        db.list_directories()
+    }
+}

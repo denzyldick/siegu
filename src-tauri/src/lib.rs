@@ -4,6 +4,7 @@ mod commands;
 pub mod common;
 mod file;
 mod ml;
+mod tauri_sync_event;
 #[cfg(test)]
 mod test;
 #[cfg(test)]
@@ -24,6 +25,10 @@ struct WebRtcState {
 
 struct ScanState {
     guard: siegu_core::ScanGuard,
+}
+
+struct MdnsState {
+    daemon: std::sync::Mutex<Option<siegu_core::mdns::DaemonHandle>>,
 }
 
 struct ShutdownState {
@@ -132,6 +137,15 @@ pub fn run() {
             });
 
             let config_path = get_config_path(app.handle());
+
+            // Clean up stale temp files on startup
+            {
+                let cp = config_path.clone();
+                tauri::async_runtime::spawn(async move {
+                    siegu_core::mesh::MeshManager::cleanup_temp_files(&cp).await;
+                });
+            }
+
             let ml_context = ml::start_background_worker(app.handle(), config_path.clone());
             app.manage(ml_context);
 
@@ -149,6 +163,10 @@ pub fn run() {
                 guard: siegu_core::ScanGuard::new(),
             });
 
+            app.manage(MdnsState {
+                daemon: std::sync::Mutex::new(None),
+            });
+
             app.manage(ShutdownState::default());
 
             let app_handle_for_interval = app.handle().clone();
@@ -161,6 +179,19 @@ pub fn run() {
                     );
                     interval.tick().await;
                     commands::scan::scan_files(app_handle_for_interval.clone());
+                }
+            });
+
+            // Periodic temp file cleanup every 30 minutes
+            let app_handle_for_cleanup = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(1800));
+                loop {
+                    interval.tick().await;
+                    let cp = get_config_path(&app_handle_for_cleanup);
+                    if !cp.is_empty() {
+                        siegu_core::mesh::MeshManager::cleanup_temp_files(&cp).await;
+                    }
                 }
             });
 
@@ -226,6 +257,9 @@ pub fn run() {
             commands::sync::get_media_server_port,
             commands::sync::generate_pairing_codes,
             commands::sync::hash_pairing_code,
+            commands::sync::auto_reconnect,
+            commands::sync::clear_saved_session,
+            commands::sync::list_peer_devices,
             // Indexing
             commands::indexing::get_indexing_status,
             commands::indexing::get_unindexed_count,
