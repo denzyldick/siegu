@@ -1,11 +1,83 @@
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
 use siegu_core::database::Database;
+use siegu_core::mesh_transport::MeshTransport;
 use siegu_core::scanner::ScanGuard;
+use siegu_core::{MeshManager, PeerDevice, SavedSession, SyncEvent, SyncProgress};
 
 mod analyze_tui;
+
+pub struct CliSyncEvent {
+    pub config_path: String,
+}
+
+impl SyncEvent for CliSyncEvent {
+    fn on_state_change(&self, state: &str) {
+        println!("[sync] {state}");
+    }
+
+    fn on_log(&self, message: &str) {
+        println!("[sync] {message}");
+    }
+
+    fn on_sync_progress(&self, progress: SyncProgress) {
+        println!(
+            "[sync] {}: {}/{} ({:.0}%) - {}",
+            progress.device_id,
+            progress.items_completed,
+            progress.items_total,
+            progress.progress * 100.0,
+            progress.status,
+        );
+    }
+
+    fn on_photo_received(&self, _photo_id: String, _path: String) {}
+
+    fn on_sync_error(&self, error: String) {
+        eprintln!("[sync] Error: {error}");
+    }
+
+    fn on_peer_connected(&self, device_id: String, device_name: String, models_enabled: Vec<String>, protocol_version: u8) {
+        let db = Database::new(&self.config_path);
+        db.upsert_peer_device(&PeerDevice {
+            device_id,
+            name: device_name,
+            ip: String::new(),
+            port: 0,
+            device_type: String::new(),
+            os: String::new(),
+            models_enabled,
+            protocol_version,
+            storage_used: 0,
+            storage_capacity: 0,
+            last_seen: String::new(),
+        });
+    }
+
+    fn on_peer_disconnected(&self, peer_id: String) {
+        let db = Database::new(&self.config_path);
+        db.update_peer_device_seen(&peer_id);
+    }
+
+    fn on_device_registered(&self, _db: &Database) {}
+
+    fn get_config_path(&self) -> String {
+        self.config_path.clone()
+    }
+
+    fn get_sync_path(&self) -> Option<String> {
+        let db = Database::new(&self.config_path);
+        db.get_state().get("sync_path").cloned()
+    }
+
+    fn get_directories(&self) -> Vec<String> {
+        let db = Database::new(&self.config_path);
+        db.list_directories()
+    }
+}
 
 #[derive(Parser)]
 #[command(name = "siegu", version, about = "Privacy-first media management CLI")]
@@ -57,6 +129,44 @@ enum Commands {
     Config {
         #[command(subcommand)]
         action: ConfigAction,
+    },
+    /// Mesh sync commands
+    Mesh {
+        #[command(subcommand)]
+        action: MeshAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum MeshAction {
+    /// Start a LAN mesh host and wait for peers
+    Host {
+        #[arg(short, long, default_value = "0")]
+        port: u16,
+        #[arg(short, long)]
+        config: Option<String>,
+    },
+    /// Join a mesh room via signaling server
+    Join {
+        /// Room ID or signaling URL
+        room: String,
+        #[arg(short, long)]
+        config: Option<String>,
+    },
+    /// Show mesh/session status
+    Status {
+        #[arg(short, long)]
+        config: Option<String>,
+    },
+    /// Disconnect and clear saved session
+    Disconnect {
+        #[arg(short, long)]
+        config: Option<String>,
+    },
+    /// Show storage quota usage
+    Quota {
+        #[arg(short, long)]
+        config: Option<String>,
     },
 }
 
@@ -155,6 +265,31 @@ async fn main() {
                 ConfigAction::GetKey { key } => cmd_config_get_key(&config_dir, key),
                 ConfigAction::Set { key, value } => cmd_config_set(&config_dir, key, value),
                 ConfigAction::Keys => cmd_config_keys(),
+            }
+        }
+        Commands::Mesh { action } => {
+            let config_dir = resolve_config_dir(&cli.config_dir, &None);
+            match action {
+                MeshAction::Host { port, config } => {
+                    let config_dir = resolve_config_dir(&cli.config_dir, config);
+                    cmd_mesh_host(*port, &config_dir).await;
+                }
+                MeshAction::Join { room, config } => {
+                    let config_dir = resolve_config_dir(&cli.config_dir, config);
+                    cmd_mesh_join(room, &config_dir).await;
+                }
+                MeshAction::Status { config } => {
+                    let config_dir = resolve_config_dir(&cli.config_dir, config);
+                    cmd_mesh_status(&config_dir);
+                }
+                MeshAction::Disconnect { config } => {
+                    let config_dir = resolve_config_dir(&cli.config_dir, config);
+                    cmd_mesh_disconnect(&config_dir);
+                }
+                MeshAction::Quota { config } => {
+                    let config_dir = resolve_config_dir(&cli.config_dir, config);
+                    cmd_mesh_quota(&config_dir);
+                }
             }
         }
     }
@@ -474,10 +609,9 @@ async fn cmd_serve(port: u16) {
 }
 
 async fn cmd_sync(server: &str) {
-    println!("Remote sync is available through the Tauri GUI app.");
-    println!("The CLI does not currently support WebRTC peer connections.");
+    println!("Remote sync requires a config directory and session setup.");
+    println!("Use `siegu mesh join <room>` for LAN sync, or pass a signaling URL.");
     println!("Server URL: {server}");
-    println!("Use `siegu serve` to start a LAN server instead.");
 }
 
 fn cmd_config_get(config_dir: &Path) {
@@ -525,5 +659,185 @@ fn cmd_config_keys() {
     println!("Valid config keys:");
     for key in siegu_core::config::ALLOWED_CONFIG_KEYS {
         println!("  {key}");
+    }
+}
+
+async fn cmd_mesh_host(port: u16, config_dir: &Path) {
+    let config_path = config_dir.display().to_string();
+    let _ = std::fs::create_dir_all(config_dir);
+    let db = Database::new(&config_path);
+
+    let room_id = uuid::Uuid::new_v4().to_string();
+    let hostname = std::env::var("HOSTNAME")
+        .or_else(|_| std::env::var("COMPUTERNAME"))
+        .unwrap_or_else(|_| "siegu-host".to_string());
+
+    println!("Starting LAN mesh host...");
+    println!("Room ID: {room_id}");
+
+    let actual_port = MeshTransport::start_lan_server(port).await
+        .expect("Failed to start LAN signaling server");
+    println!("Signaling server on port {actual_port}");
+
+    let event = Arc::new(CliSyncEvent { config_path: config_path.clone() });
+
+    let transport = MeshTransport::new(
+        room_id.clone(),
+        true,
+        format!("ws://127.0.0.1:{actual_port}"),
+        config_path.clone(),
+        uuid::Uuid::new_v4().to_string(),
+        hostname.clone(),
+        Vec::new(),
+        event,
+    );
+
+    let daemon = match siegu_core::mdns::create_daemon() {
+        Ok(d) => {
+            if let Err(e) = siegu_core::mdns::register_service(&d, &hostname, actual_port, &room_id) {
+                eprintln!("mDNS registration failed: {e}");
+            } else {
+                println!("mDNS registered as {hostname}");
+            }
+            Some(d)
+        }
+        Err(e) => {
+            eprintln!("mDNS init failed: {e}");
+            None
+        }
+    };
+
+    db.save_session(&SavedSession {
+        room_id: room_id.clone(),
+        signaling_url: format!("ws://127.0.0.1:{actual_port}"),
+        port: actual_port,
+        is_initiator: true,
+        passphrase: String::new(),
+    });
+
+    println!("Waiting for peers... Press Ctrl+C to stop.");
+
+    let transport_handle = tokio::spawn(async move {
+        if let Err(e) = transport.start().await {
+            eprintln!("WebRTC transport stopped: {e}");
+        }
+    });
+
+    let _ = tokio::signal::ctrl_c().await;
+    println!("Shutting down...");
+
+    if let Some(ref d) = daemon {
+        siegu_core::mdns::unregister_service(d, &hostname);
+    }
+    transport_handle.abort();
+    println!("Shutting down...");
+    transport_handle.abort();
+}
+
+async fn cmd_mesh_join(room: &str, config_dir: &Path) {
+    let config_path = config_dir.display().to_string();
+    let _ = std::fs::create_dir_all(config_dir);
+    let db = Database::new(&config_path);
+
+    let device_name = std::env::var("HOSTNAME")
+        .or_else(|_| std::env::var("COMPUTERNAME"))
+        .unwrap_or_else(|_| "siegu-device".to_string());
+
+    let signaling_url = if room.starts_with("ws://") || room.starts_with("wss://") {
+        room.to_string()
+    } else {
+        format!("ws://127.0.0.1:8080/{}", room)
+    };
+
+    println!("Joining mesh room: {room}");
+    println!("Signaling: {signaling_url}");
+
+    let event = Arc::new(CliSyncEvent { config_path: config_path.clone() });
+
+    let transport = MeshTransport::new(
+        room.to_string(),
+        false,
+        signaling_url.clone(),
+        config_path.clone(),
+        uuid::Uuid::new_v4().to_string(),
+        device_name,
+        Vec::new(),
+        event,
+    );
+
+    db.save_session(&SavedSession {
+        room_id: room.to_string(),
+        signaling_url,
+        port: 0,
+        is_initiator: false,
+        passphrase: String::new(),
+    });
+
+    println!("Connecting... Press Ctrl+C to stop.");
+
+    let transport_handle = tokio::spawn(async move {
+        if let Err(e) = transport.start().await {
+            eprintln!("WebRTC transport stopped: {e}");
+        }
+    });
+
+    let _ = tokio::signal::ctrl_c().await;
+    println!("Shutting down...");
+    transport_handle.abort();
+}
+
+fn cmd_mesh_status(config_dir: &Path) {
+    let config_path = config_dir.display().to_string();
+    let db = Database::new(&config_path);
+    match db.load_session() {
+        Some(session) => {
+            println!("Saved session:");
+            println!("  Room:         {}", session.room_id);
+            println!("  Signaling:    {}", session.signaling_url);
+            println!("  Port:         {}", session.port);
+            println!("  Initiator:    {}", session.is_initiator);
+        }
+        None => {
+            println!("No saved session.");
+        }
+    }
+    let peers = db.list_peer_devices();
+    if !peers.is_empty() {
+        println!("\nKnown peer devices:");
+        for p in &peers {
+            println!("  {} ({}) - last seen: {}", p.name, p.device_id, p.last_seen);
+        }
+    }
+    let state = db.get_state();
+    if let Some(max_mb) = state.get("max_storage_mb") {
+        println!("  Storage quota: {max_mb} MB");
+    } else {
+        println!("  Storage quota: 10240 MB (default)");
+    }
+}
+
+fn cmd_mesh_disconnect(config_dir: &Path) {
+    let config_path = config_dir.display().to_string();
+    let db = Database::new(&config_path);
+    db.clear_session();
+    println!("Session cleared.");
+}
+
+fn cmd_mesh_quota(config_dir: &Path) {
+    let config_path = config_dir.display().to_string();
+    let used = siegu_core::MeshManager::get_storage_used(&config_path);
+    let quota = siegu_core::MeshManager::get_storage_quota(&config_path);
+    let pct = if quota > 0 {
+        (used as f64 / quota as f64) * 100.0
+    } else {
+        0.0
+    };
+    println!("Storage usage:");
+    println!("  Used:  {} bytes ({:.2} MB)", used, used as f64 / 1_048_576.0);
+    println!("  Quota: {} bytes ({:.2} MB)", quota, quota as f64 / 1_048_576.0);
+    println!("  Usage: {:.1}%", pct);
+
+    if pct > 90.0 {
+        println!("  WARNING: Storage nearly full!");
     }
 }
