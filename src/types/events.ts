@@ -1,6 +1,6 @@
 import type { MediaItem } from './media'
 import type { ScanProgress, FileScanProgress, IndexingProgress } from './scan'
-import type { SyncProgress } from './sync'
+import type { SyncProgress, PeerDevice } from './sync'
 import type { ModelProgress, DownloadProgress, AiJob } from './models'
 
 export interface ScanProgressEvent {
@@ -59,6 +59,22 @@ export interface IndexingEtaEvent {
   }
 }
 
+export interface PeerConnectedEvent {
+  payload: PeerDevice
+}
+
+export interface PeerDisconnectedEvent {
+  payload: string
+}
+
+export interface WebRtcStateEvent {
+  payload: string
+}
+
+export interface RoomCodeEvent {
+  payload: string
+}
+
 export type TauriEventMap = {
   'scan-progress': ScanProgressEvent
   'file-scan-progress': FileScanProgressEvent
@@ -72,6 +88,10 @@ export type TauriEventMap = {
   'sync-error': SyncErrorEvent
   'download-progress': DownloadProgressEvent
   'model-progress': ModelProgressEvent
+  'webrtc-state': WebRtcStateEvent
+  'peer-connected': PeerConnectedEvent
+  'peer-disconnected': PeerDisconnectedEvent
+  'room-code': RoomCodeEvent
 }
 
 export type TauriEventName = keyof TauriEventMap

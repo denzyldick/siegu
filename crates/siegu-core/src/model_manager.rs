@@ -88,7 +88,21 @@ pub const MODEL_REGISTRY: &[ModelFile] = &[
         model_name: "blip",
         filename: "blip.onnx",
         url: "https://huggingface.co/onnx-community/Salesforce_blip-image-captioning-base/resolve/main/split_0.onnx",
-        expected_size: 10_000_000,
+        expected_size: 340_000_000,
+        sha256: "",
+    },
+    ModelFile {
+        model_name: "blip",
+        filename: "blip_decoder.onnx",
+        url: "https://huggingface.co/onnx-community/Salesforce_blip-image-captioning-base/resolve/main/split_1.onnx",
+        expected_size: 640_000_000,
+        sha256: "",
+    },
+    ModelFile {
+        model_name: "blip",
+        filename: "blip_tokenizer.json",
+        url: "https://huggingface.co/Salesforce/blip-image-captioning-base/resolve/main/tokenizer.json",
+        expected_size: 500_000,
         sha256: "",
     },
     ModelFile {

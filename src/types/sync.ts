@@ -30,3 +30,17 @@ export interface DiscoveredHost {
   ip: string
   port: number
 }
+
+export interface PeerDevice {
+  device_id: string
+  name: string
+  ip: string
+  port: number
+  device_type: string
+  os: string
+  models_enabled: string[]
+  protocol_version: number
+  storage_used: number
+  storage_capacity: number
+  last_seen: string
+}

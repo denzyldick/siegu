@@ -32,6 +32,8 @@ pub struct LoadedModels {
     pub aesthetics: Option<ModelEngine>,
     pub yolo: Option<ModelEngine>,
     pub blip: Option<ModelEngine>,
+    pub blip_decoder: Option<ModelEngine>,
+    pub blip_tokenizer: Option<tokenizers::Tokenizer>,
     pub midas: Option<ModelEngine>,
     pub whisper_encoder: Option<ModelEngine>,
     pub whisper_decoder: Option<ModelEngine>,
@@ -129,10 +131,34 @@ pub fn load_models(
         None
     };
     let blip = if model_enabled(config, "blip") {
-        log("Loading BLIP model...");
+        log("Loading BLIP vision encoder...");
         let m = load_model(&models_dir, "blip.onnx");
-        log("BLIP ready.");
+        log("BLIP vision encoder ready.");
         m
+    } else {
+        None
+    };
+    let blip_decoder = if model_enabled(config, "blip") {
+        log("Loading BLIP text decoder...");
+        let m = load_model(&models_dir, "blip_decoder.onnx");
+        log("BLIP text decoder ready.");
+        m
+    } else {
+        None
+    };
+    let blip_tokenizer = if model_enabled(config, "blip") {
+        let tok_path = models_dir.join("blip_tokenizer.json");
+        if tok_path.exists() {
+            tokenizers::Tokenizer::from_file(&tok_path).ok()
+        } else {
+            // fall back to shared tokenizer.json
+            let fallback = models_dir.join("tokenizer.json");
+            if fallback.exists() {
+                tokenizers::Tokenizer::from_file(&fallback).ok()
+            } else {
+                None
+            }
+        }
     } else {
         None
     };
@@ -214,6 +240,8 @@ pub fn load_models(
         aesthetics,
         yolo,
         blip,
+        blip_decoder,
+        blip_tokenizer,
         midas,
         whisper_encoder,
         whisper_decoder,

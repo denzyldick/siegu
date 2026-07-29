@@ -32,7 +32,9 @@
     "setup_local_desc": "Indexar fotos desde carpetas en este ordenador",
     "join_library": "Unirse a una biblioteca",
     "join_library_desc": "Sincronizar con otro dispositivo en tu red",
-    "ai_disclaimer": "Los modelos de IA se ejecutan completamente en tu dispositivo. Ningún dato sale nunca de tu ordenador."
+    "ai_disclaimer": "Los modelos de IA se ejecutan completamente en tu dispositivo. Ningún dato sale nunca de tu ordenador.",
+    "syncing": "Syncing...",
+    "sync_complete": "Sync complete"
   },
   "search": {
     "placeholder": "Buscar recuerdos...",
@@ -316,7 +318,14 @@
     "joining_room": "Entrando a la sala...",
     "error_joining": "Error al entrar: {error}",
     "start_syncing": "Iniciar sincronización",
-    "awaiting_webrtc_receiver": "Canal de señalización solicitado. Esperando conexión del receptor WebRTC."
+    "awaiting_webrtc_receiver": "Canal de señalización solicitado. Esperando conexión del receptor WebRTC.",
+    "syncing": "Syncing...",
+    "sync_complete": "Sync complete",
+    "searching_network": "Searching for devices on your network...",
+    "no_devices_found": "No devices found nearby",
+    "select_device": "Select a device to connect to",
+    "device_on_network": "On your network",
+    "connect_fromAnywhere": "Connect from anywhere with Internet Sync — coming soon"
   },
   "media_viewer": {
     "metadata": "Metadatos",

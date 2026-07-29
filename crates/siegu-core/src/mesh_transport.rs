@@ -646,6 +646,7 @@ mod tests {
         }
         fn on_peer_disconnected(&self, _id: String) {}
         fn on_device_registered(&self, _db: &Database) {}
+        fn on_metadata_updated(&self, _photo_id: &str, _caption: Option<&str>, _aesthetics_score: Option<f64>) {}
         fn get_config_path(&self) -> String {
             "/tmp/test".into()
         }

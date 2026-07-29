@@ -1,11 +1,27 @@
 #!/bin/bash
+# scripts/run-android.sh
+#
+# Builds and deploys the Siegu Android app on a connected device.
+# Steps:
+#   1. Build the frontend (yarn build)
+#   2. Cross-compile the Rust library for aarch64-linux-android via cargo-ndk
+#   3. Copy the .so into jniLibs for the Android Gradle project
+#   4. Build a universal debug APK via Gradle
+#   5. Install it on the connected device via adb
+#
+# Prerequisites:
+#   - Android SDK + NDK r27 installed (default: ~/Android/Sdk)
+#   - cargo-ndk installed (cargo install cargo-ndk)
+#   - Rust targets: rustup target add aarch64-linux-android
+#   - yarn deps installed (yarn install)
+#   - Connected device or emulator with adb
 set -euo pipefail
 
 NDK_VERSION="27.0.12077973"
 ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
 NDK="$ANDROID_HOME/ndk/$NDK_VERSION"
 TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64"
-PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 cd "$PROJECT_DIR"
 

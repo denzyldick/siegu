@@ -12,6 +12,9 @@ mod analyze_tui;
 
 pub struct CliSyncEvent {
     pub config_path: String,
+    pub sync_tx: Arc<
+        tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<siegu_core::SyncMessage>>>,
+    >,
 }
 
 impl SyncEvent for CliSyncEvent {
@@ -63,6 +66,21 @@ impl SyncEvent for CliSyncEvent {
     }
 
     fn on_device_registered(&self, _db: &Database) {}
+
+    fn on_metadata_updated(&self, _photo_id: &str, _caption: Option<&str>, _aesthetics_score: Option<f64>) {
+        let msg = siegu_core::SyncMessage::MetadataUpdate {
+            photo_id: _photo_id.to_string(),
+            caption: _caption.map(|c| c.to_string()),
+            aesthetics_score: _aesthetics_score,
+            indexed: 2,
+        };
+        self.on_log(&format!("Metadata updated for {_photo_id}"));
+        if let Ok(g) = self.sync_tx.try_lock() {
+            if let Some(tx) = g.as_ref() {
+                let _ = tx.send(msg);
+            }
+        }
+    }
 
     fn get_config_path(&self) -> String {
         self.config_path.clone()
@@ -679,7 +697,8 @@ async fn cmd_mesh_host(port: u16, config_dir: &Path) {
         .expect("Failed to start LAN signaling server");
     println!("Signaling server on port {actual_port}");
 
-    let event = Arc::new(CliSyncEvent { config_path: config_path.clone() });
+    let sync_tx = Arc::new(tokio::sync::Mutex::new(None));
+    let event = Arc::new(CliSyncEvent { config_path: config_path.clone(), sync_tx: Arc::clone(&sync_tx) });
 
     let transport = MeshTransport::new(
         room_id.clone(),
@@ -752,7 +771,8 @@ async fn cmd_mesh_join(room: &str, config_dir: &Path) {
     println!("Joining mesh room: {room}");
     println!("Signaling: {signaling_url}");
 
-    let event = Arc::new(CliSyncEvent { config_path: config_path.clone() });
+    let sync_tx2 = Arc::new(tokio::sync::Mutex::new(None));
+    let event = Arc::new(CliSyncEvent { config_path: config_path.clone(), sync_tx: Arc::clone(&sync_tx2) });
 
     let transport = MeshTransport::new(
         room.to_string(),

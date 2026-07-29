@@ -9,7 +9,7 @@ import {
   stopWebrtcSession,
   requestStartSync,
 } from '@/services/tauri'
-import type { DiscoveredHost } from '@/types/sync'
+import type { DiscoveredHost, PeerDevice } from '@/types/sync'
 
 export type ConnectMode = 'host' | 'join'
 
@@ -33,10 +33,13 @@ export function useConnect() {
   const disconnecting = ref(false)
   const syncProgress = ref<SyncProgressState>({ status: '', progress: 0 })
   const selectedLanHost = ref<DiscoveredHost | null>(null)
+  const peerList = ref<PeerDevice[]>([])
 
   let unlistenWebRtc: UnlistenFn | null = null
   let unlistenSync: UnlistenFn | null = null
   let unlistenRoomCode: UnlistenFn | null = null
+  let unlistenPeerConnected: UnlistenFn | null = null
+  let unlistenPeerDisconnected: UnlistenFn | null = null
 
   function handleWebRtcState(payload: string): void {
     connectionStatus.value = payload
@@ -72,6 +75,25 @@ export function useConnect() {
   function handleRoomCode(payload: string): void {
     passphrase.value = [payload]
     uuid.value = payload
+  }
+
+  function handlePeerConnected(device: PeerDevice): void {
+    const existing = peerList.value.findIndex((p) => p.device_id === device.device_id)
+    if (existing >= 0) {
+      peerList.value[existing] = device
+    } else {
+      peerList.value.push(device)
+    }
+    connectionStatus.value = `Peer Connected: ${device.name}`
+    isConnected.value = true
+  }
+
+  function handlePeerDisconnected(peerId: string): void {
+    peerList.value = peerList.value.filter((p) => p.device_id !== peerId)
+    if (peerList.value.length === 0) {
+      isConnected.value = false
+      connectionStatus.value = t('connect.disconnected')
+    }
   }
 
   function getSignalingUrl(): string {
@@ -165,6 +187,12 @@ export function useConnect() {
     unlistenRoomCode = await listen<string>('room-code', (event) => {
       handleRoomCode(event.payload)
     })
+    unlistenPeerConnected = await listen<PeerDevice>('peer-connected', (event) => {
+      handlePeerConnected(event.payload)
+    })
+    unlistenPeerDisconnected = await listen<string>('peer-disconnected', (event) => {
+      handlePeerDisconnected(event.payload)
+    })
   }
 
   function stopEventListeners(): void {
@@ -179,6 +207,14 @@ export function useConnect() {
     if (unlistenRoomCode) {
       unlistenRoomCode()
       unlistenRoomCode = null
+    }
+    if (unlistenPeerConnected) {
+      unlistenPeerConnected()
+      unlistenPeerConnected = null
+    }
+    if (unlistenPeerDisconnected) {
+      unlistenPeerDisconnected()
+      unlistenPeerDisconnected = null
     }
   }
 
@@ -206,6 +242,7 @@ export function useConnect() {
     disconnecting,
     syncProgress,
     selectedLanHost,
+    peerList,
     initialize,
     selectLanHost,
     joinWebRTC,

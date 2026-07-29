@@ -32,7 +32,9 @@
     "setup_local_desc": "Fotos aus Ordnern auf diesem Computer indizieren",
     "join_library": "Einer Bibliothek beitreten",
     "join_library_desc": "Mit einem anderen Gerät in deinem Netzwerk synchronisieren",
-    "ai_disclaimer": "KI-Modelle laufen vollständig auf deinem Gerät. Keine Daten verlassen jemals deinen Computer."
+    "ai_disclaimer": "KI-Modelle laufen vollständig auf deinem Gerät. Keine Daten verlassen jemals deinen Computer.",
+    "syncing": "Syncing...",
+    "sync_complete": "Sync complete"
   },
   "search": {
     "placeholder": "Erinnerungen durchsuchen...",
@@ -316,7 +318,14 @@
     "joining_room": "Betrete Raum...",
     "error_joining": "Beitrittsfehler: {error}",
     "start_syncing": "Sync starten",
-    "awaiting_webrtc_receiver": "Signalisierungskanal angefordert. Warte auf WebRTC-Empfängerverbindung."
+    "awaiting_webrtc_receiver": "Signalisierungskanal angefordert. Warte auf WebRTC-Empfängerverbindung.",
+    "syncing": "Syncing...",
+    "sync_complete": "Sync complete",
+    "searching_network": "Searching for devices on your network...",
+    "no_devices_found": "No devices found nearby",
+    "select_device": "Select a device to connect to",
+    "device_on_network": "On your network",
+    "connect_fromAnywhere": "Connect from anywhere with Internet Sync — coming soon"
   },
   "media_viewer": {
     "metadata": "Metadaten",

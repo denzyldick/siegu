@@ -71,6 +71,24 @@
           />
         </div>
 
+        <div
+          v-if="peerList.length > 0"
+          class="text-left px-2 mb-2"
+        >
+          <div class="text-caption font-weight-bold text-zinc-secondary mb-1">
+            {{ $t('devices.connected') }} ({{ peerList.length }})
+          </div>
+          <div
+            v-for="peer in peerList"
+            :key="peer.device_id"
+            class="d-flex align-center pa-2 mb-1 rounded bg-zinc-50"
+          >
+            <v-icon size="14" class="mr-2 text-zinc-secondary">mdi-laptop</v-icon>
+            <span class="text-body-2 text-zinc-primary font-weight-medium">{{ peer.name }}</span>
+            <span class="text-caption text-zinc-secondary ml-2">{{ peer.os }}</span>
+          </div>
+        </div>
+
         <ConnectStatusBar
           :status="connectionStatus"
           :is-connected="isConnected"
@@ -121,6 +139,24 @@
         v-if="mode === 'join' && !selectedLanHost && !isConnected"
         @select="selectLanHost"
       />
+
+        <div
+          v-if="peerList.length > 0"
+          class="text-left px-2 mb-2"
+        >
+          <div class="text-caption font-weight-bold text-zinc-secondary mb-1">
+            {{ $t('devices.connected') }} ({{ peerList.length }})
+          </div>
+          <div
+            v-for="peer in peerList"
+            :key="peer.device_id"
+            class="d-flex align-center pa-2 mb-1 rounded bg-zinc-50"
+          >
+            <v-icon size="14" class="mr-2 text-zinc-secondary">mdi-laptop</v-icon>
+          <span class="text-body-2 text-zinc-primary font-weight-medium">{{ peer.name }}</span>
+          <span class="text-caption text-zinc-secondary ml-2">{{ peer.os }}</span>
+        </div>
+      </div>
 
       <div class="text-caption text-zinc-muted mb-1 text-center py-2" v-if="connectionStatus">
         <v-progress-circular
@@ -181,6 +217,7 @@ const {
   disconnecting,
   syncProgress,
   selectedLanHost,
+  peerList,
   initialize,
   selectLanHost,
   joinWebRTC,

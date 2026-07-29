@@ -100,6 +100,7 @@ pub struct PhotoResult {
     pub nsfw: Option<String>,
     pub ocr: Option<String>,
     pub transcript: Option<String>,
+    pub caption: Option<String>,
     pub face_count: usize,
     pub faces: Vec<FaceInfo>,
     pub completed_models: Vec<&'static str>,
@@ -454,17 +455,16 @@ pub fn analyze_image(
         }
     }
 
-    // BLIP
+    // BLIP caption generation
     if should_run_model(target_model, "blip", Some(config)) && ai_status.blip == 0 {
-        if let Some(ref model) = models.blip {
-            let start = Instant::now();
-            let input = preprocessing::blip_preprocess(&img);
-            if let Ok(_data) = run_model(model, input, "pixel_values") {
-                result.completed_models.push("blip");
-                result
-                    .model_timings
-                    .insert("blip".to_string(), start.elapsed().as_secs_f64());
-            }
+        let start = Instant::now();
+        let caption = generate_blip_caption(&img, models);
+        if let Some(caption) = caption {
+            result.caption = Some(caption);
+            result.completed_models.push("blip");
+            result
+                .model_timings
+                .insert("blip".to_string(), start.elapsed().as_secs_f64());
         }
     }
 
@@ -483,6 +483,102 @@ pub fn analyze_image(
     }
 
     result
+}
+
+/// Generates an image caption using the BLIP vision encoder + text decoder.
+///
+/// 1. Runs `blip.onnx` (vision encoder) to produce image embeddings
+/// 2. Runs `blip_decoder.onnx` (text decoder) autoregressively from [CLS]
+/// 3. Returns the decoded caption string, or [`None`] on failure
+pub fn generate_blip_caption(img: &image::RgbImage, models: &mut LoadedModels) -> Option<String> {
+    let vision_encoder = models.blip.as_ref()?;
+    let decoder = models.blip_decoder.as_ref()?;
+    let tokenizer = models.blip_tokenizer.as_ref()?;
+
+    // ── 1. Run vision encoder ────────────────────────────────────────────
+    let input = preprocessing::blip_preprocess(img);
+    let shape = input.shape().to_vec();
+    let data = input.into_raw_vec_and_offset().0;
+    let tensor = ort::value::Value::from_array((shape, data)).ok()?;
+
+    let (enc_hidden, enc_attn_mask) = {
+        let mut lock = vision_encoder.lock().ok()?;
+        let encoder_outputs = lock.run(ort::inputs!["pixel_values" => tensor]).ok()?;
+        if encoder_outputs.len() >= 2 {
+            let (_, hidden_data) = encoder_outputs[0].try_extract_tensor::<f32>().ok()?;
+            let (_, mask_data) = encoder_outputs[1].try_extract_tensor::<i64>().ok()?;
+            (hidden_data.to_vec(), mask_data.to_vec())
+        } else {
+            return None;
+        }
+    };
+
+    let bos: i64 = 30522;
+    let eos: i64 = 2;
+    let max_len: usize = 20;
+
+    let mut tokens: Vec<u32> = vec![bos as u32];
+
+    for _ in 0..max_len {
+        let seq_len = tokens.len();
+        let ids_arr = ndarray::Array2::from_shape_vec((1, seq_len), tokens.clone()).ok()?;
+        let mask_arr = ndarray::Array2::from_shape_vec((1, seq_len), vec![1i64; seq_len]).ok()?;
+        let enc_arr = ndarray::Array3::from_shape_vec((1, 577, 768), enc_hidden.clone()).ok()?;
+        let enc_mask_arr = ndarray::Array2::from_shape_vec((1, 577), enc_attn_mask.clone()).ok()?;
+
+        let ids_tensor =
+            ort::value::Value::from_array((ids_arr.shape().to_vec(), ids_arr.into_raw_vec()))
+                .ok()?;
+        let mask_tensor =
+            ort::value::Value::from_array((mask_arr.shape().to_vec(), mask_arr.into_raw_vec()))
+                .ok()?;
+        let enc_tensor =
+            ort::value::Value::from_array((enc_arr.shape().to_vec(), enc_arr.into_raw_vec()))
+                .ok()?;
+        let enc_mask_tensor = ort::value::Value::from_array((
+            enc_mask_arr.shape().to_vec(),
+            enc_mask_arr.into_raw_vec(),
+        ))
+        .ok()?;
+
+        let mut inputs: HashMap<String, ort::value::Value> = HashMap::new();
+        inputs.insert("input_ids".into(), ids_tensor.into_dyn());
+        inputs.insert("attention_mask".into(), mask_tensor.into_dyn());
+        inputs.insert("encoder_hidden_states".into(), enc_tensor.into_dyn());
+        inputs.insert("encoder_attention_mask".into(), enc_mask_tensor.into_dyn());
+
+        let next_token = {
+            let mut lock = decoder.lock().ok()?;
+            let outputs = lock.run(inputs).ok()?;
+            let (logits_shape, logits_data) = outputs[0].try_extract_tensor::<f32>().ok()?;
+            let vocab_size = *logits_shape.last().unwrap_or(&30524) as usize;
+            let last_offset = logits_data.len().saturating_sub(vocab_size);
+            let last_logits = &logits_data[last_offset..last_offset + vocab_size];
+
+            last_logits
+                .iter()
+                .enumerate()
+                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+                .map(|(i, _)| i as i64)?
+        };
+
+        if next_token == eos as i64 {
+            break;
+        }
+        tokens.push(next_token as u32);
+    }
+
+    // Decode tokens (skip BOS prefix)
+    let decoded = tokenizer
+        .decode(&tokens[1..], false)
+        .ok()?
+        .trim()
+        .to_string();
+    if decoded.is_empty() || decoded == "[UNK]" {
+        None
+    } else {
+        Some(decoded)
+    }
 }
 
 pub fn is_video_file(path: &str) -> bool {
@@ -715,6 +811,12 @@ pub fn flush_results_to_db(
                 (score, photo_id),
             );
         }
+        if let Some(ref caption) = result.caption {
+            let _ = db.connection.execute(
+                "UPDATE photo SET caption = ?1 WHERE id = ?2",
+                (caption, photo_id),
+            );
+        }
         let _ = db.connection.execute(
             "INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES(?1, 'face_count', ?2)",
             (photo_id, &result.face_count.to_string()),
@@ -783,6 +885,8 @@ mod tests {
             aesthetics: None,
             yolo: None,
             blip: None,
+            blip_decoder: None,
+            blip_tokenizer: None,
             midas: None,
             whisper_encoder: None,
             whisper_decoder: None,

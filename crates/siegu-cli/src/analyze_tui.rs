@@ -61,6 +61,8 @@ impl AnalysisCallbacks for TuiCallbacks {
         });
     }
 
+    fn on_metadata_updated(&self, _photo_id: &str, _caption: Option<&str>, _aesthetics_score: Option<f64>) {}
+
     fn on_scan_complete(&self) {
         let _ = self.tx.send(TuiEvent::ScanComplete);
     }

@@ -32,7 +32,9 @@
     "setup_local_desc": "Indeksá fotonan for di karpetanan riba e komputadó aki",
     "join_library": "Há pa un Biblioteca",
     "join_library_desc": "Sinkronisá ku otro aparato riba bo red",
-    "ai_disclaimer": "Modelonan di AI ta kore kompletu riba bo aparato. Ningun dato nunca ta sali for di bo komputadó."
+    "ai_disclaimer": "Modelonan di AI ta kore kompletu riba bo aparato. Ningun dato nunca ta sali for di bo komputadó.",
+    "syncing": "Syncing...",
+    "sync_complete": "Sync complete"
   },
   "search": {
     "placeholder": "Búskeda di memorianan...",
@@ -316,7 +318,14 @@
     "joining_room": "Huntando kuarto...",
     "error_joining": "Error di hunta: {error}",
     "start_syncing": "Inisiá Sinkronisashon",
-    "awaiting_webrtc_receiver": "Canal di señalishon solicitá. Esperando conexion di receptor WebRTC."
+    "awaiting_webrtc_receiver": "Canal di señalishon solicitá. Esperando conexion di receptor WebRTC.",
+    "syncing": "Syncing...",
+    "sync_complete": "Sync complete",
+    "searching_network": "Searching for devices on your network...",
+    "no_devices_found": "No devices found nearby",
+    "select_device": "Select a device to connect to",
+    "device_on_network": "On your network",
+    "connect_fromAnywhere": "Connect from anywhere with Internet Sync — coming soon"
   },
   "media_viewer": {
     "metadata": "Metadato",

@@ -82,5 +82,12 @@ pub fn midas_preprocess(img: &image::RgbImage) -> Array4<f32> {
 }
 
 pub fn blip_preprocess(img: &image::RgbImage) -> Array4<f32> {
-    clip_preprocess(img)
+    let resized = image::imageops::resize(img, 384, 384, image::imageops::FilterType::Triangle);
+    let mut input = Array4::<f32>::zeros((1, 3, 384, 384));
+    for (x, y, pixel) in resized.enumerate_pixels() {
+        input[[0, 0, y as usize, x as usize]] = (pixel[0] as f32 / 255.0 - 0.48145466) / 0.26862954;
+        input[[0, 1, y as usize, x as usize]] = (pixel[1] as f32 / 255.0 - 0.4578275) / 0.2613026;
+        input[[0, 2, y as usize, x as usize]] = (pixel[2] as f32 / 255.0 - 0.40821073) / 0.2757771;
+    }
+    input
 }

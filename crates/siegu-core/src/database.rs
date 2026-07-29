@@ -1526,6 +1526,15 @@ impl Database {
     }
 
     /// Update caption, aesthetics_score, and indexed level for a photo.
+    pub fn clear_sync_needed(&self, id: &str) {
+        if let Err(e) = self
+            .connection
+            .execute("UPDATE photo SET sync_needed = 0 WHERE id = ?1", [id])
+        {
+            tracing::warn!("clear_sync_needed: failed for {id}: {e}");
+        }
+    }
+
     pub fn update_photo_metadata(
         &self,
         id: &str,

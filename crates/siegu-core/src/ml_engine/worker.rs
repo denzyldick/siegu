@@ -17,6 +17,12 @@ pub trait AnalysisCallbacks: Send + Sync {
         remaining: usize,
         progress_model: Option<&str>,
     );
+    fn on_metadata_updated(
+        &self,
+        photo_id: &str,
+        caption: Option<&str>,
+        aesthetics_score: Option<f64>,
+    );
     fn on_scan_complete(&self);
     fn on_progress(&self, completed: usize, total: usize, avg_ms: f64);
     fn on_model_status(&self, model: &str, status: &str, pending: usize, total: usize);
@@ -37,6 +43,7 @@ impl AnalysisCallbacks for NoopCallbacks {
         _progress_model: Option<&str>,
     ) {
     }
+    fn on_metadata_updated(&self, _photo_id: &str, _caption: Option<&str>, _aesthetics_score: Option<f64>) {}
     fn on_scan_complete(&self) {}
     fn on_progress(&self, _completed: usize, _total: usize, _avg_ms: f64) {}
     fn on_model_status(&self, _model: &str, _status: &str, _pending: usize, _total: usize) {}
@@ -304,6 +311,14 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                                 &result,
                                 target_model_ref.as_deref(),
                             );
+
+                            if result.caption.is_some() || result.aesthetics.is_some() {
+                                callbacks.on_metadata_updated(
+                                    &photo_entry.id,
+                                    result.caption.as_deref(),
+                                    result.aesthetics,
+                                );
+                            }
 
                             let remaining = decrement_pending_count(&pending_count_ref);
                             callbacks.on_photo_complete(

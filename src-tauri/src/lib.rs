@@ -146,7 +146,12 @@ pub fn run() {
                 });
             }
 
-            let ml_context = ml::start_background_worker(app.handle(), config_path.clone());
+            let sync_tx = Arc::new(tokio::sync::Mutex::new(None));
+            let ml_context = ml::start_background_worker(
+                app.handle(),
+                config_path.clone(),
+                Arc::clone(&sync_tx),
+            );
             app.manage(ml_context);
 
             let media_server_port = transport::start_media_server(config_path);
@@ -156,7 +161,7 @@ pub fn run() {
 
             app.manage(WebRtcState {
                 active_session: std::sync::Mutex::new(None),
-                sync_tx: Arc::new(tokio::sync::Mutex::new(None)),
+                sync_tx,
             });
 
             app.manage(ScanState {

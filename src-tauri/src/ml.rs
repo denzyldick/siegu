@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::common::emit_log;
 use tauri::AppHandle;
 use tauri::Emitter;
@@ -5,12 +7,14 @@ use tauri::Emitter;
 pub use siegu_core::ml_worker::{Job, MlContext};
 
 use siegu_core::database::Database;
+use siegu_core::mesh::SyncMessage;
 use siegu_core::ml_engine::worker::AnalysisCallbacks;
 use siegu_core::ml_engine::PhotoResult;
 
 struct TauriCallbacks {
     app: AppHandle,
     config_path: String,
+    sync_tx: Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<SyncMessage>>>>,
 }
 
 impl AnalysisCallbacks for TauriCallbacks {
@@ -64,6 +68,20 @@ impl AnalysisCallbacks for TauriCallbacks {
         }
     }
 
+    fn on_metadata_updated(&self, photo_id: &str, caption: Option<&str>, aesthetics_score: Option<f64>) {
+        emit_log(&self.app, format!("Metadata updated for {photo_id}"));
+        if let Ok(g) = self.sync_tx.try_lock() {
+            if let Some(tx) = g.as_ref() {
+                let _ = tx.send(SyncMessage::MetadataUpdate {
+                    photo_id: photo_id.to_string(),
+                    caption: caption.map(|c| c.to_string()),
+                    aesthetics_score,
+                    indexed: 2,
+                });
+            }
+        }
+    }
+
     fn on_scan_complete(&self) {}
 
     fn on_progress(&self, _completed: usize, _total: usize, _avg_ms: f64) {}
@@ -96,10 +114,15 @@ impl AnalysisCallbacks for TauriCallbacks {
     }
 }
 
-pub fn start_background_worker(app: &AppHandle, config_path: String) -> MlContext {
+pub fn start_background_worker(
+    app: &AppHandle,
+    config_path: String,
+    sync_tx: Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<SyncMessage>>>>,
+) -> MlContext {
     let callbacks = TauriCallbacks {
         app: app.clone(),
         config_path: config_path.clone(),
+        sync_tx,
     };
     siegu_core::ml_engine::worker::start_worker(callbacks, config_path, 32)
 }

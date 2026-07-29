@@ -133,6 +133,7 @@ pub trait SyncEvent: Send + Sync {
     );
     fn on_peer_disconnected(&self, peer_id: String);
     fn on_device_registered(&self, db: &Database);
+    fn on_metadata_updated(&self, photo_id: &str, caption: Option<&str>, aesthetics_score: Option<f64>);
     fn get_config_path(&self) -> String;
     fn get_sync_path(&self) -> Option<String>;
     fn get_directories(&self) -> Vec<String>;
@@ -412,11 +413,13 @@ impl MeshManager {
                     let relative_path = Self::compute_relative_path(&path, &dirs);
                     let dc_send = Arc::clone(dc);
                     let event_arc = Arc::clone(&event);
+                    let config_path_clone = config_path.to_string();
+                    let id_clone = id.clone();
                     tokio::spawn(async move {
-                        let _ = Self::send_file_with_retry(
+                        let result = Self::send_file_with_retry(
                             dc_send,
                             OutgoingFile {
-                                id,
+                                id: id_clone.clone(),
                                 path,
                                 relative_path,
                                 created,
@@ -430,6 +433,10 @@ impl MeshManager {
                             event_arc,
                         )
                         .await;
+                        if result.is_ok() {
+                            let db = Database::new(&config_path_clone);
+                            db.clear_sync_needed(&id_clone);
+                        }
                     });
                 }
             }
@@ -578,6 +585,7 @@ impl MeshManager {
                                 caption: caption_clone.as_deref(),
                                 aesthetics_score: aesthetics_clone,
                             });
+                            db.clear_sync_needed(&id_clone);
                         });
 
                         event.on_photo_received(id_for_event, path_for_event);
@@ -776,6 +784,7 @@ impl SyncEvent for NullSyncEvent {
     fn on_peer_connected(&self, _: String, _: String, _: Vec<String>, _: u8) {}
     fn on_peer_disconnected(&self, _: String) {}
     fn on_device_registered(&self, _: &Database) {}
+    fn on_metadata_updated(&self, _: &str, _: Option<&str>, _: Option<f64>) {}
     fn get_config_path(&self) -> String {
         String::new()
     }

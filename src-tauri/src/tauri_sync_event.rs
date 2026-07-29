@@ -1,11 +1,13 @@
 use std::sync::Arc;
 use tauri::Emitter;
 
-use siegu_core::{Database, PeerDevice, SyncEvent, SyncProgress};
+use siegu_core::{Database, PeerDevice, SyncEvent, SyncMessage, SyncProgress};
 
 pub struct TauriSyncEvent {
     pub app: tauri::AppHandle,
     pub config_path: String,
+    pub sync_tx:
+        Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<SyncMessage>>>>,
 }
 
 impl SyncEvent for TauriSyncEvent {
@@ -100,5 +102,19 @@ impl SyncEvent for TauriSyncEvent {
     fn get_directories(&self) -> Vec<String> {
         let db = Database::new(&self.config_path);
         db.list_directories()
+    }
+
+    fn on_metadata_updated(&self, photo_id: &str, caption: Option<&str>, aesthetics_score: Option<f64>) {
+        self.on_log(&format!("Metadata updated for {photo_id}"));
+        if let Ok(g) = self.sync_tx.try_lock() {
+            if let Some(tx) = g.as_ref() {
+                let _ = tx.send(SyncMessage::MetadataUpdate {
+                    photo_id: photo_id.to_string(),
+                    caption: caption.map(|c| c.to_string()),
+                    aesthetics_score,
+                    indexed: 2,
+                });
+            }
+        }
     }
 }

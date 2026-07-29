@@ -32,7 +32,9 @@
     "setup_local_desc": "Indicizza foto da cartelle su questo computer",
     "join_library": "Unisciti a una Libreria",
     "join_library_desc": "Sincronizza con un altro dispositivo sulla tua rete",
-    "ai_disclaimer": "I modelli AI vengono eseguiti interamente sul tuo dispositivo. Nessun dato lascia mai il tuo computer."
+    "ai_disclaimer": "I modelli AI vengono eseguiti interamente sul tuo dispositivo. Nessun dato lascia mai il tuo computer.",
+    "syncing": "Syncing...",
+    "sync_complete": "Sync complete"
   },
   "search": {
     "placeholder": "Cerca ricordi...",
@@ -316,7 +318,14 @@
     "joining_room": "Entrando nella stanza...",
     "error_joining": "Errore di ingresso: {error}",
     "start_syncing": "Avvia Sincronizzazione",
-    "awaiting_webrtc_receiver": "Canale di segnalazione richiesto. In attesa connessione ricevitore WebRTC."
+    "awaiting_webrtc_receiver": "Canale di segnalazione richiesto. In attesa connessione ricevitore WebRTC.",
+    "syncing": "Syncing...",
+    "sync_complete": "Sync complete",
+    "searching_network": "Searching for devices on your network...",
+    "no_devices_found": "No devices found nearby",
+    "select_device": "Select a device to connect to",
+    "device_on_network": "On your network",
+    "connect_fromAnywhere": "Connect from anywhere with Internet Sync — coming soon"
   },
   "media_viewer": {
     "metadata": "Metadati",
