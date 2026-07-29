@@ -7,47 +7,17 @@
 
 **Siegu** (pronounced *see-goo*) is a privacy-first, local-only media management application. It organizes, secures, and synchronizes your photo and video library across devices without ever touching the cloud.
 
-![Siegu Screenshot](./branding/screenshot.png)
-
 ## Key Features
 
-### Privacy-First AI
-- **Local Semantic Search**: Find photos by describing them (e.g., "sunset at the beach") using local **CLIP** models.
-- **Face Recognition**: Automatically detect and group faces using **UltraFace**, all processed offline.
-- **14 AI Models**: CLIP, UltraFace, OCR, NSFW, Aesthetics, YOLO, BLIP, ArcFace, MiDaS, Whisper, SAM, SuperRes.
-- **Zero Cloud**: No telemetry, no tracking, and no external AI API calls.
+- **Local Semantic Search** — find photos by describing them ("sunset at the beach") using on-device CLIP models
+- **Face Recognition** — automatic face detection and grouping via UltraFace + ArcFace
+- **14 AI Models** — CLIP, BLIP, YOLO, OCR, NSFW, MiDaS, Whisper, and more, all running locally on ONNX Runtime
+- **Peer-to-Peer Sync** — encrypted WebRTC sync between devices, no cloud required
+- **Mesh Networking** — LAN discovery via mDNS, QR codes, or mnemonic phrases
+- **Smart Library** — EXIF extraction, video indexing, heatmap, map view
+- **Cross-Platform** — Linux, macOS, Windows, Android, iOS
 
-### Peer-to-Peer Synchronization
-- **Cloudless Sync**: Mirror your library between devices using encrypted **WebRTC** data channels.
-- **Mnemonic Discovery**: Connect devices using a 4-word mnemonic or QR code -- no accounts required.
-- **Delta Transfers**: Only sync what's missing with intelligent manifest comparison.
-- **Go Signaling Server**: Docker-based signaling server (`ghcr.io/denzyldick/signalling-server`).
-
-### Smart Library Management
-- **Watched Folders**: Monitor directories for real-time library updates.
-- **EXIF Extraction**: 22 EXIF properties extracted and displayed (camera, lens, GPS, orientation).
-- **Optimized Thumbnails**: Orientation-correct thumbnails stored in a local SQLite database.
-- **Video Indexing**: Keyframe extraction and AI analysis make video content searchable.
-
-### CLI & Daemon Mode
-- **`siegu` CLI**: Full headless access -- scan, analyze, manage models, sync, serve.
-- **Workspace Architecture**: `siegu-core` (shared library), `siegu-cli`, `siegu-tauri` (GUI).
-- **Zero Code Duplication**: All business logic in `siegu-core`, used by both CLI and GUI.
-
-## Design Philosophy
-
-- **Minimalist Aesthetic**: Pure black interactive elements on a clean white/zinc background.
-- **Tactile Feedback**: Every interaction features smooth scaling and transitions.
-- **Consistency**: A unified "Button + Icon" language across the entire application.
-
-## Getting Started
-
-### Prerequisites
-- **Node.js** (v18+)
-- **Rust** (Latest Stable)
-- **System Dependencies**: See [Tauri Prerequisites](https://tauri.app/v1/guides/getting-started/prerequisites)
-
-### Installation
+## Quick Install
 
 ```bash
 git clone https://github.com/denzyldick/siegu.git
@@ -56,112 +26,19 @@ npm install
 npm run tauri dev
 ```
 
-### Neovim Debugging
+**Prerequisites**: Node.js v18+, Rust stable, system deps (see [docs/getting-started.md](docs/getting-started.md)).
 
-If you want to use Neovim with `nvim-dap` and `codelldb`, this repo includes a
-project-local config in [`.nvim.lua`](./.nvim.lua).
+## Documentation
 
-Enable local config loading in your own Neovim setup:
+For full documentation, see the `docs/` directory:
 
-```lua
-vim.o.exrc = true
-vim.o.secure = true
-```
-
-Then open the repo root in Neovim and use:
-
-```vim
-:SieguTauriDev
-:SieguDebugAttach
-```
-
-Workflow:
-
-1. Run `:SieguTauriDev` to start the Tauri dev session.
-2. Wait for the app window to open.
-3. Run `:SieguDebugAttach` to attach CodeLLDB to the Rust backend and step through code.
-
-Requirements:
-
-- `nvim-dap`
-- `codelldb` on your `PATH`
-- Neovim with local `exrc` enabled
-
-### CLI Installation
-
-```bash
-cargo install --path crates/siegu-cli
-siegu --help
-```
-
-## CLI Usage
-
-```bash
-# Scan a folder for media
-siegu scan /path/to/photos
-
-# Check model status
-siegu models list
-
-# Download all AI models
-siegu models download
-
-# Show app status (photos, config, models, memory)
-siegu status
-
-# Start LAN signaling server
-siegu serve --port 8080
-
-# Manage configuration
-siegu config get
-siegu config set theme dark
-siegu config set tier paid
-siegu config keys
-```
-
-## Tech Stack
-
-- **Frontend**: Vue 3, Vuetify 3, Vite
-- **Core**: Rust, Tauri v2
-- **Database**: SQLite (rusqlite)
-- **AI Engine**: ONNX Runtime (ort)
-- **Networking**: WebRTC (webrtc-rs), WebSockets (tokio-tungstenite)
-- **CLI**: clap, indicatif, tracing
-- **Signaling**: Go server (Docker)
-
-## Workspace Structure
-
-```
-siegu/
-├── crates/
-│   ├── siegu-core/      # Core library (16 modules, 130 tests)
-│   ├── siegu-cli/       # CLI binary (scan, models, config, serve)
-│   └── siegu-tauri/     # Tauri GUI app
-├── src/                 # Vue 3 frontend
-├── .github/workflows/   # CI (test, clippy, cargo-audit, build)
-├── docker-compose.yml   # Go signaling server
-└── ARCHITECTURE.md      # Detailed architecture docs
-```
-
-## Security
-
-- **Model Integrity**: SHA-256 verification on all model downloads.
-- **Filename Sanitization**: Synced filenames sanitized against path traversal.
-- **Graceful Shutdown**: Background tasks shut down cleanly on app exit.
-- **Transaction Safety**: ML batch writes use BEGIN/COMMIT/ROLLBACK.
-- **Config Validation**: Type-checked config keys with range constraints.
-- **Scan Deduplication**: Concurrent scan prevention via `ScanGuard`.
+| Category | Docs |
+|----------|------|
+| **User** | [Getting Started](docs/getting-started.md), [Build](docs/build.md), [Configuration](docs/configuration.md), [CLI](docs/cli.md), [Sync Guide](docs/sync.md) |
+| **Technical** | [Architecture](docs/architecture.md), [Database](docs/database.md), [ML Engine](docs/ml-engine.md), [Mesh Protocol](docs/mesh-protocol.md), [Frontend](docs/frontend.md), [Backend](docs/backend.md), [Android](docs/android.md), [iOS](docs/ios.md), [Developing](docs/developing.md), [Security](docs/security.md) |
 
 ## License
 
-Siegu is licensed under the **Functional Source License, Version 1.1 (FSL-1.1-Apache-2.0)**.
+Licensed under **FSL-1.1-Apache-2.0** — commercial use allowed for non-competing products. Automatically becomes **Apache 2.0** on March 9, 2028.
 
-- **Commercial Use**: Allowed for non-competing products.
-- **Competing Use**: Prohibited until the **Change Date**.
-- **Change Date**: **March 9, 2028** (at which point the license automatically becomes **Apache 2.0**).
-
-See the [LICENSE](LICENSE) file for full details.
-
----
-
-Built with love by [Denzyl Dick](https://github.com/denzyldick)
+See [LICENSE](LICENSE) for details.
