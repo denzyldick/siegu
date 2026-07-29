@@ -1,13 +1,10 @@
 #!/bin/sh
 
-# Format Rust code
-if command -v rustfmt &> /dev/null; then
-  CHANGED_RUST=$(git diff --cached --name-only --diff-filter=ACM -- '*.rs')
-  if [ -n "$CHANGED_RUST" ]; then
-    echo "Formatting Rust files..."
-    echo "$CHANGED_RUST" | xargs rustfmt --edition 2021
-    git add $CHANGED_RUST
-  fi
+# Format Rust code with cargo fmt (matches CI exactly)
+if [ -n "$(git diff --cached --name-only --diff-filter=ACM -- '*.rs')" ]; then
+  echo "Formatting Rust files..."
+  cargo fmt
+  git add -u -- '*.rs'
 fi
 
 # Format JS/Vue files

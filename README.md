@@ -87,23 +87,6 @@ Requirements:
 - `codelldb` on your `PATH`
 - Neovim with local `exrc` enabled
 
-### Android Build & Deploy
-
-Build and install the Android app on a connected device:
-
-```bash
-bash scripts/run-android.sh
-```
-
-The script:
-1. Builds the frontend (`yarn build`)
-2. Cross-compiles the Rust library for `aarch64-linux-android` via `cargo-ndk`
-3. Copies `libsiegu_lib.so` into `jniLibs/arm64-v8a`
-4. Builds a universal debug APK via Gradle
-5. Installs it on the connected device via `adb install -r`
-
-**Prerequisites**: Android SDK + NDK r27 (`~/Android/Sdk`), `cargo-ndk`, Rust target `aarch64-linux-android`, connected device/emulator.
-
 ### CLI Installation
 
 ```bash
