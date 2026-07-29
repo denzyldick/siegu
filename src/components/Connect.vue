@@ -181,7 +181,6 @@ import ConnectModeToggle from '@/components/connect/ConnectModeToggle.vue'
 import ConnectHostView from '@/components/connect/ConnectHostView.vue'
 import ConnectJoinView from '@/components/connect/ConnectJoinView.vue'
 import ConnectLanDiscovery from '@/components/connect/ConnectLanDiscovery.vue'
-import ConnectSyncButton from '@/components/connect/ConnectSyncButton.vue'
 import ConnectStatusBar from '@/components/connect/ConnectStatusBar.vue'
 
 const props = withDefaults(
@@ -238,12 +237,14 @@ const showDisconnect = computed(() => {
   )
 })
 
-watch(mode, (newMode) => {
+watch(mode, async (newMode, oldMode) => {
   emit('modeChange', newMode)
-  if (newMode === 'host' && !uuid.value) {
-    initialize()
-  } else if (newMode === 'join') {
+  if (oldMode && oldMode !== newMode) {
+    await disconnectSession()
     resetJoinState()
+  }
+  if (newMode === 'host') {
+    initialize()
   }
 })
 
@@ -275,6 +276,7 @@ watch(dialog, async (open) => {
     await startEventListeners()
     initialize()
   } else {
+    await disconnectSession()
     stopEventListeners()
     loading.value = false
     if (syncCompleteTimer) {
@@ -288,7 +290,9 @@ onMounted(() => {
   mode.value = props.initialMode
   if (props.embedded) {
     startEventListeners()
-    initialize()
+    if (mode.value === 'host') {
+      initialize()
+    }
   }
 })
 
@@ -296,6 +300,8 @@ onBeforeUnmount(() => {
   if (syncCompleteTimer) {
     clearTimeout(syncCompleteTimer)
   }
+  disconnectSession()
+  stopEventListeners()
 })
 </script>
 

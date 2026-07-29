@@ -429,9 +429,24 @@ impl MeshTransport {
                         Err(_) => continue,
                     };
                     match signal {
-                        SignalMessage::Joined { .. } | SignalMessage::PeerJoined { .. }
-                            if !is_remote =>
-                        {
+                        SignalMessage::Joined { peer_count, .. } if !is_remote => {
+                            if peer_count > 1 {
+                                self.event.on_state_change("Peer Joined");
+                            }
+                            if self.is_initiator && peer_count > 1 {
+                                let offer = pc.create_offer(None).await?;
+                                pc.set_local_description(offer.clone()).await?;
+                                self.send_signal(
+                                    &ws_write,
+                                    &SignalMessage::Offer {
+                                        payload: serde_json::to_string(&offer)?,
+                                        target: "peer".to_string(),
+                                    },
+                                )
+                                .await?;
+                            }
+                        }
+                        SignalMessage::PeerJoined { .. } if !is_remote => {
                             self.event.on_state_change("Peer Joined");
                             if self.is_initiator {
                                 let offer = pc.create_offer(None).await?;
@@ -646,7 +661,13 @@ mod tests {
         }
         fn on_peer_disconnected(&self, _id: String) {}
         fn on_device_registered(&self, _db: &Database) {}
-        fn on_metadata_updated(&self, _photo_id: &str, _caption: Option<&str>, _aesthetics_score: Option<f64>) {}
+        fn on_metadata_updated(
+            &self,
+            _photo_id: &str,
+            _caption: Option<&str>,
+            _aesthetics_score: Option<f64>,
+        ) {
+        }
         fn get_config_path(&self) -> String {
             "/tmp/test".into()
         }

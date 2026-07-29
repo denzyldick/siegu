@@ -325,7 +325,11 @@
     "no_devices_found": "No devices found nearby",
     "select_device": "Select a device to connect to",
     "device_on_network": "On your network",
-    "connect_fromAnywhere": "Connect from anywhere with Internet Sync — coming soon"
+    "connect_fromAnywhere": "Connect from anywhere with Internet Sync — coming soon",
+    "host_desc": "Share your QR code so other devices can connect to yours",
+    "join_desc": "Scan a QR code or pick a device on your network to connect",
+    "camera_denied": "Camera permission denied. Grant access in settings or enter the code manually.",
+    "camera_unavailable": "Could not access camera. Enter the code manually below."
   },
   "media_viewer": {
     "metadata": "Metadati",

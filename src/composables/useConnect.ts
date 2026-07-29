@@ -162,14 +162,18 @@ export function useConnect() {
   }
 
   async function disconnectSession(): Promise<void> {
+    if (disconnecting.value) return
     disconnecting.value = true
     try {
       await stopWebrtcSession()
       connectionStatus.value = t('connect.disconnected')
+      uuid.value = ''
+      passphrase.value = []
       isConnected.value = false
       peerJoined.value = false
       syncProgress.value = { status: '', progress: 0 }
       selectedLanHost.value = null
+      peerList.value = []
     } catch (error) {
       console.error('Disconnect Error:', error)
     } finally {

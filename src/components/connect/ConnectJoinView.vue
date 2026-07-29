@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { BrowserQRCodeReader } from '@zxing/library'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   modelValue: string
@@ -17,6 +20,7 @@ const emit = defineEmits<{
 }>()
 
 const isScanning = ref(false)
+const cameraError = ref('')
 const scannerVideo = ref<HTMLVideoElement | null>(null)
 const codeReader = new BrowserQRCodeReader()
 
@@ -27,6 +31,7 @@ const localValue = computed({
 
 async function startScanner(): Promise<void> {
   isScanning.value = true
+  cameraError.value = ''
   try {
     const videoElement = scannerVideo.value
     if (!videoElement) {
@@ -40,8 +45,11 @@ async function startScanner(): Promise<void> {
         emit('join')
       }
     })
-  } catch {
+  } catch (err) {
     isScanning.value = false
+    cameraError.value = err instanceof DOMException && err.name === 'NotAllowedError'
+      ? t('connect.camera_denied')
+      : t('connect.camera_unavailable')
   }
 }
 
@@ -68,6 +76,7 @@ function stopScanner(): void {
         <v-btn color="black" block height="56" class="siegu-btn" @click="startScanner">
           {{ $t('connect.open_camera') }}
         </v-btn>
+        <div v-if="cameraError" class="text-caption text-error mt-2">{{ cameraError }}</div>
       </div>
 
       <div v-else class="position-relative">
