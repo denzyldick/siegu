@@ -319,7 +319,9 @@ const showDisconnect = computed(() => {
 function start(selectedMode: 'host' | 'join') {
   started.value = true
   mode.value = selectedMode
-  initialize()
+  if (selectedMode === 'host') {
+    initialize()
+  }
 }
 
 watch(mode, async (newMode, oldMode) => {
@@ -327,7 +329,9 @@ watch(mode, async (newMode, oldMode) => {
   if (started.value && oldMode && oldMode !== newMode) {
     await disconnectSession()
     resetJoinState()
-    initialize()
+    if (newMode === 'host') {
+      initialize()
+    }
   }
 })
 

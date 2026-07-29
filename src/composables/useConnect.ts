@@ -123,8 +123,6 @@ export function useConnect() {
       const roomId = await hashPairingCode(codes.uuid)
       if (mode.value === 'host') {
         await startLanHost(roomId, false)
-      } else {
-        await startListening(roomId)
       }
     } catch (error) {
       console.error('Pairing Error:', error)
