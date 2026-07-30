@@ -302,6 +302,7 @@
     "establishing_link": "Sichere Verbindung wird hergestellt...",
     "link_established": "Verbindung hergestellt!",
     "ready_to_sync": "Bereit zum Synchronisieren.",
+    "host_instructions": "Lade Siegu auf deinem anderen Gerät, tippe auf Netzwerk beitreten und gib diesen Satz ein.",
     "manual_phrase": "Manueller Satz",
     "or_enter_manually": "Oder manuell eingeben",
     "phrase_placeholder": "Gib einen 4-Wort-Satz ein",

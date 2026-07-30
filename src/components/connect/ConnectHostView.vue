@@ -1,15 +1,12 @@
 <script setup lang="ts">
 const props = defineProps<{
   passphrase: string[]
-  hostIp: string
-  hostPort: number
 }>()
 </script>
 
 <template>
-  <div v-if="hostIp" class="text-center mb-4">
-    <div class="text-caption text-zinc-muted uppercase tracking-widest">{{ $t('connect.host_address') }}</div>
-    <div class="text-body-1 font-weight-bold text-zinc-primary">{{ hostIp }}:{{ hostPort }}</div>
+  <div class="text-caption text-zinc-muted text-center mb-4 px-2" style="max-width: 320px">
+    {{ $t('connect.host_instructions') }}
   </div>
 
   <div class="text-caption text-zinc-muted mb-2 uppercase tracking-widest">

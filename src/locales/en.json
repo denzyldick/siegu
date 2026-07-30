@@ -159,6 +159,7 @@
     "establishing_link": "Establishing secure link...",
     "link_established": "Link Established!",
     "ready_to_sync": "Ready to synchronize.",
+    "host_instructions": "Download Siegu on your other device, tap Join Network, and enter this passphrase.",
     "manual_phrase": "Manual Phrase",
     "or_enter_manually": "Or enter manually",
     "phrase_placeholder": "Enter 6-word phrase",

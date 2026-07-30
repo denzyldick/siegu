@@ -302,6 +302,7 @@
     "establishing_link": "Creazione collegamento sicuro...",
     "link_established": "Collegamento Stabilito!",
     "ready_to_sync": "Pronto per sincronizzare.",
+    "host_instructions": "Scarica Siegu sul tuo altro dispositivo, tocca Unisciti alla rete e inserisci questa frase.",
     "manual_phrase": "Frase manuale",
     "or_enter_manually": "O inserisci manualmente",
     "phrase_placeholder": "Inserisci frase di 4 parole",

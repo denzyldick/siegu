@@ -57,10 +57,16 @@ const emit = defineEmits<{
     variant="flat"
     color="black"
     size="small"
-    class="siegu-btn mt-4"
+    class="mt-4"
     @click="emit('disconnect')"
     :loading="disconnecting"
+    :icon="disconnecting ? undefined : 'mdi-close'"
   >
-    {{ $t('devices.disconnect') }}
+    <template v-if="!disconnecting" #default>
+      <div class="d-flex align-center ga-1">
+        <v-icon size="14">mdi-close</v-icon>
+        <span>{{ $t('devices.disconnect') }}</span>
+      </div>
+    </template>
   </v-btn>
 </template>

@@ -72,13 +72,9 @@
         </div>
 
         <template v-if="started">
-          <ConnectModeToggle v-if="!hideModeToggle" v-model="mode" />
-
           <ConnectHostView
             v-if="mode === 'host'"
             :passphrase="passphrase"
-            :host-ip="hostIp"
-            :host-port="hostPort"
           />
 
           <ConnectJoinView
@@ -141,18 +137,6 @@
           />
         </template>
 
-        <v-divider class="opacity-10 my-4"></v-divider>
-
-        <v-card-actions class="justify-center">
-          <v-btn variant="flat" color="#18181b" class="siegu-btn px-6" @click="dialog = false">
-            <div class="d-flex align-center">
-              <div class="siegu-icon-circle siegu-icon-circle-sm mr-2">
-                <v-icon size="12">mdi-close</v-icon>
-              </div>
-              <span class="font-weight-bold">{{ $t('common.close') }}</span>
-            </div>
-          </v-btn>
-        </v-card-actions>
       </v-card>
     </v-dialog>
 
@@ -195,13 +179,9 @@
       </div>
 
       <template v-if="started">
-        <ConnectModeToggle v-if="!hideModeToggle" v-model="mode" />
-
         <ConnectHostView
           v-if="mode === 'host'"
           :passphrase="passphrase"
-          :host-ip="hostIp"
-          :host-port="hostPort"
         />
 
         <ConnectJoinView
@@ -263,7 +243,6 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useConnect } from '@/composables/useConnect'
-import ConnectModeToggle from '@/components/connect/ConnectModeToggle.vue'
 import ConnectHostView from '@/components/connect/ConnectHostView.vue'
 import ConnectJoinView from '@/components/connect/ConnectJoinView.vue'
 import ConnectLanDiscovery from '@/components/connect/ConnectLanDiscovery.vue'
@@ -302,8 +281,6 @@ const {
   syncProgress,
   selectedLanHost,
   peerList,
-  hostIp,
-  hostPort,
   initialize,
   selectLanHost,
   joinWebRTC,

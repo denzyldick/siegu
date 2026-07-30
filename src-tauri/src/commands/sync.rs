@@ -247,8 +247,31 @@ pub async fn discover_lan_devices(
     let daemon = siegu_core::mdns::create_daemon().map_err(|e| e.to_string())?;
     let hosts =
         siegu_core::mdns::discover_hosts(&daemon, timeout_secs).map_err(|e| e.to_string())?;
-    emit_log(&app, format!("Discovered {} LAN device(s)", hosts.len()));
-    Ok(hosts)
+
+    let local_ip = get_local_ip();
+
+    let filtered: Vec<siegu_core::mdns::DiscoveredHost> = hosts
+        .into_iter()
+        .filter(|h| {
+            // Filter out own host
+            if let Some(ref ip) = local_ip {
+                if h.ip == *ip {
+                    return false;
+                }
+            }
+            true
+        })
+        .map(|mut h| {
+            // Strip mDNS technical suffix from name
+            if let Some(pos) = h.name.find("._siegu") {
+                h.name = h.name[..pos].to_string();
+            }
+            h
+        })
+        .collect();
+
+    emit_log(&app, format!("Discovered {} LAN device(s)", filtered.len()));
+    Ok(filtered)
 }
 
 #[tauri::command]

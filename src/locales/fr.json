@@ -302,6 +302,7 @@
     "establishing_link": "Établissement de la liaison sécurisée...",
     "link_established": "Liaison établie !",
     "ready_to_sync": "Prêt à synchroniser.",
+    "host_instructions": "Télécharge Siegu sur ton autre appareil, appuie sur Rejoindre le réseau et entre cette phrase.",
     "manual_phrase": "Phrase manuelle",
     "or_enter_manually": "Ou saisir manuellement",
     "phrase_placeholder": "Entrez une phrase de 4 mots",
