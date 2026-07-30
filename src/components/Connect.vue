@@ -80,16 +80,20 @@
             :passphrase="passphrase"
             :peer-joined="peerJoined"
             :is-connected="isConnected"
+            :host-ip="hostIp"
+            :host-port="hostPort"
           />
 
           <ConnectJoinView
-            v-if="mode === 'join' && selectedLanHost"
+            v-if="mode === 'join'"
             v-model="joinPassphrase"
             :loading="loading"
             :is-connected="isConnected"
             :show-sync-button="isConnected"
             :syncing="syncing"
-            @join="joinWebRTC"
+            :host-ip="selectedLanHost?.ip ?? ''"
+            :host-port="selectedLanHost?.port ?? 0"
+            @join="(ip: string, port: string) => joinWebRTC(ip, port)"
             @sync="triggerSync"
           />
 
@@ -199,16 +203,20 @@
           :passphrase="passphrase"
           :peer-joined="peerJoined"
           :is-connected="isConnected"
+          :host-ip="hostIp"
+          :host-port="hostPort"
         />
 
         <ConnectJoinView
-          v-if="mode === 'join' && selectedLanHost"
+          v-if="mode === 'join'"
           v-model="joinPassphrase"
           :loading="loading"
           :is-connected="isConnected"
           :show-sync-button="false"
           :syncing="syncing"
-          @join="joinWebRTC"
+          :host-ip="selectedLanHost?.ip ?? ''"
+          :host-port="selectedLanHost?.port ?? 0"
+          @join="(ip: string, port: string) => joinWebRTC(ip, port)"
           @sync="triggerSync"
         />
 
@@ -296,6 +304,8 @@ const {
   syncProgress,
   selectedLanHost,
   peerList,
+  hostIp,
+  hostPort,
   initialize,
   selectLanHost,
   joinWebRTC,
@@ -305,8 +315,6 @@ const {
   stopEventListeners,
   resetJoinState,
 } = useConnect()
-
-let syncCompleteTimer: ReturnType<typeof setTimeout> | null = null
 
 const showDisconnect = computed(() => {
   return (
@@ -339,25 +347,6 @@ watch(isConnected, (connected) => {
   if (connected) emit('connected')
 })
 
-watch(syncProgress, (progress) => {
-  if (syncCompleteTimer) {
-    clearTimeout(syncCompleteTimer)
-    syncCompleteTimer = null
-  }
-  if (progress.status === 'Up to date' || progress.status.startsWith('Finished')) {
-    const currentStatus = progress.status
-    syncCompleteTimer = setTimeout(() => {
-      if (syncProgress.value.status === currentStatus) {
-        syncProgress.value = { status: '', progress: 0 }
-        if (dialog.value) {
-          dialog.value = false
-          emit('done')
-        }
-      }
-    }, 2000)
-  }
-})
-
 watch(dialog, async (open) => {
   if (open) {
     await startEventListeners()
@@ -366,10 +355,6 @@ watch(dialog, async (open) => {
     await disconnectSession()
     stopEventListeners()
     loading.value = false
-    if (syncCompleteTimer) {
-      clearTimeout(syncCompleteTimer)
-      syncCompleteTimer = null
-    }
   }
 })
 
@@ -384,9 +369,6 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  if (syncCompleteTimer) {
-    clearTimeout(syncCompleteTimer)
-  }
   disconnectSession()
   stopEventListeners()
 })

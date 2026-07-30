@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { discoverLanDevices } from '@/services/tauri'
+import { discoverLanDevices, isAndroid, pingMdnsPlugin } from '@/services/tauri'
 import type { DiscoveredHost } from '@/types/sync'
 
 const emit = defineEmits<{
@@ -9,26 +9,48 @@ const emit = defineEmits<{
 
 const hosts = ref<DiscoveredHost[]>([])
 const scanning = ref(true)
+const error = ref('')
 const elapsed = ref(0)
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let elapsedTimer: ReturnType<typeof setInterval> | null = null
 
 const showUpsell = computed(() => elapsed.value >= 5 && hosts.value.length === 0)
 
+async function initPlugin(): Promise<boolean> {
+  if (isAndroid) {
+    try {
+      await pingMdnsPlugin()
+      return true
+    } catch {
+      error.value = 'mDNS plugin not available'
+      scanning.value = false
+      return false
+    }
+  }
+  return true
+}
+
 async function poll(): Promise<void> {
   try {
     const results = await discoverLanDevices(2)
-    hosts.value = results
-  } catch {
-    // ignore poll errors
-  } finally {
+    if (results.length > 0) {
+      hosts.value = results
+      error.value = ''
+    }
+  } catch (e) {
+    error.value = String(e)
+  }
+  if (hosts.value.length > 0 || elapsed.value >= 8) {
     scanning.value = false
   }
 }
 
-onMounted(() => {
-  poll()
-  pollTimer = setInterval(poll, 3000)
+onMounted(async () => {
+  const ok = await initPlugin()
+  if (ok) {
+    poll()
+    pollTimer = setInterval(poll, 3000)
+  }
   elapsedTimer = setInterval(() => {
     elapsed.value++
   }, 1000)
@@ -74,7 +96,7 @@ onUnmounted(() => {
       v-if="!scanning && hosts.length === 0"
       class="text-caption text-zinc-muted text-center py-4"
     >
-      {{ $t('connect.no_devices_found') }}
+      {{ error || $t('connect.no_devices_found') }}
     </div>
 
     <v-card
