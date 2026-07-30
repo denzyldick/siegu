@@ -24,6 +24,7 @@
     <!-- Required for Android 13+ to access local network info without location -->
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     
     <application
         android:icon="@mipmap/ic_launcher"

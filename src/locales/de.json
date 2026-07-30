@@ -294,9 +294,17 @@
     "alt_thumb": "Fotominiatur"
   },
   "connect": {
-    "link_device_title": "Gerät verbinden",
+	  "joining":"Wartend",
+    "link_device_title": "Geräte verbinden",
     "link_device_desc": "Synchronisiere deine Bibliothek auf deiner eigenen Hardware.",
     "privacy_note": "Deine Daten bleiben in deinem lokalen Netzwerk — keine Drittanbieter-Server. Alles bleibt zwischen deinen Geräten.",
+    "same_network_note": "Make sure both devices are connected to the same Wi-Fi network.",
+    "cross_network_upsell": "Not on the same network? Use our hosted signaling server or host your own. Coming soon.",
+    "network_confirm_title": "Connect Devices",
+    "network_confirm_dont_show": "Don't show this again",
+    "join_waitlist": "Join the waitlist",
+    "copy_phrase": "Copy passphrase",
+    "copied": "Copied!",
     "host": "Host",
     "join": "Beitreten",
     "device_found": "Gerät gefunden!",

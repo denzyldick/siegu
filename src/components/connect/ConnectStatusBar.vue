@@ -52,21 +52,16 @@ const emit = defineEmits<{
     ></v-progress-linear>
   </div>
 
-  <v-btn
-    v-if="showDisconnect"
-    variant="flat"
-    color="black"
-    size="small"
-    class="mt-4"
-    @click="emit('disconnect')"
-    :loading="disconnecting"
-    :icon="disconnecting ? undefined : 'mdi-close'"
-  >
-    <template v-if="!disconnecting" #default>
-      <div class="d-flex align-center ga-1">
-        <v-icon size="14">mdi-close</v-icon>
-        <span>{{ $t('devices.disconnect') }}</span>
-      </div>
-    </template>
-  </v-btn>
+  <div v-if="showDisconnect" class="text-center mt-4">
+    <v-btn
+      variant="flat"
+      color="black"
+      size="small"
+      @click="emit('disconnect')"
+      :loading="disconnecting"
+      prepend-icon="mdi-close"
+    >
+      {{ $t('devices.disconnect') }}
+    </v-btn>
+  </div>
 </template>

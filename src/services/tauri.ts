@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import { platform } from '@tauri-apps/plugin-os'
 import type { MediaItem, ListFilesOptions } from '@/types/media'
 import type { Person, UnnamedFace } from '@/types/person'
 import type { PairingCodes, DiscoveredHost } from '@/types/sync'
@@ -233,6 +234,7 @@ export async function requestStartSync(): Promise<void> {
 }
 
 export async function listDevices(): Promise<Array<{
+  id: string
   title: string
   icon: string
   os: string
@@ -245,8 +247,8 @@ export async function listDevices(): Promise<Array<{
   return parseJsonArray(raw)
 }
 
-export async function removeDevice(name: string): Promise<void> {
-  await call<unknown>('remove_device', { name })
+export async function removeDevice(id: string): Promise<void> {
+  await call<unknown>('remove_device', { id })
 }
 
 export async function generatePairingCodes(): Promise<PairingCodes> {
@@ -269,11 +271,23 @@ export async function stopWebrtcSession(): Promise<void> {
   await call<unknown>('stop_webrtc_session')
 }
 
-export async function startLanHost(roomId: string, isInitiator: boolean): Promise<void> {
-  await call<unknown>('start_lan_host', { roomId, isInitiator })
+export async function startLanHost(roomId: string, isInitiator: boolean): Promise<{ ip: string; port: number }> {
+  return call<{ ip: string; port: number }>('start_lan_host', { roomId, isInitiator })
+}
+
+export const isAndroid = platform() === 'android'
+
+export async function pingMdnsPlugin(): Promise<boolean> {
+  if (!isAndroid) return false
+  const r = await invoke<{ ok: boolean }>('plugin:mdns|ping')
+  return r.ok
 }
 
 export async function discoverLanDevices(timeoutSecs: number = 3): Promise<DiscoveredHost[]> {
+  if (isAndroid) {
+    const result = await invoke<{ hosts: string }>('plugin:mdns|discover', { timeoutSecs })
+    return JSON.parse(result.hosts)
+  }
   return call<DiscoveredHost[]>('discover_lan_devices', { timeoutSecs })
 }
 

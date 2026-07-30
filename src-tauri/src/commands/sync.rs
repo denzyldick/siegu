@@ -121,7 +121,9 @@ pub async fn start_webrtc_session(
                 app_handle,
                 Some(sync_tx),
             );
-            let _ = transport.start().await;
+            if let Err(e) = transport.start().await {
+                emit_log(&app, format!("WebRTC session failed: {e}"));
+            }
         });
 
         *session = Some(handle);
@@ -403,7 +405,9 @@ pub async fn auto_reconnect(
                         app_handle,
                         Some(sync_tx),
                     );
-                    let _ = transport.start().await;
+                    if let Err(e) = transport.start().await {
+                        emit_log(&app, format!("WebRTC session failed: {e}"));
+                    }
                 });
                 *active = Some(handle);
             }

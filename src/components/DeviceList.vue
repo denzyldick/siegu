@@ -71,7 +71,7 @@
                     ></v-btn>
                   </template>
                   <v-list density="compact" rounded="lg" class="border-subtle">
-                    <v-list-item @click="removeDevice(device.title)" color="error">
+                    <v-list-item @click="removeDevice(device.id)" color="error">
                       <template v-slot:prepend>
                         <v-icon size="small" color="error">mdi-delete-outline</v-icon>
                       </template>
@@ -268,6 +268,7 @@ import Connect from './Connect.vue'
 import { listDevices, removeDevice as removeDeviceApi, requestStartSync } from '@/services/tauri'
 
 interface DeviceWithSync {
+  id: string
   title: string
   icon: string
   os: string
@@ -314,8 +315,8 @@ async function startSync() {
   }
 }
 
-function removeDevice(name: string) {
-  deviceToDelete.value = name
+function removeDevice(id: string) {
+  deviceToDelete.value = id
   deleteDialog.value = true
 }
 

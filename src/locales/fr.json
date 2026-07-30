@@ -294,9 +294,17 @@
     "alt_thumb": "Vignette photo"
   },
   "connect": {
+	  "joining":"En attente",
     "link_device_title": "Lier un appareil",
     "link_device_desc": "Synchronisez votre bibliothèque sur votre propre matériel.",
     "privacy_note": "Vos données restent sur votre réseau local — aucun serveur tiers. Tout reste entre vos appareils.",
+    "same_network_note": "Make sure both devices are connected to the same Wi-Fi network.",
+    "cross_network_upsell": "Not on the same network? Use our hosted signaling server or host your own. Coming soon.",
+    "network_confirm_title": "Connect Devices",
+    "network_confirm_dont_show": "Don't show this again",
+    "join_waitlist": "Join the waitlist",
+    "copy_phrase": "Copy passphrase",
+    "copied": "Copied!",
     "host": "Hôte",
     "join": "Rejoindre",
     "device_found": "Appareil trouvé !",

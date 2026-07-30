@@ -294,9 +294,17 @@
     "alt_thumb": "Miniatura foto"
   },
   "connect": {
+	  "joining":"In attesa",
     "link_device_title": "Collega Dispositivo",
     "link_device_desc": "Sincronizza la tua libreria sul tuo hardware.",
     "privacy_note": "I tuoi dati restano sulla tua rete locale — nessun server di terze parti. Tutto rimane tra i tuoi dispositivi.",
+    "same_network_note": "Make sure both devices are connected to the same Wi-Fi network.",
+    "cross_network_upsell": "Not on the same network? Use our hosted signaling server or host your own. Coming soon.",
+    "network_confirm_title": "Connect Devices",
+    "network_confirm_dont_show": "Don't show this again",
+    "join_waitlist": "Join the waitlist",
+    "copy_phrase": "Copy passphrase",
+    "copied": "Copied!",
     "host": "Host",
     "join": "Unisciti",
     "device_found": "Dispositivo Trovato!",

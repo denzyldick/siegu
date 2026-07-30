@@ -40,9 +40,9 @@ const syncStatusText = computed(() => {
 </script>
 
 <template>
-  <div v-if="hostIp" class="d-flex justify-center mb-6 flex-column ga-4">
+  <div v-if="hostIp" class="d-flex flex-column align-stretch mb-6 ga-4" style="width: 100%">
     <div class="text-center mb-2">
-      <div class="text-caption text-zinc-muted">Connect to</div>
+      <div class="text-caption text-zinc-muted">Direct connection</div>
       <div class="text-body-1 font-weight-bold text-zinc-primary">{{ hostIp }}:{{ hostPort }}</div>
     </div>
 
@@ -54,7 +54,8 @@ const syncStatusText = computed(() => {
       hide-details
       flat
       rounded="lg"
-      class="text-center siegu-field join-passphrase"
+      class="text-center join-passphrase"
+      style="width: 100%; min-width: 280px"
       @keyup.enter="emit('join', hostIp, String(hostPort))"
       :disabled="loading || isConnected"
     ></v-text-field>
@@ -62,13 +63,17 @@ const syncStatusText = computed(() => {
     <v-btn
       v-if="!showSyncButton"
       variant="flat"
+      color="black"
       @click="emit('join', hostIp, String(hostPort))"
       class="siegu-btn py-6"
       block
-      :loading="loading"
-      :disabled="!modelValue || isConnected"
+      :disabled="loading || !modelValue || isConnected"
     >
-      <div class="d-flex align-center">
+      <div v-if="loading" class="d-flex align-center">
+        <v-progress-circular indeterminate size="18" width="2" color="white" class="mr-3" />
+        <span>{{ t('connect.joining') }}</span>
+      </div>
+      <div v-else class="d-flex align-center">
         <div class="siegu-icon-circle mr-3">
           <v-icon size="14">mdi-link-variant</v-icon>
         </div>
@@ -77,7 +82,7 @@ const syncStatusText = computed(() => {
     </v-btn>
 
     <div
-      v-else-if="syncing"
+      v-if="syncing"
       class="d-flex flex-column align-center py-4 ga-2"
     >
       <div v-if="deviceName" class="text-caption text-zinc-secondary">
@@ -130,20 +135,33 @@ const syncStatusText = computed(() => {
   justify-content: center;
 }
 
+.join-passphrase :deep(.v-field) {
+  background: #a1a1aa !important;
+}
+
+.join-passphrase :deep(.v-field__overlay) {
+  background: #a1a1aa !important;
+}
+
+.join-passphrase :deep(.v-field--focused),
+.join-passphrase :deep(.v-field--focused .v-field__overlay) {
+  background: #18181b !important;
+}
+
 .join-passphrase :deep(input) {
   color: #fafafa !important;
   caret-color: #fafafa !important;
+  font-size: 14px !important;
+  letter-spacing: 0.02em;
 }
 
 .join-passphrase :deep(.v-field__input) {
   color: #fafafa !important;
+  min-height: 40px !important;
+  padding: 4px 8px !important;
 }
 
 .join-passphrase :deep(.v-label) {
   color: #71717a !important;
-}
-
-.siegu-btn:deep(.v-btn--loading .v-btn__content) {
-  opacity: 1;
 }
 </style>

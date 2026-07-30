@@ -17,12 +17,20 @@ android {
     compileSdk = 34
     namespace = "io.denzyl.siegu"
     defaultConfig {
-        manifestPlaceholders["usesCleartextTraffic"] = "false"
+        manifestPlaceholders["usesCleartextTraffic"] = "true"
         applicationId = "io.denzyl.siegu"
         minSdk = 24
         targetSdk = 34
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+    }
+    signingConfigs {
+        create("debugKeystore") {
+            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -37,6 +45,7 @@ android {
             }
         }
         getByName("release") {
+            signingConfig = signingConfigs["debugKeystore"]
             isMinifyEnabled = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }

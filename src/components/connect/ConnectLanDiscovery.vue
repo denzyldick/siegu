@@ -14,7 +14,7 @@ const elapsed = ref(0)
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let elapsedTimer: ReturnType<typeof setInterval> | null = null
 
-const showUpsell = computed(() => elapsed.value >= 5 && hosts.value.length === 0)
+const noDevices = computed(() => elapsed.value >= 15 && hosts.value.length === 0) // Show the spinner for the first 15s
 
 async function initPlugin(): Promise<boolean> {
   if (isAndroid) {
@@ -36,12 +36,10 @@ async function poll(): Promise<void> {
     if (results.length > 0) {
       hosts.value = results
       error.value = ''
+      scanning.value = false
     }
   } catch (e) {
     error.value = String(e)
-  }
-  if (hosts.value.length > 0 || elapsed.value >= 8) {
-    scanning.value = false
   }
 }
 
@@ -73,7 +71,7 @@ onUnmounted(() => {
       <span class="text-caption text-zinc-secondary">{{ $t('connect.searching_network') }}</span>
     </div>
 
-    <v-list v-if="hosts.length > 0" density="compact" class="bg-transparent pa-0">
+    <v-list v-if="hosts.length > 0" density="compact" class="bg-transparent pa-0 w-100">
       <v-list-item
         v-for="host in hosts"
         :key="`${host.ip}:${host.port}`"
@@ -93,22 +91,11 @@ onUnmounted(() => {
     </v-list>
 
     <div
-      v-if="!scanning && hosts.length === 0"
+      v-if="noDevices"
       class="text-caption text-zinc-muted text-center py-4"
     >
       {{ error || $t('connect.no_devices_found') }}
     </div>
-
-    <v-card
-      v-if="showUpsell"
-      variant="flat"
-      class="bg-zinc-50 border-subtle rounded-xl pa-4 text-center mt-2"
-    >
-      <v-icon size="24" color="grey" class="mb-2">mdi-wifi-off</v-icon>
-      <div class="text-body-2 text-zinc-secondary">
-        {{ $t('connect.connect_fromAnywhere') }}
-      </div>
-    </v-card>
   </div>
 </template>
 

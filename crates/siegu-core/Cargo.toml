@@ -41,7 +41,7 @@ lazy_static = "1.5.0"
 heic = { workspace = true }
 num_cpus = "1.16.0"
 warp = { workspace = true }
-mdns-sd = { workspace = true }
+socket2 = "0.5"
 webrtc = { rev = "5aa49c0", git = "https://github.com/webrtc-rs/webrtc" }
 bytes = "1.11.1"
 aes-gcm = { workspace = true }

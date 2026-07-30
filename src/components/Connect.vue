@@ -22,13 +22,13 @@
 
       <v-card
         v-if="!embedded"
-        class="border-subtle pa-6 text-center bg-siegu-white"
+        class="border-subtle pa-5 text-center bg-siegu-white"
         rounded="xl"
         min-width="350"
-        max-width="400"
+        max-width="440"
       >
-        <div class="d-flex justify-center mb-4">
-          <svg viewBox="0 0 240 90" width="200" height="75" class="connect-illustration">
+        <div v-if="!confirmDialog && !(started && mode === 'host' && !isConnected)" class="d-flex justify-center mb-3">
+          <svg viewBox="0 0 240 90" width="180" height="68" class="connect-illustration">
             <!-- Desktop -->
             <rect x="8" y="12" width="52" height="38" rx="3" fill="none" stroke="#18181b" stroke-width="2"/>
             <rect x="13" y="17" width="42" height="28" rx="1" fill="#18181b" opacity="0.06"/>
@@ -73,50 +73,97 @@
           </svg>
         </div>
 
-        <div class="text-h5 font-weight-bold text-zinc-primary mb-2">
+        <div v-if="!confirmDialog && !(started && mode === 'host' && !isConnected)" class="text-h5 font-weight-bold text-zinc-primary mb-2">
           {{ $t('connect.link_device_title') }}
         </div>
-        <div class="text-body-2 text-zinc-secondary mb-6">
+        <div v-if="!confirmDialog && !(started && (mode === 'host' || mode === 'join') && !isConnected)" class="text-body-2 text-zinc-secondary mb-6">
           {{ $t('connect.link_device_desc') }}
         </div>
-        <div class="text-caption text-zinc-muted mb-6 px-2" style="line-height: 1.5">
+        <div v-if="!confirmDialog && !(started && (mode === 'host' || mode === 'join') && !isConnected)" class="text-caption text-zinc-muted mb-6 px-2" style="line-height: 1.5">
           {{ $t('connect.privacy_note') }}
         </div>
 
-        <div v-if="!started" class="d-flex flex-column align-center mb-6 ga-4">
-          <v-btn
-            color="black"
-            variant="flat"
-            height="56"
-            class="siegu-btn px-8 text-none"
-            @click="start('host')"
-          >
-            <div class="d-flex align-center">
-              <div class="siegu-icon-circle siegu-icon-circle-md mr-3">
-                <v-icon size="16">mdi-laptop</v-icon>
-              </div>
-              <span class="font-weight-bold">{{ $t('connect.host') }}</span>
-            </div>
-          </v-btn>
-          <div class="text-caption text-zinc-muted text-center px-4">
-            {{ $t('connect.host_desc') }}
+        <div v-if="!started && !confirmDialog" class="d-flex flex-row justify-center mb-2 ga-3 w-100">
+          <v-tooltip :text="$t('connect.host_desc')" location="bottom">
+            <template v-slot:activator="{ props }">
+              <v-btn
+                v-bind="props"
+                color="black"
+                variant="flat"
+                height="44"
+                class="siegu-btn px-5 text-none"
+                @click="confirmStart('host')"
+              >
+                <div class="d-flex align-center">
+                  <div class="siegu-icon-circle siegu-icon-circle-sm mr-2">
+                    <v-icon size="14">mdi-laptop</v-icon>
+                  </div>
+                  <span class="font-weight-bold">{{ $t('connect.host') }}</span>
+                </div>
+              </v-btn>
+            </template>
+          </v-tooltip>
+          <v-tooltip :text="$t('connect.join_desc')" location="bottom">
+            <template v-slot:activator="{ props }">
+              <v-btn
+                v-bind="props"
+                color="black"
+                variant="flat"
+                height="44"
+                class="siegu-btn px-5 text-none"
+                @click="confirmStart('join')"
+              >
+                <div class="d-flex align-center">
+                  <div class="siegu-icon-circle siegu-icon-circle-sm mr-2">
+                    <v-icon size="14">mdi-cellphone-link</v-icon>
+                  </div>
+                  <span class="font-weight-bold">{{ $t('connect.join') }}</span>
+                </div>
+              </v-btn>
+            </template>
+          </v-tooltip>
+        </div>
+
+        <div v-if="!started && confirmDialog" class="text-left px-2">
+          <div class="text-body-2 font-weight-bold text-zinc-primary mb-3">
+            {{ $t('connect.network_confirm_title') }}
           </div>
-          <v-btn
-            color="black"
-            variant="flat"
-            height="56"
-            class="siegu-btn px-8 text-none"
-            @click="start('join')"
+          <div class="text-caption text-zinc-secondary mb-3" style="line-height: 1.5">
+            {{ $t('connect.same_network_note') }}
+          </div>
+          <a
+            href="https://siegu.app/waitlist"
+            target="_blank"
+            class="text-caption font-weight-medium mb-4 d-inline-block"
+            style="color: #22c55e; text-decoration: none;"
           >
-            <div class="d-flex align-center">
-              <div class="siegu-icon-circle siegu-icon-circle-md mr-3">
-                <v-icon size="16">mdi-cellphone-link</v-icon>
-              </div>
-              <span class="font-weight-bold">{{ $t('connect.join') }}</span>
-            </div>
-          </v-btn>
-          <div class="text-caption text-zinc-muted text-center px-4">
-            {{ $t('connect.join_desc') }}
+            {{ $t('connect.join_waitlist') }} →
+          </a>
+          <v-checkbox
+            v-model="dontShowAgain"
+            :label="$t('connect.network_confirm_dont_show')"
+            hide-details
+            density="compact"
+            class="text-caption mb-4"
+            color="black"
+          />
+          <div class="d-flex ga-3">
+            <v-btn
+              variant="outlined"
+              color="black"
+              class="text-none flex-1"
+              @click="confirmDialog = false"
+            >
+              Back
+            </v-btn>
+            <v-btn
+              color="black"
+              variant="flat"
+              class="text-none flex-1"
+              @click="proceedFromConfirm"
+            >
+              Continue
+            </v-btn>
           </div>
         </div>
 
@@ -138,6 +185,7 @@
             :device-name="selectedLanHost?.name ?? ''"
             :items-completed="syncProgress.items_completed"
             :items-total="syncProgress.items_total"
+            :connection-status="connectionStatus"
             @join="(ip: string, port: string) => joinWebRTC(ip, port)"
             @sync="triggerSync"
           />
@@ -190,41 +238,45 @@
     </v-dialog>
 
     <div v-if="embedded" class="w-100">
-      <div v-if="!started && !hideModeToggle" class="d-flex flex-column align-center mb-6 ga-4">
-        <v-btn
-          color="black"
-          variant="flat"
-          height="56"
-          class="siegu-btn px-8 text-none"
-          @click="start('host')"
-        >
-          <div class="d-flex align-center">
-            <div class="siegu-icon-circle siegu-icon-circle-md mr-3">
-              <v-icon size="16">mdi-laptop</v-icon>
-            </div>
-            <span class="font-weight-bold">{{ $t('connect.host') }}</span>
-          </div>
-        </v-btn>
-        <div class="text-caption text-zinc-muted text-center px-4">
-          {{ $t('connect.host_desc') }}
-        </div>
-        <v-btn
-          color="black"
-          variant="flat"
-          height="56"
-          class="siegu-btn px-8 text-none"
-          @click="start('join')"
-        >
-          <div class="d-flex align-center">
-            <div class="siegu-icon-circle siegu-icon-circle-md mr-3">
-              <v-icon size="16">mdi-cellphone-link</v-icon>
-            </div>
-            <span class="font-weight-bold">{{ $t('connect.join') }}</span>
-          </div>
-        </v-btn>
-        <div class="text-caption text-zinc-muted text-center px-4">
-          {{ $t('connect.join_desc') }}
-        </div>
+      <div v-if="!started && !hideModeToggle" class="d-flex flex-row align-center mb-6 ga-3 w-100">
+        <v-tooltip :text="$t('connect.host_desc')" location="bottom">
+          <template v-slot:activator="{ props }">
+            <v-btn
+              v-bind="props"
+              color="black"
+              variant="flat"
+              height="56"
+              class="siegu-btn px-6 text-none flex-1"
+              @click="start('host')"
+            >
+              <div class="d-flex align-center">
+                <div class="siegu-icon-circle siegu-icon-circle-md mr-2">
+                  <v-icon size="16">mdi-laptop</v-icon>
+                </div>
+                <span class="font-weight-bold">{{ $t('connect.host') }}</span>
+              </div>
+            </v-btn>
+          </template>
+        </v-tooltip>
+        <v-tooltip :text="$t('connect.join_desc')" location="bottom">
+          <template v-slot:activator="{ props }">
+            <v-btn
+              v-bind="props"
+              color="black"
+              variant="flat"
+              height="56"
+              class="siegu-btn px-6 text-none flex-1"
+              @click="start('join')"
+            >
+              <div class="d-flex align-center">
+                <div class="siegu-icon-circle siegu-icon-circle-md mr-2">
+                  <v-icon size="16">mdi-cellphone-link</v-icon>
+                </div>
+                <span class="font-weight-bold">{{ $t('connect.join') }}</span>
+              </div>
+            </v-btn>
+          </template>
+        </v-tooltip>
       </div>
 
       <template v-if="started">
@@ -245,6 +297,7 @@
           :device-name="selectedLanHost?.name ?? ''"
           :items-completed="syncProgress.items_completed"
           :items-total="syncProgress.items_total"
+          :connection-status="connectionStatus"
           @join="(ip: string, port: string) => joinWebRTC(ip, port)"
           @sync="triggerSync"
         />
@@ -318,6 +371,28 @@ const emit = defineEmits<{
 
 const dialog = ref(false)
 const started = ref(false)
+const confirmDialog = ref(false)
+const pendingMode = ref<'host' | 'join' | null>(null)
+const dontShowAgain = ref(localStorage.getItem('siegu_skip_network_confirm') === 'true')
+
+function confirmStart(selectedMode: 'host' | 'join') {
+  if (dontShowAgain.value) {
+    start(selectedMode)
+  } else {
+    pendingMode.value = selectedMode
+    confirmDialog.value = true
+  }
+}
+
+function proceedFromConfirm() {
+  if (dontShowAgain.value) {
+    localStorage.setItem('siegu_skip_network_confirm', 'true')
+  }
+  confirmDialog.value = false
+  if (pendingMode.value) {
+    start(pendingMode.value)
+  }
+}
 const {
   mode,
   passphrase,
@@ -381,6 +456,8 @@ watch(dialog, async (open) => {
     await startEventListeners()
   } else {
     started.value = false
+    confirmDialog.value = false
+    pendingMode.value = null
     await disconnectSession()
     stopEventListeners()
     loading.value = false

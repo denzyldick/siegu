@@ -294,9 +294,17 @@
     "alt_thumb": "Fotominiatuur"
   },
   "connect": {
+	  "joining":"Wachtend",
     "link_device_title": "Apparaat koppelen",
     "link_device_desc": "Synchroniseer je bibliotheek op al je hardware.",
     "privacy_note": "Je gegevens blijven op je lokale netwerk — geen servers van derden. Alles blijft tussen je apparaten.",
+    "same_network_note": "Make sure both devices are connected to the same Wi-Fi network.",
+    "cross_network_upsell": "Not on the same network? Use our hosted signaling server or host your own. Coming soon.",
+    "network_confirm_title": "Connect Devices",
+    "network_confirm_dont_show": "Don't show this again",
+    "join_waitlist": "Join the waitlist",
+    "copy_phrase": "Copy passphrase",
+    "copied": "Copied!",
     "host": "Host",
     "join": "Deelnemen",
     "device_found": "Apparaat gevonden!",

@@ -11,6 +11,8 @@
     "fs:default",
     "dialog:default",
     "notification:default",
+    "mdns:default",
+    "permission:default",
     {
       "identifier": "fs:allow-home-read-recursive",
       "allow": [

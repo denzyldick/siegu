@@ -118,6 +118,10 @@ impl MeshTransport {
     }
 
     pub async fn start(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.event.on_log(&format!(
+            "DEBUG start() called: room_id={} is_init={} url={} device={}",
+            self.room_id, self.is_initiator, self.signaling_url, self.device_id
+        ));
         if self.room_id.is_empty() {
             let err = "Room ID is missing".to_string();
             self.event.on_state_change(&err);
@@ -153,7 +157,7 @@ impl MeshTransport {
                 err
             })?;
 
-        self.event.on_log("Connected to signaling server!");
+        self.event.on_log("DEBUG WebSocket connected!");
         if !is_remote {
             self.event
                 .on_state_change("Connected to signaling. Waiting for peer...");
@@ -389,7 +393,7 @@ impl MeshTransport {
             }));
         }
 
-        self.event.on_log("Entering signaling message loop");
+        self.event.on_log("DEBUG entering signaling loop");
         let mut read = ws_read;
 
         if is_remote {
@@ -406,6 +410,8 @@ impl MeshTransport {
                     .await?;
             }
         } else {
+            self.event
+                .on_log(&format!("DEBUG sending Join device_id={}", self.device_id));
             self.send_signal(
                 &ws_write,
                 &SignalMessage::Join {
@@ -413,6 +419,7 @@ impl MeshTransport {
                 },
             )
             .await?;
+            self.event.on_log("DEBUG Join sent successfully");
         }
 
         while let Some(msg) = read.next().await {
@@ -424,12 +431,19 @@ impl MeshTransport {
                     };
                     match signal {
                         SignalMessage::Joined { peer_count, .. } if !is_remote => {
+                            eprintln!(
+                                "[siegu-transport] received Joined peer_count={} is_init={}",
+                                peer_count, self.is_initiator
+                            );
                             if peer_count > 1 {
                                 self.event.on_state_change("Peer Joined");
                             }
                             if self.is_initiator && peer_count > 1 {
+                                eprintln!("[siegu-transport] creating offer...");
                                 let offer = pc.create_offer(None).await?;
+                                eprintln!("[siegu-transport] offer created, setting local desc");
                                 pc.set_local_description(offer.clone()).await?;
+                                eprintln!("[siegu-transport] sending offer");
                                 self.send_signal(
                                     &ws_write,
                                     &SignalMessage::Offer {
@@ -438,9 +452,11 @@ impl MeshTransport {
                                     },
                                 )
                                 .await?;
+                                eprintln!("[siegu-transport] offer sent");
                             }
                         }
                         SignalMessage::PeerJoined { .. } if !is_remote => {
+                            eprintln!("[siegu-transport] received PeerJoined");
                             self.event.on_state_change("Peer Joined");
                             if self.is_initiator {
                                 let offer = pc.create_offer(None).await?;
@@ -456,6 +472,7 @@ impl MeshTransport {
                             }
                         }
                         SignalMessage::Offer { payload, .. } if !is_remote => {
+                            eprintln!("[siegu-transport] received Offer");
                             let sdp: RTCSessionDescription = serde_json::from_str(&payload)?;
                             pc.set_remote_description(sdp).await?;
                             {
@@ -476,6 +493,7 @@ impl MeshTransport {
                             .await?;
                         }
                         SignalMessage::Answer { payload, .. } if !is_remote => {
+                            eprintln!("[siegu-transport] received Answer");
                             if let Ok(sdp) = serde_json::from_str::<RTCSessionDescription>(&payload)
                             {
                                 pc.set_remote_description(sdp).await?;
@@ -486,6 +504,7 @@ impl MeshTransport {
                             }
                         }
                         SignalMessage::IceCandidate { payload, .. } if !is_remote => {
+                            eprintln!("[siegu-transport] received ICE candidate");
                             if let Ok(candidate) =
                                 serde_json::from_str::<RTCIceCandidateInit>(&payload)
                             {
@@ -583,6 +602,7 @@ impl MeshTransport {
                             self.event.on_state_change("Room closed");
                         }
                         SignalMessage::Error { message } => {
+                            eprintln!("[siegu-transport] Signaling error: {message}");
                             self.event
                                 .on_state_change(&format!("Signaling error: {message}"));
                         }
@@ -590,6 +610,7 @@ impl MeshTransport {
                     }
                 }
                 Err(e) => {
+                    eprintln!("[siegu-transport] WebSocket error: {e}");
                     self.event.on_state_change(&format!("WebSocket error: {e}"));
                     break;
                 }

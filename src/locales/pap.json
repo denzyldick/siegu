@@ -294,9 +294,17 @@
     "alt_thumb": "Miniatura di foto"
   },
   "connect": {
+	  "joining":"Wardando",
     "link_device_title": "Vincular Aparato",
     "link_device_desc": "Sinkronisá bo biblioteka riba bo propio hardware.",
     "privacy_note": "Bo data keda riba bo red lokal — niun server di tercero. Tur kos keda entre bo aparatonan.",
+    "same_network_note": "Make sure both devices are connected to the same Wi-Fi network.",
+    "cross_network_upsell": "Not on the same network? Use our hosted signaling server or host your own. Coming soon.",
+    "network_confirm_title": "Connect Devices",
+    "network_confirm_dont_show": "Don't show this again",
+    "join_waitlist": "Join the waitlist",
+    "copy_phrase": "Copy passphrase",
+    "copied": "Copied!",
     "host": "Host",
     "join": "Há pa",
     "device_found": "Aparato hañá!",

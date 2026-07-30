@@ -6003,6 +6003,36 @@
           "markdownDescription": "This enables all file write related commands without any pre-configured accessible paths."
         },
         {
+          "description": "Default plugin permissions.\n#### This default permission set includes:\n\n- `allow-ping`\n- `allow-discover`",
+          "type": "string",
+          "const": "mdns:default",
+          "markdownDescription": "Default plugin permissions.\n#### This default permission set includes:\n\n- `allow-ping`\n- `allow-discover`"
+        },
+        {
+          "description": "Enables the discover command without any pre-configured scope.",
+          "type": "string",
+          "const": "mdns:allow-discover",
+          "markdownDescription": "Enables the discover command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the ping command without any pre-configured scope.",
+          "type": "string",
+          "const": "mdns:allow-ping",
+          "markdownDescription": "Enables the ping command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the discover command without any pre-configured scope.",
+          "type": "string",
+          "const": "mdns:deny-discover",
+          "markdownDescription": "Denies the discover command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the ping command without any pre-configured scope.",
+          "type": "string",
+          "const": "mdns:deny-ping",
+          "markdownDescription": "Denies the ping command without any pre-configured scope."
+        },
+        {
           "description": "This permission set configures which\nnotification features are by default exposed.\n\n#### Granted Permissions\n\nIt allows all notification related features.\n\n\n#### This default permission set includes:\n\n- `allow-is-permission-granted`\n- `allow-request-permission`\n- `allow-notify`\n- `allow-register-action-types`\n- `allow-register-listener`\n- `allow-cancel`\n- `allow-get-pending`\n- `allow-remove-active`\n- `allow-get-active`\n- `allow-check-permissions`\n- `allow-show`\n- `allow-batch`\n- `allow-list-channels`\n- `allow-delete-channel`\n- `allow-create-channel`\n- `allow-permission-state`",
           "type": "string",
           "const": "notification:default",
@@ -6349,6 +6379,24 @@
           "type": "string",
           "const": "os:deny-version",
           "markdownDescription": "Denies the version command without any pre-configured scope."
+        },
+        {
+          "description": "Default plugin permissions.\n#### This default permission set includes:\n\n- `allow-requestCamera`",
+          "type": "string",
+          "const": "permission:default",
+          "markdownDescription": "Default plugin permissions.\n#### This default permission set includes:\n\n- `allow-requestCamera`"
+        },
+        {
+          "description": "Enables the requestCamera command without any pre-configured scope.",
+          "type": "string",
+          "const": "permission:allow-requestCamera",
+          "markdownDescription": "Enables the requestCamera command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the requestCamera command without any pre-configured scope.",
+          "type": "string",
+          "const": "permission:deny-requestCamera",
+          "markdownDescription": "Denies the requestCamera command without any pre-configured scope."
         }
       ]
     },
