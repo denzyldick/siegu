@@ -182,7 +182,7 @@
             :sync-progress="syncProgress"
             :show-disconnect="showDisconnect"
             :disconnecting="disconnecting"
-            @disconnect="disconnectSession"
+            @disconnect="handleDisconnect"
           />
         </template>
 
@@ -347,6 +347,11 @@ const showDisconnect = computed(() => {
       (connectionStatus.value.length > 0 && connectionStatus.value !== 'Disconnected'))
   )
 })
+
+async function handleDisconnect() {
+  await disconnectSession()
+  dialog.value = false
+}
 
 function start(selectedMode: 'host' | 'join') {
   started.value = true
