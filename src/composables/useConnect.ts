@@ -16,6 +16,8 @@ export type ConnectMode = 'host' | 'join'
 export interface SyncProgressState {
   status: string
   progress: number
+  items_completed: number
+  items_total: number
 }
 
 export function useConnect() {
@@ -31,9 +33,11 @@ export function useConnect() {
   const loading = ref(false)
   const syncing = ref(false)
   const disconnecting = ref(false)
-  const syncProgress = ref<SyncProgressState>({ status: '', progress: 0 })
+  const syncProgress = ref<SyncProgressState>({ status: '', progress: 0, items_completed: 0, items_total: 0 })
   const selectedLanHost = ref<DiscoveredHost | null>(null)
   const peerList = ref<PeerDevice[]>([])
+  const hostIp = ref('')
+  const hostPort = ref(0)
 
   let unlistenWebRtc: UnlistenFn | null = null
   let unlistenSync: UnlistenFn | null = null
@@ -62,8 +66,18 @@ export function useConnect() {
     }
   }
 
-  function handleSyncProgress(payload: { status: string; progress: number }): void {
-    syncProgress.value = { status: payload.status, progress: payload.progress }
+  function handleSyncProgress(payload: {
+    status: string
+    progress: number
+    items_completed: number
+    items_total: number
+  }): void {
+    syncProgress.value = {
+      status: payload.status,
+      progress: payload.progress,
+      items_completed: payload.items_completed ?? 0,
+      items_total: payload.items_total ?? 0,
+    }
     if (payload.status.toLowerCase().includes('syncing')) {
       syncing.value = true
     }
@@ -100,6 +114,9 @@ export function useConnect() {
     if (selectedLanHost.value) {
       return `ws://${selectedLanHost.value.ip}:${selectedLanHost.value.port}`
     }
+    if (hostIp.value && hostPort.value) {
+      return `ws://${hostIp.value}:${hostPort.value}`
+    }
     return import.meta.env.VITE_SIGNALING_URL || 'wss://siegu.io/ws'
   }
 
@@ -122,7 +139,9 @@ export function useConnect() {
       passphrase.value = codes.passphrase
       const roomId = await hashPairingCode(codes.uuid)
       if (mode.value === 'host') {
-        await startLanHost(roomId, false)
+        const info = await startLanHost(roomId, false)
+        hostIp.value = info.ip
+        hostPort.value = info.port
       }
     } catch (error) {
       console.error('Pairing Error:', error)
@@ -134,8 +153,12 @@ export function useConnect() {
     selectedLanHost.value = host
   }
 
-  async function joinWebRTC(): Promise<void> {
+  async function joinWebRTC(ip?: string, port?: string): Promise<void> {
     if (!joinPassphrase.value || loading.value) return
+    if (ip && port) {
+      hostIp.value = ip
+      hostPort.value = parseInt(port) || 0
+    }
     loading.value = true
     connectionStatus.value = t('connect.joining_room')
     const signalingUrl = getSignalingUrl()
@@ -169,7 +192,7 @@ export function useConnect() {
       passphrase.value = []
       isConnected.value = false
       peerJoined.value = false
-      syncProgress.value = { status: '', progress: 0 }
+      syncProgress.value = { status: '', progress: 0, items_completed: 0, items_total: 0 }
       selectedLanHost.value = null
       peerList.value = []
     } catch (error) {
@@ -183,7 +206,12 @@ export function useConnect() {
     unlistenWebRtc = await listen<string>('webrtc-state', (event) => {
       handleWebRtcState(event.payload)
     })
-    unlistenSync = await listen<{ status: string; progress: number }>('sync-progress', (event) => {
+    unlistenSync = await listen<{
+      status: string
+      progress: number
+      items_completed: number
+      items_total: number
+    }>('sync-progress', (event) => {
       handleSyncProgress(event.payload)
     })
     unlistenRoomCode = await listen<string>('room-code', (event) => {
@@ -223,8 +251,10 @@ export function useConnect() {
   function resetJoinState(): void {
     connectionStatus.value = ''
     peerJoined.value = false
-    syncProgress.value = { status: '', progress: 0 }
+    syncProgress.value = { status: '', progress: 0, items_completed: 0, items_total: 0 }
     selectedLanHost.value = null
+    hostIp.value = ''
+    hostPort.value = 0
   }
 
   onUnmounted(() => {
@@ -245,6 +275,8 @@ export function useConnect() {
     syncProgress,
     selectedLanHost,
     peerList,
+    hostIp,
+    hostPort,
     initialize,
     selectLanHost,
     joinWebRTC,
