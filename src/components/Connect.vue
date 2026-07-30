@@ -93,6 +93,9 @@
             :syncing="syncing"
             :host-ip="selectedLanHost?.ip ?? ''"
             :host-port="selectedLanHost?.port ?? 0"
+            :device-name="selectedLanHost?.name ?? ''"
+            :items-completed="syncProgress.items_completed"
+            :items-total="syncProgress.items_total"
             @join="(ip: string, port: string) => joinWebRTC(ip, port)"
             @sync="triggerSync"
           />
@@ -216,6 +219,9 @@
           :syncing="syncing"
           :host-ip="selectedLanHost?.ip ?? ''"
           :host-port="selectedLanHost?.port ?? 0"
+          :device-name="selectedLanHost?.name ?? ''"
+          :items-completed="syncProgress.items_completed"
+          :items-total="syncProgress.items_total"
           @join="(ip: string, port: string) => joinWebRTC(ip, port)"
           @sync="triggerSync"
         />

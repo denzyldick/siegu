@@ -10,13 +10,13 @@ const isVisible = computed(() => {
   return (
     syncStore.status !== 'idle' &&
     syncStore.status !== 'completed' &&
-    syncStore.progress.total > 0
+    syncStore.progress.items_total > 0
   )
 })
 
 const displayProgress = computed(() => {
-  if (syncStore.progress.total === 0) return 0
-  return Math.round((syncStore.progress.received / syncStore.progress.total) * 100)
+  if (syncStore.progress.items_total === 0) return 0
+  return Math.round((syncStore.progress.items_completed / syncStore.progress.items_total) * 100)
 })
 
 function dismiss(): void {
