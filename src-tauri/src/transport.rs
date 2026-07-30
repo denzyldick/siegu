@@ -6,6 +6,20 @@ use warp::Filter;
 pub use siegu_core::mesh::{SyncMessage, SyncProgress};
 pub use siegu_core::SignalMessage;
 
+pub fn get_or_create_device_id(config_path: &str) -> String {
+    use crate::database;
+    let db = database::Database::new(config_path);
+    let state = db.get_state();
+    if let Some(id) = state.get("device_id") {
+        return id.clone();
+    }
+    let id = uuid::Uuid::new_v4().to_string();
+    let mut new_state = std::collections::HashMap::new();
+    new_state.insert("device_id".to_string(), id.clone());
+    db.set_state(new_state);
+    id
+}
+
 pub struct MediaServerState {
     pub port: u16,
 }
@@ -40,7 +54,7 @@ pub fn create_transport(
         Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<SyncMessage>>>>,
     >,
 ) -> MeshTransport {
-    let device_id = uuid::Uuid::new_v4().to_string();
+    let device_id = get_or_create_device_id(&config_path);
     let device_name = std::env::var("HOSTNAME")
         .or_else(|_| std::env::var("COMPUTERNAME"))
         .unwrap_or_else(|_| "siegu-device".to_string());
