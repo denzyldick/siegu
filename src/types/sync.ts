@@ -3,9 +3,12 @@ export type SyncStatus = 'idle' | 'connecting' | 'connected' | 'syncing' | 'comp
 export type ConnectionMode = 'lan' | 'internet'
 
 export interface SyncProgress {
-  total: number
-  received: number
-  current_file: string | null
+  device_id: string
+  status: string
+  progress: number
+  bytes_per_second: number
+  items_completed: number
+  items_total: number
 }
 
 export interface Device {

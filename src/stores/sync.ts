@@ -6,7 +6,7 @@ import type { SyncStatus, Device } from '@/types/sync'
 
 export const useSyncStore = defineStore('sync', () => {
   const status = ref<SyncStatus>('idle')
-  const progress = ref({ total: 0, received: 0, current_file: null as string | null })
+  const progress = ref({ items_completed: 0, items_total: 0, status: '' })
   const error = ref<string | null>(null)
   const devices = ref<Device[]>([])
   const connected = ref(false)
@@ -27,15 +27,23 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
-  void listenEvent('sync-progress', (payload) => {
-    status.value = 'syncing'
+  void listenEvent('sync-progress', (payload: {
+    device_id: string
+    status: string
+    progress: number
+    bytes_per_second: number
+    items_completed: number
+    items_total: number
+  }) => {
     progress.value = {
-      total: payload.total,
-      received: payload.received,
-      current_file: payload.current_file,
+      items_completed: payload.items_completed ?? 0,
+      items_total: payload.items_total ?? 0,
+      status: payload.status,
     }
-
-    if (payload.received >= payload.total && payload.total > 0) {
+    if (payload.status.toLowerCase().includes('syncing')) {
+      status.value = 'syncing'
+    }
+    if (payload.status === 'Up to date' || payload.status.startsWith('Finished')) {
       status.value = 'completed'
       connected.value = true
     }
