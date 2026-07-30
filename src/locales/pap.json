@@ -296,6 +296,7 @@
   "connect": {
     "link_device_title": "Vincular Aparato",
     "link_device_desc": "Sinkronisá bo biblioteka riba bo propio hardware.",
+    "privacy_note": "Bo data keda riba bo red lokal — niun server di tercero. Tur kos keda entre bo aparatonan.",
     "host": "Host",
     "join": "Há pa",
     "device_found": "Aparato hañá!",

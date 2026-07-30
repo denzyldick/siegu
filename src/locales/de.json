@@ -296,6 +296,7 @@
   "connect": {
     "link_device_title": "Gerät verbinden",
     "link_device_desc": "Synchronisiere deine Bibliothek auf deiner eigenen Hardware.",
+    "privacy_note": "Deine Daten bleiben in deinem lokalen Netzwerk — keine Drittanbieter-Server. Alles bleibt zwischen deinen Geräten.",
     "host": "Host",
     "join": "Beitreten",
     "device_found": "Gerät gefunden!",

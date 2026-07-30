@@ -296,6 +296,7 @@
   "connect": {
     "link_device_title": "Collega Dispositivo",
     "link_device_desc": "Sincronizza la tua libreria sul tuo hardware.",
+    "privacy_note": "I tuoi dati restano sulla tua rete locale — nessun server di terze parti. Tutto rimane tra i tuoi dispositivi.",
     "host": "Host",
     "join": "Unisciti",
     "device_found": "Dispositivo Trovato!",

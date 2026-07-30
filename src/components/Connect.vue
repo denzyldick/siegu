@@ -27,11 +27,60 @@
         min-width="350"
         max-width="400"
       >
+        <div class="d-flex justify-center mb-4">
+          <svg viewBox="0 0 240 90" width="200" height="75" class="connect-illustration">
+            <!-- Desktop -->
+            <rect x="8" y="12" width="52" height="38" rx="3" fill="none" stroke="#18181b" stroke-width="2"/>
+            <rect x="13" y="17" width="42" height="28" rx="1" fill="#18181b" opacity="0.06"/>
+            <rect x="8" y="50" width="52" height="5" rx="1" fill="none" stroke="#18181b" stroke-width="2"/>
+            <rect x="13" y="55" width="42" height="3" rx="1" fill="none" stroke="#18181b" stroke-width="1.5"/>
+            <!-- Lock on desktop -->
+            <rect x="30" y="24" width="8" height="6" rx="1.5" fill="none" stroke="#22c55e" stroke-width="1.5"/>
+            <path d="M30,27 v-3 a4,4 0 0,1 8,0 v3" fill="none" stroke="#22c55e" stroke-width="1.5"/>
+            <circle cx="34" cy="29" r="1.2" fill="#22c55e"/>
+
+            <!-- Direct connection line -->
+            <line x1="64" y1="35" x2="166" y2="35" stroke="#18181b" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.3"/>
+            <line x1="64" y1="45" x2="166" y2="45" stroke="#18181b" stroke-width="1" stroke-dasharray="3,4" opacity="0.15"/>
+
+            <!-- Animated data dots -->
+            <circle r="4" fill="#22c55e" opacity="0.8">
+              <animateMotion dur="2.5s" repeatCount="indefinite" path="M64,35 L166,35"/>
+            </circle>
+            <circle r="3" fill="#22c55e" opacity="0.5">
+              <animateMotion dur="2.5s" repeatCount="indefinite" begin="0.8s" path="M64,35 L166,35"/>
+            </circle>
+            <circle r="2" fill="#22c55e" opacity="0.3">
+              <animateMotion dur="2.5s" repeatCount="indefinite" begin="1.6s" path="M64,35 L166,35"/>
+            </circle>
+
+            <!-- Reverse data dot -->
+            <circle r="3" fill="#a855f7" opacity="0.5">
+              <animateMotion dur="3s" repeatCount="indefinite" path="M166,45 L64,45"/>
+            </circle>
+
+            <!-- Phone -->
+            <rect x="175" y="10" width="24" height="44" rx="4" fill="none" stroke="#18181b" stroke-width="2"/>
+            <rect x="179" y="15" width="16" height="24" rx="1" fill="#18181b" opacity="0.06"/>
+            <circle cx="187" cy="48" r="3" fill="none" stroke="#18181b" stroke-width="1.5"/>
+            <rect x="183" y="11.5" width="8" height="1.5" rx="0.75" fill="#18181b" opacity="0.3"/>
+            <!-- Check on phone -->
+            <path d="M183,26 l3,3 l6,-6" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+            <!-- Labels -->
+            <text x="34" y="72" text-anchor="middle" fill="#71717a" font-size="8" font-family="inherit">This device</text>
+            <text x="187" y="72" text-anchor="middle" fill="#71717a" font-size="8" font-family="inherit">Other device</text>
+          </svg>
+        </div>
+
         <div class="text-h5 font-weight-bold text-zinc-primary mb-2">
           {{ $t('connect.link_device_title') }}
         </div>
         <div class="text-body-2 text-zinc-secondary mb-6">
           {{ $t('connect.link_device_desc') }}
+        </div>
+        <div class="text-caption text-zinc-muted mb-6 px-2" style="line-height: 1.5">
+          {{ $t('connect.privacy_note') }}
         </div>
 
         <div v-if="!started" class="d-flex flex-column align-center mb-6 ga-4">

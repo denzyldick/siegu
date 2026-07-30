@@ -151,6 +151,7 @@
   "connect": {
     "link_device_title": "Link Device",
     "link_device_desc": "Sync your library across your own hardware.",
+    "privacy_note": "Your data stays on your local network — no third-party servers. Everything stays between your devices.",
     "host": "Host",
     "host_desc": "Let other devices discover and connect to your library",
     "join": "Join",

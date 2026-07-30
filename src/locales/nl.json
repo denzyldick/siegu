@@ -296,6 +296,7 @@
   "connect": {
     "link_device_title": "Apparaat koppelen",
     "link_device_desc": "Synchroniseer je bibliotheek op al je hardware.",
+    "privacy_note": "Je gegevens blijven op je lokale netwerk — geen servers van derden. Alles blijft tussen je apparaten.",
     "host": "Host",
     "join": "Deelnemen",
     "device_found": "Apparaat gevonden!",

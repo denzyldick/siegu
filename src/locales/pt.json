@@ -296,6 +296,7 @@
   "connect": {
     "link_device_title": "Vincular Dispositivo",
     "link_device_desc": "Sincronize sua biblioteca em seu próprio hardware.",
+    "privacy_note": "Seus dados permanecem na sua rede local — sem servidores de terceiros. Tudo fica entre seus dispositivos.",
     "host": "Anfitrião",
     "join": "Entrar",
     "device_found": "Dispositivo Encontrado!",
