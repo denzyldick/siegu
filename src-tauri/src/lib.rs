@@ -3,7 +3,9 @@ pub use common::{emit_log, get_config_path};
 mod commands;
 pub mod common;
 mod file;
+mod mdns_plugin;
 mod ml;
+mod permission_plugin;
 mod tauri_sync_event;
 #[cfg(test)]
 mod test;
@@ -61,6 +63,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(wallpaper_plugin::init())
+        .plugin(mdns_plugin::init())
+        .plugin(permission_plugin::init())
         .setup(|app| {
             if let Err(e) = ffmpeg_next::init() {
                 emit_log(

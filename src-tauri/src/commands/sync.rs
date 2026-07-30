@@ -4,32 +4,54 @@ use crate::transport;
 
 use crate::common::emit_log;
 use siegu_core::mesh_transport::MeshTransport;
-use siegu_core::SavedSession;
+use siegu_core::{PeerDevice, SavedSession};
 use std::sync::Arc;
 use tauri::Manager;
 
-/// Pure business logic — inserts or replaces a device in the database.
-pub fn do_join_network(db: &database::Database, ip: &str, name: &str) {
-    let _ = db.connection.execute(
-        "INSERT OR REPLACE INTO device(ip, name) VALUES(?1, ?2)",
-        (ip, name),
-    );
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct LanHostInfo {
+    pub ip: String,
+    pub port: u16,
 }
 
-/// Pure business logic — removes a device by name from the database.
-pub fn do_remove_device(db: &database::Database, name: &str) -> Result<(), String> {
-    db.connection
-        .execute("DELETE FROM device WHERE name = ?1", [name])
-        .map_err(|e| e.to_string())?;
+/// Returns the first non-loopback IPv4 address on the machine.
+fn get_local_ip() -> Option<String> {
+    let s = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
+    s.connect("8.8.8.8:53").ok()?;
+    let addr = s.local_addr().ok()?;
+    Some(addr.ip().to_string())
+}
+
+/// Pure business logic — inserts or updates a peer device.
+pub fn do_join_network(db: &database::Database, ip: &str, name: &str) {
+    let device_id = uuid::Uuid::new_v4().to_string();
+    db.upsert_peer_device(&PeerDevice {
+        device_id,
+        name: name.to_string(),
+        ip: ip.to_string(),
+        port: 0,
+        device_type: String::new(),
+        os: String::new(),
+        models_enabled: vec![],
+        protocol_version: 1,
+        storage_used: 0,
+        storage_capacity: 0,
+        last_seen: String::new(),
+    });
+}
+
+/// Pure business logic — removes a device by id from the database.
+pub fn do_remove_device(db: &database::Database, id: &str) -> Result<(), String> {
+    db.remove_peer_device(id);
     Ok(())
 }
 
 /// Pure business logic — lists devices and prepends the host device.
 pub fn do_list_devices(db: &database::Database) -> Vec<database::DeviceInfo> {
-    let mut devices = db.list_devices();
-
-    for peer in db.list_peer_devices() {
-        devices.push(database::DeviceInfo {
+    let mut devices: Vec<database::DeviceInfo> = db
+        .list_peer_devices()
+        .into_iter()
+        .map(|peer| database::DeviceInfo {
             id: peer.device_id,
             title: peer.name,
             icon: "mdi-cellphone".to_string(),
@@ -38,8 +60,8 @@ pub fn do_list_devices(db: &database::Database) -> Vec<database::DeviceInfo> {
             photo_count: 0,
             video_count: 0,
             os: peer.os,
-        });
-    }
+        })
+        .collect();
 
     let hostname = std::env::var("HOSTNAME").unwrap_or_else(|_| "localhost".to_string());
     let (photo_count, video_count) = db.get_media_counts();
@@ -75,14 +97,6 @@ pub async fn start_webrtc_session(
     let config_path = get_config_path(&app);
     if config_path.is_empty() {
         return Err("Config error".to_string());
-    }
-
-    let db = database::Database::new(&config_path);
-    let config = db.get_state();
-    let tier = config.get("tier").map(|s| s.as_str()).unwrap_or("free");
-    if tier == "free" && !signalingUrl.contains("127.0.0.1") && !signalingUrl.contains("localhost")
-    {
-        return Err("Free tier does not support remote sync. Use LAN sync instead.".to_string());
     }
 
     let sync_tx = Arc::clone(&state.sync_tx);
@@ -132,7 +146,7 @@ pub async fn start_lan_host(
     mdns_state: tauri::State<'_, crate::MdnsState>,
     room_id: String,
     is_initiator: bool,
-) -> Result<(), String> {
+) -> Result<LanHostInfo, String> {
     let app_handle = app.clone();
     let config_path = get_config_path(&app);
     if config_path.is_empty() {
@@ -152,6 +166,25 @@ pub async fn start_lan_host(
     let port = MeshTransport::start_lan_server(0)
         .await
         .map_err(|e| e.to_string())?;
+
+    let ip = get_local_ip().unwrap_or_else(|| "127.0.0.1".to_string());
+
+    // Firewall check: attempt TCP connect to self
+    if ip != "127.0.0.1" {
+        let addr = format!("{}:{}", ip, port);
+        match std::net::TcpStream::connect_timeout(
+            &addr.parse().unwrap(),
+            std::time::Duration::from_secs(2),
+        ) {
+            Ok(_) => emit_log(&app, format!("TCP self-check OK — {addr} reachable")),
+            Err(e) => emit_log(
+                &app,
+                format!(
+                    "WARNING: Cannot reach own LAN address {addr}. Firewall may block incoming connections: {e}"
+                ),
+            ),
+        }
+    }
 
     let sync_tx = Arc::clone(&state.sync_tx);
 
@@ -203,7 +236,7 @@ pub async fn start_lan_host(
         });
     }
 
-    Ok(())
+    Ok(LanHostInfo { ip, port })
 }
 
 #[tauri::command]
@@ -261,14 +294,14 @@ pub async fn join_network(app: tauri::AppHandle, ip: String, name: String) {
 }
 
 #[tauri::command]
-pub async fn remove_device(app: tauri::AppHandle, name: String) -> Result<(), String> {
+pub async fn remove_device(app: tauri::AppHandle, id: String) -> Result<(), String> {
     use crate::database;
     let path = get_config_path(&app);
     if path.is_empty() {
         return Err("Config error".to_string());
     }
     let db = database::Database::new(&path);
-    do_remove_device(&db, &name)
+    do_remove_device(&db, &id)
 }
 
 #[tauri::command]
@@ -388,9 +421,10 @@ mod tests {
     fn join_network_adds_device() {
         let (db, _dir) = test_db();
         do_join_network(&db, "192.168.1.10", "Phone");
-        let devices = db.list_devices();
-        assert_eq!(devices.len(), 1);
-        assert_eq!(devices[0].title, "Phone");
+        let peers = db.list_peer_devices();
+        assert_eq!(peers.len(), 1);
+        assert_eq!(peers[0].name, "Phone");
+        assert_eq!(peers[0].ip, "192.168.1.10");
     }
 
     #[test]
@@ -398,22 +432,24 @@ mod tests {
         let (db, _dir) = test_db();
         do_join_network(&db, "192.168.1.10", "Phone");
         do_join_network(&db, "192.168.1.11", "Tablet");
-        let devices = db.list_devices();
-        assert_eq!(devices.len(), 2);
+        let peers = db.list_peer_devices();
+        assert_eq!(peers.len(), 2);
     }
 
     #[test]
     fn remove_device() {
         let (db, _dir) = test_db();
         do_join_network(&db, "192.168.1.10", "Phone");
-        do_remove_device(&db, "Phone").unwrap();
-        assert!(db.list_devices().is_empty());
+        let peers = db.list_peer_devices();
+        assert_eq!(peers.len(), 1);
+        do_remove_device(&db, &peers[0].device_id).unwrap();
+        assert!(db.list_peer_devices().is_empty());
     }
 
     #[test]
     fn remove_nonexistent_device_no_error() {
         let (db, _dir) = test_db();
-        do_remove_device(&db, "Ghost").unwrap();
+        do_remove_device(&db, "non-existent-id").unwrap();
     }
 
     #[test]
@@ -434,8 +470,9 @@ mod tests {
         let devices = do_list_devices(&db);
         assert_eq!(devices.len(), 3);
         assert!(devices[0].host);
-        assert_eq!(devices[1].title, "Tablet");
-        assert_eq!(devices[2].title, "Phone");
+        let titles: Vec<&str> = devices.iter().map(|d| d.title.as_str()).collect();
+        assert!(titles.contains(&"Tablet"));
+        assert!(titles.contains(&"Phone"));
     }
 
     #[test]

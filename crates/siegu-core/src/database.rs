@@ -408,10 +408,6 @@ impl Database {
             (),
         );
         let _ = conn.execute(
-            "CREATE TABLE IF NOT EXISTS device(ip STRING, name STRING, offer STRING);",
-            (),
-        );
-        let _ = conn.execute(
             "CREATE TABLE IF NOT EXISTS peer_device(\
              device_id TEXT PRIMARY KEY, name TEXT, ip TEXT, port INTEGER DEFAULT 0, \
              device_type TEXT DEFAULT '', os TEXT DEFAULT '', \
@@ -421,6 +417,13 @@ impl Database {
              );",
             (),
         );
+        // Migrate legacy device table → peer_device, then drop it.
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO peer_device(device_id, name, ip, port, last_seen) \
+             SELECT lower(hex(randomblob(16))), name, ip, 0, datetime('now') FROM device",
+            (),
+        );
+        let _ = conn.execute("DROP TABLE IF EXISTS device", ());
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS faces (photo_id STRING, face_id STRING PRIMARY KEY, crop_path STRING, encoded STRING, embedding BLOB, person_id STRING);", ());
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS people (id STRING PRIMARY KEY, name STRING, embedding BLOB);", ());
         let _ = conn.execute(
@@ -1436,30 +1439,6 @@ impl Database {
         (photo_count, video_count)
     }
 
-    /// List all paired devices.
-    pub fn list_devices(&self) -> Vec<DeviceInfo> {
-        let mut results = Vec::new();
-        if let Ok(mut stmt) = self.connection.prepare("SELECT ip, name FROM device") {
-            if let Ok(iter) = stmt.query_map([], |row| {
-                Ok(DeviceInfo {
-                    id: row.get::<_, String>(0)?, // Using IP as ID for now or it could be UUID
-                    title: row.get::<_, String>(1)?,
-                    icon: "mdi-cellphone".to_string(), // Default icon
-                    up_to_date: true,
-                    host: false,
-                    photo_count: 0,
-                    video_count: 0,
-                    os: "unknown".to_string(),
-                })
-            }) {
-                for d in iter.flatten() {
-                    results.push(d);
-                }
-            }
-        }
-        results
-    }
-
     /// Get all named people with their stored face embeddings.
     pub fn get_all_people_with_embeddings(&self) -> Vec<(String, Vec<f32>)> {
         let mut results = Vec::new();
@@ -2051,16 +2030,23 @@ mod tests {
     }
 
     #[test]
-    fn test_device_list() {
+    fn test_peer_device_upsert_and_list() {
         let db = test_db();
-        db.connection
-            .execute(
-                "INSERT OR REPLACE INTO device(ip, name) VALUES(?1, ?2)",
-                ("192.168.1.1", "test-device"),
-            )
-            .unwrap();
-        let devices = db.list_devices();
-        assert!(devices.iter().any(|d| d.title == "test-device"));
+        db.upsert_peer_device(&PeerDevice {
+            device_id: "test-id".to_string(),
+            name: "test-device".to_string(),
+            ip: "192.168.1.1".to_string(),
+            port: 0,
+            device_type: String::new(),
+            os: "android".to_string(),
+            models_enabled: vec![],
+            protocol_version: 1,
+            storage_used: 0,
+            storage_capacity: 0,
+            last_seen: String::new(),
+        });
+        let peers = db.list_peer_devices();
+        assert!(peers.iter().any(|p| p.name == "test-device"));
     }
 
     #[test]

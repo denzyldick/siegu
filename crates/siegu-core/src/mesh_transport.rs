@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc::UnboundedSender;
@@ -129,23 +130,28 @@ impl MeshTransport {
         ));
         self.event.on_state_change("Connecting to signaling...");
 
-        let is_remote = self.signaling_url.contains("wss://")
-            || (self.signaling_url.contains("ws://")
-                && !self.signaling_url.contains("127.0.0.1")
-                && !self.signaling_url.contains("localhost"));
+        let is_remote = self.signaling_url.contains("wss://");
 
         let base_url = self.signaling_url.trim_end_matches('/');
 
-        let (ws_stream, _) = if is_remote {
-            connect_async(base_url.to_string().into_client_request()?).await
+        let connect_fut = if is_remote {
+            connect_async(base_url.to_string().into_client_request()?)
         } else {
-            connect_async(format!("{}/{}", base_url, self.room_id).into_client_request()?).await
-        }
-        .map_err(|e| {
-            let err = format!("Signaling connection failed: {e}");
-            self.event.on_state_change(&err);
-            err
-        })?;
+            connect_async(format!("{}/{}", base_url, self.room_id).into_client_request()?)
+        };
+
+        let (ws_stream, _) = tokio::time::timeout(Duration::from_secs(10), connect_fut)
+            .await
+            .map_err(|_| {
+                let err = "Signaling connection failed: timed out after 10s".to_string();
+                self.event.on_state_change(&err);
+                err
+            })?
+            .map_err(|e| {
+                let err = format!("Signaling connection failed: {e}");
+                self.event.on_state_change(&err);
+                err
+            })?;
 
         self.event.on_log("Connected to signaling server!");
         if !is_remote {
@@ -186,13 +192,9 @@ impl MeshTransport {
         let pc = Arc::new(api.new_peer_connection(config).await?);
 
         let event = Arc::clone(&self.event);
-        let config_path = self.config_path.clone();
-        let room_id = self.room_id.clone();
 
         pc.on_peer_connection_state_change(Box::new(move |s: RTCPeerConnectionState| {
             let event = Arc::clone(&event);
-            let config_path = config_path.clone();
-            let room_id = room_id.clone();
             Box::pin(async move {
                 event.on_log(&format!("Peer Connection State changed to: {s:?}"));
                 let status = match s {
@@ -204,14 +206,6 @@ impl MeshTransport {
                     _ => "Awaiting connection...",
                 };
                 event.on_state_change(status);
-                if s == RTCPeerConnectionState::Connected {
-                    let db = Database::new(&config_path);
-                    let peer_name = format!("Peer ({})", &room_id[..room_id.len().min(8)]);
-                    let _ = db.connection.execute(
-                        "INSERT OR REPLACE INTO device(ip, name) VALUES(?1, ?2)",
-                        (&room_id, &peer_name),
-                    );
-                }
             })
         }));
 

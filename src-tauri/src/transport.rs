@@ -46,9 +46,9 @@ pub fn create_transport(
         .unwrap_or_else(|_| "siegu-device".to_string());
     let models_enabled = Vec::new();
 
-    let sync_tx = external_tx.clone().unwrap_or_else(|| {
-        Arc::new(tokio::sync::Mutex::new(None))
-    });
+    let sync_tx = external_tx
+        .clone()
+        .unwrap_or_else(|| Arc::new(tokio::sync::Mutex::new(None)));
     let event = Arc::new(super::tauri_sync_event::TauriSyncEvent {
         app: app.clone(),
         config_path: config_path.clone(),

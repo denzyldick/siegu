@@ -43,7 +43,13 @@ impl SyncEvent for CliSyncEvent {
         eprintln!("[sync] Error: {error}");
     }
 
-    fn on_peer_connected(&self, device_id: String, device_name: String, models_enabled: Vec<String>, protocol_version: u8) {
+    fn on_peer_connected(
+        &self,
+        device_id: String,
+        device_name: String,
+        models_enabled: Vec<String>,
+        protocol_version: u8,
+    ) {
         let db = Database::new(&self.config_path);
         db.upsert_peer_device(&PeerDevice {
             device_id,
@@ -67,7 +73,12 @@ impl SyncEvent for CliSyncEvent {
 
     fn on_device_registered(&self, _db: &Database) {}
 
-    fn on_metadata_updated(&self, _photo_id: &str, _caption: Option<&str>, _aesthetics_score: Option<f64>) {
+    fn on_metadata_updated(
+        &self,
+        _photo_id: &str,
+        _caption: Option<&str>,
+        _aesthetics_score: Option<f64>,
+    ) {
         let msg = siegu_core::SyncMessage::MetadataUpdate {
             photo_id: _photo_id.to_string(),
             caption: _caption.map(|c| c.to_string()),
@@ -693,12 +704,16 @@ async fn cmd_mesh_host(port: u16, config_dir: &Path) {
     println!("Starting LAN mesh host...");
     println!("Room ID: {room_id}");
 
-    let actual_port = MeshTransport::start_lan_server(port).await
+    let actual_port = MeshTransport::start_lan_server(port)
+        .await
         .expect("Failed to start LAN signaling server");
     println!("Signaling server on port {actual_port}");
 
     let sync_tx = Arc::new(tokio::sync::Mutex::new(None));
-    let event = Arc::new(CliSyncEvent { config_path: config_path.clone(), sync_tx: Arc::clone(&sync_tx) });
+    let event = Arc::new(CliSyncEvent {
+        config_path: config_path.clone(),
+        sync_tx: Arc::clone(&sync_tx),
+    });
 
     let transport = MeshTransport::new(
         room_id.clone(),
@@ -713,7 +728,8 @@ async fn cmd_mesh_host(port: u16, config_dir: &Path) {
 
     let daemon = match siegu_core::mdns::create_daemon() {
         Ok(d) => {
-            if let Err(e) = siegu_core::mdns::register_service(&d, &hostname, actual_port, &room_id) {
+            if let Err(e) = siegu_core::mdns::register_service(&d, &hostname, actual_port, &room_id)
+            {
                 eprintln!("mDNS registration failed: {e}");
             } else {
                 println!("mDNS registered as {hostname}");
@@ -772,7 +788,10 @@ async fn cmd_mesh_join(room: &str, config_dir: &Path) {
     println!("Signaling: {signaling_url}");
 
     let sync_tx2 = Arc::new(tokio::sync::Mutex::new(None));
-    let event = Arc::new(CliSyncEvent { config_path: config_path.clone(), sync_tx: Arc::clone(&sync_tx2) });
+    let event = Arc::new(CliSyncEvent {
+        config_path: config_path.clone(),
+        sync_tx: Arc::clone(&sync_tx2),
+    });
 
     let transport = MeshTransport::new(
         room.to_string(),
@@ -825,7 +844,10 @@ fn cmd_mesh_status(config_dir: &Path) {
     if !peers.is_empty() {
         println!("\nKnown peer devices:");
         for p in &peers {
-            println!("  {} ({}) - last seen: {}", p.name, p.device_id, p.last_seen);
+            println!(
+                "  {} ({}) - last seen: {}",
+                p.name, p.device_id, p.last_seen
+            );
         }
     }
     let state = db.get_state();
@@ -853,8 +875,16 @@ fn cmd_mesh_quota(config_dir: &Path) {
         0.0
     };
     println!("Storage usage:");
-    println!("  Used:  {} bytes ({:.2} MB)", used, used as f64 / 1_048_576.0);
-    println!("  Quota: {} bytes ({:.2} MB)", quota, quota as f64 / 1_048_576.0);
+    println!(
+        "  Used:  {} bytes ({:.2} MB)",
+        used,
+        used as f64 / 1_048_576.0
+    );
+    println!(
+        "  Quota: {} bytes ({:.2} MB)",
+        quota,
+        quota as f64 / 1_048_576.0
+    );
     println!("  Usage: {:.1}%", pct);
 
     if pct > 90.0 {

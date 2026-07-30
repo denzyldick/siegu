@@ -133,7 +133,12 @@ pub trait SyncEvent: Send + Sync {
     );
     fn on_peer_disconnected(&self, peer_id: String);
     fn on_device_registered(&self, db: &Database);
-    fn on_metadata_updated(&self, photo_id: &str, caption: Option<&str>, aesthetics_score: Option<f64>);
+    fn on_metadata_updated(
+        &self,
+        photo_id: &str,
+        caption: Option<&str>,
+        aesthetics_score: Option<f64>,
+    );
     fn get_config_path(&self) -> String;
     fn get_sync_path(&self) -> Option<String>;
     fn get_directories(&self) -> Vec<String>;

@@ -68,7 +68,12 @@ impl AnalysisCallbacks for TauriCallbacks {
         }
     }
 
-    fn on_metadata_updated(&self, photo_id: &str, caption: Option<&str>, aesthetics_score: Option<f64>) {
+    fn on_metadata_updated(
+        &self,
+        photo_id: &str,
+        caption: Option<&str>,
+        aesthetics_score: Option<f64>,
+    ) {
         emit_log(&self.app, format!("Metadata updated for {photo_id}"));
         if let Ok(g) = self.sync_tx.try_lock() {
             if let Some(tx) = g.as_ref() {

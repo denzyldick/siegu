@@ -43,7 +43,13 @@ impl AnalysisCallbacks for NoopCallbacks {
         _progress_model: Option<&str>,
     ) {
     }
-    fn on_metadata_updated(&self, _photo_id: &str, _caption: Option<&str>, _aesthetics_score: Option<f64>) {}
+    fn on_metadata_updated(
+        &self,
+        _photo_id: &str,
+        _caption: Option<&str>,
+        _aesthetics_score: Option<f64>,
+    ) {
+    }
     fn on_scan_complete(&self) {}
     fn on_progress(&self, _completed: usize, _total: usize, _avg_ms: f64) {}
     fn on_model_status(&self, _model: &str, _status: &str, _pending: usize, _total: usize) {}
