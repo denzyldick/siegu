@@ -303,9 +303,6 @@
     "link_established": "Verbinding gemaakt!",
     "ready_to_sync": "Klaar om te synchroniseren.",
     "manual_phrase": "Handmatige zin",
-    "scan_qr": "Scan QR-code",
-    "scan_qr_desc": "Richt je camera op de QR-code van de host.",
-    "open_camera": "Camera openen",
     "or_enter_manually": "Of handmatig invoeren",
     "phrase_placeholder": "Voer 4-woordige zin in",
     "link_device_button": "Apparaat koppelen",
@@ -330,10 +327,8 @@
     "select_device": "Select a device to connect to",
     "device_on_network": "On your network",
     "connect_fromAnywhere": "Connect from anywhere with Internet Sync — coming soon",
-    "host_desc": "Share your QR code so other devices can connect to yours",
-    "join_desc": "Scan a QR code or pick a device on your network to connect",
-    "camera_denied": "Camera permission denied. Grant access in settings or enter the code manually.",
-    "camera_unavailable": "Could not access camera. Enter the code manually below."
+    "host_desc": "Let other devices discover and connect to your library",
+    "join_desc": "Pick a device on your network to connect"
   },
   "media_viewer": {
     "metadata": "Metadata",

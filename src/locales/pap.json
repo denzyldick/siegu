@@ -303,9 +303,6 @@
     "link_established": "Enlace establesé!",
     "ready_to_sync": "Klá pa sinkronisá.",
     "manual_phrase": "Frase manual",
-    "scan_qr": "Scan kódigo QR",
-    "scan_qr_desc": "Apuntá bo cámara na e kódigo QR di e host.",
-    "open_camera": "Habri cámara",
     "or_enter_manually": "Of skirbi manualmente",
     "phrase_placeholder": "Skirbi un frase di 4 palabra",
     "link_device_button": "Vincular Aparato",
@@ -330,10 +327,8 @@
     "select_device": "Select a device to connect to",
     "device_on_network": "On your network",
     "connect_fromAnywhere": "Connect from anywhere with Internet Sync — coming soon",
-    "host_desc": "Share your QR code so other devices can connect to yours",
-    "join_desc": "Scan a QR code or pick a device on your network to connect",
-    "camera_denied": "Camera permission denied. Grant access in settings or enter the code manually.",
-    "camera_unavailable": "Could not access camera. Enter the code manually below."
+    "host_desc": "Let other devices discover and connect to your library",
+    "join_desc": "Pick a device on your network to connect"
   },
   "media_viewer": {
     "metadata": "Metadato",

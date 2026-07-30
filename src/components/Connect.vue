@@ -76,10 +76,7 @@
 
           <ConnectHostView
             v-if="mode === 'host'"
-            :uuid="uuid"
             :passphrase="passphrase"
-            :peer-joined="peerJoined"
-            :is-connected="isConnected"
             :host-ip="hostIp"
             :host-port="hostPort"
           />
@@ -202,10 +199,7 @@
 
         <ConnectHostView
           v-if="mode === 'host'"
-          :uuid="uuid"
           :passphrase="passphrase"
-          :peer-joined="peerJoined"
-          :is-connected="isConnected"
           :host-ip="hostIp"
           :host-port="hostPort"
         />
@@ -298,12 +292,10 @@ const dialog = ref(false)
 const started = ref(false)
 const {
   mode,
-  uuid,
   passphrase,
   joinPassphrase,
   connectionStatus,
   isConnected,
-  peerJoined,
   loading,
   syncing,
   disconnecting,
