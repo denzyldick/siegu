@@ -145,11 +145,14 @@
     "processing_bg": "Processing in background...",
     "received_memory": "Received new memory: {id}",
     "synced_memory": "Synced memory {id} to device",
+    "status": "Syncing",
+    "paused": "Sync paused — device offline",
     "error_status": "Error",
-    "folder_init_error": "Failed to initialize sync folder: {error}"
+    "folder_init_error": "Failed to initialize sync folder: {error}",
+    "reconnect": "Reconnect"
   },
   "connect": {
-	  "joining": "joining",
+    "joining": "Joining...",
     "link_device_title": "Connect Devices",
     "link_device_desc": "Sync your library across your own hardware.",
     "privacy_note": "Your data stays on your local network — no third-party servers. Everything stays between your devices.",
@@ -180,7 +183,6 @@
     "awaiting_webrtc": "Signaling channel requested. Awaiting WebRTC connection.",
     "error_connecting": "Error connecting: {error}",
     "joining_room": "Joining room...",
-    "joining": "Joining...",
     "error_joining": "Error joining: {error}",
     "start_syncing": "Start Syncing",
     "syncing": "Syncing...",

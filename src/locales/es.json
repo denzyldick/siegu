@@ -78,7 +78,10 @@
     "received_memory": "Nuevo recuerdo recibido: {id}",
     "synced_memory": "Recuerdo {id} sincronizado al dispositivo",
     "error_status": "Error",
-    "folder_init_error": "Error al inicializar la carpeta de sincronización: {error}"
+    "folder_init_error": "Error al inicializar la carpeta de sincronización: {error}",
+    "status": "Sincronizando",
+    "paused": "Sincronización pausada: dispositivo sin conexión",
+    "reconnect": "Reconectar"
   },
   "filters": {
     "favorites_only": "Solo favoritos",
@@ -294,7 +297,7 @@
     "alt_thumb": "Miniatura de foto"
   },
   "connect": {
-	  "joining":"esperando",
+    "joining": "esperando",
     "link_device_title": "Conectar dispositivos",
     "link_device_desc": "Sincroniza tu biblioteca en tu propio hardware.",
     "privacy_note": "Tus datos permanecen en tu red local — sin servidores de terceros. Todo queda entre tus dispositivos.",

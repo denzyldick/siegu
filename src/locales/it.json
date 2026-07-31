@@ -78,7 +78,10 @@
     "received_memory": "Nuovo ricordo ricevuto: {id}",
     "synced_memory": "Ricordo {id} sincronizzato sul dispositivo",
     "error_status": "Errore",
-    "folder_init_error": "Impossibile inizializzare la cartella di sincronizzazione: {error}"
+    "folder_init_error": "Impossibile inizializzare la cartella di sincronizzazione: {error}",
+    "status": "Sincronizzazione",
+    "paused": "Sincronizzazione in pausa — dispositivo offline",
+    "reconnect": "Riconnetti"
   },
   "filters": {
     "favorites_only": "Solo preferiti",
@@ -294,7 +297,7 @@
     "alt_thumb": "Miniatura foto"
   },
   "connect": {
-	  "joining":"In attesa",
+    "joining": "In attesa",
     "link_device_title": "Collega Dispositivo",
     "link_device_desc": "Sincronizza la tua libreria sul tuo hardware.",
     "privacy_note": "I tuoi dati restano sulla tua rete locale — nessun server di terze parti. Tutto rimane tra i tuoi dispositivi.",

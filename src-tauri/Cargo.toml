@@ -76,6 +76,7 @@ ffmpeg-next = "8.1.0"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
+tauri-plugin-single-instance = "2"
 wallpaper = "3.2.0"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios", target_os = "windows")))'.dependencies]

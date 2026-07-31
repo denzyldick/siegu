@@ -78,7 +78,10 @@
     "received_memory": "Neue Erinnerung erhalten: {id}",
     "synced_memory": "Erinnerung {id} auf Gerät synchronisiert",
     "error_status": "Fehler",
-    "folder_init_error": "Sync-Ordner konnte nicht initialisiert werden: {error}"
+    "folder_init_error": "Sync-Ordner konnte nicht initialisiert werden: {error}",
+    "status": "Synchronisiert",
+    "paused": "Sync pausiert – Gerät offline",
+    "reconnect": "Neu verbinden"
   },
   "filters": {
     "favorites_only": "Nur Favoriten",
@@ -294,7 +297,7 @@
     "alt_thumb": "Fotominiatur"
   },
   "connect": {
-	  "joining":"Wartend",
+    "joining": "Wartend",
     "link_device_title": "Geräte verbinden",
     "link_device_desc": "Synchronisiere deine Bibliothek auf deiner eigenen Hardware.",
     "privacy_note": "Deine Daten bleiben in deinem lokalen Netzwerk — keine Drittanbieter-Server. Alles bleibt zwischen deinen Geräten.",

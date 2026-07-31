@@ -68,6 +68,7 @@ export function useConnect() {
 
   function handleSyncProgress(payload: {
     status: string
+    phase?: 'idle' | 'syncing' | 'completed'
     progress: number
     items_completed: number
     items_total: number
@@ -78,10 +79,9 @@ export function useConnect() {
       items_completed: payload.items_completed ?? 0,
       items_total: payload.items_total ?? 0,
     }
-    if (payload.status.toLowerCase().includes('syncing')) {
+    if (payload.phase === 'syncing') {
       syncing.value = true
-    }
-    if (payload.status === 'Up to date' || payload.status.startsWith('Finished')) {
+    } else if (payload.phase === 'completed') {
       syncing.value = false
     }
   }
@@ -118,17 +118,6 @@ export function useConnect() {
       return `ws://${hostIp.value}:${hostPort.value}`
     }
     return import.meta.env.VITE_SIGNALING_URL || 'wss://siegu.io/ws'
-  }
-
-  async function startListening(roomId: string): Promise<void> {
-    connectionStatus.value = t('connect.waiting_for_partner')
-    const signalingUrl = getSignalingUrl()
-    try {
-      await startWebrtcSession(roomId, false, signalingUrl)
-      connectionStatus.value = t('connect.awaiting_webrtc')
-    } catch (error) {
-      connectionStatus.value = t('connect.error_connecting', { error })
-    }
   }
 
   async function initialize(): Promise<void> {

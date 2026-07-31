@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSyncStore } from '@/stores/sync'
+import { autoReconnect } from '@/services/tauri'
 
 const { t } = useI18n()
 const syncStore = useSyncStore()
+const reconnecting = ref(false)
+
+const isOffline = computed(() => syncStore.connection === 'offline')
 
 const isVisible = computed(() => {
+  if (isOffline.value) return true
   return (
     syncStore.status !== 'idle' &&
     syncStore.status !== 'completed' &&
@@ -22,6 +27,16 @@ const displayProgress = computed(() => {
 function dismiss(): void {
   syncStore.status = 'idle'
 }
+
+async function reconnect(): Promise<void> {
+  if (reconnecting.value) return
+  reconnecting.value = true
+  try {
+    await autoReconnect()
+  } finally {
+    reconnecting.value = false
+  }
+}
 </script>
 
 <template>
@@ -32,14 +47,14 @@ function dismiss(): void {
         color="surface"
       >
         <v-progress-circular
-          v-if="displayProgress === 0 || displayProgress === 100"
+          v-if="!isOffline && (displayProgress === 0 || displayProgress === 100)"
           indeterminate
           size="18"
           width="2"
           color="black"
           class="mr-3"
         />
-        <div v-else class="mr-3 d-flex align-center">
+        <div v-else-if="!isOffline" class="mr-3 d-flex align-center">
           <v-progress-circular
             :model-value="displayProgress"
             size="22"
@@ -49,14 +64,30 @@ function dismiss(): void {
             <span style="font-size: 8px; font-weight: bold">{{ displayProgress }}</span>
           </v-progress-circular>
         </div>
+        <v-icon v-else color="warning" size="18" class="mr-3">mdi-pause-circle-outline</v-icon>
         <div
           class="text-caption font-weight-bold text-zinc-primary text-truncate pr-2"
           style="max-width: 220px"
         >
-          {{ t('sync.status') }} {{ displayProgress }}%
+          {{ isOffline ? t('sync.paused') : `${t('sync.status')} ${displayProgress}%` }}
         </div>
-        <v-divider vertical class="mx-2 opacity-10" length="16" />
+        <template v-if="isOffline">
+          <v-divider vertical class="mx-2 opacity-10" length="16" />
+          <v-btn
+            variant="flat"
+            color="black"
+            size="small"
+            class="text-none text-caption px-2"
+            :loading="reconnecting"
+            @click="reconnect"
+          >
+            <v-icon start size="14">mdi-refresh</v-icon>
+            {{ t('sync.reconnect') }}
+          </v-btn>
+        </template>
+        <v-divider v-else vertical class="mx-2 opacity-10" length="16" />
         <v-btn
+          v-if="!isOffline"
           icon="mdi-close"
           variant="text"
           size="x-small"

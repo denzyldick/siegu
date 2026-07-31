@@ -47,6 +47,7 @@ const syncStatusText = computed(() => {
     </div>
 
     <v-text-field
+      v-if="!isConnected"
       v-model="localValue"
       :placeholder="t('connect.phrase_placeholder')"
       variant="solo-filled"
@@ -57,17 +58,17 @@ const syncStatusText = computed(() => {
       class="text-center join-passphrase"
       style="width: 100%; min-width: 280px"
       @keyup.enter="emit('join', hostIp, String(hostPort))"
-      :disabled="loading || isConnected"
+      :disabled="loading"
     ></v-text-field>
 
     <v-btn
-      v-if="!showSyncButton"
+      v-if="!showSyncButton && !isConnected"
       variant="flat"
       color="black"
       @click="emit('join', hostIp, String(hostPort))"
       class="siegu-btn py-6"
       block
-      :disabled="loading || !modelValue || isConnected"
+      :disabled="loading || !modelValue"
     >
       <div v-if="loading" class="d-flex align-center">
         <v-progress-circular indeterminate size="18" width="2" color="white" class="mr-3" />

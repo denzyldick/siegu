@@ -5,6 +5,8 @@ import { useAppStore } from '@/stores/app'
 import { useScanStore } from '@/stores/scan'
 import { useModelsStore } from '@/stores/models'
 import { useUiStore } from '@/stores/ui'
+import { useSyncStore } from '@/stores/sync'
+import { autoReconnect } from '@/services/tauri'
 import AppDock from '@/components/layout/AppDock.vue'
 import AppToolbar from '@/components/layout/AppToolbar.vue'
 import ProgressBanner from '@/components/layout/ProgressBanner.vue'
@@ -66,7 +68,21 @@ onMounted(async () => {
       console.error('[App] loadModels failed:', e)
     }
   }
+
+  if (!appStore.isNewInstall) {
+    void tryAutoReconnect()
+  }
 })
+
+async function tryAutoReconnect(): Promise<void> {
+  const syncStore = useSyncStore()
+  try {
+    if (syncStore.connection === 'connected') return
+    await autoReconnect()
+  } catch (e) {
+    console.error('[App] autoReconnect failed:', e)
+  }
+}
 
 function handleSearch(_query: string): void {
   uiStore.setPage('home')

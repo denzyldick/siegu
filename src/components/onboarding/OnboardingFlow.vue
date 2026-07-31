@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useModelsStore } from '@/stores/models'
+import { useUiStore } from '@/stores/ui'
 import Setting from '@/components/Setting.vue'
 import FolderPicker from '@/components/FolderPicker.vue'
 import Connect from '@/components/Connect.vue'
@@ -11,6 +12,7 @@ import Greet from '@/components/Greet.vue'
 const { t } = useI18n()
 const appStore = useAppStore()
 const modelsStore = useModelsStore()
+const uiStore = useUiStore()
 
 const step = ref<'greet' | 'folders' | 'models' | 'sync' | 'finalize'>('greet')
 const syncPath = ref('')
@@ -42,7 +44,7 @@ async function handleSetSyncPath(path: string): Promise<void> {
 
 async function finishSetupAndScan(): Promise<void> {
   appStore.completeOnboarding()
-  if (deviceConnected.value) return
+  uiStore.setPage('home')
   setTimeout(() => appStore.startTour(), 1500)
   setTimeout(() => appStore.startScan(), 500)
 }
@@ -135,6 +137,7 @@ async function finishSetupAndScan(): Promise<void> {
               :embedded="true"
               :initial-mode="connectionMode"
               :hide-mode-toggle="true"
+              :keep-session-on-unmount="true"
               @connected="deviceConnected = true"
               @mode-change="connectionMode = $event"
             />
@@ -151,7 +154,7 @@ async function finishSetupAndScan(): Promise<void> {
 
           <div class="d-flex flex-column ga-3">
             <v-btn
-              v-if="!showConnectUI"
+              v-if="!showConnectUI && !deviceConnected"
               block color="black" height="56" class="siegu-btn"
               @click="showConnectUI = true"
             >
@@ -159,14 +162,14 @@ async function finishSetupAndScan(): Promise<void> {
               {{ t('onboarding.link_device') }}
             </v-btn>
             <v-btn
-              v-if="!showConnectUI"
+              v-if="!showConnectUI && !deviceConnected"
               block color="black" height="56" class="siegu-btn"
               @click="goToStep('finalize')"
             >
               {{ t('onboarding.skip') }}
             </v-btn>
             <v-btn
-              v-if="showConnectUI && deviceConnected"
+              v-if="deviceConnected"
               block color="black" height="56" class="siegu-btn"
               @click="finishSetupAndScan"
             >

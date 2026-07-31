@@ -32,6 +32,7 @@ export interface DiscoveredHost {
   name: string
   ip: string
   port: number
+  room_id?: string
 }
 
 export interface PeerDevice {

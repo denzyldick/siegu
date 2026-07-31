@@ -78,7 +78,10 @@
     "received_memory": "Nouveau souvenir reçu : {id}",
     "synced_memory": "Souvenir {id} synchronisé vers l'appareil",
     "error_status": "Erreur",
-    "folder_init_error": "Échec d'initialisation du dossier de synchronisation : {error}"
+    "folder_init_error": "Échec d'initialisation du dossier de synchronisation : {error}",
+    "status": "Synchronisation",
+    "paused": "Synchronisation en pause — appareil hors ligne",
+    "reconnect": "Reconnecter"
   },
   "filters": {
     "favorites_only": "Favoris uniquement",
@@ -294,7 +297,7 @@
     "alt_thumb": "Vignette photo"
   },
   "connect": {
-	  "joining":"En attente",
+    "joining": "En attente",
     "link_device_title": "Lier un appareil",
     "link_device_desc": "Synchronisez votre bibliothèque sur votre propre matériel.",
     "privacy_note": "Vos données restent sur votre réseau local — aucun serveur tiers. Tout reste entre vos appareils.",

@@ -171,6 +171,11 @@
           <ConnectHostView
             v-if="mode === 'host'"
             :passphrase="passphrase"
+            :is-connected="isConnected"
+            :syncing="syncing"
+            :items-completed="syncProgress.items_completed"
+            :items-total="syncProgress.items_total"
+            :peer-name="peerList[0]?.name ?? ''"
           />
 
           <ConnectJoinView
@@ -283,6 +288,11 @@
         <ConnectHostView
           v-if="mode === 'host'"
           :passphrase="passphrase"
+          :is-connected="isConnected"
+          :syncing="syncing"
+          :items-completed="syncProgress.items_completed"
+          :items-total="syncProgress.items_total"
+          :peer-name="peerList[0]?.name ?? ''"
         />
 
         <ConnectJoinView
@@ -355,11 +365,13 @@ const props = withDefaults(
     embedded?: boolean
     initialMode?: 'host' | 'join'
     hideModeToggle?: boolean
+    keepSessionOnUnmount?: boolean
   }>(),
   {
     embedded: false,
     initialMode: 'host',
     hideModeToggle: false,
+    keepSessionOnUnmount: false,
   },
 )
 
@@ -475,7 +487,9 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  disconnectSession()
+  if (!props.keepSessionOnUnmount) {
+    disconnectSession()
+  }
   stopEventListeners()
 })
 </script>

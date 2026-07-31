@@ -78,7 +78,10 @@
     "received_memory": "Memoria nobo risibí: {id}",
     "synced_memory": "Memoria {id} sinkronisá na aparato",
     "error_status": "Error",
-    "folder_init_error": "No por a inisialisa karpeta di sinkronisashon: {error}"
+    "folder_init_error": "No por a inisialisa karpeta di sinkronisashon: {error}",
+    "status": "Sinkronisá",
+    "paused": "Sinkronisashon pausá — aparato offline",
+    "reconnect": "Rekonektá"
   },
   "filters": {
     "favorites_only": "Solamente faboritonan",
@@ -294,7 +297,7 @@
     "alt_thumb": "Miniatura di foto"
   },
   "connect": {
-	  "joining":"Wardando",
+    "joining": "Wardando",
     "link_device_title": "Vincular Aparato",
     "link_device_desc": "Sinkronisá bo biblioteka riba bo propio hardware.",
     "privacy_note": "Bo data keda riba bo red lokal — niun server di tercero. Tur kos keda entre bo aparatonan.",

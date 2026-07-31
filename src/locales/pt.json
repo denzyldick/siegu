@@ -78,7 +78,10 @@
     "received_memory": "Nova memória recebida: {id}",
     "synced_memory": "Memória {id} sincronizada no dispositivo",
     "error_status": "Erro",
-    "folder_init_error": "Falha ao inicializar a pasta de sincronização: {error}"
+    "folder_init_error": "Falha ao inicializar a pasta de sincronização: {error}",
+    "status": "Sincronizando",
+    "paused": "Sincronização pausada — dispositivo offline",
+    "reconnect": "Reconectar"
   },
   "filters": {
     "favorites_only": "Apenas favoritos",
@@ -294,7 +297,7 @@
     "alt_thumb": "Miniatura de foto"
   },
   "connect": {
-	"joining": "Adesão",
+    "joining": "Adesão",
     "link_device_title": "Vincular Dispositivo",
     "link_device_desc": "Sincronize sua biblioteca em seu próprio hardware.",
     "privacy_note": "Seus dados permanecem na sua rede local — sem servidores de terceiros. Tudo fica entre seus dispositivos.",

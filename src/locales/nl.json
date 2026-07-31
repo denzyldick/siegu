@@ -78,7 +78,10 @@
     "received_memory": "Nieuwe herinnering ontvangen: {id}",
     "synced_memory": "Herinnering {id} gesynchroniseerd naar apparaat",
     "error_status": "Fout",
-    "folder_init_error": "Kan synchronisatiemap niet initialiseren: {error}"
+    "folder_init_error": "Kan synchronisatiemap niet initialiseren: {error}",
+    "status": "Synchroniseren",
+    "paused": "Sync onderbroken — apparaat offline",
+    "reconnect": "Opnieuw verbinden"
   },
   "filters": {
     "favorites_only": "Alleen favorieten",
@@ -294,7 +297,7 @@
     "alt_thumb": "Fotominiatuur"
   },
   "connect": {
-	  "joining":"Wachtend",
+    "joining": "Wachtend",
     "link_device_title": "Apparaat koppelen",
     "link_device_desc": "Synchroniseer je bibliotheek op al je hardware.",
     "privacy_note": "Je gegevens blijven op je lokale netwerk — geen servers van derden. Alles blijft tussen je apparaten.",

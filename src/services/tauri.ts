@@ -233,6 +233,10 @@ export async function requestStartSync(): Promise<void> {
   await call<unknown>('request_start_sync')
 }
 
+export async function autoReconnect(): Promise<boolean> {
+  return call<boolean>('auto_reconnect')
+}
+
 export async function listDevices(): Promise<Array<{
   id: string
   title: string
