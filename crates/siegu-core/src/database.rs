@@ -426,7 +426,7 @@ impl Database {
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS faces (photo_id STRING, face_id STRING PRIMARY KEY, crop_path STRING, encoded STRING, embedding BLOB, person_id STRING);", ());
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS people (id STRING PRIMARY KEY, name STRING, embedding BLOB);", ());
         let _ = conn.execute(
-            "CREATE TABLE IF NOT EXISTS config(key STRING, value STRING);",
+            "CREATE TABLE IF NOT EXISTS config(key TEXT, value TEXT);",
             (),
         );
         // Deduplicate config rows (old schema had no UNIQUE constraint)
@@ -457,7 +457,9 @@ impl Database {
         let mut map = HashMap::new();
         if let Ok(mut stmt) = self.connection.prepare("SELECT key, value FROM config") {
             if let Ok(rows) = stmt.query_map([], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                let key = Self::sql_value_to_string(row.get::<_, rusqlite::types::Value>(0)?);
+                let value = Self::sql_value_to_string(row.get::<_, rusqlite::types::Value>(1)?);
+                Ok((key, value))
             }) {
                 for row in rows.flatten() {
                     map.insert(row.0, row.1);
@@ -474,6 +476,17 @@ impl Database {
             (level, message),
         ) {
             tracing::warn!("store_log: failed to insert log entry: {e}");
+        }
+    }
+
+    /// Convert any SQLite storage class to its string representation.
+    fn sql_value_to_string(value: rusqlite::types::Value) -> String {
+        match value {
+            rusqlite::types::Value::Null => String::new(),
+            rusqlite::types::Value::Integer(i) => i.to_string(),
+            rusqlite::types::Value::Real(f) => f.to_string(),
+            rusqlite::types::Value::Text(s) => s,
+            rusqlite::types::Value::Blob(b) => String::from_utf8_lossy(&b).into_owned(),
         }
     }
 
@@ -2415,5 +2428,42 @@ mod tests {
             !ids.contains(&"sync_siegu"),
             "files inside a /siegu/ folder must not be re-synced"
         );
+    }
+
+    #[test]
+    fn test_onboarding_complete_flag() {
+        let db = test_db();
+        assert!(!db.is_onboarding_complete(), "fresh DB is not initialized");
+
+        db.set_onboarding_complete();
+        assert!(db.is_onboarding_complete());
+    }
+
+    #[test]
+    fn test_legacy_config_numeric_value_reads_as_string() {
+        let db = test_db();
+        db.connection.execute("DROP TABLE config", ()).unwrap();
+        db.connection
+            .execute("CREATE TABLE config(key STRING, value STRING)", ())
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO config (key, value) VALUES('session_port', '35225')",
+                (),
+            )
+            .unwrap();
+        assert_eq!(
+            db.get_state().get("session_port").map(String::as_str),
+            Some("35225")
+        );
+    }
+
+    #[test]
+    fn test_has_any_photos() {
+        let mut db = test_db();
+        assert!(!db.has_any_photos(), "fresh DB has no photos");
+
+        let _ = db.store_photo_batch(&[make_photo("p_any", "/tmp/any.jpg")]);
+        assert!(db.has_any_photos());
     }
 }

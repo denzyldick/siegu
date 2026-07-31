@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useModelsStore } from '@/stores/models'
 import { useUiStore } from '@/stores/ui'
+import { markOnboardingComplete } from '@/services/tauri'
 import Setting from '@/components/Setting.vue'
 import FolderPicker from '@/components/FolderPicker.vue'
 import Connect from '@/components/Connect.vue'
@@ -43,6 +44,11 @@ async function handleSetSyncPath(path: string): Promise<void> {
 }
 
 async function finishSetupAndScan(): Promise<void> {
+  try {
+    await markOnboardingComplete()
+  } catch (error) {
+    console.error('[Onboarding] markOnboardingComplete failed:', error)
+  }
   appStore.completeOnboarding()
   uiStore.setPage('home')
   setTimeout(() => appStore.startTour(), 1500)

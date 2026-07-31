@@ -136,6 +136,21 @@ mod tests {
     }
 
     #[test]
+    fn is_initialized_true_when_onboarding_complete() {
+        let (db, _dir) = test_db();
+        db.set_onboarding_complete();
+        assert!(do_is_initialized(&db));
+    }
+
+    #[test]
+    fn is_initialized_true_when_photos_exist() {
+        let (mut db, _dir) = test_db();
+        db.store_photo_batch(&[make_photo("p1", "/tmp/p1.jpg")])
+            .unwrap();
+        assert!(do_is_initialized(&db));
+    }
+
+    #[test]
     fn add_directory_duplicate_not_deduped() {
         let (db, _dir) = test_db();
         do_add_directory(&db, "/photos");

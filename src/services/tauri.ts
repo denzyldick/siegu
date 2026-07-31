@@ -39,6 +39,10 @@ export async function isInitialized(): Promise<boolean> {
   return call<boolean>('is_initialized')
 }
 
+export async function markOnboardingComplete(): Promise<void> {
+  await call<unknown>('mark_onboarding_complete')
+}
+
 export async function scanFiles(): Promise<void> {
   await call<unknown>('scan_files')
 }
