@@ -197,14 +197,14 @@ pub struct FaceWithPerson {
 
 impl Database {
     /// Get all photos (with their detected objects and faces) for device sync.
-    /// Includes every scanned photo so sync works immediately after a scan; photos
-    /// that are NOT inside a 'siegu' folder are included (to prevent re-syncing
-    /// synced files).
+    /// Includes every scanned photo so sync works immediately after a scan, plus
+    /// photos received over sync (stored under a 'siegu' folder). The manifest is
+    /// "what this device has", so it must include received files: otherwise a
+    /// sync-only device reports an empty library and re-requests everything it
+    /// already received on every reconnect.
     pub fn get_photo_sync_info(&self) -> Vec<PhotoSyncInfo> {
         let mut results = Vec::new();
-        let sql = "SELECT id, location, created, latitude, longitude, caption, aesthetics_score FROM photo p 
-                   WHERE p.location NOT LIKE '%/siegu/%'
-                   AND p.location NOT LIKE '%\\siegu\\%'";
+        let sql = "SELECT id, location, created, latitude, longitude, caption, aesthetics_score FROM photo p";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             let iter = stmt.query_map([], |row| {
                 let id: String = row.get(0)?;
@@ -2396,7 +2396,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_photo_sync_info_includes_unindexed_and_excludes_siegu() {
+    fn test_get_photo_sync_info_includes_unindexed_and_received() {
         let mut db = test_db();
         let _ = db.store_photo_batch(&[
             make_photo("sync_plain", "/home/test/plain.jpg"),
@@ -2425,8 +2425,8 @@ mod tests {
         );
         assert!(ids.contains(&"sync_indexed"));
         assert!(
-            !ids.contains(&"sync_siegu"),
-            "files inside a /siegu/ folder must not be re-synced"
+            ids.contains(&"sync_siegu"),
+            "received files under /siegu/ are part of this device's library and must be in the manifest"
         );
     }
 

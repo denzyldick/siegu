@@ -26,6 +26,7 @@ pub const SYNC_MESSAGE_BUDGET: usize = 48000;
 pub const MAX_BUFFERED_BYTES: usize = 1_000_000;
 pub const MAX_RETRY_ATTEMPTS: u32 = 3;
 pub const RETRY_BACKOFF_MS: u64 = 500;
+pub const BACKPRESSURE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
@@ -382,7 +383,15 @@ impl MeshManager {
                 items_total: 0,
             });
 
+            let buffer_wait_start = std::time::Instant::now();
             while dc.buffered_amount().await > MAX_BUFFERED_BYTES {
+                if buffer_wait_start.elapsed() > BACKPRESSURE_TIMEOUT {
+                    return Err(format!(
+                        "Peer stopped reading data channel after {}",
+                        BACKPRESSURE_TIMEOUT.as_secs_f32()
+                    )
+                    .into());
+                }
                 tokio::time::sleep(std::time::Duration::from_millis(50)).await;
             }
         }
