@@ -53,6 +53,7 @@ pub fn create_transport(
     external_tx: Option<
         Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<SyncMessage>>>>,
     >,
+    connected: Option<Arc<std::sync::atomic::AtomicBool>>,
 ) -> MeshTransport {
     let device_id = get_or_create_device_id(&config_path);
     let device_name = std::env::var("HOSTNAME")
@@ -67,6 +68,8 @@ pub fn create_transport(
         app: app.clone(),
         config_path: config_path.clone(),
         sync_tx,
+        offline_notified: std::sync::atomic::AtomicBool::new(false),
+        connected: connected.unwrap_or_default(),
     });
 
     let mut transport = MeshTransport::new(

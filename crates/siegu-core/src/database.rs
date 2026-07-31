@@ -196,15 +196,14 @@ pub struct FaceWithPerson {
 }
 
 impl Database {
-    /// Get all indexed photos with their detected objects and faces, for device sync.
+    /// Get all photos (with their detected objects and faces) for device sync.
+    /// Includes every scanned photo so sync works immediately after a scan; photos
+    /// that are NOT inside a 'siegu' folder are included (to prevent re-syncing
+    /// synced files).
     pub fn get_photo_sync_info(&self) -> Vec<PhotoSyncInfo> {
         let mut results = Vec::new();
-        // Only select photos that have been indexed (have at least one entry in object or faces table)
-        // AND are NOT inside a 'siegu' folder (to prevent re-syncing synced files)
         let sql = "SELECT id, location, created, latitude, longitude, caption, aesthetics_score FROM photo p 
-                   WHERE (EXISTS (SELECT 1 FROM object WHERE photo_id = p.id) 
-                   OR EXISTS (SELECT 1 FROM faces WHERE photo_id = p.id))
-                   AND p.location NOT LIKE '%/siegu/%'
+                   WHERE p.location NOT LIKE '%/siegu/%'
                    AND p.location NOT LIKE '%\\siegu\\%'";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             let iter = stmt.query_map([], |row| {
@@ -1504,6 +1503,28 @@ impl Database {
         }
     }
 
+    /// Whether the photo already has a stored thumbnail (non-empty `encoded`).
+    pub fn has_thumbnail(&self, id: &str) -> bool {
+        self.connection
+            .query_row("SELECT encoded FROM photo WHERE id = ?1", [id], |r| {
+                r.get::<_, String>(0)
+            })
+            .map(|encoded| !encoded.is_empty())
+            .unwrap_or(false)
+    }
+
+    /// Store a generated thumbnail for a photo. Only writes when the photo has no
+    /// thumbnail yet. Returns true if the thumbnail was actually stored.
+    pub fn update_photo_thumbnail(&self, id: &str, encoded: &str) -> bool {
+        self.connection
+            .execute(
+                "UPDATE photo SET encoded = ?1 WHERE id = ?2 AND (encoded IS NULL OR encoded = '')",
+                (encoded, id),
+            )
+            .map(|affected| affected > 0)
+            .unwrap_or(false)
+    }
+
     /// Update caption, aesthetics_score, and indexed level for a photo.
     pub fn clear_sync_needed(&self, id: &str) {
         if let Err(e) = self
@@ -2294,5 +2315,81 @@ mod tests {
         for v in &videos {
             assert!(v.location.ends_with(".mp4"), "expected mp4: {}", v.location);
         }
+    }
+
+    fn make_photo(id: &str, location: &str) -> Photo {
+        Photo {
+            id: id.to_string(),
+            location: location.to_string(),
+            encoded: String::new(),
+            created: "2024-01-01".to_string(),
+            objects: HashMap::new(),
+            properties: HashMap::new(),
+            latitude: 0.0,
+            longitude: 0.0,
+            favorite: false,
+            indexed: 0,
+            caption: None,
+            aesthetics_score: None,
+            ai_status: AiStatus::default(),
+        }
+    }
+
+    #[test]
+    fn test_has_thumbnail_and_update_photo_thumbnail() {
+        let mut db = test_db();
+        let _ = db.store_photo_batch(&[make_photo("thumb_1", "/tmp/thumb.jpg")]);
+
+        assert!(!db.has_thumbnail("thumb_1"), "fresh photo has no thumbnail");
+        assert!(
+            db.update_photo_thumbnail("thumb_1", "data:image/jpeg;base64,abc"),
+            "first thumbnail write should succeed"
+        );
+        assert!(db.has_thumbnail("thumb_1"));
+
+        let photo = db.get_photo_by_id("thumb_1").unwrap();
+        assert_eq!(photo.encoded, "data:image/jpeg;base64,abc");
+
+        assert!(
+            !db.update_photo_thumbnail("thumb_1", "data:image/jpeg;base64,overwrite"),
+            "existing thumbnail must not be overwritten"
+        );
+        let photo = db.get_photo_by_id("thumb_1").unwrap();
+        assert_eq!(photo.encoded, "data:image/jpeg;base64,abc");
+    }
+
+    #[test]
+    fn test_get_photo_sync_info_includes_unindexed_and_excludes_siegu() {
+        let mut db = test_db();
+        let _ = db.store_photo_batch(&[
+            make_photo("sync_plain", "/home/test/plain.jpg"),
+            make_photo("sync_indexed", "/home/test/indexed.jpg"),
+            make_photo("sync_siegu", "/home/test/siegu/received.jpg"),
+        ]);
+        db.import_photo(ImportedPhoto {
+            id: "sync_indexed",
+            location: "/home/test/indexed.jpg",
+            created: "2024-01-01",
+            latitude: None,
+            longitude: None,
+            objects_json: r#"[{"class":"person","probability":0.9}]"#,
+            faces_json: "[]",
+            encoded: "",
+            caption: None,
+            aesthetics_score: None,
+        });
+
+        let info = db.get_photo_sync_info();
+        let ids: Vec<&str> = info.iter().map(|p| p.id.as_str()).collect();
+
+        assert!(
+            ids.contains(&"sync_plain"),
+            "unindexed photo must appear in sync info immediately"
+        );
+        assert!(ids.contains(&"sync_indexed"));
+        assert!(
+            !ids.contains(&"sync_siegu"),
+            "files inside a /siegu/ folder must not be re-synced"
+        );
     }
 }

@@ -23,7 +23,7 @@ use webrtc::peer_connection::configuration::RTCConfiguration;
 use webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState;
 use webrtc::peer_connection::sdp::session_description::RTCSessionDescription;
 
-use crate::database::Database;
+use crate::database::{Database, PhotoSyncInfo};
 use crate::mesh::{IncomingFile, MeshManager, SyncEvent, SyncMessage, PROTOCOL_VERSION};
 use crate::signal::SignalMessage;
 
@@ -168,6 +168,9 @@ impl MeshTransport {
 
         let incoming_files: Arc<Mutex<HashMap<String, IncomingFile>>> =
             Arc::new(Mutex::new(HashMap::new()));
+        let pending_manifest: Arc<Mutex<Vec<PhotoSyncInfo>>> = Arc::new(Mutex::new(Vec::new()));
+        let transfer_semaphore: Arc<tokio::sync::Semaphore> =
+            Arc::new(tokio::sync::Semaphore::new(4));
         let items_completed = Arc::new(AtomicUsize::new(0));
         let items_total = Arc::new(AtomicUsize::new(0));
         let pending_ice: Arc<Mutex<Vec<RTCIceCandidateInit>>> = Arc::new(Mutex::new(Vec::new()));
@@ -210,6 +213,12 @@ impl MeshTransport {
                     _ => "Awaiting connection...",
                 };
                 event.on_state_change(status);
+                if matches!(
+                    s,
+                    RTCPeerConnectionState::Disconnected | RTCPeerConnectionState::Failed
+                ) {
+                    event.on_peer_offline();
+                }
             })
         }));
 
@@ -244,6 +253,7 @@ impl MeshTransport {
         let event_dc = Arc::clone(&self.event);
         let config_path_dc = self.config_path.clone();
         let incoming_files_dc = Arc::clone(&incoming_files);
+        let pending_manifest_dc = Arc::clone(&pending_manifest);
         let items_completed_dc = Arc::clone(&items_completed);
         let items_total_dc = Arc::clone(&items_total);
         let device_id_dc = self.device_id.clone();
@@ -269,6 +279,7 @@ impl MeshTransport {
                 let models = models_on.clone();
                 Box::pin(async move {
                     event.on_state_change("Secure Data Channel Ready");
+                    event.on_log("DEBUG [initiator] data channel OPENED");
                     let _ = MeshManager::send_sync_message(
                         &dc,
                         &SyncMessage::VersionNegotiate {
@@ -279,11 +290,18 @@ impl MeshTransport {
                         },
                     )
                     .await;
+                    event.on_log("DEBUG [initiator] sent VersionNegotiate");
                     let _ =
                         MeshManager::send_sync_message(&dc, &SyncMessage::ManifestRequest).await;
+                    event.on_log("DEBUG [initiator] sent ManifestRequest");
                     let _ = MeshManager::send_sync_message(&dc, &SyncMessage::CatchUp).await;
+                    event.on_log("DEBUG [initiator] sent CatchUp");
                     let mut rx = sync_rx.lock().await;
                     while let Some(msg) = rx.recv().await {
+                        event.on_log(&format!(
+                            "DEBUG [initiator] forwarding sync msg: {:?}",
+                            std::mem::discriminant(&msg)
+                        ));
                         let _ = MeshManager::send_sync_message(&dc, &msg).await;
                     }
                 })
@@ -291,6 +309,8 @@ impl MeshTransport {
 
             let dc_msg = Arc::clone(&dc);
             let incoming_msg = Arc::clone(&incoming_files_dc);
+            let pending_msg = Arc::clone(&pending_manifest_dc);
+            let transfer_msg = Arc::clone(&transfer_semaphore);
             let config_msg = config_path_dc.clone();
             let event_msg = Arc::clone(&event_dc);
             let completed_msg = Arc::clone(&items_completed_dc);
@@ -299,15 +319,19 @@ impl MeshTransport {
             dc.on_message(Box::new(move |msg: DataChannelMessage| {
                 let dc = Arc::clone(&dc_msg);
                 let incoming = Arc::clone(&incoming_msg);
+                let pending = Arc::clone(&pending_msg);
+                let transfer = Arc::clone(&transfer_msg);
                 let config = config_msg.clone();
                 let event = Arc::clone(&event_msg);
                 let completed = Arc::clone(&completed_msg);
                 let total = Arc::clone(&total_msg);
                 Box::pin(async move {
                     let text = String::from_utf8_lossy(&msg.data);
+                    event.on_log("DEBUG [initiator] received message over data channel");
                     if let Ok(sync_msg) = serde_json::from_str::<SyncMessage>(&text) {
                         MeshManager::handle_sync_message(
-                            sync_msg, &dc, &incoming, &config, event, &completed, &total,
+                            sync_msg, &dc, &incoming, &pending, &transfer, &config, event,
+                            &completed, &total,
                         )
                         .await;
                     }
@@ -315,6 +339,8 @@ impl MeshTransport {
             }));
         } else {
             let incoming_rcv = Arc::clone(&incoming_files_dc);
+            let pending_rcv = Arc::clone(&pending_manifest_dc);
+            let transfer_rcv = Arc::clone(&transfer_semaphore);
             let config_rcv = config_path_dc.clone();
             let event_rcv = Arc::clone(&event_dc);
             let completed_rcv = Arc::clone(&items_completed_dc);
@@ -326,6 +352,8 @@ impl MeshTransport {
 
             pc.on_data_channel(Box::new(move |d: Arc<RTCDataChannel>| {
                 let incoming = Arc::clone(&incoming_rcv);
+                let pending = Arc::clone(&pending_rcv);
+                let transfer = Arc::clone(&transfer_rcv);
                 let config = config_rcv.clone();
                 let event = Arc::clone(&event_rcv);
                 let completed = Arc::clone(&completed_rcv);
@@ -334,6 +362,8 @@ impl MeshTransport {
 
                 let dc_msg = Arc::clone(&d);
                 let incoming_msg = Arc::clone(&incoming);
+                let pending_msg = Arc::clone(&pending);
+                let transfer_msg = Arc::clone(&transfer);
                 let config_msg = config.clone();
                 let event_msg = Arc::clone(&event);
                 let completed_msg = Arc::clone(&completed);
@@ -342,15 +372,19 @@ impl MeshTransport {
                 d.on_message(Box::new(move |msg: DataChannelMessage| {
                     let dc = Arc::clone(&dc_msg);
                     let incoming = Arc::clone(&incoming_msg);
+                    let pending = Arc::clone(&pending_msg);
+                    let transfer = Arc::clone(&transfer_msg);
                     let config = config_msg.clone();
                     let event = Arc::clone(&event_msg);
                     let completed = Arc::clone(&completed_msg);
                     let total = Arc::clone(&total_msg);
                     Box::pin(async move {
                         let text = String::from_utf8_lossy(&msg.data);
+                        event.on_log("DEBUG [receiver] received message over data channel");
                         if let Ok(sync_msg) = serde_json::from_str::<SyncMessage>(&text) {
                             MeshManager::handle_sync_message(
-                                sync_msg, &dc, &incoming, &config, event, &completed, &total,
+                                sync_msg, &dc, &incoming, &pending, &transfer, &config, event,
+                                &completed, &total,
                             )
                             .await;
                         }
@@ -367,8 +401,9 @@ impl MeshTransport {
                 d.on_open(Box::new(move || {
                     let dc = Arc::clone(&dc_open);
                     let sync_rx = Arc::clone(&sync_rx_final);
-                    drop(event_open);
+                    let event_open = Arc::clone(&event_open);
                     Box::pin(async move {
+                        event_open.on_log("DEBUG [receiver] data channel OPENED");
                         let _ = MeshManager::send_sync_message(
                             &dc,
                             &SyncMessage::VersionNegotiate {
@@ -379,11 +414,18 @@ impl MeshTransport {
                             },
                         )
                         .await;
+                        event_open.on_log("DEBUG [receiver] sent VersionNegotiate");
                         let _ = MeshManager::send_sync_message(&dc, &SyncMessage::ManifestRequest)
                             .await;
+                        event_open.on_log("DEBUG [receiver] sent ManifestRequest");
                         let _ = MeshManager::send_sync_message(&dc, &SyncMessage::CatchUp).await;
+                        event_open.on_log("DEBUG [receiver] sent CatchUp");
                         let mut rx = sync_rx.lock().await;
                         while let Some(msg) = rx.recv().await {
+                            event_open.on_log(&format!(
+                                "DEBUG [receiver] forwarding sync msg: {:?}",
+                                std::mem::discriminant(&msg)
+                            ));
                             let _ = MeshManager::send_sync_message(&dc, &msg).await;
                         }
                     })
@@ -597,6 +639,7 @@ impl MeshTransport {
                         }
                         SignalMessage::PeerDisconnected { .. } => {
                             self.event.on_state_change("Peer disconnected");
+                            self.event.on_peer_offline();
                         }
                         SignalMessage::RoomClosed => {
                             self.event.on_state_change("Room closed");

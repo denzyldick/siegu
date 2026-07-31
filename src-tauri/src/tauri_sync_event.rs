@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::Emitter;
 
@@ -7,6 +8,10 @@ pub struct TauriSyncEvent {
     pub app: tauri::AppHandle,
     pub config_path: String,
     pub sync_tx: Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<SyncMessage>>>>,
+    /// Tracks whether we already surfaced the "peer offline" notification for the current session.
+    pub offline_notified: AtomicBool,
+    /// Shared "a live peer connection exists" flag used to protect sessions from auto-reconnect.
+    pub connected: Arc<AtomicBool>,
 }
 
 impl SyncEvent for TauriSyncEvent {
@@ -72,8 +77,18 @@ impl SyncEvent for TauriSyncEvent {
         };
         db.upsert_peer_device(&device);
         self.on_log(&format!("Peer registered: {device_id}"));
+        self.offline_notified.store(false, Ordering::SeqCst);
+        self.connected.store(true, Ordering::SeqCst);
         let _ = self.app.emit("webrtc-state", "Peer Connected");
         let _ = self.app.emit("peer-connected", &device);
+    }
+
+    fn on_peer_offline(&self) {
+        self.connected.store(false, Ordering::SeqCst);
+        if !self.offline_notified.swap(true, Ordering::SeqCst) {
+            self.on_log("Peer offline: sync paused until device reconnects");
+            notify_sync_paused(&self.app);
+        }
     }
 
     fn on_peer_disconnected(&self, peer_id: String) {
@@ -121,4 +136,32 @@ impl SyncEvent for TauriSyncEvent {
             }
         }
     }
+}
+
+pub fn notify_sync_paused(app: &tauri::AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        use tauri_plugin_notification::NotificationExt;
+        let _ = app
+            .notification()
+            .builder()
+            .title("Siegu")
+            .body("Sync paused — device went offline. It will resume when it reconnects.")
+            .show();
+    });
+}
+
+pub fn notify_photos_ready(app: &tauri::AppHandle, pending: i64) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        use tauri_plugin_notification::NotificationExt;
+        let _ = app
+            .notification()
+            .builder()
+            .title("Siegu")
+            .body(format!(
+                "Scan complete — {pending} photo(s) ready to sync. Connect a device to sync them."
+            ))
+            .show();
+    });
 }
