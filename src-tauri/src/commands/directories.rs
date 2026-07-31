@@ -24,7 +24,7 @@ pub fn do_remove_directory_full(db: &mut Database, path: &str) {
 
 /// Pure business logic — testable without Tauri.
 pub fn do_is_initialized(db: &Database) -> bool {
-    !db.list_directories().is_empty()
+    !db.list_directories().is_empty() || db.is_onboarding_complete() || db.has_any_photos()
 }
 
 #[tauri::command]
@@ -75,6 +75,16 @@ pub async fn is_initialized(app: tauri::AppHandle) -> bool {
     }
     let database = database::Database::new(&path);
     do_is_initialized(&database)
+}
+
+#[tauri::command]
+pub async fn mark_onboarding_complete(app: tauri::AppHandle) {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return;
+    }
+    let database = database::Database::new(&path);
+    database.set_onboarding_complete();
 }
 
 #[cfg(test)]

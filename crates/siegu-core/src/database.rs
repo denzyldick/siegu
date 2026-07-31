@@ -1295,6 +1295,30 @@ impl Database {
         }
     }
 
+    /// Mark onboarding as complete so the app does not show first-run setup again
+    /// even when no scan directory was configured (e.g. an Android device that only
+    /// receives photos over sync).
+    pub fn set_onboarding_complete(&self) {
+        let mut state = std::collections::HashMap::new();
+        state.insert("onboarding_complete".to_string(), "1".to_string());
+        self.set_state(state);
+    }
+
+    /// Whether onboarding has been completed.
+    pub fn is_onboarding_complete(&self) -> bool {
+        self.get_state()
+            .get("onboarding_complete")
+            .map(|v| v == "1")
+            .unwrap_or(false)
+    }
+
+    /// Whether any photo exists in the library at all.
+    pub fn has_any_photos(&self) -> bool {
+        self.connection
+            .query_row("SELECT EXISTS(SELECT 1 FROM photo)", [], |r| r.get(0))
+            .unwrap_or(false)
+    }
+
     /// Merge all faces from `from_id` into `to_id`, then delete the source person.
     pub fn merge_people(&self, from_id: &str, to_id: &str) {
         if let Err(e) = self.connection.execute(

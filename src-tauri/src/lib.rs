@@ -284,6 +284,7 @@ pub fn run() {
             commands::directories::remove_directory,
             commands::directories::remove_directory_full,
             commands::directories::is_initialized,
+            commands::directories::mark_onboarding_complete,
             // People
             commands::people::get_people,
             commands::people::get_unnamed_faces,
