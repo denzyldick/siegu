@@ -100,6 +100,7 @@ pub async fn start_webrtc_session(
     }
 
     let sync_tx = Arc::clone(&state.sync_tx);
+    let connected = Arc::clone(&state.connected);
 
     if let Ok(mut session) = state.active_session.lock() {
         if let Some(handle) = session.take() {
@@ -120,6 +121,7 @@ pub async fn start_webrtc_session(
                 config_path,
                 app_handle,
                 Some(sync_tx),
+                Some(connected),
             );
             if let Err(e) = transport.start().await {
                 emit_log(&app, format!("WebRTC session failed: {e}"));
@@ -149,8 +151,19 @@ pub async fn start_lan_host(
     room_id: String,
     is_initiator: bool,
 ) -> Result<LanHostInfo, String> {
+    start_host_internal(&app, &state, &mdns_state, room_id, is_initiator).await
+}
+
+/// Shared host startup: fresh LAN signaling server + mDNS registration + saved session.
+async fn start_host_internal(
+    app: &tauri::AppHandle,
+    state: &crate::WebRtcState,
+    mdns_state: &crate::MdnsState,
+    room_id: String,
+    is_initiator: bool,
+) -> Result<LanHostInfo, String> {
     let app_handle = app.clone();
-    let config_path = get_config_path(&app);
+    let config_path = get_config_path(app);
     if config_path.is_empty() {
         return Err("Config error".to_string());
     }
@@ -162,6 +175,9 @@ pub async fn start_lan_host(
     let daemon = siegu_core::mdns::create_daemon().map_err(|e| e.to_string())?;
     {
         let mut d = mdns_state.daemon.lock().map_err(|e| e.to_string())?;
+        if let Some(old) = d.take() {
+            old.shutdown();
+        }
         *d = Some(daemon.clone());
     }
 
@@ -178,9 +194,9 @@ pub async fn start_lan_host(
             &addr.parse().unwrap(),
             std::time::Duration::from_secs(2),
         ) {
-            Ok(_) => emit_log(&app, format!("TCP self-check OK — {addr} reachable")),
+            Ok(_) => emit_log(app, format!("TCP self-check OK — {addr} reachable")),
             Err(e) => emit_log(
-                &app,
+                app,
                 format!(
                     "WARNING: Cannot reach own LAN address {addr}. Firewall may block incoming connections: {e}"
                 ),
@@ -189,10 +205,11 @@ pub async fn start_lan_host(
     }
 
     let sync_tx = Arc::clone(&state.sync_tx);
+    let connected = Arc::clone(&state.connected);
 
     if let Ok(mut session) = state.active_session.lock() {
         if let Some(handle) = session.take() {
-            emit_log(&app, "Aborting previous WebRTC session".to_string());
+            emit_log(app, "Aborting previous WebRTC session".to_string());
             handle.abort();
         }
 
@@ -208,6 +225,7 @@ pub async fn start_lan_host(
                 config_path,
                 app_handle.clone(),
                 Some(sync_tx),
+                Some(connected),
             );
 
             if let Err(e) =
@@ -380,41 +398,111 @@ pub async fn hash_pairing_code(input: String) -> Result<String, String> {
 pub async fn auto_reconnect(
     app: tauri::AppHandle,
     state: tauri::State<'_, crate::WebRtcState>,
+    mdns_state: tauri::State<'_, crate::MdnsState>,
 ) -> Result<bool, String> {
+    use std::sync::atomic::Ordering;
     let config_path = get_config_path(&app);
     if config_path.is_empty() {
         return Ok(false);
     }
-    let db = database::Database::new(&config_path);
-    match db.load_session() {
-        Some(session) => {
-            emit_log(
-                &app,
-                format!("Auto-reconnecting to room {}", session.room_id),
-            );
-            let app_handle = app.clone();
-            let sync_tx = Arc::clone(&state.sync_tx);
 
-            if let Ok(mut active) = state.active_session.lock() {
-                let handle = tauri::async_runtime::spawn(async move {
-                    let transport = transport::create_transport(
-                        session.room_id,
-                        session.is_initiator,
-                        session.signaling_url,
-                        config_path,
-                        app_handle,
-                        Some(sync_tx),
-                    );
-                    if let Err(e) = transport.start().await {
-                        emit_log(&app, format!("WebRTC session failed: {e}"));
-                    }
-                });
-                *active = Some(handle);
-            }
-            Ok(true)
-        }
-        None => Ok(false),
+    // Never abort a live session: if a peer is connected, there is nothing to reconnect.
+    if state.connected.load(Ordering::SeqCst) {
+        emit_log(
+            &app,
+            "Auto-reconnect skipped: session already connected".to_string(),
+        );
+        return Ok(false);
     }
+
+    let db = database::Database::new(&config_path);
+    let Some(session) = db.load_session() else {
+        return Ok(false);
+    };
+
+    emit_log(
+        &app,
+        format!("Auto-reconnecting to room {}", session.room_id),
+    );
+
+    if !session.is_initiator {
+        // Host session: the saved URL may point at a stale LAN port. Re-host on a fresh
+        // port, re-register mDNS and persist the updated session.
+        match start_host_internal(
+            &app,
+            &state,
+            &mdns_state,
+            session.room_id.clone(),
+            session.is_initiator,
+        )
+        .await
+        {
+            Ok(info) => emit_log(
+                &app,
+                format!("Host session restarted on port {}", info.port),
+            ),
+            Err(e) => emit_log(&app, format!("Failed to restart host session: {e}")),
+        }
+        return Ok(true);
+    }
+
+    // Joiner session: prefer the room the host currently advertises over mDNS so a restarted
+    // host (new LAN port) is still found; fall back to the saved URL.
+    let mut target_url = session.signaling_url.clone();
+    if let Ok(daemon) = siegu_core::mdns::create_daemon() {
+        let discovered = siegu_core::mdns::discover_hosts(&daemon, 3);
+        daemon.shutdown();
+        if let Ok(hosts) = discovered {
+            if let Some(matched) = hosts.iter().find(|h| h.room_id == session.room_id) {
+                target_url = format!("ws://{}:{}", matched.ip, matched.port);
+                emit_log(
+                    &app,
+                    format!("Rediscovered host {} at {target_url}", matched.name),
+                );
+            }
+        }
+    }
+
+    let app_handle = app.clone();
+    let sync_tx = Arc::clone(&state.sync_tx);
+    let connected = Arc::clone(&state.connected);
+    let config_path_for_session = config_path.clone();
+    let room_id_for_session = session.room_id.clone();
+    let room_id_for_save = room_id_for_session.clone();
+    let signaling_url_for_session = target_url.clone();
+    let is_initiator = session.is_initiator;
+
+    if let Ok(mut active) = state.active_session.lock() {
+        if let Some(handle) = active.take() {
+            handle.abort();
+        }
+        let handle = tauri::async_runtime::spawn(async move {
+            let transport = transport::create_transport(
+                room_id_for_session.clone(),
+                is_initiator,
+                target_url,
+                config_path,
+                app_handle.clone(),
+                Some(sync_tx),
+                Some(connected),
+            );
+            if let Err(e) = transport.start().await {
+                emit_log(&app_handle, format!("WebRTC session failed: {e}"));
+            }
+        });
+        *active = Some(handle);
+
+        let db2 = database::Database::new(&config_path_for_session);
+        db2.save_session(&SavedSession {
+            room_id: room_id_for_save,
+            signaling_url: signaling_url_for_session,
+            port: 0,
+            is_initiator,
+            passphrase: String::new(),
+        });
+    }
+
+    Ok(true)
 }
 
 #[tauri::command]

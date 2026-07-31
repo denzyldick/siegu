@@ -23,6 +23,7 @@ struct WebRtcState {
     active_session: std::sync::Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
     sync_tx:
         Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<transport::SyncMessage>>>>,
+    connected: Arc<std::sync::atomic::AtomicBool>,
 }
 
 struct ScanState {
@@ -51,11 +52,55 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
+/// Best-effort config dir resolution for the panic hook (no AppHandle available there).
+fn config_dir_fallback() -> Option<std::path::PathBuf> {
+    if let Some(x) = std::env::var_os("XDG_CONFIG_HOME") {
+        return Some(std::path::PathBuf::from(x));
+    }
+    let home = std::env::var_os("HOME")?;
+    #[cfg(target_os = "macos")]
+    let base = std::path::PathBuf::from(&home).join("Library/Application Support");
+    #[cfg(not(target_os = "macos"))]
+    let base = std::path::PathBuf::from(&home).join(".config");
+    Some(base)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    std::panic::set_hook(Box::new(|info| {
+        use std::io::Write;
+        let msg = format!("PANIC: {}", info);
+        eprintln!("[siegu] {msg}");
+        if let Some(config_dir) = config_dir_fallback() {
+            let app_config = config_dir.join("io.denzyl.siegu");
+            let _ = std::fs::create_dir_all(&app_config);
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(app_config.join("siegu_debug.log"))
+            {
+                let _ = writeln!(f, "{msg}");
+                let _ = f.flush();
+            }
+        }
+        if std::env::var("RUST_BACKTRACE")
+            .map(|v| v != "0")
+            .unwrap_or(false)
+        {
+            eprintln!("[siegu] {}", std::backtrace::Backtrace::force_capture());
+        }
+    }));
+
     let builder = tauri::Builder::default();
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }));
     builder
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_os::init())
@@ -166,6 +211,7 @@ pub fn run() {
             app.manage(WebRtcState {
                 active_session: std::sync::Mutex::new(None),
                 sync_tx,
+                connected: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             });
 
             app.manage(ScanState {

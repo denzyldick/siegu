@@ -9,17 +9,39 @@ use crate::sync_transport::{
     cleanup_sync_temp, resolve_sync_target_dir, sanitize_filename, sync_temp_dir,
 };
 
-pub const PROTOCOL_VERSION: u8 = 1;
+pub const PROTOCOL_VERSION: u8 = 2;
 pub const MAX_MESH_DEVICES: usize = 5;
-pub const CHUNK_SIZE: usize = 65536;
+
+/// Max raw file bytes carried in a single `FileChunk` payload. The `Vec<u8>` is
+/// serialized as a JSON array of numbers (~4 chars/byte), so the whole message
+/// must stay well under the SCTP max message size (65536). A chunk payload this
+/// size serializes to ~56 KB.
+pub const FILE_CHUNK_PAYLOAD: usize = 14000;
+
+/// Serialized-byte budget for a single sync message. The WebRTC data channel
+/// rejects messages larger than the negotiated SCTP max message size (65536 by
+/// default), so anything that could grow past that — like a photo manifest for a
+/// large library — must be split into chunks below this budget.
+pub const SYNC_MESSAGE_BUDGET: usize = 48000;
 pub const MAX_BUFFERED_BYTES: usize = 1_000_000;
 pub const MAX_RETRY_ATTEMPTS: u32 = 3;
 pub const RETRY_BACKOFF_MS: u64 = 500;
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum SyncPhase {
+    #[default]
+    Idle,
+    Syncing,
+    Completed,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SyncProgress {
     pub device_id: String,
     pub status: String,
+    #[serde(default)]
+    pub phase: SyncPhase,
     pub progress: f32,
     pub bytes_per_second: u64,
     pub items_completed: usize,
@@ -32,6 +54,8 @@ pub enum SyncMessage {
     ManifestRequest,
     ManifestResponse {
         photos: Vec<PhotoSyncInfo>,
+        #[serde(default)]
+        more: bool,
     },
     FileRequest {
         id: String,
@@ -66,6 +90,8 @@ pub enum SyncMessage {
     CatchUp,
     PeerProgress {
         status: String,
+        #[serde(default)]
+        phase: SyncPhase,
         progress: f32,
         items_completed: usize,
         items_total: usize,
@@ -132,6 +158,8 @@ pub trait SyncEvent: Send + Sync {
         protocol_version: u8,
     );
     fn on_peer_disconnected(&self, peer_id: String);
+    /// Called when the connected peer drops off (transport failure / explicit leave).
+    fn on_peer_offline(&self) {}
     fn on_device_registered(&self, db: &Database);
     fn on_metadata_updated(
         &self,
@@ -206,6 +234,51 @@ impl MeshManager {
         Ok(())
     }
 
+    /// Split a manifest into chunks, each serializing to less than the data
+    /// channel's max message size. Returns (chunk, more).
+    pub fn split_manifest_chunks(photos: Vec<PhotoSyncInfo>) -> Vec<(Vec<PhotoSyncInfo>, bool)> {
+        let mut chunks = Vec::new();
+        let mut remaining = photos.into_iter().peekable();
+        loop {
+            let mut chunk = Vec::new();
+            let mut bytes = 0usize;
+            while let Some(photo) = remaining.peek() {
+                let approx = serde_json::to_string(photo).map(|s| s.len()).unwrap_or(256);
+                if !chunk.is_empty() && bytes + approx > SYNC_MESSAGE_BUDGET {
+                    break;
+                }
+                bytes += approx;
+                chunk.push(photo.clone());
+                remaining.next();
+            }
+            let more = remaining.peek().is_some();
+            chunks.push((chunk, more));
+            if !more {
+                return chunks;
+            }
+        }
+    }
+
+    /// Send a photo manifest as a series of `ManifestResponse` messages, each
+    /// staying below the data channel's max message size. The last message has
+    /// `more: false` so the receiver knows the manifest is complete.
+    pub async fn send_manifest_response(
+        dc: &Arc<webrtc::data_channel::RTCDataChannel>,
+        photos: Vec<PhotoSyncInfo>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        for (chunk, more) in Self::split_manifest_chunks(photos) {
+            Self::send_sync_message(
+                dc,
+                &SyncMessage::ManifestResponse {
+                    photos: chunk,
+                    more,
+                },
+            )
+            .await?;
+        }
+        Ok(())
+    }
+
     pub async fn send_file_with_retry(
         dc: Arc<webrtc::data_channel::RTCDataChannel>,
         outgoing: OutgoingFile,
@@ -276,7 +349,7 @@ impl MeshManager {
         )
         .await?;
 
-        let mut buffer = vec![0u8; CHUNK_SIZE];
+        let mut buffer = vec![0u8; FILE_CHUNK_PAYLOAD];
         let mut total_sent = 0u64;
         let mut chunk_index = 0u32;
         loop {
@@ -302,6 +375,7 @@ impl MeshManager {
             event.on_sync_progress(SyncProgress {
                 device_id: "peer".to_string(),
                 status: format!("Sending {filename}"),
+                phase: SyncPhase::Syncing,
                 progress,
                 bytes_per_second: 0,
                 items_completed: 0,
@@ -329,6 +403,7 @@ impl MeshManager {
         event.on_sync_progress(SyncProgress {
             device_id: "peer".to_string(),
             status: format!("Finished sending {filename}"),
+            phase: SyncPhase::Completed,
             progress: 100.0,
             bytes_per_second: 0,
             items_completed: 1,
@@ -342,6 +417,8 @@ impl MeshManager {
         msg: SyncMessage,
         dc: &Arc<webrtc::data_channel::RTCDataChannel>,
         incoming_files: &Arc<Mutex<std::collections::HashMap<String, IncomingFile>>>,
+        pending_manifest: &Arc<tokio::sync::Mutex<Vec<PhotoSyncInfo>>>,
+        transfer_semaphore: &Arc<tokio::sync::Semaphore>,
         config_path: &str,
         event: Arc<dyn SyncEvent>,
         items_completed: &Arc<std::sync::atomic::AtomicUsize>,
@@ -349,12 +426,30 @@ impl MeshManager {
     ) {
         match msg {
             SyncMessage::ManifestRequest => {
+                event.on_log("DEBUG handle ManifestRequest");
                 let db = Database::new(config_path);
                 let photos = db.get_photo_sync_info();
-                let _ =
-                    Self::send_sync_message(dc, &SyncMessage::ManifestResponse { photos }).await;
+                let _ = Self::send_manifest_response(dc, photos).await;
+                event.on_log("DEBUG sent ManifestResponse (chunked)");
             }
-            SyncMessage::ManifestResponse { photos } => {
+            SyncMessage::ManifestResponse { photos, more } => {
+                let chunk_len = photos.len();
+                let mut pending = pending_manifest.lock().await;
+                pending.extend(photos);
+                event.on_log(&format!(
+                    "DEBUG handle ManifestResponse chunk with {} photos (more={more}, total={})",
+                    chunk_len,
+                    pending.len()
+                ));
+                if more {
+                    return;
+                }
+                let photos = std::mem::take(&mut *pending);
+                drop(pending);
+                event.on_log(&format!(
+                    "DEBUG manifest complete, comparing {} photos",
+                    photos.len()
+                ));
                 let db = Database::new(config_path);
                 let my_manifest = db.get_photo_sync_info();
                 let mut to_request = Vec::new();
@@ -372,6 +467,7 @@ impl MeshManager {
                     event.on_sync_progress(SyncProgress {
                         device_id: "peer".to_string(),
                         status: format!("Syncing {total} new files"),
+                        phase: SyncPhase::Syncing,
                         progress: 0.0,
                         bytes_per_second: 0,
                         items_completed: 0,
@@ -382,6 +478,7 @@ impl MeshManager {
                         dc,
                         &SyncMessage::PeerProgress {
                             status: format!("Peer needs {total} files"),
+                            phase: SyncPhase::Syncing,
                             progress: 0.0,
                             items_completed: 0,
                             items_total: total,
@@ -396,6 +493,7 @@ impl MeshManager {
                     event.on_sync_progress(SyncProgress {
                         device_id: "peer".to_string(),
                         status: "Up to date".to_string(),
+                        phase: SyncPhase::Completed,
                         progress: 100.0,
                         bytes_per_second: 0,
                         items_completed: 0,
@@ -404,6 +502,7 @@ impl MeshManager {
                 }
             }
             SyncMessage::FileRequest { id } => {
+                event.on_log(&format!("DEBUG handle FileRequest for {id}"));
                 let db = Database::new(config_path);
                 if let Ok((path, created, lat, lon, objects, faces, caption, aesthetics_score)) = db.connection.query_row(
                     "SELECT p.location, p.created, p.latitude, p.longitude,
@@ -420,7 +519,17 @@ impl MeshManager {
                     let event_arc = Arc::clone(&event);
                     let config_path_clone = config_path.to_string();
                     let id_clone = id.clone();
+                    let semaphore = Arc::clone(transfer_semaphore);
                     tokio::spawn(async move {
+                        let _permit = match semaphore.acquire_owned().await {
+                            Ok(p) => p,
+                            Err(e) => {
+                                event_arc.on_log(&format!(
+                                    "DEBUG transfer semaphore closed, skipping {id_clone}: {e}"
+                                ));
+                                return;
+                            }
+                        };
                         let result = Self::send_file_with_retry(
                             dc_send,
                             OutgoingFile {
@@ -506,6 +615,7 @@ impl MeshManager {
                     event.on_sync_progress(SyncProgress {
                         device_id: "peer".to_string(),
                         status: format!("Receiving {}", file_state.filename),
+                        phase: SyncPhase::Syncing,
                         progress,
                         bytes_per_second: 0,
                         items_completed: 0,
@@ -601,6 +711,7 @@ impl MeshManager {
                         event.on_sync_progress(SyncProgress {
                             device_id: "peer".to_string(),
                             status,
+                            phase: SyncPhase::Syncing,
                             progress,
                             bytes_per_second: 0,
                             items_completed: completed,
@@ -611,6 +722,7 @@ impl MeshManager {
                             dc,
                             &SyncMessage::PeerProgress {
                                 status: format!("Peer received {completed}/{total}"),
+                                phase: SyncPhase::Syncing,
                                 progress,
                                 items_completed: completed,
                                 items_total: total,
@@ -625,10 +737,12 @@ impl MeshManager {
                     Self::send_sync_message(dc, &SyncMessage::FileRequest { id: photo.id }).await;
             }
             SyncMessage::StartSync => {
+                event.on_log("DEBUG handle StartSync");
                 event.on_state_change("Sync started");
                 let _ = Self::send_sync_message(dc, &SyncMessage::ManifestRequest).await;
             }
             SyncMessage::CatchUp => {
+                event.on_log("DEBUG handle CatchUp");
                 let db = Database::new(config_path);
                 let ids: Vec<String> = {
                     let sql = "SELECT id FROM photo WHERE sync_needed = 1 AND location NOT LIKE '%/siegu/%' AND location NOT LIKE '%\\siegu\\%'";
@@ -647,6 +761,7 @@ impl MeshManager {
             }
             SyncMessage::PeerProgress {
                 status,
+                phase,
                 progress,
                 items_completed,
                 items_total,
@@ -654,6 +769,7 @@ impl MeshManager {
                 event.on_sync_progress(SyncProgress {
                     device_id: "peer".to_string(),
                     status,
+                    phase,
                     progress,
                     bytes_per_second: 0,
                     items_completed,
@@ -807,12 +923,121 @@ mod tests {
 
     #[test]
     fn test_protocol_version() {
-        assert_eq!(PROTOCOL_VERSION, 1);
+        assert_eq!(PROTOCOL_VERSION, 2);
+    }
+
+    #[test]
+    fn test_split_manifest_chunks_fit_data_channel_limit() {
+        let photos: Vec<PhotoSyncInfo> = (0..1000)
+            .map(|i| PhotoSyncInfo {
+                id: format!("photo_{i}"),
+                location: format!("/home/user/pictures/{}/image_{i}.jpg", i % 10),
+                created: "2024-01-01".to_string(),
+                latitude: Some(52.0),
+                longitude: Some(4.9),
+                objects: "[]".to_string(),
+                faces: "[]".to_string(),
+                caption: None,
+                aesthetics_score: None,
+            })
+            .collect();
+
+        // Sanity: the full manifest serialized in one message would be rejected.
+        let single = serde_json::to_string(&SyncMessage::ManifestResponse {
+            photos: photos.clone(),
+            more: false,
+        })
+        .unwrap();
+        assert!(
+            single.len() > 65536,
+            "sanity: full manifest must exceed the SCTP max message size"
+        );
+
+        let chunks = MeshManager::split_manifest_chunks(photos.clone());
+        assert!(
+            chunks.len() >= 2,
+            "expected multiple chunks, got {}",
+            chunks.len()
+        );
+
+        let mut all: Vec<PhotoSyncInfo> = Vec::new();
+        for (i, (chunk, more)) in chunks.iter().enumerate() {
+            let msg = SyncMessage::ManifestResponse {
+                photos: chunk.clone(),
+                more: *more,
+            };
+            let json = serde_json::to_string(&msg).unwrap();
+            assert!(
+                json.len() < 65536,
+                "chunk {} must fit in the data channel max message size, got {} bytes",
+                i,
+                json.len()
+            );
+            assert_eq!(
+                *more,
+                i < chunks.len() - 1,
+                "only the last chunk ends the manifest"
+            );
+            assert!(!chunk.is_empty(), "no empty chunks");
+            all.extend(chunk.iter().cloned());
+        }
+
+        assert_eq!(all.len(), photos.len());
+        assert_eq!(all[0].id, "photo_0");
+        assert_eq!(all[all.len() - 1].id, "photo_999");
+    }
+
+    #[test]
+    fn test_split_manifest_chunks_single_chunk_when_small() {
+        let photos: Vec<PhotoSyncInfo> = (0..3)
+            .map(|i| PhotoSyncInfo {
+                id: format!("photo_{i}"),
+                location: format!("/tmp/photo_{i}.jpg"),
+                created: "2024-01-01".to_string(),
+                latitude: None,
+                longitude: None,
+                objects: "[]".to_string(),
+                faces: "[]".to_string(),
+                caption: None,
+                aesthetics_score: None,
+            })
+            .collect();
+
+        let chunks = MeshManager::split_manifest_chunks(photos);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].1, false, "single chunk must be the final chunk");
     }
 
     #[test]
     fn test_max_mesh_devices() {
         assert_eq!(MAX_MESH_DEVICES, 5);
+    }
+
+    #[test]
+    fn test_file_chunk_fits_data_channel_limit() {
+        let data = vec![255u8; FILE_CHUNK_PAYLOAD];
+        let msg = SyncMessage::FileChunk {
+            id: "photo_0".to_string(),
+            index: 42,
+            data,
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(
+            json.len() < 65536,
+            "FileChunk must fit in the SCTP max message size, got {} bytes",
+            json.len()
+        );
+
+        let parsed: SyncMessage = serde_json::from_str(&json).unwrap();
+        match parsed {
+            SyncMessage::FileChunk { id, index, data } => {
+                assert_eq!(id, "photo_0");
+                assert_eq!(index, 42);
+                assert_eq!(data.len(), FILE_CHUNK_PAYLOAD);
+                assert_eq!(data[0], 255);
+            }
+            other => panic!("unexpected message variant: {:?}", other),
+        }
     }
 
     #[test]
@@ -940,6 +1165,7 @@ mod tests {
         let progress = SyncProgress {
             device_id: "peer".to_string(),
             status: "Syncing".to_string(),
+            phase: SyncPhase::Syncing,
             progress: 50.0,
             bytes_per_second: 1024,
             items_completed: 5,
@@ -948,5 +1174,6 @@ mod tests {
         let json = serde_json::to_string(&progress).unwrap();
         assert!(json.contains("50.0"));
         assert!(json.contains("Syncing"));
+        assert!(json.contains("\"phase\":\"syncing\""));
     }
 }

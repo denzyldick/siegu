@@ -15,6 +15,8 @@ pub struct DiscoveredHost {
     pub name: String,
     pub ip: String,
     pub port: u16,
+    #[serde(default)]
+    pub room_id: String,
 }
 
 #[derive(Debug, Clone)]
@@ -435,6 +437,7 @@ fn parse_hosts_from_response(buf: &[u8]) -> Vec<DiscoveredHost> {
     let mut srv_records: Vec<(String, u16, String)> = Vec::new();
     let mut a_records: HashMap<String, String> = HashMap::new();
     let mut ptr_records: Vec<String> = Vec::new();
+    let mut txt_records: HashMap<String, String> = HashMap::new();
 
     // Parse answers
     for _ in 0..ancount + arcount {
@@ -483,6 +486,25 @@ fn parse_hosts_from_response(buf: &[u8]) -> Vec<DiscoveredHost> {
                     srv_records.push((name.clone(), port, target));
                 }
             }
+            16 => {
+                // TXT: sequence of <len><bytes> strings, e.g. "room=<id>"
+                let mut room = String::new();
+                let mut off = pos;
+                let end = pos + rdlen;
+                while off < end {
+                    let l = buf[off] as usize;
+                    off += 1;
+                    if off + l > end {
+                        break;
+                    }
+                    let s = String::from_utf8_lossy(&buf[off..off + l]).to_string();
+                    if let Some(v) = s.strip_prefix("room=") {
+                        room = v.to_string();
+                    }
+                    off += l;
+                }
+                txt_records.insert(name.trim_end_matches('.').to_string(), room);
+            }
             _ => {}
         }
 
@@ -509,6 +531,10 @@ fn parse_hosts_from_response(buf: &[u8]) -> Vec<DiscoveredHost> {
                     name: srv.0.trim_end_matches('.').to_string(),
                     ip: ip.clone(),
                     port: srv.1,
+                    room_id: txt_records
+                        .get(srv.0.trim_end_matches('.'))
+                        .cloned()
+                        .unwrap_or_default(),
                 });
             }
         }

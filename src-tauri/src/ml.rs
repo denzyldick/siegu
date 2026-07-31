@@ -87,7 +87,47 @@ impl AnalysisCallbacks for TauriCallbacks {
         }
     }
 
-    fn on_scan_complete(&self) {}
+    fn on_scan_complete(&self) {
+        let db = Database::new(&self.config_path);
+        let pending: i64 = db
+            .connection
+            .query_row(
+                "SELECT COUNT(*) FROM photo WHERE sync_needed = 1 AND location NOT LIKE '%/siegu/%' AND location NOT LIKE '%\\siegu\\%'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+
+        if pending == 0 {
+            emit_log(
+                &self.app,
+                "Scan complete: no photos pending sync".to_string(),
+            );
+            return;
+        }
+
+        let mut pushed = false;
+        if let Ok(g) = self.sync_tx.try_lock() {
+            if let Some(tx) = g.as_ref() {
+                pushed = tx.send(SyncMessage::StartSync).is_ok();
+            }
+        }
+
+        if pushed {
+            emit_log(
+                &self.app,
+                format!("Scan complete: pushed StartSync to peer ({pending} photos pending sync)"),
+            );
+        } else {
+            emit_log(
+                &self.app,
+                format!(
+                    "Scan complete with {pending} photos pending sync, but no active peer session"
+                ),
+            );
+            crate::tauri_sync_event::notify_photos_ready(&self.app, pending);
+        }
+    }
 
     fn on_progress(&self, _completed: usize, _total: usize, _avg_ms: f64) {}
 
