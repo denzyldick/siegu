@@ -1,11 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getTopTags, listObjects, searchFacets } from '@/services/tauri'
-import type { SearchTag, SearchFacetsData, ActiveFilter, FacetType } from '@/types/search'
+import { searchFacets } from '@/services/tauri'
+import type { SearchFacetsData, ActiveFilter, FacetType } from '@/types/search'
 
 export const useSearchStore = defineStore('search', () => {
   const query = ref('')
-  const tags = ref<SearchTag[]>([])
   const recentSearches = ref<string[]>([])
   const loading = ref(false)
   const facets = ref<SearchFacetsData | null>(null)
@@ -19,15 +18,6 @@ export const useSearchStore = defineStore('search', () => {
   )
   const activeFacets = computed(() => activeFilters.value)
 
-  async function loadTopTags(): Promise<void> {
-    try {
-      tags.value = await getTopTags()
-    } catch (error) {
-      console.error('[SearchStore] Failed to load top tags:', error)
-      tags.value = []
-    }
-  }
-
   async function loadFacets(): Promise<void> {
     if (facetsLoading.value) return
     facetsLoading.value = true
@@ -37,16 +27,6 @@ export const useSearchStore = defineStore('search', () => {
       console.error('[SearchStore] Failed to load search facets:', error)
     } finally {
       facetsLoading.value = false
-    }
-  }
-
-  async function searchObjects(q: string): Promise<SearchTag[]> {
-    if (!q.trim()) return []
-    try {
-      return await listObjects(q)
-    } catch (error) {
-      console.error('[SearchStore] Failed to search objects:', error)
-      return []
     }
   }
 
@@ -115,7 +95,6 @@ export const useSearchStore = defineStore('search', () => {
 
   return {
     query,
-    tags,
     recentSearches,
     loading,
     facets,
@@ -125,9 +104,7 @@ export const useSearchStore = defineStore('search', () => {
     mediaFilters,
     hasQuery,
     hasFilters,
-    loadTopTags,
     loadFacets,
-    searchObjects,
     setQuery,
     clearQuery,
     addFilter,

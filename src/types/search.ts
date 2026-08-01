@@ -1,8 +1,3 @@
-export interface SearchTag {
-  title: string
-  type: string
-}
-
 export type FacetType = 'person' | 'location' | 'tag' | 'month'
 
 export interface FacetGroup {

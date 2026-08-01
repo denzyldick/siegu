@@ -184,16 +184,6 @@ export async function deleteFace(faceId: number): Promise<void> {
   await call<unknown>('delete_face', { faceId });
 }
 
-export async function getTopTags(): Promise<Array<{ title: string; type: string }>> {
-  const raw = await call<string>('get_top_tags');
-  return parseJsonArray<{ title: string; type: string }>(raw);
-}
-
-export async function listObjects(query: string): Promise<Array<{ title: string; type: string }>> {
-  const raw = await call<string>('list_objects', { query });
-  return parseJsonArray<{ title: string; type: string }>(raw);
-}
-
 export async function searchFacets(): Promise<SearchFacetsData> {
   const raw = await call<string>('search_facets');
   return parseJsonObject<SearchFacetsData>(raw);
