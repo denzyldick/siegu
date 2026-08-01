@@ -105,6 +105,8 @@
       "media_type": "Tipo di media",
       "favorites": "Favoritonan",
       "videos": "Videonan",
+      "quality": "Kalidad",
+      "reset_quality": "Reset",
       "clear_all": "Limpia tur"
     }
   },

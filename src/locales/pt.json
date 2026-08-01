@@ -105,6 +105,8 @@
       "media_type": "Tipo de mídia",
       "favorites": "Favoritos",
       "videos": "Vídeos",
+      "quality": "Qualidade",
+      "reset_quality": "Redefinir",
       "clear_all": "Limpar tudo"
     }
   },

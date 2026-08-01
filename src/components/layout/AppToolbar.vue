@@ -16,7 +16,6 @@ interface Props {
 defineProps<Props>()
 const emit = defineEmits<{
   (e: 'scan'): void
-  (e: 'search', query: string): void
 }>()
 
 const { t } = useI18n()
@@ -154,7 +153,7 @@ function formatIndexingCount(count: number): string {
       </v-col>
 
       <v-col class="mx-2 flex-grow-1">
-        <SearchBar @search="(query: string) => emit('search', query)" @advanced="filterPanelOpen = true" />
+        <SearchBar @advanced="filterPanelOpen = true" />
       </v-col>
 
       <v-col cols="auto">

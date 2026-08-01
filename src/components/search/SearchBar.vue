@@ -12,7 +12,6 @@ import type { FacetGroup, LocationGroup, PhotoTile } from '@/types/search'
 import type { MediaItem } from '@/types/media'
 
 const emit = defineEmits<{
-  (e: 'search', query: string): void
   (e: 'advanced'): void
 }>()
 
@@ -196,13 +195,11 @@ function runSearch(): void {
   const term = searchStore.query.trim()
   if (!term) return
   searchStore.addRecentSearch(term)
-  emit('search', term)
   closeDropdown()
 }
 
 function selectRecent(term: string): void {
   searchStore.setQuery(term)
-  emit('search', term)
   closeDropdown()
 }
 

@@ -57,6 +57,14 @@ function onDateRangeChange(range: [string, string] | null): void {
   }
 }
 
+function qualityValue(): number {
+  return Math.round((searchStore.aestheticsMin ?? 0) * 100)
+}
+
+function setQuality(value: number): void {
+  searchStore.setAestheticsMin(value > 0 ? value / 100 : null)
+}
+
 const activeCount = computed(() => active.value.length)
 </script>
 
@@ -94,7 +102,7 @@ const activeCount = computed(() => active.value.length)
               @click="searchStore.toggleFavoriteOnly()"
             >
               <v-icon start>mdi-star</v-icon>
-              {{ t('search.advanced.favorites') }}
+              {{ t('search.magic.favorites') }}
               <span v-if="facets?.stats" class="ml-1 opacity-75">({{ facets.stats.favorites }})</span>
             </v-chip>
             <v-chip
@@ -103,8 +111,71 @@ const activeCount = computed(() => active.value.length)
               @click="searchStore.toggleVideoOnly()"
             >
               <v-icon start>mdi-video</v-icon>
-              {{ t('search.advanced.videos') }}
+              {{ t('search.magic.videos') }}
               <span v-if="facets?.stats" class="ml-1 opacity-75">({{ facets.stats.videos }})</span>
+            </v-chip>
+            <v-chip
+              :color="searchStore.mediaFilters.facesOnly ? 'primary' : ''"
+              variant="tonal"
+              @click="searchStore.toggleFacesOnly()"
+            >
+              <v-icon start>mdi-face-man</v-icon>
+              {{ t('search.magic.faces') }}
+              <span v-if="facets?.stats" class="ml-1 opacity-75">({{ facets.stats.face_photos }})</span>
+            </v-chip>
+            <v-chip
+              :color="searchStore.mediaFilters.papersOnly ? 'primary' : ''"
+              variant="tonal"
+              @click="searchStore.togglePapersOnly()"
+            >
+              <v-icon start>mdi-file-document-outline</v-icon>
+              {{ t('search.magic.papers') }}
+            </v-chip>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <div class="d-flex align-center justify-space-between mb-2">
+            <div class="text-subtitle-2 text-siegu-subtle">{{ t('search.advanced.quality') }}</div>
+            <span v-if="searchStore.aestheticsMin" class="text-caption font-weight-bold">
+              {{ Math.round(searchStore.aestheticsMin * 100) }}%+
+            </span>
+          </div>
+          <div class="d-flex align-center ga-2">
+            <v-slider
+              :model-value="qualityValue()"
+              min="0"
+              max="100"
+              step="5"
+              hide-details
+              class="flex-1"
+              @update:model-value="setQuality"
+            />
+            <v-btn
+              v-if="searchStore.aestheticsMin"
+              size="x-small"
+              variant="text"
+              @click="searchStore.setAestheticsMin(null)"
+            >
+              {{ t('search.advanced.reset_quality') }}
+            </v-btn>
+          </div>
+        </div>
+
+        <div v-if="facets?.cameras?.length" class="mb-4">
+          <div class="text-subtitle-2 mb-2 text-siegu-subtle">{{ t('search.cameras') }}</div>
+          <div class="filter-chips">
+            <v-chip
+              v-for="cam in facets.cameras"
+              :key="cam.name"
+              :color="searchStore.camera === cam.name ? 'primary' : ''"
+              variant="tonal"
+              size="small"
+              @click="searchStore.setCamera(searchStore.camera === cam.name ? null : cam.name)"
+            >
+              <v-icon start>mdi-camera</v-icon>
+              {{ cam.name }}
+              <span class="ml-1 opacity-75">({{ cam.count }})</span>
             </v-chip>
           </div>
         </div>
@@ -169,47 +240,37 @@ const activeCount = computed(() => active.value.length)
 
         <div v-if="facets?.locations?.length" class="mb-4">
           <div class="text-subtitle-2 mb-2 text-siegu-subtle">{{ t('search.locations') }}</div>
-          <div class="filter-list">
-            <div
+          <div class="filter-chips">
+            <v-chip
               v-for="location in facets.locations"
               :key="location.name"
-              class="filter-item"
-              :class="{ 'filter-item--active': isActive('location', location.name) }"
+              :color="isActive('location', location.name) ? 'primary' : ''"
+              variant="tonal"
+              size="small"
               @click="toggle('location', location.name, location.name)"
             >
-              <v-checkbox
-                :model-value="isActive('location', location.name)"
-                density="compact"
-                hide-details
-                class="mr-1"
-              />
-              <v-icon size="18" class="mr-2">mdi-map-marker</v-icon>
-              <span class="flex-1">{{ location.name }}</span>
-              <span class="text-siegu-subtle">({{ location.count }})</span>
-            </div>
+              <v-icon start>mdi-map-marker</v-icon>
+              {{ location.name }}
+              <span class="ml-1 opacity-75">({{ location.count }})</span>
+            </v-chip>
           </div>
         </div>
 
         <div v-if="facets?.tags?.length" class="mb-4">
           <div class="text-subtitle-2 mb-2 text-siegu-subtle">{{ t('search.tags') }}</div>
-          <div class="filter-list">
-            <div
+          <div class="filter-chips">
+            <v-chip
               v-for="tag in facets.tags"
               :key="tag.name"
-              class="filter-item"
-              :class="{ 'filter-item--active': isActive('tag', tag.name) }"
+              :color="isActive('tag', tag.name) ? 'primary' : ''"
+              variant="tonal"
+              size="small"
               @click="toggle('tag', tag.name, tag.name)"
             >
-              <v-checkbox
-                :model-value="isActive('tag', tag.name)"
-                density="compact"
-                hide-details
-                class="mr-1"
-              />
-              <v-icon size="18" class="mr-2">mdi-tag</v-icon>
-              <span class="flex-1">{{ tag.name }}</span>
-              <span class="text-siegu-subtle">({{ tag.count }})</span>
-            </div>
+              <v-icon start>mdi-tag</v-icon>
+              {{ tag.name }}
+              <span class="ml-1 opacity-75">({{ tag.count }})</span>
+            </v-chip>
           </div>
         </div>
 
@@ -253,5 +314,11 @@ const activeCount = computed(() => active.value.length)
 
 .filter-item--active {
   background: rgba(99, 102, 241, 0.14);
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 </style>

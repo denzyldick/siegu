@@ -105,6 +105,8 @@
       "media_type": "Mediatype",
       "favorites": "Favorieten",
       "videos": "Video's",
+      "quality": "Kwaliteit",
+      "reset_quality": "Resetten",
       "clear_all": "Alles wissen"
     }
   },

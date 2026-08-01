@@ -86,10 +86,6 @@ async function tryAutoReconnect(): Promise<void> {
   }
 }
 
-function handleSearch(_query: string): void {
-  uiStore.setPage('home')
-}
-
 function handleClearSearch(): void {
   searchStore.clearQuery()
   searchStore.clearFilters()
@@ -119,10 +115,10 @@ function removeFilterChip(index: number): void {
 
     <template v-else>
       <AppToolbar
+        v-if="currentPage === 'home'"
         :is-active="scanStore.isActive"
         :status-label="scanStore.isActive ? t('sync.indexing') : t('sync.refresh')"
         @scan="appStore.startScan()"
-        @search="handleSearch"
       />
 
       <v-main class="bg-siegu-main">
@@ -132,6 +128,7 @@ function removeFilterChip(index: number): void {
             <div
               v-if="currentPage === 'home' && searchStore.activeFilters.length"
               class="d-flex align-center flex-wrap px-4 pt-2 ga-2"
+              style="max-width: 980px; margin: 0 auto"
             >
               <v-chip
                 v-for="(filter, index) in searchStore.activeFilters"

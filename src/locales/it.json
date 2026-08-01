@@ -105,6 +105,8 @@
       "media_type": "Tipo di supporto",
       "favorites": "Preferiti",
       "videos": "Video",
+      "quality": "Qualità",
+      "reset_quality": "Ripristina",
       "clear_all": "Cancella tutto"
     }
   },
