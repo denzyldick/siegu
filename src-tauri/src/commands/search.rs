@@ -26,9 +26,14 @@ pub struct SearchFacetCount {
 pub struct SearchFacets {
     pub people: Vec<SearchFacetGroup>,
     pub unnamed_faces: Vec<SearchFacetGroup>,
-    pub locations: Vec<SearchFacetCount>,
+    pub locations: Vec<database::LocationGroup>,
     pub tags: Vec<SearchFacetCount>,
+    pub papers: Vec<SearchFacetCount>,
+    pub cameras: Vec<SearchFacetCount>,
     pub months: Vec<SearchFacetCount>,
+    pub best_photos: Vec<database::SearchPhotoTile>,
+    pub favorite_photos: Vec<database::SearchPhotoTile>,
+    pub recent_photos: Vec<database::SearchPhotoTile>,
     pub stats: database::SearchStats,
 }
 
@@ -77,13 +82,19 @@ pub fn do_get_search_facets(db: &Database) -> SearchFacets {
             )
         })
         .collect();
-    let locations = db
-        .get_location_counts(25)
+    let locations = db.get_location_groups(25);
+    let tags = db
+        .get_tag_counts(40)
         .into_iter()
         .map(|(name, count)| SearchFacetCount { name, count })
         .collect();
-    let tags = db
-        .get_tag_counts(40)
+    let papers = db
+        .get_paper_counts(8)
+        .into_iter()
+        .map(|(name, count)| SearchFacetCount { name, count })
+        .collect();
+    let cameras = db
+        .get_camera_counts(12)
         .into_iter()
         .map(|(name, count)| SearchFacetCount { name, count })
         .collect();
@@ -98,7 +109,12 @@ pub fn do_get_search_facets(db: &Database) -> SearchFacets {
         unnamed_faces,
         locations,
         tags,
+        papers,
+        cameras,
         months,
+        best_photos: db.get_best_photos(8),
+        favorite_photos: db.get_favorite_photos(8),
+        recent_photos: db.get_recent_photos(8),
         stats: db.get_search_stats(),
     }
 }
@@ -167,16 +183,42 @@ mod tests {
                 (),
             )
             .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO photo (id, location, created, encoded, aesthetics_score) VALUES ('p2', '/b.jpg', '2026-03-02', 'thumb', 0.95)",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO properties (photo_id, key, value) VALUES ('p2', 'Make', 'Sony')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO object (photo_id, class, probability) VALUES ('p1', 'a receipt', '0.9')",
+                (),
+            )
+            .unwrap();
 
         let facets = do_get_search_facets(&db);
-        assert_eq!(facets.stats.photos, 1);
+        assert_eq!(facets.stats.photos, 2);
         assert_eq!(facets.locations.len(), 1);
         assert_eq!(facets.locations[0].name, "Paris, France");
         assert_eq!(facets.locations[0].count, 1);
-        assert_eq!(facets.tags.len(), 2);
+        assert_eq!(facets.tags.len(), 3);
         assert_eq!(facets.people.len(), 1);
         assert_eq!(facets.people[0].name.as_deref(), Some("Alice"));
         assert_eq!(facets.people[0].count, 1);
+        assert_eq!(facets.papers.len(), 1);
+        assert_eq!(facets.papers[0].name, "a receipt");
+        assert_eq!(facets.cameras.len(), 1);
+        assert_eq!(facets.cameras[0].name, "Sony");
+        assert_eq!(facets.best_photos.len(), 1);
+        assert_eq!(facets.best_photos[0].id, "p2");
+        assert_eq!(facets.best_photos[0].aesthetics_score, Some(0.95));
+        assert_eq!(facets.recent_photos.len(), 2);
     }
 
     #[test]

@@ -23,6 +23,11 @@ pub fn do_list_files(
         None,
         None,
         None,
+        false,
+        None,
+        None,
+        false,
+        false,
     )
 }
 
@@ -40,6 +45,11 @@ pub fn do_list_files_filtered(
     tag: Option<String>,
     date_from: Option<String>,
     date_to: Option<String>,
+    has_faces: bool,
+    aesthetics_min: Option<f64>,
+    camera: Option<String>,
+    papers: bool,
+    random: bool,
 ) -> Vec<Photo> {
     let filter = crate::database::PhotoFilter {
         person_id,
@@ -47,6 +57,12 @@ pub fn do_list_files_filtered(
         tag,
         date_from,
         date_to,
+        favorite: favorites_only,
+        has_faces,
+        aesthetics_min,
+        camera,
+        papers,
+        random,
     };
     db.list_photos_filtered(query, offset, limit, favorites_only, videos_only, &filter)
 }
@@ -94,6 +110,11 @@ pub async fn list_files(
     tag: Option<String>,
     date_from: Option<String>,
     date_to: Option<String>,
+    has_faces: bool,
+    aesthetics_min: Option<f64>,
+    camera: Option<String>,
+    papers: bool,
+    random: bool,
 ) -> Result<String, String> {
     let path = get_config_path(&app);
     if path.is_empty() {
@@ -115,6 +136,11 @@ pub async fn list_files(
         tag,
         date_from,
         date_to,
+        has_faces,
+        aesthetics_min,
+        camera,
+        papers,
+        random,
     ))
     .unwrap_or("[]".to_string()))
 }

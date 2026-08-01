@@ -32,6 +32,53 @@ pub struct SearchStats {
     pub ocr_photos: i64,
     pub faces: i64,
     pub named_people: i64,
+    /// Photos containing at least one detected face.
+    pub face_photos: i64,
+}
+
+/// A lightweight photo used by the discovery rails (best shots, favorites,
+/// recent). Carries just enough to render a thumbnail and a badge.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct SearchPhotoTile {
+    pub id: String,
+    pub location: String,
+    pub encoded: String,
+    pub created: String,
+    pub aesthetics_score: Option<f64>,
+    pub favorite: bool,
+}
+
+/// A resolved location with a representative photo thumbnail so the discovery
+/// rail can show a real preview instead of a bare label.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct LocationGroup {
+    pub name: String,
+    pub count: i64,
+    pub photo_location: Option<String>,
+    pub encoded: Option<String>,
+}
+
+/// CLIP zero-shot classes that correspond to documents, receipts and
+/// screenshots, powering the "Papers & screenshots" section and filter.
+pub const PAPER_CLASSES: &[&str] = &[
+    "a passport",
+    "a driver's license",
+    "an id card",
+    "a document",
+    "a receipt",
+    "a screenshot",
+    "a meme",
+    "a text message",
+];
+
+/// Builds a SQL-safe `IN (...)` clause from the paper class list, escaping
+/// embedded quotes so labels like "a driver's license" stay valid literals.
+fn paper_class_in_clause() -> String {
+    PAPER_CLASSES
+        .iter()
+        .map(|c| format!("'{}'", c.replace('\'', "''")))
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 /// Optional facet filters combined with AND against the media list.
@@ -42,6 +89,18 @@ pub struct PhotoFilter {
     pub tag: Option<String>,
     pub date_from: Option<String>,
     pub date_to: Option<String>,
+    /// Only photos marked as favorites.
+    pub favorite: bool,
+    /// Only photos containing at least one detected face.
+    pub has_faces: bool,
+    /// Only photos whose aesthetics score is at least this value.
+    pub aesthetics_min: Option<f64>,
+    /// Only photos shot with a camera whose Make or Model contains this value.
+    pub camera: Option<String>,
+    /// Only photos whose object classes are documents/screenshots (CLIP).
+    pub papers: bool,
+    /// Random order instead of newest-first (used by "Surprise me").
+    pub random: bool,
 }
 
 /// Persisted sync session for auto-reconnect on app restart.
@@ -895,10 +954,42 @@ impl Database {
             facet_filters.push_str(&format!(" AND p.created <= ?{slot}"));
             extra_params.push(Box::new(date_to.clone()));
         }
+        if filter.favorite {
+            facet_filters.push_str(
+                " AND EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite')",
+            );
+        }
+        if filter.has_faces {
+            facet_filters.push_str(" AND EXISTS(SELECT 1 FROM faces WHERE photo_id=p.id)");
+        }
+        if let Some(ref aesthetics_min) = filter.aesthetics_min {
+            slot += 1;
+            facet_filters.push_str(&format!(" AND p.aesthetics_score >= ?{slot}"));
+            extra_params.push(Box::new(*aesthetics_min));
+        }
+        if let Some(ref camera) = filter.camera {
+            slot += 1;
+            facet_filters.push_str(&format!(
+                " AND EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key IN ('Make','Model') AND value LIKE ?{slot})"
+            ));
+            extra_params.push(Box::new(format!("%{camera}%")));
+        }
+        if filter.papers {
+            facet_filters.push_str(&format!(
+                " AND EXISTS(SELECT 1 FROM object WHERE photo_id=p.id AND class IN ({paper_in}))",
+                paper_in = paper_class_in_clause()
+            ));
+        }
+
+        let order_by = if filter.random {
+            "ORDER BY RANDOM()"
+        } else {
+            "ORDER BY p.created DESC"
+        };
 
         let sql = format!("SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, 
             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received 
-            FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE 1=1 {fav_filter} {video_filter} {q_filter} {facet_filters} ORDER BY p.created DESC LIMIT ?1, ?2");
+            FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE 1=1 {fav_filter} {video_filter} {q_filter} {facet_filters} {order_by} LIMIT ?1, ?2");
         if let Ok(mut stmt) = self.connection.prepare(&sql) {
             let q_param = if is_uuid {
                 query.to_string()
@@ -1050,7 +1141,176 @@ impl Database {
             ocr_photos: query_count("SELECT COUNT(DISTINCT photo_id) FROM ocr"),
             faces: query_count("SELECT COUNT(*) FROM faces"),
             named_people: query_count("SELECT COUNT(*) FROM people WHERE name IS NOT NULL"),
+            face_photos: query_count("SELECT COUNT(DISTINCT photo_id) FROM faces"),
         }
+    }
+
+    /// Highest-rated photos by aesthetics score, for the "Best of your library" rail.
+    pub fn get_best_photos(&self, limit: i64) -> Vec<SearchPhotoTile> {
+        let mut tiles = Vec::new();
+        let sql = "SELECT p.id, p.location, p.encoded, p.created, p.aesthetics_score, \
+            EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite') \
+            FROM photo p WHERE p.aesthetics_score IS NOT NULL AND p.aesthetics_score > 0 \
+            ORDER BY p.aesthetics_score DESC LIMIT ?1";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) = stmt.query_map([limit], |row| {
+                Ok(SearchPhotoTile {
+                    id: row.get(0)?,
+                    location: row.get(1)?,
+                    encoded: row.get(2).unwrap_or_default(),
+                    created: row.get(3).unwrap_or_default(),
+                    aesthetics_score: row.get(4).ok(),
+                    favorite: row.get(5).unwrap_or(false),
+                })
+            }) {
+                for t in iter.flatten() {
+                    tiles.push(t);
+                }
+            }
+        }
+        tiles
+    }
+
+    /// Favorited photos, newest first, for the Favorites rail.
+    pub fn get_favorite_photos(&self, limit: i64) -> Vec<SearchPhotoTile> {
+        let mut tiles = Vec::new();
+        let sql = "SELECT p.id, p.location, p.encoded, p.created, p.aesthetics_score, 1 \
+            FROM photo p WHERE EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite') \
+            ORDER BY p.created DESC LIMIT ?1";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) = stmt.query_map([limit], |row| {
+                Ok(SearchPhotoTile {
+                    id: row.get(0)?,
+                    location: row.get(1)?,
+                    encoded: row.get(2).unwrap_or_default(),
+                    created: row.get(3).unwrap_or_default(),
+                    aesthetics_score: row.get(4).ok(),
+                    favorite: row.get(5).unwrap_or(false),
+                })
+            }) {
+                for t in iter.flatten() {
+                    tiles.push(t);
+                }
+            }
+        }
+        tiles
+    }
+
+    /// Most recently added photos for the Recent rail.
+    pub fn get_recent_photos(&self, limit: i64) -> Vec<SearchPhotoTile> {
+        let mut tiles = Vec::new();
+        let sql = "SELECT p.id, p.location, p.encoded, p.created, p.aesthetics_score, \
+            EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite') \
+            FROM photo p ORDER BY p.created DESC, p.id DESC LIMIT ?1";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) = stmt.query_map([limit], |row| {
+                Ok(SearchPhotoTile {
+                    id: row.get(0)?,
+                    location: row.get(1)?,
+                    encoded: row.get(2).unwrap_or_default(),
+                    created: row.get(3).unwrap_or_default(),
+                    aesthetics_score: row.get(4).ok(),
+                    favorite: row.get(5).unwrap_or(false),
+                })
+            }) {
+                for t in iter.flatten() {
+                    tiles.push(t);
+                }
+            }
+        }
+        tiles
+    }
+
+    /// Document/screenshot classes (CLIP zero-shot) with photo counts.
+    pub fn get_paper_counts(&self, limit: i64) -> Vec<(String, i64)> {
+        let mut counts = Vec::new();
+        let sql = format!(
+            "SELECT class, COUNT(*) FROM object WHERE class IN ({paper_in}) \
+        GROUP BY class ORDER BY COUNT(*) DESC LIMIT ?1",
+            paper_in = paper_class_in_clause()
+        );
+        if let Ok(mut stmt) = self.connection.prepare(&sql) {
+            if let Ok(iter) = stmt.query_map([limit], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            }) {
+                for c in iter.flatten() {
+                    counts.push(c);
+                }
+            }
+        }
+        counts
+    }
+
+    /// Camera identifiers (Make + Model from EXIF) with photo counts, most common first.
+    pub fn get_camera_counts(&self, limit: i64) -> Vec<(String, i64)> {
+        let mut by_photo: std::collections::HashMap<String, (Option<String>, Option<String>)> =
+            std::collections::HashMap::new();
+        let sql = "SELECT photo_id, key, value FROM properties WHERE key IN ('Make','Model')";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) = stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            }) {
+                for r in iter.flatten() {
+                    let (pid, key, value) = r;
+                    let entry = by_photo.entry(pid).or_default();
+                    if key == "Make" {
+                        entry.0 = Some(value);
+                    } else {
+                        entry.1 = Some(value);
+                    }
+                }
+            }
+        }
+        let mut counts: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+        for (_, (make, model)) in by_photo {
+            let label = match (make, model) {
+                (Some(m), Some(md)) if !md.is_empty() => format!("{m} {md}").trim().to_string(),
+                (Some(m), _) => m,
+                (_, Some(md)) => md,
+                _ => continue,
+            };
+            if label.is_empty() {
+                continue;
+            }
+            *counts.entry(label).or_insert(0) += 1;
+        }
+        let mut sorted: Vec<(String, i64)> = counts.into_iter().collect();
+        sorted.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        sorted.truncate(limit as usize);
+        sorted
+    }
+
+    /// Locations with counts and a representative photo thumbnail for the rail.
+    pub fn get_location_groups(&self, limit: i64) -> Vec<LocationGroup> {
+        let mut groups = Vec::new();
+        let sql = "SELECT pr.value AS name, COUNT(*) AS cnt, \
+            (SELECT p2.location FROM photo p2 JOIN properties pr2 ON pr2.photo_id=p2.id \
+                WHERE pr2.key='location_name' AND pr2.value=pr.value \
+                ORDER BY (p2.encoded != '') DESC, p2.created DESC LIMIT 1) AS rep_loc, \
+            (SELECT p2.encoded FROM photo p2 JOIN properties pr2 ON pr2.photo_id=p2.id \
+                WHERE pr2.key='location_name' AND pr2.value=pr.value \
+                ORDER BY (p2.encoded != '') DESC, p2.created DESC LIMIT 1) AS rep_enc \
+            FROM properties pr WHERE pr.key='location_name' \
+            GROUP BY pr.value ORDER BY cnt DESC LIMIT ?1";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) = stmt.query_map([limit], |row| {
+                Ok(LocationGroup {
+                    name: row.get(0)?,
+                    count: row.get(1)?,
+                    photo_location: row.get(2).ok(),
+                    encoded: row.get(3).ok(),
+                })
+            }) {
+                for g in iter.flatten() {
+                    groups.push(g);
+                }
+            }
+        }
+        groups
     }
 
     /// Toggle the favorite status of a photo. Returns true if now favorited.
@@ -2990,6 +3250,159 @@ mod tests {
         assert_eq!(stats.ocr_photos, 1);
         assert_eq!(stats.faces, 1);
         assert_eq!(stats.named_people, 1);
+        assert_eq!(stats.face_photos, 1);
+    }
+
+    #[test]
+    fn test_discovery_photo_rails_and_groups() {
+        let mut db = test_db();
+        for (id, created, aesthetics) in [
+            ("p1", "2026-03-01", Some(0.9)),
+            ("p2", "2026-02-10", Some(0.5)),
+            ("p3", "2026-01-05", None),
+        ] {
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded, aesthetics_score) VALUES (?1, ?2, ?3, '', ?4)",
+                    (id, format!("/{id}.jpg"), created, aesthetics),
+                )
+                .unwrap();
+        }
+        db.connection
+            .execute(
+                "INSERT INTO properties (photo_id, key, value) VALUES ('p2', 'favorite', 'true')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'location_name', 'Paris, France')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'Make', 'Apple')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'Model', 'iPhone 15 Pro')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO object (photo_id, class, probability) VALUES ('p1', 'a receipt', '0.9')",
+                (),
+            )
+            .unwrap();
+
+        let best = db.get_best_photos(10);
+        assert_eq!(best.len(), 2);
+        assert_eq!(best[0].id, "p1");
+        assert_eq!(best[0].aesthetics_score, Some(0.9));
+
+        let favs = db.get_favorite_photos(10);
+        assert_eq!(favs.len(), 1);
+        assert_eq!(favs[0].id, "p2");
+        assert!(favs[0].favorite);
+
+        let recent = db.get_recent_photos(10);
+        assert_eq!(recent.len(), 3);
+        assert_eq!(recent[0].id, "p1");
+
+        let papers = db.get_paper_counts(10);
+        assert_eq!(papers, vec![("a receipt".to_string(), 1)]);
+
+        let cameras = db.get_camera_counts(10);
+        assert_eq!(cameras, vec![("Apple iPhone 15 Pro".to_string(), 1)]);
+
+        let groups = db.get_location_groups(10);
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].name, "Paris, France");
+        assert_eq!(groups[0].count, 1);
+    }
+
+    #[test]
+    fn test_list_photos_new_facet_filters() {
+        let mut db = test_db();
+        for (id, created, aesthetics) in [
+            ("p1", "2026-03-01", Some(0.9)),
+            ("p2", "2026-02-10", Some(0.4)),
+        ] {
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded, aesthetics_score) VALUES (?1, ?2, ?3, '', ?4)",
+                    (id, format!("/{id}.jpg"), created, aesthetics),
+                )
+                .unwrap();
+        }
+        db.connection
+            .execute(
+                "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'favorite', 'true')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'Make', 'Sony')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO faces (photo_id, face_id) VALUES ('p1', 'f1')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO object (photo_id, class, probability) VALUES ('p1', 'a screenshot', '0.9')",
+                (),
+            )
+            .unwrap();
+
+        let filter = |f: PhotoFilter| db.list_photos_filtered("", 0, 100, false, false, &f);
+
+        let favs = filter(PhotoFilter {
+            favorite: true,
+            ..Default::default()
+        });
+        assert_eq!(favs.len(), 1);
+        assert_eq!(favs[0].id, "p1");
+
+        let faces = filter(PhotoFilter {
+            has_faces: true,
+            ..Default::default()
+        });
+        assert_eq!(faces.len(), 1);
+
+        let quality = filter(PhotoFilter {
+            aesthetics_min: Some(0.6),
+            ..Default::default()
+        });
+        assert_eq!(quality.len(), 1);
+        assert_eq!(quality[0].id, "p1");
+
+        let sony = filter(PhotoFilter {
+            camera: Some("Sony".into()),
+            ..Default::default()
+        });
+        assert_eq!(sony.len(), 1);
+
+        let papers = filter(PhotoFilter {
+            papers: true,
+            ..Default::default()
+        });
+        assert_eq!(papers.len(), 1);
+
+        let random = filter(PhotoFilter {
+            random: true,
+            ..Default::default()
+        });
+        assert_eq!(random.len(), 2);
     }
 
     fn make_photo(id: &str, location: &str) -> Photo {
