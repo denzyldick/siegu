@@ -1,165 +1,180 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { dayCounts } from '@/services/tauri'
-import type { DayCount } from '@/types/search'
+import { computed, onMounted, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { dayCounts } from '@/services/tauri';
+import type { DayCount } from '@/types/search';
 
 const props = defineProps<{
-  modelValue: [string, string] | null
-}>()
+  modelValue: [string, string] | null;
+}>();
 
 const emit = defineEmits<{
-  'update:modelValue': [value: [string, string] | null]
-}>()
+  'update:modelValue': [value: [string, string] | null];
+}>();
 
-const { t } = useI18n()
+const { t } = useI18n();
 
-const viewYear = ref<number>(new Date().getFullYear())
-const viewMonth = ref<number>(new Date().getMonth())
-const counts = ref<DayCount[]>([])
-let fetchTimer: ReturnType<typeof setTimeout> | null = null
+const viewYear = ref<number>(new Date().getFullYear());
+const viewMonth = ref<number>(new Date().getMonth());
+const counts = ref<DayCount[]>([]);
+let fetchTimer: ReturnType<typeof setTimeout> | null = null;
 
-const locale = localStorage.getItem('siegu_language') || 'en'
+const locale = localStorage.getItem('siegu_language') || 'en';
 
 const weekdayLabels = computed(() => {
-  const base = new Date(2024, 0, 1)
-  const labels: string[] = []
+  const base = new Date(2024, 0, 1);
+  const labels: string[] = [];
   for (let i = 1; i <= 7; i++) {
-    const d = new Date(base)
-    d.setDate(base.getDate() + i)
-    labels.push(d.toLocaleDateString(locale, { weekday: 'short' }))
+    const d = new Date(base);
+    d.setDate(base.getDate() + i);
+    labels.push(d.toLocaleDateString(locale, { weekday: 'short' }));
   }
-  return labels
-})
+  return labels;
+});
 
 const monthLabel = computed(() => {
-  const d = new Date(viewYear.value, viewMonth.value, 1)
-  const label = d.toLocaleDateString(locale, { month: 'long', year: 'numeric' })
-  return label.charAt(0).toUpperCase() + label.slice(1)
-})
+  const d = new Date(viewYear.value, viewMonth.value, 1);
+  const label = d.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+});
 
 const countsByDate = computed<Record<string, { photos: number; videos: number }>>(() => {
-  const map: Record<string, { photos: number; videos: number }> = {}
+  const map: Record<string, { photos: number; videos: number }> = {};
   for (const c of counts.value) {
-    map[c.date] = { photos: c.photos, videos: c.videos }
+    map[c.date] = { photos: c.photos, videos: c.videos };
   }
-  return map
-})
+  return map;
+});
 
 const cells = computed<
-  { key: string; date: string | null; day: number; count: { photos: number; videos: number } | null }[]
+  {
+    key: string;
+    date: string | null;
+    day: number;
+    count: { photos: number; videos: number } | null;
+  }[]
 >(() => {
-  const first = new Date(viewYear.value, viewMonth.value, 1)
-  const daysInMonth = new Date(viewYear.value, viewMonth.value + 1, 0).getDate()
-  const offset = (first.getDay() + 6) % 7
+  const first = new Date(viewYear.value, viewMonth.value, 1);
+  const daysInMonth = new Date(viewYear.value, viewMonth.value + 1, 0).getDate();
+  const offset = (first.getDay() + 6) % 7;
   const result: {
-    key: string
-    date: string | null
-    day: number
-    count: { photos: number; videos: number } | null
-  }[] = []
+    key: string;
+    date: string | null;
+    day: number;
+    count: { photos: number; videos: number } | null;
+  }[] = [];
   for (let i = 0; i < offset; i++) {
-    result.push({ key: `pad-${i}`, date: null, day: 0, count: null })
+    result.push({ key: `pad-${i}`, date: null, day: 0, count: null });
   }
   for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${viewYear.value}-${String(viewMonth.value + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-    result.push({ key: dateStr, date: dateStr, day: d, count: countsByDate.value[dateStr] ?? null })
+    const dateStr = `${viewYear.value}-${String(viewMonth.value + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    result.push({
+      key: dateStr,
+      date: dateStr,
+      day: d,
+      count: countsByDate.value[dateStr] ?? null,
+    });
   }
-  return result
-})
+  return result;
+});
 
-const displayRange = ref<[string, string] | null>(null)
+const displayRange = ref<[string, string] | null>(null);
+let pendingStart: string | null = null;
 
 watch(
   () => props.modelValue,
   (value) => {
-    displayRange.value = value
+    displayRange.value = value;
+    if (!value) pendingStart = null;
   },
   { immediate: true },
-)
+);
 
 function isStart(date: string): boolean {
-  return displayRange.value !== null && displayRange.value[0] === date
+  return displayRange.value !== null && displayRange.value[0] === date;
 }
 
 function isEnd(date: string): boolean {
-  return displayRange.value !== null && displayRange.value[1] === date
+  return displayRange.value !== null && displayRange.value[1] === date;
 }
 
 function isInRange(date: string): boolean {
-  if (!displayRange.value) return false
-  const [a, b] = displayRange.value
-  return date > a && date < b
+  if (!displayRange.value) return false;
+  const [a, b] = displayRange.value;
+  return date > a && date < b;
 }
 
 function selectDate(date: string): void {
-  const current = displayRange.value
-  if (!current || (current[0] && current[1])) {
-    displayRange.value = [date, date]
-    return
+  if (pendingStart === null) {
+    pendingStart = date;
+    displayRange.value = [date, date];
+    emit('update:modelValue', [date, date]);
+    return;
   }
-  const from = current[0] < date ? current[0] : date
-  const to = current[0] < date ? date : current[0]
-  const complete: [string, string] = [from, to]
-  displayRange.value = complete
-  emit('update:modelValue', complete)
+  const from = pendingStart < date ? pendingStart : date;
+  const to = pendingStart < date ? date : pendingStart;
+  pendingStart = null;
+  const complete: [string, string] = [from, to];
+  displayRange.value = complete;
+  emit('update:modelValue', complete);
 }
 
 function clear(): void {
-  displayRange.value = null
-  emit('update:modelValue', null)
+  pendingStart = null;
+  displayRange.value = null;
+  emit('update:modelValue', null);
 }
 
 function prevMonth(): void {
   if (viewMonth.value === 0) {
-    viewMonth.value = 11
-    viewYear.value -= 1
+    viewMonth.value = 11;
+    viewYear.value -= 1;
   } else {
-    viewMonth.value -= 1
+    viewMonth.value -= 1;
   }
 }
 
 function nextMonth(): void {
   if (viewMonth.value === 11) {
-    viewMonth.value = 0
-    viewYear.value += 1
+    viewMonth.value = 0;
+    viewYear.value += 1;
   } else {
-    viewMonth.value += 1
+    viewMonth.value += 1;
   }
 }
 
 function todayStr(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
 function goToday(): void {
-  const now = new Date()
-  viewYear.value = now.getFullYear()
-  viewMonth.value = now.getMonth()
+  const now = new Date();
+  viewYear.value = now.getFullYear();
+  viewMonth.value = now.getMonth();
 }
 
 async function fetchCounts(): Promise<void> {
-  const first = `${viewYear.value}-${String(viewMonth.value + 1).padStart(2, '0')}-01`
-  const last = `${viewYear.value}-${String(viewMonth.value + 1).padStart(2, '0')}-31`
+  const first = `${viewYear.value}-${String(viewMonth.value + 1).padStart(2, '0')}-01`;
+  const last = `${viewYear.value}-${String(viewMonth.value + 1).padStart(2, '0')}-31`;
   try {
-    counts.value = await dayCounts(first, last)
+    counts.value = await dayCounts(first, last);
   } catch (error) {
-    console.error('[DateRangePicker] Failed to load day counts:', error)
-    counts.value = []
+    console.error('[DateRangePicker] Failed to load day counts:', error);
+    counts.value = [];
   }
 }
 
 watch([viewYear, viewMonth], () => {
-  if (fetchTimer) clearTimeout(fetchTimer)
+  if (fetchTimer) clearTimeout(fetchTimer);
   fetchTimer = setTimeout(() => {
-    void fetchCounts()
-  }, 120)
-})
+    void fetchCounts();
+  }, 120);
+});
 
 onMounted(() => {
-  void fetchCounts()
-})
+  void fetchCounts();
+});
 </script>
 
 <template>
@@ -213,7 +228,9 @@ onMounted(() => {
           <span class="drp-day">{{ cell.day }}</span>
           <span v-if="cell.count" class="drp-counts">
             <span class="drp-count drp-count--photos">{{ cell.count.photos }}</span>
-            <span v-if="cell.count.videos" class="drp-count drp-count--videos">{{ cell.count.videos }}</span>
+            <span v-if="cell.count.videos" class="drp-count drp-count--videos">{{
+              cell.count.videos
+            }}</span>
           </span>
         </template>
       </button>

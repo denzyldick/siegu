@@ -1,189 +1,196 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useSearchStore } from '@/stores/search'
-import {
-  getFaceImageSrc,
-  getMediaThumbnailSrc,
-} from '@/composables/useMediaUtils'
-import { listFiles } from '@/services/tauri'
-import DateRangePicker from '@/components/search/DateRangePicker.vue'
-import type { FacetGroup, LocationGroup, PhotoTile } from '@/types/search'
-import type { MediaItem } from '@/types/media'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useSearchStore } from '@/stores/search';
+import { getFaceImageSrc, getMediaThumbnailSrc } from '@/composables/useMediaUtils';
+import { listFiles } from '@/services/tauri';
+import DateRangePicker from '@/components/search/DateRangePicker.vue';
+import BrandIcon from '@/components/search/BrandIcon.vue';
+import { brandMeta } from '@/components/search/brands';
+import type { FacetGroup, LocationGroup, PhotoTile } from '@/types/search';
+import type { MediaItem } from '@/types/media';
 
-const { t } = useI18n()
-const searchStore = useSearchStore()
+const { t } = useI18n();
+const searchStore = useSearchStore();
 
-const searchWrapRef = ref<HTMLElement | null>(null)
-const dropdownOpen = ref(false)
-const dropdownStyle = ref<Record<string, string>>({})
-const inlineResults = ref<MediaItem[]>([])
-const inlineLoading = ref(false)
-let searchTimer: ReturnType<typeof setTimeout> | null = null
-let fetchTimer: ReturnType<typeof setTimeout> | null = null
+const searchWrapRef = ref<HTMLElement | null>(null);
+const dropdownOpen = ref(false);
+const dropdownStyle = ref<Record<string, string>>({});
+const inlineResults = ref<MediaItem[]>([]);
+const inlineLoading = ref(false);
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
+let fetchTimer: ReturnType<typeof setTimeout> | null = null;
 
-const facets = computed(() => searchStore.facets)
-const stats = computed(() => facets.value?.stats ?? null)
+const facets = computed(() => searchStore.facets);
+const stats = computed(() => facets.value?.stats ?? null);
 
-const q = computed(() => searchStore.query.trim().toLowerCase())
+const q = computed(() => searchStore.query.trim().toLowerCase());
 
 function matches(value: string): boolean {
-  return value.toLowerCase().includes(q.value)
+  return value.toLowerCase().includes(q.value);
 }
 
 const namedPeople = computed(() =>
   (facets.value?.people ?? []).filter((p) => !q.value || matches(p.name ?? '')),
-)
+);
 
 const unnamedPeople = computed(() =>
   (facets.value?.unnamed_faces ?? []).filter((p) => !q.value || matches(p.name ?? '')),
-)
+);
 
 const peopleRow = computed(() => {
-  const named = namedPeople.value.slice(0, q.value ? 12 : 14)
-  const unnamed = unnamedPeople.value.slice(0, q.value ? 8 : 10)
-  return [...named, ...unnamed]
-})
+  const named = namedPeople.value.slice(0, q.value ? 12 : 14);
+  const unnamed = unnamedPeople.value.slice(0, q.value ? 8 : 10);
+  return [...named, ...unnamed];
+});
 
 const locations = computed(() =>
   (facets.value?.locations ?? []).filter((l) => !q.value || matches(l.name)),
-)
+);
 
-const tags = computed(() => (facets.value?.tags ?? []).filter((l) => !q.value || matches(l.name)))
+const tags = computed(() => (facets.value?.tags ?? []).filter((l) => !q.value || matches(l.name)));
 
 const papers = computed(() =>
   (facets.value?.papers ?? []).filter((p) => !q.value || matches(p.name)),
-)
+);
 
 const cameras = computed(() =>
   (facets.value?.cameras ?? []).filter((c) => !q.value || matches(c.name)),
-)
+);
 
-const dateRange = computed(() => searchStore.dateRange)
+const cameraChips = computed(() =>
+  cameras.value.map((c) => ({ ...c, hasBrand: brandMeta(c.name) !== null })),
+);
 
-const bestPhotos = computed(() => (facets.value?.best_photos ?? []).slice(0, 10))
+const dateRange = computed(() => searchStore.dateRange);
 
-const recentSearches = computed(() => searchStore.recentSearches)
+const bestPhotos = computed(() => (facets.value?.best_photos ?? []).slice(0, 10));
 
-const isMobile = computed(() => window.innerWidth < 640)
+const recentSearches = computed(() => searchStore.recentSearches);
+
+const isMobile = computed(() => window.innerWidth < 640);
 
 function faceSrc(person: FacetGroup): string {
-  return getFaceImageSrc(person.representative_crop, person.encoded)
+  return getFaceImageSrc(person.representative_crop, person.encoded);
 }
 
 function tileSrc(tile: PhotoTile): string {
-  return getMediaThumbnailSrc(tile.location, tile.encoded, true)
+  return getMediaThumbnailSrc(tile.location, tile.encoded, true);
 }
 
 function locationSrc(group: LocationGroup): string {
-  return getMediaThumbnailSrc(group.photo_location ?? '', group.encoded ?? '', true)
+  return getMediaThumbnailSrc(group.photo_location ?? '', group.encoded ?? '', true);
 }
 
 function repositionDropdown(): void {
-  const rect = searchWrapRef.value?.getBoundingClientRect()
-  if (!rect) return
-  const viewportH = window.innerHeight
-  const margin = 12
-  const below = viewportH - rect.bottom - margin
-  const above = rect.top - margin
-  const flipUp = below < Math.min(320, above)
+  const rect = searchWrapRef.value?.getBoundingClientRect();
+  if (!rect) return;
+  const viewportH = window.innerHeight;
+  const margin = 12;
+  const below = viewportH - rect.bottom - margin;
+  const above = rect.top - margin;
+  const flipUp = below < Math.min(320, above);
   const styles: Record<string, string> = {
     position: 'fixed',
     zIndex: '5000',
-  }
+  };
   if (isMobile.value) {
-    styles.left = '8px'
-    styles.right = '8px'
+    styles.left = '8px';
+    styles.right = '8px';
   } else {
-    styles.width = `${Math.min(660, Math.max(520, rect.width))}px`
-    styles.left = `${Math.max(8, rect.left + rect.width / 2 - 330)}px`
+    styles.width = `${Math.min(660, Math.max(520, rect.width))}px`;
+    styles.left = `${Math.max(8, rect.left + rect.width / 2 - 330)}px`;
   }
   if (flipUp) {
-    styles.bottom = `${viewportH - rect.top + margin}px`
-    styles.top = 'auto'
-    styles.maxHeight = `${Math.min(720, above)}px`
+    styles.bottom = `${viewportH - rect.top + margin}px`;
+    styles.top = 'auto';
+    styles.maxHeight = `${Math.min(720, above)}px`;
   } else {
-    styles.top = `${rect.bottom + margin}px`
-    styles.bottom = 'auto'
-    styles.maxHeight = `${Math.min(720, below)}px`
+    styles.top = `${rect.bottom + margin}px`;
+    styles.bottom = 'auto';
+    styles.maxHeight = `${Math.min(720, below)}px`;
   }
-  dropdownStyle.value = styles
+  dropdownStyle.value = styles;
 }
 
 function openDropdown(): void {
-  dropdownOpen.value = true
-  repositionDropdown()
+  dropdownOpen.value = true;
+  repositionDropdown();
   if (!searchStore.facets) {
-    searchStore.loadFacets()
+    searchStore.loadFacets();
   }
 }
 
 function closeDropdown(): void {
-  dropdownOpen.value = false
+  dropdownOpen.value = false;
 }
 
 function selectPerson(person: FacetGroup): void {
   searchStore.addFilter({
     type: 'person',
     value: person.id,
-    label: person.name ?? t('people.unnamed'),
-  })
-  closeDropdown()
+    label: person.name ?? '',
+  });
+  closeDropdown();
 }
 
 function selectLocation(name: string): void {
-  searchStore.addFilter({ type: 'location', value: name, label: name })
-  closeDropdown()
+  searchStore.addFilter({ type: 'location', value: name, label: name });
+  closeDropdown();
 }
 
 function selectTag(name: string): void {
-  searchStore.addFilter({ type: 'tag', value: name, label: name })
-  closeDropdown()
+  searchStore.addFilter({ type: 'tag', value: name, label: name });
+  closeDropdown();
 }
 
 function selectPaper(name: string): void {
-  searchStore.addFilter({ type: 'tag', value: name, label: labelFromPaper(name) })
-  closeDropdown()
+  searchStore.addFilter({ type: 'tag', value: name, label: labelFromPaper(name) });
+  closeDropdown();
 }
 
 function selectCamera(name: string): void {
-  searchStore.setCamera(name)
-  closeDropdown()
+  searchStore.setCamera(name);
+  closeDropdown();
 }
 
 function formatDateLabel(range: [string, string]): string {
-  const locale = localStorage.getItem('siegu_language') || 'en'
+  const locale = localStorage.getItem('siegu_language') || 'en';
   const fmt = (d: string) =>
     new Date(`${d}T00:00:00`).toLocaleDateString(locale, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
-    })
-  return range[0] === range[1] ? fmt(range[0]) : `${fmt(range[0])} — ${fmt(range[1])}`
+    });
+  return range[0] === range[1] ? fmt(range[0]) : `${fmt(range[0])} — ${fmt(range[1])}`;
 }
 
 function onDateRangeChange(range: [string, string] | null): void {
-  searchStore.setDateRange(range)
+  searchStore.setDateRange(range);
   if (range) {
-    searchStore.addFilter({ type: 'date', value: `${range[0]}|${range[1]}`, label: formatDateLabel(range) })
+    searchStore.addFilter({
+      type: 'date',
+      value: `${range[0]}|${range[1]}`,
+      label: formatDateLabel(range),
+    });
+    if (range[0] !== range[1]) closeDropdown();
   } else {
-    searchStore.removeFilter('date')
+    searchStore.removeFilter('date');
   }
-  if (range) closeDropdown()
 }
 
 function toggleMedia(type: 'favorites' | 'videos' | 'faces' | 'papers'): void {
-  if (type === 'favorites') searchStore.toggleFavoriteOnly()
-  if (type === 'videos') searchStore.toggleVideoOnly()
-  if (type === 'faces') searchStore.toggleFacesOnly()
-  if (type === 'papers') searchStore.togglePapersOnly()
-  closeDropdown()
+  if (type === 'favorites') searchStore.toggleFavoriteOnly();
+  if (type === 'videos') searchStore.toggleVideoOnly();
+  if (type === 'faces') searchStore.toggleFacesOnly();
+  if (type === 'papers') searchStore.togglePapersOnly();
+  closeDropdown();
 }
 
 function surpriseMe(): void {
-  searchStore.clearFilters()
-  searchStore.toggleSurprise()
-  closeDropdown()
+  searchStore.clearFilters();
+  searchStore.toggleSurprise();
+  closeDropdown();
 }
 
 function labelFromPaper(name: string): string {
@@ -196,34 +203,34 @@ function labelFromPaper(name: string): string {
     'a screenshot': t('search.papers.screenshot'),
     'a meme': t('search.papers.meme'),
     'a text message': t('search.papers.text_message'),
-  }
-  return map[name] ?? name
+  };
+  return map[name] ?? name;
 }
 
 function runSearch(): void {
-  const term = searchStore.query.trim()
-  if (!term) return
-  searchStore.addRecentSearch(term)
-  closeDropdown()
+  const term = searchStore.query.trim();
+  if (!term) return;
+  searchStore.addRecentSearch(term);
+  closeDropdown();
 }
 
 function selectRecent(term: string): void {
-  searchStore.setQuery(term)
-  closeDropdown()
+  searchStore.setQuery(term);
+  closeDropdown();
 }
 
 function clearAll(): void {
-  searchStore.clearQuery()
-  searchStore.clearFilters()
-  closeDropdown()
+  searchStore.clearQuery();
+  searchStore.clearFilters();
+  closeDropdown();
 }
 
 function isActive(type: string, value: string): boolean {
-  return searchStore.activeFilters.some((f) => f.type === type && f.value === value)
+  return searchStore.activeFilters.some((f) => f.type === type && f.value === value);
 }
 
 function isMediaActive(key: 'favoritesOnly' | 'videosOnly' | 'facesOnly' | 'papersOnly'): boolean {
-  return searchStore.mediaFilters[key]
+  return searchStore.mediaFilters[key];
 }
 
 function activeCount(type: string): number {
@@ -232,70 +239,70 @@ function activeCount(type: string): number {
     videos: stats.value?.videos ?? 0,
     faces: stats.value?.face_photos ?? 0,
     papers: (facets.value?.papers ?? []).reduce((sum, p) => sum + p.count, 0),
-  }
-  return counts[type] as number
+  };
+  return counts[type] as number;
 }
 
 function onKeydown(event: KeyboardEvent): void {
   if (event.key === 'Enter') {
-    runSearch()
+    runSearch();
   } else if (event.key === 'Escape') {
-    closeDropdown()
+    closeDropdown();
   }
 }
 
 function onDocumentClick(event: MouseEvent): void {
-  if (!dropdownOpen.value) return
-  const target = event.target as Node
+  if (!dropdownOpen.value) return;
+  const target = event.target as Node;
   if (searchWrapRef.value && !searchWrapRef.value.contains(target)) {
-    closeDropdown()
+    closeDropdown();
   }
 }
 
 function onScroll(): void {
   if (dropdownOpen.value) {
-    repositionDropdown()
+    repositionDropdown();
   }
 }
 
 watch(q, () => {
-  if (!dropdownOpen.value) return
-  if (searchTimer) clearTimeout(searchTimer)
+  if (!dropdownOpen.value) return;
+  if (searchTimer) clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
-    if (fetchTimer) clearTimeout(fetchTimer)
+    if (fetchTimer) clearTimeout(fetchTimer);
     fetchTimer = setTimeout(async () => {
-      const term = searchStore.query.trim()
+      const term = searchStore.query.trim();
       if (!term) {
-        inlineResults.value = []
-        return
+        inlineResults.value = [];
+        return;
       }
-      inlineLoading.value = true
+      inlineLoading.value = true;
       try {
-        const results = await listFiles({ offset: 0, limit: 12, query: term })
-        inlineResults.value = results
+        const results = await listFiles({ offset: 0, limit: 12, query: term });
+        inlineResults.value = results;
       } catch (e) {
-        console.error('[SearchBar] inline results failed:', e)
+        console.error('[SearchBar] inline results failed:', e);
       } finally {
-        inlineLoading.value = false
+        inlineLoading.value = false;
       }
-    }, 180)
-  }, 120)
-})
+    }, 180);
+  }, 120);
+});
 
 onMounted(() => {
-  searchStore.loadFacets()
-  document.addEventListener('click', onDocumentClick)
-  window.addEventListener('resize', onScroll)
-  window.addEventListener('scroll', onScroll, true)
-})
+  searchStore.loadFacets();
+  document.addEventListener('click', onDocumentClick);
+  window.addEventListener('resize', onScroll);
+  window.addEventListener('scroll', onScroll, true);
+});
 
 onUnmounted(() => {
-  document.removeEventListener('click', onDocumentClick)
-  window.removeEventListener('resize', onScroll)
-  window.removeEventListener('scroll', onScroll, true)
-  if (searchTimer) clearTimeout(searchTimer)
-  if (fetchTimer) clearTimeout(fetchTimer)
-})
+  document.removeEventListener('click', onDocumentClick);
+  window.removeEventListener('resize', onScroll);
+  window.removeEventListener('scroll', onScroll, true);
+  if (searchTimer) clearTimeout(searchTimer);
+  if (fetchTimer) clearTimeout(fetchTimer);
+});
 
 function iconForFilter(type: string): string {
   return (
@@ -307,34 +314,7 @@ function iconForFilter(type: string): string {
       camera: 'mdi-camera',
       aesthetics: 'mdi-star-four-points',
     }[type] ?? 'mdi-filter-variant'
-  )
-}
-
-function brandIcon(name: string): string {
-  const b = name.toLowerCase()
-  if (b === 'apple') return 'mdi-apple'
-  if (b === 'google' || b === 'pixel') return 'mdi-google'
-  if (b === 'microsoft' || b === 'lumia' || b === 'nokia') return 'mdi-microsoft-windows'
-  if (b === 'samsung' || b === 'lg' || b === 'oneplus' || b === 'xiaomi' || b === 'huawei') {
-    return 'mdi-cellphone'
-  }
-  if (
-    b === 'sony' ||
-    b === 'canon' ||
-    b === 'nikon' ||
-    b === 'fujifilm' ||
-    b === 'fuji' ||
-    b === 'panasonic' ||
-    b === 'olympus' ||
-    b === 'pentax' ||
-    b === 'leica' ||
-    b === 'gopro' ||
-    b === 'kodak'
-  ) {
-    return 'mdi-camera'
-  }
-  if (b === 'motorola') return 'mdi-tablet-cellphone'
-  return 'mdi-camera'
+  );
 }
 </script>
 
@@ -362,9 +342,9 @@ function brandIcon(name: string): string {
 
     <Teleport to="body">
       <div v-if="dropdownOpen" class="search-dropdown" :style="dropdownStyle" @click.stop>
-      <div v-if="!facets" class="pa-6 d-flex justify-center">
-        <v-progress-circular indeterminate size="24" width="2" />
-      </div>
+        <div v-if="!facets" class="pa-6 d-flex justify-center">
+          <v-progress-circular indeterminate size="24" width="2" />
+        </div>
 
         <template v-else>
           <!-- ============ BROWSE MODE ============ -->
@@ -435,6 +415,24 @@ function brandIcon(name: string): string {
               </button>
             </div>
 
+            <!-- Recent searches -->
+            <div v-if="recentSearches.length" class="discover-section">
+              <div class="section-header">
+                <span class="text-overline text-zinc-muted">{{ t('search.recent') }}</span>
+              </div>
+              <div class="recent-row">
+                <button
+                  v-for="term in recentSearches"
+                  :key="term"
+                  class="recent-chip"
+                  @click="selectRecent(term)"
+                >
+                  <v-icon size="14" class="mr-1">mdi-history</v-icon>
+                  <span class="ellipsis">{{ term }}</span>
+                </button>
+              </div>
+            </div>
+
             <!-- Best shots rail -->
             <div v-if="bestPhotos.length" class="discover-section">
               <div class="section-header">
@@ -453,12 +451,9 @@ function brandIcon(name: string): string {
                     <v-icon size="12">mdi-star-four-points</v-icon>
                     {{ Math.round((photo.aesthetics_score ?? 0) * 100) }}
                   </div>
-                  <v-icon
-                    v-if="photo.favorite"
-                    size="14"
-                    color="#f59e0b"
-                    class="best-fav"
-                  >mdi-heart</v-icon>
+                  <v-icon v-if="photo.favorite" size="14" color="#f59e0b" class="best-fav"
+                    >mdi-heart</v-icon
+                  >
                 </div>
               </div>
             </div>
@@ -474,7 +469,10 @@ function brandIcon(name: string): string {
                   v-for="person in peopleRow"
                   :key="person.id"
                   class="face-card"
-                  :class="{ 'facet-active': isActive('person', person.id), 'face-card--unnamed': !person.name }"
+                  :class="{
+                    'facet-active': isActive('person', person.id),
+                    'face-card--unnamed': !person.name,
+                  }"
                   @click="selectPerson(person)"
                 >
                   <div class="face-avatar-wrap">
@@ -486,7 +484,7 @@ function brandIcon(name: string): string {
                       <v-icon size="10">mdi-help</v-icon>
                     </div>
                   </div>
-                  <div class="face-name ellipsis">{{ person.name ?? t('people.unnamed') }}</div>
+                  <div class="face-name ellipsis">{{ person.name }}</div>
                   <div class="face-count">{{ person.count }}</div>
                 </div>
               </div>
@@ -506,12 +504,7 @@ function brandIcon(name: string): string {
                   :class="{ 'facet-active': isActive('location', loc.name) }"
                   @click="selectLocation(loc.name)"
                 >
-                  <v-img
-                    v-if="locationSrc(loc)"
-                    :src="locationSrc(loc)"
-                    cover
-                    class="place-img"
-                  />
+                  <v-img v-if="locationSrc(loc)" :src="locationSrc(loc)" cover class="place-img" />
                   <div v-else class="place-img place-img--empty">
                     <v-icon size="22" color="rgba(255,255,255,0.7)">mdi-map-marker</v-icon>
                   </div>
@@ -545,27 +538,6 @@ function brandIcon(name: string): string {
               </div>
             </div>
 
-            <!-- Cameras -->
-            <div v-if="cameras.length" class="discover-section">
-              <div class="section-header">
-                <span class="text-overline text-zinc-muted">{{ t('search.cameras') }}</span>
-                <span class="section-count">{{ cameras.length }}</span>
-              </div>
-              <div class="chip-cloud">
-                <button
-                  v-for="cam in cameras"
-                  :key="cam.name"
-                  class="cloud-chip"
-                  :class="{ 'chip-active': searchStore.camera === cam.name }"
-                  @click="selectCamera(cam.name)"
-                >
-                  <v-icon size="14" class="mr-1">{{ brandIcon(cam.name) }}</v-icon>
-                  {{ cam.name }}
-                  <span class="cloud-count">{{ cam.count }}</span>
-                </button>
-              </div>
-            </div>
-
             <!-- Tags cloud -->
             <div v-if="tags.length" class="discover-section">
               <div class="section-header">
@@ -595,20 +567,29 @@ function brandIcon(name: string): string {
               <DateRangePicker :model-value="dateRange" @update:model-value="onDateRangeChange" />
             </div>
 
-            <!-- Recent searches -->
-            <div v-if="recentSearches.length" class="discover-section">
+            <!-- Cameras -->
+            <div v-if="cameraChips.length" class="discover-section">
               <div class="section-header">
-                <span class="text-overline text-zinc-muted">{{ t('search.recent') }}</span>
+                <span class="text-overline text-zinc-muted">{{ t('search.cameras') }}</span>
+                <span class="section-count">{{ cameraChips.length }}</span>
               </div>
-              <div class="recent-row">
+              <div class="chip-cloud">
                 <button
-                  v-for="term in recentSearches"
-                  :key="term"
-                  class="recent-chip"
-                  @click="selectRecent(term)"
+                  v-for="cam in cameraChips"
+                  :key="cam.name"
+                  class="cloud-chip"
+                  :class="{
+                    'cloud-chip--brand': cam.hasBrand,
+                    'chip-active': searchStore.camera === cam.name,
+                  }"
+                  :title="cam.hasBrand ? cam.name : undefined"
+                  @click="selectCamera(cam.name)"
                 >
-                  <v-icon size="14" class="mr-1">mdi-history</v-icon>
-                  <span class="ellipsis">{{ term }}</span>
+                  <BrandIcon v-if="cam.hasBrand" :name="cam.name" :size="20" />
+                  <template v-else>
+                    <BrandIcon :name="cam.name" :size="16" class="mr-1" />
+                    {{ cam.name }}
+                  </template>
                 </button>
               </div>
             </div>
@@ -646,7 +627,10 @@ function brandIcon(name: string): string {
                 class="inline-thumb"
                 @click="runSearch"
               >
-                <v-img :src="getMediaThumbnailSrc(photo.location, photo.encoded ?? '', true)" cover />
+                <v-img
+                  :src="getMediaThumbnailSrc(photo.location, photo.encoded ?? '', true)"
+                  cover
+                />
               </div>
             </div>
 
@@ -659,7 +643,10 @@ function brandIcon(name: string): string {
                   v-for="person in peopleRow"
                   :key="person.id"
                   class="face-card"
-                  :class="{ 'facet-active': isActive('person', person.id), 'face-card--unnamed': !person.name }"
+                  :class="{
+                    'facet-active': isActive('person', person.id),
+                    'face-card--unnamed': !person.name,
+                  }"
                   @click="selectPerson(person)"
                 >
                   <div class="face-avatar-wrap">
@@ -671,7 +658,7 @@ function brandIcon(name: string): string {
                       <v-icon size="10">mdi-help</v-icon>
                     </div>
                   </div>
-                  <div class="face-name ellipsis">{{ person.name ?? t('people.unnamed') }}</div>
+                  <div class="face-name ellipsis">{{ person.name }}</div>
                   <div class="face-count">{{ person.count }}</div>
                 </div>
               </div>
@@ -719,15 +706,21 @@ function brandIcon(name: string): string {
               </div>
               <div class="chip-cloud">
                 <button
-                  v-for="cam in cameras"
+                  v-for="cam in cameraChips"
                   :key="cam.name"
                   class="cloud-chip"
-                  :class="{ 'chip-active': searchStore.camera === cam.name }"
+                  :class="{
+                    'cloud-chip--brand': cam.hasBrand,
+                    'chip-active': searchStore.camera === cam.name,
+                  }"
+                  :title="cam.hasBrand ? cam.name : undefined"
                   @click="selectCamera(cam.name)"
                 >
-                  <v-icon size="14" class="mr-1">{{ brandIcon(cam.name) }}</v-icon>
-                  {{ cam.name }}
-                  <span class="cloud-count">{{ cam.count }}</span>
+                  <BrandIcon v-if="cam.hasBrand" :name="cam.name" :size="20" />
+                  <template v-else>
+                    <BrandIcon :name="cam.name" :size="16" class="mr-1" />
+                    {{ cam.name }}
+                  </template>
                 </button>
               </div>
             </div>
@@ -740,7 +733,14 @@ function brandIcon(name: string): string {
             </div>
 
             <div
-              v-if="!peopleRow.length && !locations.length && !tags.length && !cameras.length && !inlineResults.length && !inlineLoading"
+              v-if="
+                !peopleRow.length &&
+                !locations.length &&
+                !tags.length &&
+                !cameras.length &&
+                !inlineResults.length &&
+                !inlineLoading
+              "
               class="pa-3 text-center"
             >
               <div class="text-body-2 text-zinc-muted">
@@ -766,7 +766,7 @@ function brandIcon(name: string): string {
                 @click:close="searchStore.removeFilter(f.type)"
               >
                 <v-icon start size="13">{{ iconForFilter(f.type) }}</v-icon>
-                {{ f.label || t('people.unnamed') }}
+                {{ f.label }}
               </v-chip>
             </div>
           </div>
@@ -835,6 +835,12 @@ function brandIcon(name: string): string {
   scrollbar-width: thin;
 }
 
+.search-dropdown button {
+  border: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .discover-header {
   display: flex;
   align-items: center;
@@ -857,6 +863,9 @@ function brandIcon(name: string): string {
   gap: 4px;
   padding: 12px 4px 8px;
   border-radius: 14px;
+  border: none;
+  -webkit-appearance: none;
+  appearance: none;
   background: var(--color-bg-hover);
   cursor: pointer;
   user-select: none;
@@ -870,7 +879,6 @@ function brandIcon(name: string): string {
 
 .magic-card--active {
   background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
-  box-shadow: inset 0 0 0 1px var(--color-border-hover);
 }
 
 .magic-icon {
@@ -1120,6 +1128,17 @@ function brandIcon(name: string): string {
 .cloud-chip.chip-active {
   border-color: var(--color-text-primary);
   color: var(--color-text-primary);
+}
+
+.cloud-chip--brand {
+  padding: 8px 14px;
+  justify-content: center;
+}
+
+.cloud-chip--brand .brand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .cloud-count {

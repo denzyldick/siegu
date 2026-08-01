@@ -1,105 +1,105 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useAppStore } from '@/stores/app'
-import { useScanStore } from '@/stores/scan'
-import { useModelsStore } from '@/stores/models'
-import { useUiStore } from '@/stores/ui'
-import { useSyncStore } from '@/stores/sync'
-import { useSearchStore } from '@/stores/search'
-import { autoReconnect } from '@/services/tauri'
-import AppDock from '@/components/layout/AppDock.vue'
-import AppToolbar from '@/components/layout/AppToolbar.vue'
-import SyncStatusBanner from '@/components/layout/SyncStatusBanner.vue'
-import OnboardingFlow from '@/components/onboarding/OnboardingFlow.vue'
-import MediaLibrary from '@/components/MediaLibrary.vue'
-import People from '@/components/People.vue'
-import Map from '@/components/Map.vue'
-import DeviceList from '@/components/DeviceList.vue'
-import Setting from '@/components/Setting.vue'
-import GuidedTour from '@/components/GuidedTour.vue'
-import ErrorBoundary from '@/components/shared/ErrorBoundary.vue'
+import { onMounted, computed } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useAppStore } from '@/stores/app';
+import { useScanStore } from '@/stores/scan';
+import { useModelsStore } from '@/stores/models';
+import { useUiStore } from '@/stores/ui';
+import { useSyncStore } from '@/stores/sync';
+import { useSearchStore } from '@/stores/search';
+import { autoReconnect } from '@/services/tauri';
+import AppDock from '@/components/layout/AppDock.vue';
+import AppToolbar from '@/components/layout/AppToolbar.vue';
+import SyncStatusBanner from '@/components/layout/SyncStatusBanner.vue';
+import OnboardingFlow from '@/components/onboarding/OnboardingFlow.vue';
+import MediaLibrary from '@/components/MediaLibrary.vue';
+import People from '@/components/People.vue';
+import Map from '@/components/Map.vue';
+import DeviceList from '@/components/DeviceList.vue';
+import Setting from '@/components/Setting.vue';
+import GuidedTour from '@/components/GuidedTour.vue';
+import ErrorBoundary from '@/components/shared/ErrorBoundary.vue';
 
-const { t } = useI18n()
-const appStore = useAppStore()
-const scanStore = useScanStore()
-const modelsStore = useModelsStore()
-const uiStore = useUiStore()
+const { t } = useI18n();
+const appStore = useAppStore();
+const scanStore = useScanStore();
+const modelsStore = useModelsStore();
+const uiStore = useUiStore();
 
-const currentPage = computed(() => uiStore.currentPage)
-const searchStore = useSearchStore()
+const currentPage = computed(() => uiStore.currentPage);
+const searchStore = useSearchStore();
 
 onMounted(async () => {
   try {
-    await appStore.checkInitialized()
+    await appStore.checkInitialized();
   } catch (e) {
-    console.error('[App] checkInitialized failed:', e)
+    console.error('[App] checkInitialized failed:', e);
   }
 
   try {
-    await appStore.detectOs()
+    await appStore.detectOs();
   } catch (e) {
-    console.error('[App] detectOs failed:', e)
+    console.error('[App] detectOs failed:', e);
   }
 
   if (!appStore.isNewInstall) {
     try {
-      await appStore.loadDirectories()
+      await appStore.loadDirectories();
     } catch (e) {
-      console.error('[App] loadDirectories failed:', e)
+      console.error('[App] loadDirectories failed:', e);
     }
     try {
-      await appStore.loadLastScanTime()
+      await appStore.loadLastScanTime();
     } catch (e) {
-      console.error('[App] loadLastScanTime failed:', e)
+      console.error('[App] loadLastScanTime failed:', e);
     }
     try {
-      await scanStore.loadIndexingStatus()
+      await scanStore.loadIndexingStatus();
     } catch (e) {
-      console.error('[App] loadIndexingStatus failed:', e)
+      console.error('[App] loadIndexingStatus failed:', e);
     }
     try {
-      await scanStore.loadUnindexedCount()
+      await scanStore.loadUnindexedCount();
     } catch (e) {
-      console.error('[App] loadUnindexedCount failed:', e)
+      console.error('[App] loadUnindexedCount failed:', e);
     }
     try {
-      await modelsStore.loadModels()
+      await modelsStore.loadModels();
     } catch (e) {
-      console.error('[App] loadModels failed:', e)
+      console.error('[App] loadModels failed:', e);
     }
   }
 
   if (!appStore.isNewInstall) {
-    void tryAutoReconnect()
+    void tryAutoReconnect();
   }
-})
+});
 
 async function tryAutoReconnect(): Promise<void> {
-  const syncStore = useSyncStore()
+  const syncStore = useSyncStore();
   try {
-    if (syncStore.connection === 'connected') return
-    await autoReconnect()
+    if (syncStore.connection === 'connected') return;
+    await autoReconnect();
   } catch (e) {
-    console.error('[App] autoReconnect failed:', e)
+    console.error('[App] autoReconnect failed:', e);
   }
 }
 
 function handleClearSearch(): void {
-  searchStore.clearQuery()
-  searchStore.clearFilters()
+  searchStore.clearQuery();
+  searchStore.clearFilters();
 }
 
 function handleSearchPerson(person: { id: string | number; name: string }): void {
-  searchStore.addFilter({ type: 'person', value: String(person.id), label: person.name })
-  searchStore.clearQuery()
-  uiStore.setPage('home')
+  searchStore.addFilter({ type: 'person', value: String(person.id), label: person.name });
+  searchStore.clearQuery();
+  uiStore.setPage('home');
 }
 
 function removeFilterChip(index: number): void {
-  const filter = searchStore.activeFilters[index]
+  const filter = searchStore.activeFilters[index];
   if (filter) {
-    searchStore.removeFilter(filter.type)
+    searchStore.removeFilter(filter.type);
   }
 }
 </script>
@@ -130,8 +130,16 @@ function removeFilterChip(index: number): void {
                 variant="tonal"
                 @click:close="removeFilterChip(index)"
               >
-                <v-icon start size="16">{{ filter.type === 'person' ? 'mdi-account' : filter.type === 'location' ? 'mdi-map-marker' : filter.type === 'tag' ? 'mdi-tag' : 'mdi-calendar-month' }}</v-icon>
-                {{ filter.label || t('people.unnamed') }}
+                <v-icon start size="16">{{
+                  filter.type === 'person'
+                    ? 'mdi-account'
+                    : filter.type === 'location'
+                      ? 'mdi-map-marker'
+                      : filter.type === 'tag'
+                        ? 'mdi-tag'
+                        : 'mdi-calendar-month'
+                }}</v-icon>
+                {{ filter.label }}
               </v-chip>
               <v-btn size="x-small" variant="text" @click="handleClearSearch">
                 {{ t('search.clear_all') }}
@@ -167,6 +175,10 @@ function removeFilterChip(index: number): void {
     </template>
 
     <SyncStatusBanner />
-    <GuidedTour :active="appStore.showTour" @finish="appStore.dismissTour()" @skip="appStore.dismissTour()" />
+    <GuidedTour
+      :active="appStore.showTour"
+      @finish="appStore.dismissTour()"
+      @skip="appStore.dismissTour()"
+    />
   </v-app>
 </template>
