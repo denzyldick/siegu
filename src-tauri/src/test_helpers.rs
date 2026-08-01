@@ -40,6 +40,8 @@ pub fn make_photo(id: &str, location: &str) -> Photo {
         caption: None,
         aesthetics_score: None,
         ai_status: AiStatus::default(),
+        sync_needed: true,
+        received: false,
     }
 }
 

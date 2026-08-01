@@ -107,6 +107,7 @@ pub enum SyncMessage {
         version: u8,
         device_id: String,
         device_name: String,
+        os: String,
         models_enabled: Vec<String>,
     },
     VersionReject {
@@ -155,6 +156,7 @@ pub trait SyncEvent: Send + Sync {
         &self,
         peer_id: String,
         peer_name: String,
+        peer_os: String,
         models_enabled: Vec<String>,
         protocol_version: u8,
     );
@@ -808,6 +810,7 @@ impl MeshManager {
                 version,
                 device_id,
                 device_name,
+                os,
                 models_enabled,
             } => {
                 if version != PROTOCOL_VERSION {
@@ -828,7 +831,7 @@ impl MeshManager {
                     models_enabled.len(),
                     models_enabled
                 ));
-                event.on_peer_connected(device_id, device_name, models_enabled, version);
+                event.on_peer_connected(device_id, device_name, os, models_enabled, version);
             }
             SyncMessage::VersionReject { reason } => {
                 event.on_sync_error(format!("Peer rejected connection: {reason}"));
@@ -920,7 +923,7 @@ impl SyncEvent for NullSyncEvent {
     fn on_sync_progress(&self, _: SyncProgress) {}
     fn on_photo_received(&self, _: String, _: String) {}
     fn on_sync_error(&self, _: String) {}
-    fn on_peer_connected(&self, _: String, _: String, _: Vec<String>, _: u8) {}
+    fn on_peer_connected(&self, _: String, _: String, _: String, _: Vec<String>, _: u8) {}
     fn on_peer_disconnected(&self, _: String) {}
     fn on_device_registered(&self, _: &Database) {}
     fn on_metadata_updated(&self, _: &str, _: Option<&str>, _: Option<f64>) {}
@@ -1132,6 +1135,7 @@ mod tests {
             version: 1,
             device_id: "device-1".to_string(),
             device_name: "Phone".to_string(),
+            os: "android".to_string(),
             models_enabled: vec!["caption".to_string(), "face".to_string()],
         };
         let json = serde_json::to_string(&msg).unwrap();
@@ -1141,11 +1145,13 @@ mod tests {
                 version,
                 device_id,
                 device_name,
+                os,
                 models_enabled,
             } => {
                 assert_eq!(version, 1);
                 assert_eq!(device_id, "device-1");
                 assert_eq!(device_name, "Phone");
+                assert_eq!(os, "android");
                 assert_eq!(models_enabled.len(), 2);
             }
             _ => panic!("Expected VersionNegotiate"),

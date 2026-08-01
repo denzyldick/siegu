@@ -47,6 +47,7 @@ impl SyncEvent for CliSyncEvent {
         &self,
         device_id: String,
         device_name: String,
+        peer_os: String,
         models_enabled: Vec<String>,
         protocol_version: u8,
     ) {
@@ -57,12 +58,14 @@ impl SyncEvent for CliSyncEvent {
             ip: String::new(),
             port: 0,
             device_type: String::new(),
-            os: String::new(),
+            os: peer_os,
             models_enabled,
             protocol_version,
             storage_used: 0,
             storage_capacity: 0,
             last_seen: String::new(),
+            photo_count: 0,
+            video_count: 0,
         });
     }
 

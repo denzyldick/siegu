@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::database;
 use siegu_core::mesh_transport::MeshTransport;
 use warp::Filter;
 
@@ -56,9 +57,17 @@ pub fn create_transport(
     connected: Option<Arc<std::sync::atomic::AtomicBool>>,
 ) -> MeshTransport {
     let device_id = get_or_create_device_id(&config_path);
-    let device_name = std::env::var("HOSTNAME")
-        .or_else(|_| std::env::var("COMPUTERNAME"))
-        .unwrap_or_else(|_| "siegu-device".to_string());
+    let db = database::Database::new(&config_path);
+    let state = db.get_state();
+    let device_name = state
+        .get("device_name")
+        .cloned()
+        .or_else(|| {
+            std::env::var("HOSTNAME")
+                .or_else(|_| std::env::var("COMPUTERNAME"))
+                .ok()
+        })
+        .unwrap_or_else(|| "siegu-device".to_string());
     let models_enabled = Vec::new();
 
     let sync_tx = external_tx
@@ -70,6 +79,7 @@ pub fn create_transport(
         sync_tx,
         offline_notified: std::sync::atomic::AtomicBool::new(false),
         connected: connected.unwrap_or_default(),
+        active_peer: Arc::new(tokio::sync::Mutex::new(None)),
     });
 
     let mut transport = MeshTransport::new(

@@ -309,6 +309,7 @@ pub fn run() {
             commands::sync::discover_lan_devices,
             commands::sync::join_network,
             commands::sync::remove_device,
+            commands::sync::rename_device,
             commands::sync::list_devices,
             commands::sync::request_start_sync,
             commands::sync::initialize_sync_folder,

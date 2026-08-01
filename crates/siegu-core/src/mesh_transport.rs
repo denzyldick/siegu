@@ -43,6 +43,7 @@ pub struct MeshTransport {
     pub config_path: String,
     pub device_id: String,
     pub device_name: String,
+    pub device_os: String,
     pub models_enabled: Vec<String>,
     pub event: Arc<dyn SyncEvent>,
     sync_tx: Arc<Mutex<Option<UnboundedSender<SyncMessage>>>>,
@@ -67,6 +68,7 @@ impl MeshTransport {
             config_path,
             device_id,
             device_name,
+            device_os: std::env::consts::OS.to_string(),
             models_enabled,
             event,
             sync_tx: Arc::new(Mutex::new(None)),
@@ -258,6 +260,7 @@ impl MeshTransport {
         let items_total_dc = Arc::clone(&items_total);
         let device_id_dc = self.device_id.clone();
         let device_name_dc = self.device_name.clone();
+        let device_os_dc = self.device_os.clone();
         let models_enabled_dc = self.models_enabled.clone();
 
         if self.is_initiator {
@@ -268,6 +271,7 @@ impl MeshTransport {
             let event_on_open = Arc::clone(&event_dc);
             let device_id_on = device_id_dc.clone();
             let device_name_on = device_name_dc.clone();
+            let device_os_on = device_os_dc.clone();
             let models_on = models_enabled_dc.clone();
 
             dc.on_open(Box::new(move || {
@@ -276,6 +280,7 @@ impl MeshTransport {
                 let event = Arc::clone(&event_on_open);
                 let device_id = device_id_on.clone();
                 let device_name = device_name_on.clone();
+                let device_os = device_os_on.clone();
                 let models = models_on.clone();
                 Box::pin(async move {
                     event.on_state_change("Secure Data Channel Ready");
@@ -286,6 +291,7 @@ impl MeshTransport {
                             version: PROTOCOL_VERSION,
                             device_id,
                             device_name,
+                            os: device_os,
                             models_enabled: models,
                         },
                     )
@@ -348,6 +354,7 @@ impl MeshTransport {
             let sync_rx_rcv = Arc::clone(&sync_rx);
             let device_id_rcv = device_id_dc.clone();
             let device_name_rcv = device_name_dc.clone();
+            let device_os_rcv = device_os_dc.clone();
             let models_rcv = models_enabled_dc.clone();
 
             pc.on_data_channel(Box::new(move |d: Arc<RTCDataChannel>| {
@@ -396,6 +403,7 @@ impl MeshTransport {
                 let event_open = Arc::clone(&event);
                 let device_id = device_id_rcv.clone();
                 let device_name = device_name_rcv.clone();
+                let device_os = device_os_rcv.clone();
                 let models = models_rcv.clone();
 
                 d.on_open(Box::new(move || {
@@ -410,6 +418,7 @@ impl MeshTransport {
                                 version: PROTOCOL_VERSION,
                                 device_id,
                                 device_name,
+                                os: device_os,
                                 models_enabled: models,
                             },
                         )
@@ -746,6 +755,7 @@ mod tests {
             &self,
             _id: String,
             _name: String,
+            _os: String,
             _models: Vec<String>,
             _version: u8,
         ) {

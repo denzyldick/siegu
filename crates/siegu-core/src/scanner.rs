@@ -228,6 +228,8 @@ pub fn photo_from_metadata(path_str: &str, meta: &PhotoMetadata) -> Photo {
         caption: None,
         aesthetics_score: None,
         ai_status: crate::database::AiStatus::default(),
+        sync_needed: true,
+        received: false,
     }
 }
 

@@ -37,6 +37,8 @@ pub fn do_join_network(db: &database::Database, ip: &str, name: &str) {
         storage_used: 0,
         storage_capacity: 0,
         last_seen: String::new(),
+        photo_count: 0,
+        video_count: 0,
     });
 }
 
@@ -57,20 +59,25 @@ pub fn do_list_devices(db: &database::Database) -> Vec<database::DeviceInfo> {
             icon: "mdi-cellphone".to_string(),
             up_to_date: true,
             host: false,
-            photo_count: 0,
-            video_count: 0,
+            photo_count: peer.photo_count,
+            video_count: peer.video_count,
             os: peer.os,
         })
         .collect();
 
     let hostname = std::env::var("HOSTNAME").unwrap_or_else(|_| "localhost".to_string());
+    let state = db.get_state();
+    let host_title = state
+        .get("device_name")
+        .cloned()
+        .unwrap_or_else(|| format!("Siegu ({hostname})"));
     let (photo_count, video_count) = db.get_media_counts();
 
     devices.insert(
         0,
         database::DeviceInfo {
             id: "host".to_string(),
-            title: format!("Siegu ({hostname})"),
+            title: host_title,
             icon: "mdi-laptop".to_string(),
             up_to_date: true,
             host: true,
@@ -81,6 +88,23 @@ pub fn do_list_devices(db: &database::Database) -> Vec<database::DeviceInfo> {
     );
 
     devices
+}
+
+/// Pure business logic — renames a device. The host device's name is persisted
+/// in config state so it survives restarts and is used when advertising over LAN.
+pub fn do_rename_device(db: &database::Database, id: &str, new_name: &str) -> Result<(), String> {
+    let name = new_name.trim();
+    if name.is_empty() {
+        return Err("Name cannot be empty".to_string());
+    }
+    if id == "host" {
+        let mut state = std::collections::HashMap::new();
+        state.insert("device_name".to_string(), name.to_string());
+        db.set_state(state);
+        return Ok(());
+    }
+    db.rename_peer_device(id, name);
+    Ok(())
 }
 
 #[tauri::command]
@@ -364,6 +388,21 @@ pub async fn remove_device(app: tauri::AppHandle, id: String) -> Result<(), Stri
 }
 
 #[tauri::command]
+pub async fn rename_device(
+    app: tauri::AppHandle,
+    id: String,
+    newName: String,
+) -> Result<(), String> {
+    use crate::database;
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return Err("Config error".to_string());
+    }
+    let db = database::Database::new(&path);
+    do_rename_device(&db, &id, &newName)
+}
+
+#[tauri::command]
 pub async fn list_devices(app: tauri::AppHandle) -> String {
     use crate::database;
     let path = get_config_path(&app);
@@ -378,11 +417,11 @@ pub async fn list_devices(app: tauri::AppHandle) -> String {
 #[tauri::command]
 pub async fn request_start_sync(state: tauri::State<'_, crate::WebRtcState>) -> Result<(), String> {
     let mut tx_lock = state.sync_tx.lock().await;
-    if let Some(tx) = tx_lock.as_mut() {
-        tx.send(transport::SyncMessage::StartSync)
-            .map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    let Some(tx) = tx_lock.as_mut() else {
+        return Err("Not connected to a device".to_string());
+    };
+    tx.send(transport::SyncMessage::StartSync)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -390,6 +429,14 @@ pub async fn initialize_sync_folder(app: tauri::AppHandle, path: String) -> Resu
     let target = std::path::PathBuf::from(&path).join("siegu");
     if let Err(e) = std::fs::create_dir_all(&target) {
         return Err(format!("Failed to create folder at {target:?}: {e}"));
+    }
+    // Persist the chosen received-data folder so resolve_sync_target_dir uses it
+    // instead of always defaulting to the first library directory.
+    let config_path = get_config_path(&app);
+    if !config_path.is_empty() {
+        let mut state = std::collections::HashMap::new();
+        state.insert("sync_path".to_string(), path.clone());
+        database::Database::new(&config_path).set_state(state);
     }
     crate::commands::directories::add_directory(app, path).await;
     Ok(())
@@ -613,5 +660,40 @@ mod tests {
             .unwrap();
         let devices = do_list_devices(&db);
         assert_eq!(devices[0].photo_count, 2);
+    }
+
+    #[test]
+    fn rename_peer_device_persists() {
+        let (db, _dir) = test_db();
+        do_join_network(&db, "192.168.1.10", "Phone");
+        let peers = db.list_peer_devices();
+        let id = peers[0].device_id.clone();
+        do_rename_device(&db, &id, "Galaxy").unwrap();
+        let peer = db.get_peer_device(&id).expect("peer exists");
+        assert_eq!(peer.name, "Galaxy");
+    }
+
+    #[test]
+    fn rename_host_persists_in_state() {
+        let (db, _dir) = test_db();
+        do_rename_device(&db, "host", "Living Room PC").unwrap();
+        let state = db.get_state();
+        assert_eq!(
+            state.get("device_name").map(|s| s.as_str()),
+            Some("Living Room PC")
+        );
+        let devices = do_list_devices(&db);
+        assert_eq!(devices[0].title, "Living Room PC");
+    }
+
+    #[test]
+    fn rename_rejects_empty_name() {
+        let (db, _dir) = test_db();
+        do_join_network(&db, "192.168.1.10", "Phone");
+        let peers = db.list_peer_devices();
+        let id = peers[0].device_id.clone();
+        assert!(do_rename_device(&db, &id, "   ").is_err());
+        let peer = db.get_peer_device(&id).expect("peer exists");
+        assert_eq!(peer.name, "Phone");
     }
 }

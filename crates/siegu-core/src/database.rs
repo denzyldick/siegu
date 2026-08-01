@@ -115,6 +115,16 @@ fn video_sql_not_like() -> String {
     )
 }
 
+/// Whether a file path is one of the known video extensions (case-insensitive).
+pub fn is_video_path(path: &str) -> bool {
+    let ext = std::path::Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    scanner::VIDEO_EXTENSIONS.iter().any(|v| *v == ext.as_str())
+}
+
 const MONTH_NAMES: &[(u8, &str, &str)] = &[
     (1, "january", "jan"),
     (2, "february", "feb"),
@@ -430,6 +440,14 @@ impl Database {
             (),
         );
         let _ = conn.execute("DROP TABLE IF EXISTS device", ());
+        let _ = conn.execute(
+            "ALTER TABLE peer_device ADD COLUMN photo_count INTEGER DEFAULT 0;",
+            (),
+        );
+        let _ = conn.execute(
+            "ALTER TABLE peer_device ADD COLUMN video_count INTEGER DEFAULT 0;",
+            (),
+        );
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS faces (photo_id STRING, face_id STRING PRIMARY KEY, crop_path STRING, encoded STRING, embedding BLOB, person_id STRING);", ());
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS people (id STRING PRIMARY KEY, name STRING, embedding BLOB);", ());
         let _ = conn.execute(
@@ -784,7 +802,7 @@ impl Database {
         };
 
         let sql = format!("SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, 
-            s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres 
+            s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received 
             FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE 1=1 {fav_filter} {video_filter} {q_filter} ORDER BY p.created DESC LIMIT ?1, ?2");
         if let Ok(mut stmt) = self.connection.prepare(&sql) {
             let q_param = if is_uuid {
@@ -829,6 +847,8 @@ impl Database {
                         sam: row.get(20).unwrap_or(0),
                         superres: row.get(21).unwrap_or(0),
                     },
+                    sync_needed: row.get(22).unwrap_or(false),
+                    received: row.get(23).unwrap_or(false),
                 })
             }) {
                 for p in iter.flatten() {
@@ -900,7 +920,7 @@ impl Database {
             .collect();
         let sql = format!(
             "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, \
-             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres \
+             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received \
              FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE p.id IN ({})",
             placeholders.join(",")
         );
@@ -937,6 +957,8 @@ impl Database {
                         sam: row.get(20).unwrap_or(0),
                         superres: row.get(21).unwrap_or(0),
                     },
+                    sync_needed: row.get(22).unwrap_or(false),
+                    received: row.get(23).unwrap_or(false),
                 })
             }) {
                 for p in iter.flatten() {
@@ -952,7 +974,7 @@ impl Database {
     /// Fetch a single photo by its ID, with objects and properties populated.
     pub fn get_photo_by_id(&self, photo_id: &str) -> Option<Photo> {
         let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, \
-             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres \
+             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received \
              FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE p.id = ?1";
         let mut stmt = self.connection.prepare(sql).ok()?;
         let mut rows = stmt
@@ -984,6 +1006,8 @@ impl Database {
                         sam: row.get(20).unwrap_or(0),
                         superres: row.get(21).unwrap_or(0),
                     },
+                    sync_needed: row.get(22).unwrap_or(false),
+                    received: row.get(23).unwrap_or(false),
                 })
             })
             .ok()?;
@@ -1272,6 +1296,8 @@ impl Database {
                         sam: row.get(20).unwrap_or(0),
                         superres: row.get(21).unwrap_or(0),
                     },
+                    sync_needed: false,
+                    received: false,
                 })
             }) {
                 for p in iter.flatten() {
@@ -1533,7 +1559,33 @@ impl Database {
         (photo_count, video_count)
     }
 
-    /// Get all named people with their stored face embeddings.
+    /// Return (pending_photo_count, pending_video_count) of items that still need
+    /// to be backed up to another device (originals not yet received by a peer).
+    pub fn get_pending_sync_counts(&self) -> (i64, i64) {
+        let not_video = video_sql_not_like();
+        let is_video = video_sql_like();
+        let photo_count: i64 = self
+            .connection
+            .query_row(
+                &format!(
+                    "SELECT COUNT(*) FROM photo WHERE {not_video} AND sync_needed = 1 AND received = 0"
+                ),
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let video_count: i64 = self
+            .connection
+            .query_row(
+                &format!(
+                    "SELECT COUNT(*) FROM photo WHERE {is_video} AND sync_needed = 1 AND received = 0"
+                ),
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        (photo_count, video_count)
+    }
     pub fn get_all_people_with_embeddings(&self) -> Vec<(String, Vec<f32>)> {
         let mut results = Vec::new();
         if let Ok(mut stmt) = self
@@ -1694,6 +1746,8 @@ impl Database {
                         sam: row.get(19).unwrap_or(0),
                         superres: row.get(20).unwrap_or(0),
                     },
+                    sync_needed: false,
+                    received: false,
                 })
             }) {
                 for p in iter.flatten() {
@@ -1740,6 +1794,8 @@ impl Database {
                             sam: row.get(19).unwrap_or(0),
                             superres: row.get(20).unwrap_or(0),
                         },
+                        sync_needed: false,
+                        received: false,
                     })
                 })
             {
@@ -1805,6 +1861,12 @@ pub struct Photo {
     pub caption: Option<String>,
     pub aesthetics_score: Option<f64>,
     pub ai_status: AiStatus,
+    /// True until any peer has received the file (drives the "not backed up" badge).
+    #[serde(default)]
+    pub sync_needed: bool,
+    /// True when this row was imported from a peer (a backup copy).
+    #[serde(default)]
+    pub received: bool,
 }
 
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
@@ -1867,24 +1929,29 @@ pub struct PeerDevice {
     pub storage_used: i64,
     pub storage_capacity: i64,
     pub last_seen: String,
+    /// Media received from this peer (running total).
+    pub photo_count: i64,
+    pub video_count: i64,
 }
 
 impl Database {
     pub fn upsert_peer_device(&self, device: &PeerDevice) {
         let _ = self.connection.execute(
-            "INSERT INTO peer_device(device_id, name, ip, port, device_type, os, models_enabled, protocol_version, storage_used, storage_capacity, last_seen) \
-             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, datetime('now')) \
+            "INSERT INTO peer_device(device_id, name, ip, port, device_type, os, models_enabled, protocol_version, storage_used, storage_capacity, last_seen, photo_count, video_count) \
+             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, datetime('now'), ?11, ?12) \
              ON CONFLICT(device_id) DO UPDATE SET \
              name=excluded.name, ip=excluded.ip, port=excluded.port, \
              device_type=excluded.device_type, os=excluded.os, \
              models_enabled=excluded.models_enabled, protocol_version=excluded.protocol_version, \
              storage_used=excluded.storage_used, storage_capacity=excluded.storage_capacity, \
+             photo_count=excluded.photo_count, video_count=excluded.video_count, \
              last_seen=datetime('now')",
             rusqlite::params![
                 device.device_id, device.name, device.ip, device.port as i32,
                 device.device_type, device.os,
                 serde_json::to_string(&device.models_enabled).unwrap_or_else(|_| "[]".to_string()),
                 device.protocol_version as i32, device.storage_used, device.storage_capacity,
+                device.photo_count, device.video_count,
             ],
         );
     }
@@ -1906,7 +1973,7 @@ impl Database {
     pub fn list_peer_devices(&self) -> Vec<PeerDevice> {
         let mut results = Vec::new();
         if let Ok(mut stmt) = self.connection.prepare(
-            "SELECT device_id, name, ip, port, device_type, os, models_enabled, protocol_version, storage_used, storage_capacity, last_seen \
+            "SELECT device_id, name, ip, port, device_type, os, models_enabled, protocol_version, storage_used, storage_capacity, last_seen, photo_count, video_count \
              FROM peer_device ORDER BY last_seen DESC"
         ) {
             if let Ok(iter) = stmt.query_map([], |row| {
@@ -1924,6 +1991,8 @@ impl Database {
                     storage_used: row.get(8)?,
                     storage_capacity: row.get(9)?,
                     last_seen: row.get(10)?,
+                    photo_count: row.get(11)?,
+                    video_count: row.get(12)?,
                 })
             }) {
                 for d in iter.flatten() {
@@ -1936,7 +2005,7 @@ impl Database {
 
     pub fn get_peer_device(&self, device_id: &str) -> Option<PeerDevice> {
         self.connection.query_row(
-            "SELECT device_id, name, ip, port, device_type, os, models_enabled, protocol_version, storage_used, storage_capacity, last_seen \
+            "SELECT device_id, name, ip, port, device_type, os, models_enabled, protocol_version, storage_used, storage_capacity, last_seen, photo_count, video_count \
              FROM peer_device WHERE device_id = ?1",
             rusqlite::params![device_id],
             |row| {
@@ -1954,9 +2023,27 @@ impl Database {
                     storage_used: row.get(8)?,
                     storage_capacity: row.get(9)?,
                     last_seen: row.get(10)?,
+                    photo_count: row.get(11)?,
+                    video_count: row.get(12)?,
                 })
             },
         ).ok()
+    }
+
+    /// Rename a peer device by its id. Leaves every other field untouched.
+    pub fn rename_peer_device(&self, device_id: &str, new_name: &str) {
+        let _ = self.connection.execute(
+            "UPDATE peer_device SET name = ?2 WHERE device_id = ?1",
+            rusqlite::params![device_id, new_name],
+        );
+    }
+
+    /// Add to a peer's running photo/video totals.
+    pub fn increment_peer_device_counts(&self, device_id: &str, photos: i64, videos: i64) {
+        let _ = self.connection.execute(
+            "UPDATE peer_device SET photo_count = photo_count + ?2, video_count = video_count + ?3 WHERE device_id = ?1",
+            rusqlite::params![device_id, photos, videos],
+        );
     }
 
     pub fn remove_peer_device(&self, device_id: &str) {
@@ -2079,6 +2166,8 @@ mod tests {
             caption: None,
             aesthetics_score: None,
             ai_status: AiStatus::default(),
+            sync_needed: true,
+            received: false,
         };
         let _ = db.store_photo_batch(&[photo]);
 
@@ -2114,6 +2203,8 @@ mod tests {
             caption: None,
             aesthetics_score: None,
             ai_status: AiStatus::default(),
+            sync_needed: true,
+            received: false,
         };
         let _ = db.store_photo_batch(&[photo]);
 
@@ -2139,6 +2230,8 @@ mod tests {
             caption: None,
             aesthetics_score: None,
             ai_status: AiStatus::default(),
+            sync_needed: true,
+            received: false,
         };
         let _ = db.store_photo_batch(&[photo]);
         let points = db.get_heatmap_points();
@@ -2160,9 +2253,54 @@ mod tests {
             storage_used: 0,
             storage_capacity: 0,
             last_seen: String::new(),
+            photo_count: 0,
+            video_count: 0,
         });
         let peers = db.list_peer_devices();
         assert!(peers.iter().any(|p| p.name == "test-device"));
+    }
+
+    #[test]
+    fn test_peer_device_rename_and_counts() {
+        let db = test_db();
+        db.upsert_peer_device(&PeerDevice {
+            device_id: "test-id".to_string(),
+            name: "old-name".to_string(),
+            ip: "192.168.1.1".to_string(),
+            port: 0,
+            device_type: String::new(),
+            os: "android".to_string(),
+            models_enabled: vec![],
+            protocol_version: 1,
+            storage_used: 0,
+            storage_capacity: 0,
+            last_seen: String::new(),
+            photo_count: 0,
+            video_count: 0,
+        });
+
+        db.rename_peer_device("test-id", "new-name");
+        let peer = db.get_peer_device("test-id").expect("peer exists");
+        assert_eq!(peer.name, "new-name");
+        assert_eq!(peer.os, "android");
+
+        db.increment_peer_device_counts("test-id", 3, 2);
+        let peer = db.get_peer_device("test-id").expect("peer exists");
+        assert_eq!(peer.photo_count, 3);
+        assert_eq!(peer.video_count, 2);
+
+        db.increment_peer_device_counts("test-id", 1, 0);
+        let peer = db.get_peer_device("test-id").expect("peer exists");
+        assert_eq!(peer.photo_count, 4);
+        assert_eq!(peer.video_count, 2);
+    }
+
+    #[test]
+    fn test_is_video_path() {
+        assert!(super::is_video_path("/DCIM/video.mp4"));
+        assert!(super::is_video_path("/clip.MOV"));
+        assert!(!super::is_video_path("/DCIM/photo.jpg"));
+        assert!(!super::is_video_path("/photo.JPEG"));
     }
 
     #[test]
@@ -2191,6 +2329,8 @@ mod tests {
             caption: None,
             aesthetics_score: None,
             ai_status: AiStatus::default(),
+            sync_needed: true,
+            received: false,
         };
         let _ = db.store_photo_batch(&[photo]);
 
@@ -2216,6 +2356,8 @@ mod tests {
             caption: None,
             aesthetics_score: None,
             ai_status: AiStatus::default(),
+            sync_needed: true,
+            received: false,
         };
         let _ = db.store_photo_batch(&[photo]);
 
@@ -2245,6 +2387,8 @@ mod tests {
             caption: None,
             aesthetics_score: None,
             ai_status: AiStatus::default(),
+            sync_needed: true,
+            received: false,
         };
         let mut p2 = Photo {
             id: "unidx_2".to_string(),
@@ -2260,6 +2404,8 @@ mod tests {
             caption: None,
             aesthetics_score: None,
             ai_status: AiStatus::default(),
+            sync_needed: true,
+            received: false,
         };
         let _ = db.store_photo_batch(&[p1, p2]);
 
@@ -2289,6 +2435,8 @@ mod tests {
                 caption: None,
                 aesthetics_score: None,
                 ai_status: AiStatus::default(),
+                sync_needed: true,
+                received: false,
             })
             .collect();
         let _ = db.store_photo_batch(&photos);
@@ -2350,6 +2498,8 @@ mod tests {
                 caption: None,
                 aesthetics_score: None,
                 ai_status: AiStatus::default(),
+                sync_needed: true,
+                received: false,
             })
             .collect();
         photos.push(Photo {
@@ -2366,6 +2516,8 @@ mod tests {
             caption: None,
             aesthetics_score: None,
             ai_status: AiStatus::default(),
+            sync_needed: true,
+            received: false,
         });
         let _ = db.store_photo_batch(&photos);
 
@@ -2375,6 +2527,53 @@ mod tests {
             "should count all 9 video extensions, got {video_count}"
         );
         assert_eq!(photo_count, 1, "should count 1 photo, got {photo_count}");
+    }
+
+    #[test]
+    fn test_get_pending_sync_counts_filters_received() {
+        let mut db = test_db();
+        let photos: Vec<Photo> = (0..6)
+            .map(|i| Photo {
+                id: format!("pending_{i}"),
+                location: if i % 2 == 0 {
+                    format!("/tmp/p_{i}.jpg")
+                } else {
+                    format!("/tmp/p_{i}.mp4")
+                },
+                encoded: String::new(),
+                created: String::new(),
+                objects: HashMap::new(),
+                properties: HashMap::new(),
+                latitude: 0.0,
+                longitude: 0.0,
+                favorite: false,
+                indexed: 0,
+                caption: None,
+                aesthetics_score: None,
+                ai_status: AiStatus::default(),
+                sync_needed: true,
+                received: false,
+            })
+            .collect();
+        let _ = db.store_photo_batch(&photos);
+        db.import_photo(ImportedPhoto {
+            id: "pending_0",
+            location: "/tmp/p_0.jpg",
+            created: "2024-01-01",
+            latitude: None,
+            longitude: None,
+            objects_json: "[]",
+            faces_json: "[]",
+            encoded: "",
+            caption: None,
+            aesthetics_score: None,
+            received: true,
+        });
+        db.clear_sync_needed("pending_1");
+
+        let (pending_photos, pending_videos) = db.get_pending_sync_counts();
+        assert_eq!(pending_photos, 2, "should count 2 pending photos");
+        assert_eq!(pending_videos, 2, "should count 2 pending videos");
     }
 
     #[test]
@@ -2397,6 +2596,8 @@ mod tests {
                     caption: None,
                     aesthetics_score: None,
                     ai_status: AiStatus::default(),
+                    sync_needed: true,
+                    received: false,
                 }
             })
             .collect();
@@ -2427,6 +2628,8 @@ mod tests {
             caption: None,
             aesthetics_score: None,
             ai_status: AiStatus::default(),
+            sync_needed: true,
+            received: false,
         }
     }
 

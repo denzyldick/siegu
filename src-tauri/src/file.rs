@@ -153,6 +153,8 @@ pub fn scan_folder(
                 caption: None,
                 aesthetics_score: None,
                 ai_status: database::AiStatus::default(),
+                sync_needed: true,
+                received: false,
             };
 
             let processed = files_processed.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
