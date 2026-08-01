@@ -73,7 +73,7 @@ function handleSave(): void {
               <template v-slot:prepend>
                 <v-avatar size="32" class="mr-2 border-subtle">
                   <v-img
-                    :src="getFaceImageSrc(item.raw.representative_crop, item.raw.encoded)"
+                    :src="getFaceImageSrc(item.representative_crop, item.encoded)"
                   ></v-img>
                 </v-avatar>
               </template>

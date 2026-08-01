@@ -196,12 +196,31 @@ pub fn extract_photo_metadata(path: &Path) -> PhotoMetadata {
 
     for tag in &exif_tags {
         if let Some(field) = exif.get_field(*tag, exif::In::PRIMARY) {
-            let value = format!("{}", field.display_value());
-            meta.properties.insert(format!("{tag}"), value);
+            meta.properties
+                .insert(format!("{tag}"), clean_field_value(field));
         }
     }
 
     meta
+}
+
+/// Render an EXIF field as a clean, normalized string.
+///
+/// `display_value()` wraps ASCII values in double quotes (kamadak-exif quotes
+/// `Ascii` strings), which then leak into stored properties and camera facets.
+/// String tags are read from the raw `Ascii` bytes instead; other tags fall back
+/// to `display_value()`.
+fn clean_field_value(field: &exif::Field) -> String {
+    match &field.value {
+        exif::Value::Ascii(parts) => parts
+            .iter()
+            .filter_map(|bytes| String::from_utf8(bytes.clone()).ok())
+            .map(|s| s.trim().replace('"', ""))
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join(" "),
+        _ => format!("{}", field.display_value()).trim().to_string(),
+    }
 }
 
 pub fn photo_from_metadata(path_str: &str, meta: &PhotoMetadata) -> Photo {
@@ -396,6 +415,23 @@ mod tests {
     fn test_scan_guard_default() {
         let guard = ScanGuard::default();
         assert!(!guard.is_running());
+    }
+
+    #[test]
+    fn test_clean_field_value_strips_ascii_quotes() {
+        let field = exif::Field {
+            tag: exif::Tag::Make,
+            ifd_num: exif::In::PRIMARY,
+            value: exif::Value::Ascii(vec![b"\"OnePlus\"".to_vec()]),
+        };
+        assert_eq!(clean_field_value(&field), "OnePlus");
+
+        let field = exif::Field {
+            tag: exif::Tag::Model,
+            ifd_num: exif::In::PRIMARY,
+            value: exif::Value::Ascii(vec![b"  iPhone 15 Pro  ".to_vec()]),
+        };
+        assert_eq!(clean_field_value(&field), "iPhone 15 Pro");
     }
 
     #[test]

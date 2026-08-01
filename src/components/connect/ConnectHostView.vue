@@ -46,7 +46,7 @@
       {{ $t('connect.host_instructions') }}
     </div>
 
-    <div class="d-flex justify-center flex-nowrap gap-2 mb-3 overflow-x-auto" v-if="passphrase.length > 0">
+    <div class="d-flex justify-center flex-wrap gap-2 mb-3" v-if="passphrase.length > 0">
       <v-chip
         v-for="(word, index) in passphrase"
         :key="index"
