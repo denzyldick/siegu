@@ -60,7 +60,32 @@
     "unnamed_faces": "Andere gezichten",
     "locations": "Locaties",
     "tags": "Tags",
+    "cameras": "Camera's",
     "dates": "Datums",
+    "discover": "Ontdek",
+    "discover_title": "Je bibliotheek in één oogopslag",
+    "best_shots": "Beste foto's",
+    "see_all": "Alles bekijken",
+    "results_for": "Resultaten voor \"{query}\"",
+    "active": "Actief",
+    "magic": {
+      "favorites": "Favorieten",
+      "videos": "Video's",
+      "faces": "Gezichten",
+      "papers": "Documenten",
+      "surprise": "Verrass me"
+    },
+    "papers": {
+      "title": "Documenten en schermafbeeldingen",
+      "passport": "Paspoort",
+      "license": "Rijbewijs",
+      "id_card": "Identiteitskaart",
+      "document": "Document",
+      "receipt": "Bon",
+      "screenshot": "Schermafbeelding",
+      "meme": "Meme",
+      "text_message": "Tekstbericht"
+    },
     "photos_count": "{count} foto's",
     "videos_count": "{count} video's",
     "faces_count": "{count} gezichten",
@@ -68,6 +93,13 @@
     "no_matches": "Geen resultaten voor \"{query}\"",
     "expand": "Geavanceerde filters",
     "clear_all": "Alles wissen",
+    "date_picker": {
+      "hint": "Kies een begin- en einddatum",
+      "clear": "Wissen",
+      "today": "Vandaag",
+      "photos": "Foto's",
+      "videos": "Video's"
+    },
     "advanced": {
       "title": "Geavanceerde filters",
       "media_type": "Mediatype",

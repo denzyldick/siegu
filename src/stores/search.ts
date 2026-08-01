@@ -10,11 +10,28 @@ export const useSearchStore = defineStore('search', () => {
   const facets = ref<SearchFacetsData | null>(null)
   const facetsLoading = ref(false)
   const activeFilters = ref<ActiveFilter[]>([])
-  const mediaFilters = ref({ favoritesOnly: false, videosOnly: false })
+  const mediaFilters = ref({
+    favoritesOnly: false,
+    videosOnly: false,
+    facesOnly: false,
+    papersOnly: false,
+  })
+  const camera = ref<string | null>(null)
+  const aestheticsMin = ref<number | null>(null)
+  const surprise = ref(false)
+  const dateRange = ref<[string, string] | null>(null)
 
   const hasQuery = computed(() => query.value.trim().length > 0)
   const hasFilters = computed(
-    () => activeFilters.value.length > 0 || mediaFilters.value.favoritesOnly || mediaFilters.value.videosOnly,
+    () =>
+      activeFilters.value.length > 0 ||
+      mediaFilters.value.favoritesOnly ||
+      mediaFilters.value.videosOnly ||
+      mediaFilters.value.facesOnly ||
+      mediaFilters.value.papersOnly ||
+      camera.value !== null ||
+      aestheticsMin.value !== null ||
+      dateRange.value !== null,
   )
   const activeFacets = computed(() => activeFilters.value)
 
@@ -49,9 +66,38 @@ export const useSearchStore = defineStore('search', () => {
     activeFilters.value = activeFilters.value.filter((f) => f.type !== type)
   }
 
+  function setCamera(value: string | null): void {
+    camera.value = value
+  }
+
+  function setAestheticsMin(value: number | null): void {
+    aestheticsMin.value = value
+  }
+
+  function setDateRange(value: [string, string] | null): void {
+    dateRange.value = value
+  }
+
+  function toggleSurprise(): void {
+    surprise.value = true
+  }
+
+  function clearSurprise(): void {
+    surprise.value = false
+  }
+
   function clearFilters(): void {
     activeFilters.value = []
-    mediaFilters.value = { favoritesOnly: false, videosOnly: false }
+    mediaFilters.value = {
+      favoritesOnly: false,
+      videosOnly: false,
+      facesOnly: false,
+      papersOnly: false,
+    }
+    camera.value = null
+    aestheticsMin.value = null
+    surprise.value = false
+    dateRange.value = null
   }
 
   function toggleFavoriteOnly(): void {
@@ -60,6 +106,14 @@ export const useSearchStore = defineStore('search', () => {
 
   function toggleVideoOnly(): void {
     mediaFilters.value.videosOnly = !mediaFilters.value.videosOnly
+  }
+
+  function toggleFacesOnly(): void {
+    mediaFilters.value.facesOnly = !mediaFilters.value.facesOnly
+  }
+
+  function togglePapersOnly(): void {
+    mediaFilters.value.papersOnly = !mediaFilters.value.papersOnly
   }
 
   function addRecentSearch(term: string): void {
@@ -102,6 +156,10 @@ export const useSearchStore = defineStore('search', () => {
     activeFilters,
     activeFacets,
     mediaFilters,
+    camera,
+    aestheticsMin,
+    surprise,
+    dateRange,
     hasQuery,
     hasFilters,
     loadFacets,
@@ -109,9 +167,16 @@ export const useSearchStore = defineStore('search', () => {
     clearQuery,
     addFilter,
     removeFilter,
+    setCamera,
+    setAestheticsMin,
+    setDateRange,
+    toggleSurprise,
+    clearSurprise,
     clearFilters,
     toggleFavoriteOnly,
     toggleVideoOnly,
+    toggleFacesOnly,
+    togglePapersOnly,
     addRecentSearch,
     clearRecentSearches,
   }

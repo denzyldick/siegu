@@ -151,7 +151,17 @@ function removeFilterChip(index: number): void {
               v-if="currentPage === 'home'"
               :search-query="searchStore.query"
               :facets="searchStore.activeFilters"
-              :filters="{ favoritesOnly: searchStore.mediaFilters.favoritesOnly, videosOnly: searchStore.mediaFilters.videosOnly, dateRange: 'all', folder: null }"
+              :filters="{
+                favoritesOnly: searchStore.mediaFilters.favoritesOnly,
+                videosOnly: searchStore.mediaFilters.videosOnly,
+                facesOnly: searchStore.mediaFilters.facesOnly,
+                papersOnly: searchStore.mediaFilters.papersOnly,
+                camera: searchStore.camera,
+                aestheticsMin: searchStore.aestheticsMin,
+                surprise: searchStore.surprise,
+                dateRange: 'all',
+                folder: null,
+              }"
               @clear-search="handleClearSearch"
               @search-person="handleSearchPerson"
             />

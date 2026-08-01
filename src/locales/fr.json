@@ -60,7 +60,32 @@
     "unnamed_faces": "Autres visages",
     "locations": "Lieux",
     "tags": "Étiquettes",
+    "cameras": "Appareils",
     "dates": "Dates",
+    "discover": "Découvrir",
+    "discover_title": "Votre bibliothèque en un coup d'œil",
+    "best_shots": "Meilleures photos",
+    "see_all": "Tout voir",
+    "results_for": "Résultats pour « {query} »",
+    "active": "Actif",
+    "magic": {
+      "favorites": "Favoris",
+      "videos": "Vidéos",
+      "faces": "Visages",
+      "papers": "Documents",
+      "surprise": "Surprends-moi"
+    },
+    "papers": {
+      "title": "Documents et captures",
+      "passport": "Passeport",
+      "license": "Permis de conduire",
+      "id_card": "Carte d'identité",
+      "document": "Document",
+      "receipt": "Reçu",
+      "screenshot": "Capture d'écran",
+      "meme": "Mème",
+      "text_message": "Message texte"
+    },
     "photos_count": "{count} photos",
     "videos_count": "{count} vidéos",
     "faces_count": "{count} visages",
@@ -68,6 +93,13 @@
     "no_matches": "Aucun résultat pour « {query} »",
     "expand": "Filtres avancés",
     "clear_all": "Tout effacer",
+    "date_picker": {
+      "hint": "Choisissez une date de début et de fin",
+      "clear": "Effacer",
+      "today": "Aujourd'hui",
+      "photos": "Photos",
+      "videos": "Vidéos"
+    },
     "advanced": {
       "title": "Filtres avancés",
       "media_type": "Type de média",

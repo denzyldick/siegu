@@ -60,7 +60,32 @@
     "unnamed_faces": "Andere Gesichter",
     "locations": "Orte",
     "tags": "Tags",
+    "cameras": "Kameras",
     "dates": "Daten",
+    "discover": "Entdecken",
+    "discover_title": "Deine Bibliothek auf einen Blick",
+    "best_shots": "Beste Aufnahmen",
+    "see_all": "Alle anzeigen",
+    "results_for": "Ergebnisse für \"{query}\"",
+    "active": "Aktiv",
+    "magic": {
+      "favorites": "Favoriten",
+      "videos": "Videos",
+      "faces": "Gesichter",
+      "papers": "Dokumente",
+      "surprise": "Überraschen"
+    },
+    "papers": {
+      "title": "Dokumente & Screenshots",
+      "passport": "Reisepass",
+      "license": "Führerschein",
+      "id_card": "Ausweis",
+      "document": "Dokument",
+      "receipt": "Quittung",
+      "screenshot": "Screenshot",
+      "meme": "Meme",
+      "text_message": "Textnachricht"
+    },
     "photos_count": "{count} Fotos",
     "videos_count": "{count} Videos",
     "faces_count": "{count} Gesichter",
@@ -68,6 +93,13 @@
     "no_matches": "Keine Treffer für \"{query}\"",
     "expand": "Erweiterte Filter",
     "clear_all": "Alles löschen",
+    "date_picker": {
+      "hint": "Start- und Enddatum auswählen",
+      "clear": "Löschen",
+      "today": "Heute",
+      "photos": "Fotos",
+      "videos": "Videos"
+    },
     "advanced": {
       "title": "Erweiterte Filter",
       "media_type": "Medientyp",

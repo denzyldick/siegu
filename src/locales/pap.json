@@ -60,7 +60,32 @@
     "unnamed_faces": "Otro cara",
     "locations": "Lugarnan",
     "tags": "Tagnan",
+    "cameras": "Kameranan",
     "dates": "Fecha",
+    "discover": "Deskubrí",
+    "discover_title": "Bo biblioteka na un bista",
+    "best_shots": "Mihó fotonan",
+    "see_all": "Mirá tur",
+    "results_for": "Resultadonan pa \"{query}\"",
+    "active": "Aktivo",
+    "magic": {
+      "favorites": "Favoritonan",
+      "videos": "Videonan",
+      "faces": "Caranan",
+      "papers": "Dokumentonan",
+      "surprise": "Sorpredé mi"
+    },
+    "papers": {
+      "title": "Dokumento i screenshot",
+      "passport": "Pasport",
+      "license": "Licencia di core",
+      "id_card": "Karnet di identidad",
+      "document": "Dokumento",
+      "receipt": "Resibu",
+      "screenshot": "Screenshot",
+      "meme": "Meme",
+      "text_message": "Mensashi di teksto"
+    },
     "photos_count": "{count} potrèt",
     "videos_count": "{count} video",
     "faces_count": "{count} cara",
@@ -68,6 +93,13 @@
     "no_matches": "No tin resultado pa \"{query}\"",
     "expand": "Filtronan avansá",
     "clear_all": "Limpia tur",
+    "date_picker": {
+      "hint": "Eskohé un fecha di inicio i di fin",
+      "clear": "Limpia",
+      "today": "Awe",
+      "photos": "Fotonan",
+      "videos": "Videonan"
+    },
     "advanced": {
       "title": "Filtronan avansá",
       "media_type": "Tipo di media",

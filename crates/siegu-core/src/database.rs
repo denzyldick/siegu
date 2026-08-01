@@ -58,6 +58,15 @@ pub struct LocationGroup {
     pub encoded: Option<String>,
 }
 
+/// Photo/video counts for a single calendar day (`YYYY-MM-DD`), powering the
+/// date-range picker in the search dropdown.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct DayCount {
+    pub date: String,
+    pub photos: i64,
+    pub videos: i64,
+}
+
 /// CLIP zero-shot classes that correspond to documents, receipts and
 /// screenshots, powering the "Papers & screenshots" section and filter.
 pub const PAPER_CLASSES: &[&str] = &[
@@ -1311,6 +1320,32 @@ impl Database {
             }
         }
         groups
+    }
+
+    /// Day-level photo/video counts within a date range (inclusive, `YYYY-MM-DD`).
+    pub fn get_day_counts(&self, from: &str, to: &str) -> Vec<DayCount> {
+        let mut counts = Vec::new();
+        let sql = format!(
+            "SELECT substr(created, 1, 10) AS day, COUNT(*) AS cnt, \
+             SUM(CASE WHEN {} THEN 1 ELSE 0 END) AS videos \
+             FROM photo WHERE substr(created, 1, 10) BETWEEN ?1 AND ?2 \
+             GROUP BY day ORDER BY day",
+            video_sql_like()
+        );
+        if let Ok(mut stmt) = self.connection.prepare(&sql) {
+            if let Ok(iter) = stmt.query_map([from, to], |row| {
+                Ok(DayCount {
+                    date: row.get(0)?,
+                    photos: row.get(1)?,
+                    videos: row.get(2).unwrap_or(0),
+                })
+            }) {
+                for d in iter.flatten() {
+                    counts.push(d);
+                }
+            }
+        }
+        counts
     }
 
     /// Toggle the favorite status of a photo. Returns true if now favorited.
@@ -3323,6 +3358,36 @@ mod tests {
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].name, "Paris, France");
         assert_eq!(groups[0].count, 1);
+    }
+
+    #[test]
+    fn test_get_day_counts() {
+        let mut db = test_db();
+        for (id, created, location) in [
+            ("p1", "2026-03-01T10:00:00", "/a.jpg"),
+            ("p2", "2026-03-01T18:00:00", "/b.jpg"),
+            ("v1", "2026-03-02T09:00:00", "/c.MP4"),
+            ("p3", "2026-04-10T09:00:00", "/d.jpg"),
+        ] {
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded) VALUES (?1, ?2, ?3, '')",
+                    (id, location, created),
+                )
+                .unwrap();
+        }
+
+        let counts = db.get_day_counts("2026-03-01", "2026-03-31");
+        assert_eq!(counts.len(), 2);
+        assert_eq!(counts[0].date, "2026-03-01");
+        assert_eq!(counts[0].photos, 2);
+        assert_eq!(counts[0].videos, 0);
+        assert_eq!(counts[1].date, "2026-03-02");
+        assert_eq!(counts[1].photos, 1);
+        assert_eq!(counts[1].videos, 1);
+
+        let empty = db.get_day_counts("2025-01-01", "2025-01-31");
+        assert!(empty.is_empty());
     }
 
     #[test]

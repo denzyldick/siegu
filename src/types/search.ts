@@ -1,4 +1,15 @@
-export type FacetType = 'person' | 'location' | 'tag' | 'month'
+export type FacetType =
+  | 'person'
+  | 'location'
+  | 'tag'
+  | 'month'
+  | 'date'
+  | 'camera'
+  | 'aesthetics'
+  | 'faces'
+  | 'papers'
+  | 'favorites'
+  | 'videos'
 
 export interface FacetGroup {
   id: string
@@ -13,6 +24,22 @@ export interface FacetCount {
   count: number
 }
 
+export interface LocationGroup {
+  name: string
+  count: number
+  photo_location: string | null
+  encoded: string | null
+}
+
+export interface PhotoTile {
+  id: string
+  location: string
+  encoded: string
+  created: string
+  aesthetics_score: number | null
+  favorite: boolean
+}
+
 export interface SearchStats {
   photos: number
   videos: number
@@ -20,14 +47,26 @@ export interface SearchStats {
   ocr_photos: number
   faces: number
   named_people: number
+  face_photos: number
+}
+
+export interface DayCount {
+  date: string
+  photos: number
+  videos: number
 }
 
 export interface SearchFacetsData {
   people: FacetGroup[]
   unnamed_faces: FacetGroup[]
-  locations: FacetCount[]
+  locations: LocationGroup[]
   tags: FacetCount[]
+  papers: FacetCount[]
+  cameras: FacetCount[]
   months: FacetCount[]
+  best_photos: PhotoTile[]
+  favorite_photos: PhotoTile[]
+  recent_photos: PhotoTile[]
   stats: SearchStats
 }
 

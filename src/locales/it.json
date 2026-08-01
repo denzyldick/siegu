@@ -60,7 +60,32 @@
     "unnamed_faces": "Altri volti",
     "locations": "Luoghi",
     "tags": "Tag",
+    "cameras": "Fotocamere",
     "dates": "Date",
+    "discover": "Scopri",
+    "discover_title": "La tua libreria a colpo d'occhio",
+    "best_shots": "Migliori scatti",
+    "see_all": "Vedi tutto",
+    "results_for": "Risultati per \"{query}\"",
+    "active": "Attivo",
+    "magic": {
+      "favorites": "Preferiti",
+      "videos": "Video",
+      "faces": "Volti",
+      "papers": "Documenti",
+      "surprise": "Sorpresami"
+    },
+    "papers": {
+      "title": "Documenti e screenshot",
+      "passport": "Passaporto",
+      "license": "Patente",
+      "id_card": "Carta d'identità",
+      "document": "Documento",
+      "receipt": "Ricevuta",
+      "screenshot": "Screenshot",
+      "meme": "Meme",
+      "text_message": "Messaggio di testo"
+    },
     "photos_count": "{count} foto",
     "videos_count": "{count} video",
     "faces_count": "{count} volti",
@@ -68,6 +93,13 @@
     "no_matches": "Nessun risultato per \"{query}\"",
     "expand": "Filtri avanzati",
     "clear_all": "Cancella tutto",
+    "date_picker": {
+      "hint": "Scegli una data di inizio e di fine",
+      "clear": "Cancella",
+      "today": "Oggi",
+      "photos": "Foto",
+      "videos": "Video"
+    },
     "advanced": {
       "title": "Filtri avanzati",
       "media_type": "Tipo di supporto",

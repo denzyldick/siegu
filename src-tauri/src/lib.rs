@@ -330,6 +330,7 @@ pub fn run() {
             // Geocode
             commands::geocode::list_objects,
             commands::search::search_facets,
+            commands::search::day_counts,
             commands::logging::resolve_photo_locations,
             commands::logging::get_location_names,
             // Wallpaper

@@ -2,7 +2,8 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSearchStore } from '@/stores/search'
-import { getFaceImageSrc, formatMonthLabel } from '@/composables/useMediaUtils'
+import { getFaceImageSrc } from '@/composables/useMediaUtils'
+import DateRangePicker from '@/components/search/DateRangePicker.vue'
 import type { FacetType } from '@/types/search'
 
 const { t } = useI18n()
@@ -36,8 +37,24 @@ function toggle(type: FacetType, value: string, label: string): void {
   }
 }
 
-function monthLabel(ym: string): string {
-  return formatMonthLabel(ym)
+function formatDateLabel(range: [string, string]): string {
+  const locale = localStorage.getItem('siegu_language') || 'en'
+  const fmt = (d: string) =>
+    new Date(`${d}T00:00:00`).toLocaleDateString(locale, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  return range[0] === range[1] ? fmt(range[0]) : `${fmt(range[0])} — ${fmt(range[1])}`
+}
+
+function onDateRangeChange(range: [string, string] | null): void {
+  searchStore.setDateRange(range)
+  if (range) {
+    searchStore.addFilter({ type: 'date', value: `${range[0]}|${range[1]}`, label: formatDateLabel(range) })
+  } else {
+    searchStore.removeFilter('date')
+  }
 }
 
 const activeCount = computed(() => active.value.length)
@@ -196,27 +213,12 @@ const activeCount = computed(() => active.value.length)
           </div>
         </div>
 
-        <div v-if="facets?.months?.length">
+        <div v-if="facets?.stats && facets.stats.photos">
           <div class="text-subtitle-2 mb-2 text-siegu-subtle">{{ t('search.dates') }}</div>
-          <div class="filter-list">
-            <div
-              v-for="month in facets.months"
-              :key="month.name"
-              class="filter-item"
-              :class="{ 'filter-item--active': isActive('month', month.name) }"
-              @click="toggle('month', month.name, monthLabel(month.name))"
-            >
-              <v-checkbox
-                :model-value="isActive('month', month.name)"
-                density="compact"
-                hide-details
-                class="mr-1"
-              />
-              <v-icon size="18" class="mr-2">mdi-calendar-month</v-icon>
-              <span class="flex-1">{{ monthLabel(month.name) }}</span>
-              <span class="text-siegu-subtle">({{ month.count }})</span>
-            </div>
-          </div>
+          <DateRangePicker
+            :model-value="searchStore.dateRange"
+            @update:model-value="onDateRangeChange"
+          />
         </div>
       </v-card-text>
 

@@ -129,6 +129,22 @@ pub async fn search_facets(app: tauri::AppHandle) -> Result<String, String> {
     Ok(serde_json::to_string(&do_get_search_facets(&db)).unwrap_or_else(|_| "{}".to_string()))
 }
 
+/// Photo/video counts per calendar day inside a `YYYY-MM-DD` range, for the
+/// date-range picker cells in the search dropdown.
+#[tauri::command]
+pub async fn day_counts(
+    app: tauri::AppHandle,
+    from: String,
+    to: String,
+) -> Result<Vec<database::DayCount>, String> {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return Ok(Vec::new());
+    }
+    let db = database::Database::new(&path);
+    Ok(db.get_day_counts(&from, &to))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

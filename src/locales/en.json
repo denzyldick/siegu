@@ -43,7 +43,32 @@
     "unnamed_faces": "Other faces",
     "locations": "Locations",
     "tags": "Tags",
+    "cameras": "Cameras",
     "dates": "Dates",
+    "discover": "Discover",
+    "discover_title": "Your library at a glance",
+    "best_shots": "Best shots",
+    "see_all": "See all",
+    "results_for": "Results for \"{query}\"",
+    "active": "Active",
+    "magic": {
+      "favorites": "Favorites",
+      "videos": "Videos",
+      "faces": "Faces",
+      "papers": "Papers",
+      "surprise": "Surprise me"
+    },
+    "papers": {
+      "title": "Papers & screenshots",
+      "passport": "Passport",
+      "license": "Driver's license",
+      "id_card": "ID card",
+      "document": "Document",
+      "receipt": "Receipt",
+      "screenshot": "Screenshot",
+      "meme": "Meme",
+      "text_message": "Text message"
+    },
     "photos_count": "{count} photos",
     "videos_count": "{count} videos",
     "faces_count": "{count} faces",
@@ -51,6 +76,13 @@
     "no_matches": "No matches for \"{query}\"",
     "expand": "Advanced filters",
     "clear_all": "Clear all",
+    "date_picker": {
+      "hint": "Pick a start and end date",
+      "clear": "Clear",
+      "today": "Today",
+      "photos": "Photos",
+      "videos": "Videos"
+    },
     "advanced": {
       "title": "Advanced Filters",
       "media_type": "Media type",

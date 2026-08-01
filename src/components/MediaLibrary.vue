@@ -200,6 +200,7 @@ import MediaCard from './MediaCard.vue';
 import MediaViewer from './MediaViewer.vue';
 import { useSyncStore } from '@/stores/sync';
 import type { MediaItem } from '@/types/media';
+import type { FacetType } from '@/types/search';
 
 const syncStore = useSyncStore();
 
@@ -210,10 +211,15 @@ const props = withDefaults(
     filters?: {
       favoritesOnly: boolean;
       videosOnly: boolean;
+      facesOnly: boolean;
+      papersOnly: boolean;
+      camera: string | null;
+      aestheticsMin: number | null;
+      surprise: boolean;
       dateRange: string;
       folder: string | null;
     };
-    facets?: { type: 'person' | 'location' | 'tag' | 'month'; value: string; label: string }[];
+    facets?: { type: FacetType; value: string; label: string }[];
   }>(),
   {
     searchQuery: '',
@@ -221,6 +227,11 @@ const props = withDefaults(
     filters: () => ({
       favoritesOnly: false,
       videosOnly: false,
+      facesOnly: false,
+      papersOnly: false,
+      camera: null,
+      aestheticsMin: null,
+      surprise: false,
       dateRange: 'all',
       folder: null,
     }),
@@ -403,6 +414,8 @@ async function loadFiles(): Promise<void> {
       const location = byType('location');
       const tag = byType('tag');
       const month = byType('month');
+      const date = byType('date');
+      const dateRange = date ? (date.value.split('|') as [string, string]) : null;
       response = await invoke<string>('list_files', {
         offset: paging.value.offset,
         limit: paging.value.limit,
@@ -413,8 +426,13 @@ async function loadFiles(): Promise<void> {
         personId: person ? person.value : null,
         location: location ? location.value : null,
         tag: tag ? tag.value : null,
-        dateFrom: month ? `${month.value}-01` : null,
-        dateTo: month ? `${month.value}-31` : null,
+        dateFrom: month ? `${month.value}-01` : dateRange ? dateRange[0] : null,
+        dateTo: month ? `${month.value}-31` : dateRange ? dateRange[1] : null,
+        hasFaces: props.filters?.facesOnly ?? false,
+        papers: props.filters?.papersOnly ?? false,
+        camera: props.filters?.camera ?? null,
+        aestheticsMin: props.filters?.aestheticsMin ?? null,
+        random: props.filters?.surprise ?? false,
       });
     }
 

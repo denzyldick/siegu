@@ -91,6 +91,11 @@ export interface ListFilesOptions {
   tag?: string;
   dateFrom?: string;
   dateTo?: string;
+  hasFaces?: boolean;
+  aestheticsMin?: number | null;
+  camera?: string | null;
+  papers?: boolean;
+  random?: boolean;
 }
 
 export interface ListFilesResponse {

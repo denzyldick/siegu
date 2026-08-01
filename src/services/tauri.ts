@@ -3,7 +3,7 @@ import { platform } from '@tauri-apps/plugin-os';
 import type { MediaItem, ListFilesOptions } from '@/types/media';
 import type { Person, UnnamedFace } from '@/types/person';
 import type { PairingCodes, DiscoveredHost } from '@/types/sync';
-import type { SearchFacetsData } from '@/types/search';
+import type { SearchFacetsData, DayCount } from '@/types/search';
 
 export class TauriError extends Error {
   constructor(
@@ -60,6 +60,11 @@ export async function listFiles(options: ListFilesOptions): Promise<MediaItem[]>
     tag: options.tag ?? null,
     dateFrom: options.dateFrom ?? null,
     dateTo: options.dateTo ?? null,
+    hasFaces: options.hasFaces ?? false,
+    aestheticsMin: options.aestheticsMin ?? null,
+    camera: options.camera ?? null,
+    papers: options.papers ?? false,
+    random: options.random ?? false,
   });
   return parseJsonArray<MediaItem>(raw);
 }
@@ -187,6 +192,10 @@ export async function deleteFace(faceId: number): Promise<void> {
 export async function searchFacets(): Promise<SearchFacetsData> {
   const raw = await call<string>('search_facets');
   return parseJsonObject<SearchFacetsData>(raw);
+}
+
+export async function dayCounts(from: string, to: string): Promise<DayCount[]> {
+  return call<DayCount[]>('day_counts', { from, to });
 }
 
 export async function checkModels(): Promise<string[]> {

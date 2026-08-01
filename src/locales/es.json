@@ -60,7 +60,32 @@
     "unnamed_faces": "Otros rostros",
     "locations": "Ubicaciones",
     "tags": "Etiquetas",
+    "cameras": "Cámaras",
     "dates": "Fechas",
+    "discover": "Descubrir",
+    "discover_title": "Tu biblioteca de un vistazo",
+    "best_shots": "Mejores fotos",
+    "see_all": "Ver todo",
+    "results_for": "Resultados para \"{query}\"",
+    "active": "Activo",
+    "magic": {
+      "favorites": "Favoritos",
+      "videos": "Videos",
+      "faces": "Rostros",
+      "papers": "Documentos",
+      "surprise": "Sorpréndeme"
+    },
+    "papers": {
+      "title": "Documentos y capturas",
+      "passport": "Pasaporte",
+      "license": "Licencia de conducir",
+      "id_card": "DNI",
+      "document": "Documento",
+      "receipt": "Recibo",
+      "screenshot": "Captura",
+      "meme": "Meme",
+      "text_message": "Mensaje de texto"
+    },
     "photos_count": "{count} fotos",
     "videos_count": "{count} videos",
     "faces_count": "{count} rostros",
@@ -68,6 +93,13 @@
     "no_matches": "Sin resultados para \"{query}\"",
     "expand": "Filtros avanzados",
     "clear_all": "Borrar todo",
+    "date_picker": {
+      "hint": "Elige una fecha de inicio y de fin",
+      "clear": "Borrar",
+      "today": "Hoy",
+      "photos": "Fotos",
+      "videos": "Videos"
+    },
     "advanced": {
       "title": "Filtros avanzados",
       "media_type": "Tipo de medio",
