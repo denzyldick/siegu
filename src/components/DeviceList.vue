@@ -34,8 +34,14 @@
         >
           <v-card-item class="py-4">
             <template v-slot:prepend>
-              <div class="siegu-icon-circle-dark mr-3">
+              <div class="siegu-icon-circle-dark mr-3 device-icon-wrap">
                 <v-icon color="#ffffff" size="small">{{ device.icon }}</v-icon>
+                <span
+                  v-if="!device.host"
+                  class="device-status-dot"
+                  :class="dotClass"
+                  :title="dotTitle"
+                ></span>
               </div>
             </template>
             <v-card-title
@@ -71,6 +77,12 @@
                     ></v-btn>
                   </template>
                   <v-list density="compact" rounded="lg" class="border-subtle">
+                    <v-list-item @click="openRename(device)">
+                      <template v-slot:prepend>
+                        <v-icon size="small">mdi-pencil-outline</v-icon>
+                      </template>
+                      <v-list-item-title>{{ $t('devices.rename_device') }}</v-list-item-title>
+                    </v-list-item>
                     <v-list-item @click="removeDevice(device.id)" color="error">
                       <template v-slot:prepend>
                         <v-icon size="small" color="error">mdi-delete-outline</v-icon>
@@ -103,9 +115,7 @@
                 <v-icon size="14" color="zinc-muted" class="mr-2"
                   >mdi-image-multiple-outline</v-icon
                 >
-                <span class="text-caption text-zinc-secondary">{{
-                  $t('media.label_photos')
-                }}</span>
+                <span class="text-caption text-zinc-secondary">{{ $t('media.label_photos') }}</span>
                 <v-spacer></v-spacer>
                 <span class="text-caption text-zinc-primary font-weight-bold">{{
                   device.photo_count
@@ -113,9 +123,7 @@
               </div>
               <div class="d-flex align-center">
                 <v-icon size="14" color="zinc-muted" class="mr-2">mdi-video-outline</v-icon>
-                <span class="text-caption text-zinc-secondary">{{
-                  $t('media.label_videos')
-                }}</span>
+                <span class="text-caption text-zinc-secondary">{{ $t('media.label_videos') }}</span>
                 <v-spacer></v-spacer>
                 <span class="text-caption text-zinc-primary font-weight-bold">{{
                   device.video_count
@@ -146,7 +154,7 @@
             </div>
             <div v-else class="d-flex align-center mt-2">
               <v-btn
-                v-if="!device.host"
+                v-if="!device.host && connection === 'connected'"
                 variant="flat"
                 color="black"
                 class="siegu-btn flex-grow-1"
@@ -155,6 +163,18 @@
               >
                 <v-icon start size="small">mdi-sync</v-icon>
                 {{ $t('devices.sync_now') }}
+              </v-btn>
+              <v-btn
+                v-else-if="!device.host && connection === 'offline'"
+                variant="tonal"
+                color="black"
+                class="siegu-btn flex-grow-1"
+                size="small"
+                :loading="reconnecting"
+                @click="reconnect"
+              >
+                <v-icon start size="small">mdi-wifi-refresh</v-icon>
+                {{ $t('devices.reconnect') }}
               </v-btn>
               <v-chip
                 v-else
@@ -206,6 +226,49 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Rename Dialog -->
+    <v-dialog v-model="renameDialog" max-width="400" rounded="xl">
+      <v-card class="pa-6 border-subtle bg-siegu-white">
+        <div class="siegu-icon-circle-dark mb-4">
+          <v-icon color="white">mdi-pencil-outline</v-icon>
+        </div>
+        <v-card-title class="text-h5 font-weight-bold text-zinc-primary px-0 pb-2">{{
+          $t('devices.rename_device_title')
+        }}</v-card-title>
+        <v-card-text class="text-zinc-secondary px-0 pb-6">
+          <v-text-field
+            v-model="renameName"
+            :label="$t('devices.device_name')"
+            variant="outlined"
+            density="comfortable"
+            hide-details="auto"
+            @keyup.enter="confirmRename"
+          ></v-text-field>
+        </v-card-text>
+        <v-card-actions class="px-0 ga-3">
+          <v-btn
+            variant="flat"
+            color="#f4f4f5"
+            class="siegu-btn flex-grow-1 text-zinc-primary"
+            height="44"
+            @click="renameDialog = false"
+          >
+            {{ $t('common.cancel') }}
+          </v-btn>
+          <v-btn
+            variant="flat"
+            color="black"
+            class="siegu-btn flex-grow-1"
+            height="44"
+            @click="confirmRename"
+            :loading="renaming"
+          >
+            {{ $t('common.save') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -219,6 +282,27 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+.device-icon-wrap {
+  position: relative;
+}
+.device-status-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+}
+.dot-connected {
+  background: #22c55e;
+}
+.dot-offline {
+  background: #ef4444;
+}
+.dot-idle {
+  background: #a1a1aa;
 }
 .device-card {
   transition: all 0.2s ease;
@@ -262,38 +346,67 @@
 </style>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import Connect from './Connect.vue'
-import { listDevices, removeDevice as removeDeviceApi, requestStartSync } from '@/services/tauri'
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import Connect from './Connect.vue';
+import { useSyncStore } from '@/stores/sync';
+import {
+  listDevices,
+  removeDevice as removeDeviceApi,
+  renameDevice as renameDeviceApi,
+  requestStartSync,
+} from '@/services/tauri';
 
 interface DeviceWithSync {
-  id: string
-  title: string
-  icon: string
-  os: string
-  photo_count: number
-  video_count: number
-  host: string
-  subtitle: string
-  syncing: boolean
-  progress: number
-  syncStatus: string
-  items_completed: number
-  items_total: number
+  id: string;
+  title: string;
+  icon: string;
+  os: string;
+  photo_count: number;
+  video_count: number;
+  host: string;
+  subtitle: string;
+  syncing: boolean;
+  progress: number;
+  syncStatus: string;
+  items_completed: number;
+  items_total: number;
 }
 
-const devices = ref<DeviceWithSync[]>([])
-const deleteDialog = ref(false)
-const deviceToDelete = ref('')
-const deleting = ref(false)
+const devices = ref<DeviceWithSync[]>([]);
+const deleteDialog = ref(false);
+const deviceToDelete = ref('');
+const deleting = ref(false);
 
-let unlistenRefresh: UnlistenFn | null = null
-let unlistenSync: UnlistenFn | null = null
+const renameDialog = ref(false);
+const renameId = ref('');
+const renameName = ref('');
+const renaming = ref(false);
+const reconnecting = ref(false);
+
+const syncStore = useSyncStore();
+const { t } = useI18n();
+const connection = computed(() => syncStore.connection);
+
+const dotClass = computed(() => {
+  if (syncStore.connection === 'connected') return 'dot-connected';
+  if (syncStore.connection === 'offline') return 'dot-offline';
+  return 'dot-idle';
+});
+
+const dotTitle = computed(() => {
+  if (syncStore.connection === 'connected') return t('devices.status_connected');
+  if (syncStore.connection === 'offline') return t('devices.status_offline');
+  return t('devices.status_idle');
+});
+
+let unlistenRefresh: UnlistenFn | null = null;
+let unlistenSync: UnlistenFn | null = null;
 
 async function loadDevices() {
   try {
-    const realDevices = await listDevices()
+    const realDevices = await listDevices();
     devices.value = (realDevices || []).map((d) => ({
       ...d,
       syncing: false,
@@ -301,70 +414,101 @@ async function loadDevices() {
       syncStatus: '',
       items_completed: 0,
       items_total: 0,
-    }))
+    }));
   } catch (err) {
-    console.error('Failed to list devices:', err)
+    console.error('Failed to list devices:', err);
   }
 }
 
 async function startSync() {
   try {
-    await requestStartSync()
+    await requestStartSync();
   } catch (err) {
-    console.error('Failed to request sync:', err)
+    console.error('Failed to request sync:', err);
+  }
+}
+
+async function reconnect() {
+  reconnecting.value = true;
+  try {
+    await syncStore.reconnect();
+    await loadDevices();
+  } finally {
+    reconnecting.value = false;
+  }
+}
+
+function openRename(device: DeviceWithSync) {
+  renameId.value = device.id;
+  renameName.value = device.title;
+  renameDialog.value = true;
+}
+
+async function confirmRename() {
+  const name = renameName.value.trim();
+  if (!name) return;
+  renaming.value = true;
+  try {
+    await renameDeviceApi(renameId.value, name);
+    await loadDevices();
+    renameDialog.value = false;
+  } catch (err) {
+    console.error('Failed to rename device:', err);
+  } finally {
+    renaming.value = false;
   }
 }
 
 function removeDevice(id: string) {
-  deviceToDelete.value = id
-  deleteDialog.value = true
+  deviceToDelete.value = id;
+  deleteDialog.value = true;
 }
 
 async function confirmDelete() {
-  deleting.value = true
+  deleting.value = true;
   try {
-    await removeDeviceApi(deviceToDelete.value)
-    await loadDevices()
-    deleteDialog.value = false
+    await removeDeviceApi(deviceToDelete.value);
+    await loadDevices();
+    deleteDialog.value = false;
   } catch (err) {
-    console.error('Failed to remove device:', err)
+    console.error('Failed to remove device:', err);
   } finally {
-    deleting.value = false
-    deviceToDelete.value = ''
+    deleting.value = false;
+    deviceToDelete.value = '';
   }
 }
 
 onMounted(async () => {
-  await loadDevices()
+  await loadDevices();
 
   unlistenRefresh = await listen('refresh-devices', () => {
-    loadDevices()
-  })
+    loadDevices();
+  });
 
   unlistenSync = await listen('sync-progress', (event) => {
     const payload = event.payload as {
-      status: string
-      progress: number
-      items_completed: number
-      items_total: number
-    }
+      status: string;
+      progress: number;
+      items_completed: number;
+      items_total: number;
+    };
     devices.value.forEach((d) => {
       if (!d.host) {
         d.syncing =
           payload.status !== 'idle' &&
           !payload.status.includes('Finished') &&
-          !payload.status.includes('Up to date')
-        d.progress = payload.progress
-        d.syncStatus = payload.status
-        d.items_completed = payload.items_completed
-        d.items_total = payload.items_total
+          !payload.status.includes('Up to date');
+        d.progress = payload.progress;
+        d.syncStatus = payload.status;
+        d.items_completed = payload.items_completed;
+        d.items_total = payload.items_total;
       }
-    })
-  })
-})
+    });
+  });
+});
 
 onUnmounted(() => {
-  if (unlistenRefresh) unlistenRefresh()
-  if (unlistenSync) unlistenSync()
-})
+  if (unlistenRefresh) unlistenRefresh();
+  if (unlistenSync) unlistenSync();
+});
 </script>
