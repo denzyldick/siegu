@@ -34,7 +34,10 @@
     "join_library_desc": "Mit einem anderen Gerät in deinem Netzwerk synchronisieren",
     "ai_disclaimer": "KI-Modelle laufen vollständig auf deinem Gerät. Keine Daten verlassen jemals deinen Computer.",
     "syncing": "Syncing...",
-    "sync_complete": "Sync complete"
+    "sync_complete": "Sync complete",
+    "your_library_title": "Wähle deinen Bibliotheksordner",
+    "your_library_desc": "Wähle den Ordner mit deinen eigenen Fotos, damit sie auf dem verknüpften Gerät gesichert werden können.",
+    "choose_folder": "Ordner wählen"
   },
   "search": {
     "placeholder": "Erinnerungen durchsuchen...",
@@ -164,7 +167,14 @@
     "online": "Online",
     "remove_device_title": "Gerät entfernen?",
     "remove_device_confirm": "Bist du sicher, dass du {name} entfernen möchtest? Dies stoppt die gesamte Synchronisation mit diesem Gerät.",
-    "more_info": "mehr Informationen"
+    "more_info": "mehr Informationen",
+    "rename_device": "Umbenennen",
+    "rename_device_title": "Gerät umbenennen",
+    "device_name": "Gerätename",
+    "reconnect": "Erneut verbinden",
+    "status_connected": "Verbunden",
+    "status_offline": "Offline",
+    "status_idle": "Bereit"
   },
   "settings": {
     "title": "Einstellungen",
@@ -291,7 +301,8 @@
     "alt_photo": "Foto",
     "aesthetics_score": "Ästhetikbewertung",
     "faces_detected": "Gesichter erkannt",
-    "fully_indexed": "Vollständig indiziert"
+    "fully_indexed": "Vollständig indiziert",
+    "not_synced": "Nicht auf einem anderen Gerät gesichert — Tippen zum erneuten Verbinden"
   },
   "media_thumbnail": {
     "alt_thumb": "Fotominiatur"

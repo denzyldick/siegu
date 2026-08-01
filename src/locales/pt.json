@@ -34,7 +34,10 @@
     "join_library_desc": "Sincronizar com outro dispositivo em sua rede",
     "ai_disclaimer": "Os modelos de IA são executados inteiramente no seu dispositivo. Nenhum dado sai jamais do seu computador.",
     "syncing": "Syncing...",
-    "sync_complete": "Sync complete"
+    "sync_complete": "Sync complete",
+    "your_library_title": "Escolha a pasta da sua biblioteca",
+    "your_library_desc": "Escolha a pasta com suas próprias fotos para que possam ser copiadas para o dispositivo vinculado.",
+    "choose_folder": "Escolher pasta"
   },
   "search": {
     "placeholder": "Pesquisar memórias...",
@@ -164,7 +167,14 @@
     "online": "Online",
     "remove_device_title": "Remover Dispositivo?",
     "remove_device_confirm": "Tem certeza de que deseja remover {name}? Isso interromperá toda sincronização com este dispositivo.",
-    "more_info": "mais informações"
+    "more_info": "mais informações",
+    "rename_device": "Renomear",
+    "rename_device_title": "Renomear dispositivo",
+    "device_name": "Nome do dispositivo",
+    "reconnect": "Reconectar",
+    "status_connected": "Conectado",
+    "status_offline": "Offline",
+    "status_idle": "Inativo"
   },
   "settings": {
     "title": "Configurações",
@@ -291,7 +301,8 @@
     "alt_photo": "Foto",
     "aesthetics_score": "Pontuação estética",
     "faces_detected": "Rostos detectados",
-    "fully_indexed": "Totalmente indexado"
+    "fully_indexed": "Totalmente indexado",
+    "not_synced": "Não copiado para outro dispositivo — toque para reconectar"
   },
   "media_thumbnail": {
     "alt_thumb": "Miniatura de foto"

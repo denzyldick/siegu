@@ -34,7 +34,10 @@
     "join_library_desc": "Synchroniser avec un autre appareil sur votre réseau",
     "ai_disclaimer": "Les modèles IA fonctionnent entièrement sur votre appareil. Aucune donnée ne quitte jamais votre ordinateur.",
     "syncing": "Syncing...",
-    "sync_complete": "Sync complete"
+    "sync_complete": "Sync complete",
+    "your_library_title": "Choisissez votre dossier de bibliothèque",
+    "your_library_desc": "Choisissez le dossier contenant vos propres photos pour qu'elles puissent être sauvegardées sur l'appareil lié.",
+    "choose_folder": "Choisir un dossier"
   },
   "search": {
     "placeholder": "Rechercher des souvenirs...",
@@ -164,7 +167,14 @@
     "online": "En ligne",
     "remove_device_title": "Supprimer l'appareil ?",
     "remove_device_confirm": "Êtes-vous sûr de vouloir supprimer {name} ? Cela arrêtera toute synchronisation avec cet appareil.",
-    "more_info": "plus d'informations"
+    "more_info": "plus d'informations",
+    "rename_device": "Renommer",
+    "rename_device_title": "Renommer l'appareil",
+    "device_name": "Nom de l'appareil",
+    "reconnect": "Reconnecter",
+    "status_connected": "Connecté",
+    "status_offline": "Hors ligne",
+    "status_idle": "Inactif"
   },
   "settings": {
     "title": "Paramètres",
@@ -291,7 +301,8 @@
     "alt_photo": "Photo",
     "aesthetics_score": "Score d'esthétique",
     "faces_detected": "Visages détectés",
-    "fully_indexed": "Entièrement indexé"
+    "fully_indexed": "Entièrement indexé",
+    "not_synced": "Non sauvegardé sur un autre appareil — touchez pour reconnecter"
   },
   "media_thumbnail": {
     "alt_thumb": "Vignette photo"

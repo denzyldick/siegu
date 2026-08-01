@@ -34,7 +34,10 @@
     "join_library_desc": "Synchroniseer met een ander apparaat op je netwerk",
     "ai_disclaimer": "AI-modellen draaien volledig op je apparaat. Geen gegevens verlaten ooit je computer.",
     "syncing": "Syncing...",
-    "sync_complete": "Sync complete"
+    "sync_complete": "Sync complete",
+    "your_library_title": "Kies je bibliotheekmap",
+    "your_library_desc": "Kies de map met je eigen foto's zodat ze op het gekoppelde apparaat kunnen worden geback-upt.",
+    "choose_folder": "Kies map"
   },
   "search": {
     "placeholder": "Zoek herinneringen...",
@@ -164,7 +167,14 @@
     "online": "Online",
     "remove_device_title": "Apparaat verwijderen?",
     "remove_device_confirm": "Weet je zeker dat je {name} wilt verwijderen? Dit stopt alle synchronisatie met dit apparaat.",
-    "more_info": "meer informatie"
+    "more_info": "meer informatie",
+    "rename_device": "Naam wijzigen",
+    "rename_device_title": "Apparaatnaam wijzigen",
+    "device_name": "Apparaatnaam",
+    "reconnect": "Opnieuw verbinden",
+    "status_connected": "Verbonden",
+    "status_offline": "Offline",
+    "status_idle": "Inactief"
   },
   "settings": {
     "title": "Instellingen",
@@ -291,7 +301,8 @@
     "alt_photo": "Foto",
     "aesthetics_score": "Esthetiekscore",
     "faces_detected": "Gezichten gedetecteerd",
-    "fully_indexed": "Volledig geïndexeerd"
+    "fully_indexed": "Volledig geïndexeerd",
+    "not_synced": "Niet geback-upt op een ander apparaat — tik om opnieuw te verbinden"
   },
   "media_thumbnail": {
     "alt_thumb": "Fotominiatuur"

@@ -34,7 +34,10 @@
     "join_library_desc": "Sinkronisá ku otro aparato riba bo red",
     "ai_disclaimer": "Modelonan di AI ta kore kompletu riba bo aparato. Ningun dato nunca ta sali for di bo komputadó.",
     "syncing": "Syncing...",
-    "sync_complete": "Sync complete"
+    "sync_complete": "Sync complete",
+    "your_library_title": "Elegí e mapa di bo biblioteka",
+    "your_library_desc": "Elegí e mapa ku bo mes foto pa nan por wòrdu respaldá riba e aparato conectá.",
+    "choose_folder": "Elegí mapa"
   },
   "search": {
     "placeholder": "Búskeda di memorianan...",
@@ -164,7 +167,14 @@
     "online": "Online",
     "remove_device_title": "Kitá Aparato?",
     "remove_device_confirm": "Bo ta sigur ku bo ke kitá {name}? Esaki lo stòp tur sinkronisashon ku e aparato aki.",
-    "more_info": "mas informashon"
+    "more_info": "mas informashon",
+    "rename_device": "Renombrá",
+    "rename_device_title": "Renombrá aparato",
+    "device_name": "Nòmber di aparato",
+    "reconnect": "Reconectá",
+    "status_connected": "Conectá",
+    "status_offline": "Offline",
+    "status_idle": "Inaktivo"
   },
   "settings": {
     "title": "Ajustenan",
@@ -291,7 +301,8 @@
     "alt_photo": "Foto",
     "aesthetics_score": "Puntuashon estétiko",
     "faces_detected": "Karanan detectá",
-    "fully_indexed": "Kompletamente indeksá"
+    "fully_indexed": "Kompletamente indeksá",
+    "not_synced": "No respaldá na otro aparato — toca pa reconectá"
   },
   "media_thumbnail": {
     "alt_thumb": "Miniatura di foto"

@@ -16,7 +16,8 @@
     "alt_photo": "Photo",
     "aesthetics_score": "Aesthetics score",
     "faces_detected": "Faces detected",
-    "fully_indexed": "Fully indexed"
+    "fully_indexed": "Fully indexed",
+    "not_synced": "Not backed up on another device — tap to reconnect"
   },
   "media_thumbnail": {
     "alt_thumb": "Photo thumbnail"
@@ -114,6 +115,13 @@
     "photos_count": "{count} photos",
     "videos_count": "{count} videos",
     "remove_device": "Remove Device",
+    "rename_device": "Rename",
+    "rename_device_title": "Rename Device",
+    "device_name": "Device name",
+    "reconnect": "Reconnect",
+    "status_connected": "Connected",
+    "status_offline": "Offline",
+    "status_idle": "Idle",
     "local_environment": "Local Environment",
     "connected": "Connected",
     "system": "System:",
@@ -383,6 +391,9 @@
     "change": "Change",
     "device_linked": "Device linked successfully!",
     "link_device": "Link a Device",
+    "your_library_title": "Choose your library folder",
+    "your_library_desc": "Pick the folder with your own photos so they can be backed up to the linked device.",
+    "choose_folder": "Choose folder",
     "skip": "Skip for now",
     "start_syncing": "Start Syncing",
     "syncing": "Syncing...",
