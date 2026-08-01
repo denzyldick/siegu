@@ -291,7 +291,7 @@
                   style="width: 70px"
                 >
                   <v-avatar size="56" class="border-subtle mb-1">
-                    <v-img :src="face.encoded" cover></v-img>
+                    <v-img :src="face.encoded ?? ''" cover></v-img>
                   </v-avatar>
                   <div class="text-caption text-zinc-primary text-truncate text-center w-100 font-weight-bold">
                     {{ face.person_name || $t('media_viewer.unnamed') }}
@@ -349,6 +349,15 @@ import MediaThumbnail from './MediaThumbnail.vue'
 import { isVideo as checkIsVideo } from '@/composables/useMediaUtils'
 import type { MediaItem } from '@/types/media'
 
+interface DetectedFace {
+  photo_id: string
+  face_id: string
+  crop_path: string
+  encoded: string | null
+  person_id: string | null
+  person_name: string | null
+}
+
 const props = defineProps<{
   modelValue: boolean
   photos: MediaItem[]
@@ -365,7 +374,7 @@ const emit = defineEmits<{
 const showInfo = ref(false)
 const os = ref('')
 const mediaPort = ref<number | null>(null)
-const detectedFaces = ref<Record<string, unknown>[]>([])
+const detectedFaces = ref<DetectedFace[]>([])
 const isAnalyzing = ref(false)
 const isAnalyzingModel = ref<string | null>(null)
 const runStartTime = ref(0)
@@ -479,7 +488,7 @@ const aiTags = computed(() => {
 const uniquePeople = computed(() => {
   if (!detectedFaces.value) return []
   const seen = new Set()
-  return detectedFaces.value.filter((face: Record<string, unknown>) => {
+  return detectedFaces.value.filter((face: DetectedFace) => {
     if (!face.person_id) return true
     if (seen.has(face.person_id as string)) return false
     seen.add(face.person_id as string)
@@ -528,11 +537,11 @@ async function fetchFaces(): Promise<void> {
   }
 }
 
-function goToPerson(face: Record<string, unknown>): void {
+function goToPerson(face: DetectedFace): void {
   if (!face.person_id) return
   emit('navigate-to-person', {
     id: face.person_id as string,
-    name: (face.person_name as string) || 'Unnamed',
+    name: face.person_name || 'Unnamed',
   })
   close()
 }

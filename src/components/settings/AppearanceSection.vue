@@ -22,19 +22,28 @@
         hide-details
         class="mt-0"
       >
-        <v-radio :label="$t('settings.theme_system')" value="system">
-          <template v-slot:prepend>
-            <v-icon size="small" color="#71717a" class="mr-2">mdi-theme-light-dark</v-icon>
+        <v-radio value="system">
+          <template v-slot:label>
+            <span class="d-flex align-center">
+              <v-icon size="small" color="#71717a" class="mr-2">mdi-theme-light-dark</v-icon>
+              {{ $t('settings.theme_system') }}
+            </span>
           </template>
         </v-radio>
-        <v-radio :label="$t('settings.theme_light')" value="light">
-          <template v-slot:prepend>
-            <v-icon size="small" color="#f59e0b" class="mr-2">mdi-white-balance-sunny</v-icon>
+        <v-radio value="light">
+          <template v-slot:label>
+            <span class="d-flex align-center">
+              <v-icon size="small" color="#f59e0b" class="mr-2">mdi-white-balance-sunny</v-icon>
+              {{ $t('settings.theme_light') }}
+            </span>
           </template>
         </v-radio>
-        <v-radio :label="$t('settings.theme_dark')" value="dark">
-          <template v-slot:prepend>
-            <v-icon size="small" color="#71717a" class="mr-2">mdi-weather-night</v-icon>
+        <v-radio value="dark">
+          <template v-slot:label>
+            <span class="d-flex align-center">
+              <v-icon size="small" color="#71717a" class="mr-2">mdi-weather-night</v-icon>
+              {{ $t('settings.theme_dark') }}
+            </span>
           </template>
         </v-radio>
       </v-radio-group>
