@@ -10,7 +10,6 @@ import { useSearchStore } from '@/stores/search'
 import { autoReconnect } from '@/services/tauri'
 import AppDock from '@/components/layout/AppDock.vue'
 import AppToolbar from '@/components/layout/AppToolbar.vue'
-import ProgressBanner from '@/components/layout/ProgressBanner.vue'
 import SyncStatusBanner from '@/components/layout/SyncStatusBanner.vue'
 import OnboardingFlow from '@/components/onboarding/OnboardingFlow.vue'
 import MediaLibrary from '@/components/MediaLibrary.vue'
@@ -114,15 +113,9 @@ function removeFilterChip(index: number): void {
     </template>
 
     <template v-else>
-      <AppToolbar
-        v-if="currentPage === 'home'"
-        :is-active="scanStore.isActive"
-        :status-label="scanStore.isActive ? t('sync.indexing') : t('sync.refresh')"
-        @scan="appStore.startScan()"
-      />
+      <AppToolbar v-if="currentPage === 'home'" />
 
       <v-main class="bg-siegu-main">
-        <ProgressBanner />
         <ErrorBoundary>
           <div data-tour="photos" class="w-100">
             <div

@@ -91,7 +91,6 @@
     "faces_count": "{count} Gesichter",
     "enter_to_search": "Suche nach \"{query}\"",
     "no_matches": "Keine Treffer für \"{query}\"",
-    "expand": "Erweiterte Filter",
     "clear_all": "Alles löschen",
     "date_picker": {
       "hint": "Start- und Enddatum auswählen",

@@ -37,6 +37,18 @@ function resolveTheme(): string {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
+function syncDataTheme(): void {
+  document.documentElement.dataset.theme = resolveTheme()
+}
+
+syncDataTheme()
+
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if ((localStorage.getItem('siegu_theme') || 'system') === 'system') {
+    syncDataTheme()
+  }
+})
+
 const vuetify = createVuetify({
   components,
   theme: {

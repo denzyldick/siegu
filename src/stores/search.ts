@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { searchFacets } from '@/services/tauri'
+import { searchFacets, resolvePhotoLocations } from '@/services/tauri'
 import type { SearchFacetsData, ActiveFilter, FacetType } from '@/types/search'
 
 export const useSearchStore = defineStore('search', () => {
@@ -20,6 +20,7 @@ export const useSearchStore = defineStore('search', () => {
   const aestheticsMin = ref<number | null>(null)
   const surprise = ref(false)
   const dateRange = ref<[string, string] | null>(null)
+  let locationsResolved = false
 
   const hasQuery = computed(() => query.value.trim().length > 0)
   const hasFilters = computed(
@@ -37,6 +38,16 @@ export const useSearchStore = defineStore('search', () => {
 
   async function loadFacets(): Promise<void> {
     if (facetsLoading.value) return
+    if (!locationsResolved) {
+      locationsResolved = true
+      resolvePhotoLocations()
+        .catch((error) => {
+          console.error('[SearchStore] Failed to resolve photo locations:', error)
+        })
+        .finally(() => {
+          if (facets.value) void loadFacets()
+        })
+    }
     facetsLoading.value = true
     try {
       facets.value = await searchFacets()

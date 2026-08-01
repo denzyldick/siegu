@@ -61,8 +61,10 @@ function onThemeChange(val: string | null): void {
   if (val === 'system') {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     theme.global.name.value = prefersDark ? 'dark' : 'light'
+    document.documentElement.dataset.theme = prefersDark ? 'dark' : 'light'
   } else {
     theme.global.name.value = val
+    document.documentElement.dataset.theme = val
   }
 }
 </script>

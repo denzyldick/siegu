@@ -126,16 +126,6 @@ const syncStatusText = computed(() => {
 </template>
 
 <style scoped>
-.siegu-icon-circle {
-  width: 28px;
-  height: 28px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .join-passphrase :deep(.v-field) {
   background: #a1a1aa !important;
 }

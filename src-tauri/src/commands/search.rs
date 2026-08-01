@@ -230,7 +230,7 @@ mod tests {
         assert_eq!(facets.papers.len(), 1);
         assert_eq!(facets.papers[0].name, "a receipt");
         assert_eq!(facets.cameras.len(), 1);
-        assert_eq!(facets.cameras[0].name, "Sony");
+        assert_eq!(facets.cameras[0].name, "sony");
         assert_eq!(facets.best_photos.len(), 1);
         assert_eq!(facets.best_photos[0].id, "p2");
         assert_eq!(facets.best_photos[0].aesthetics_score, Some(0.95));

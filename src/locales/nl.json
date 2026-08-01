@@ -91,7 +91,6 @@
     "faces_count": "{count} gezichten",
     "enter_to_search": "Zoek naar \"{query}\"",
     "no_matches": "Geen resultaten voor \"{query}\"",
-    "expand": "Geavanceerde filters",
     "clear_all": "Alles wissen",
     "date_picker": {
       "hint": "Kies een begin- en einddatum",

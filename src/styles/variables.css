@@ -10,7 +10,8 @@
   -webkit-text-size-adjust: 100%;
 }
 
-.v-theme--light {
+.v-theme--light,
+[data-theme='light'] {
   --color-bg-primary: #fafafa;
   --color-bg-surface: #ffffff;
   --color-bg-zinc-100: #f4f4f5;
@@ -32,7 +33,8 @@
   --color-bg-rail: rgba(255, 255, 255, 0.8);
 }
 
-.v-theme--dark {
+.v-theme--dark,
+[data-theme='dark'] {
   --color-bg-primary: #09090b;
   --color-bg-surface: #18181b;
   --color-bg-zinc-100: #27272a;

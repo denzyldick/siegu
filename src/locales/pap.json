@@ -91,7 +91,6 @@
     "faces_count": "{count} cara",
     "enter_to_search": "Buska pa \"{query}\"",
     "no_matches": "No tin resultado pa \"{query}\"",
-    "expand": "Filtronan avansá",
     "clear_all": "Limpia tur",
     "date_picker": {
       "hint": "Eskohé un fecha di inicio i di fin",

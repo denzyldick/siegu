@@ -1276,16 +1276,20 @@ impl Database {
         }
         let mut counts: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
         for (_, (make, model)) in by_photo {
-            let label = match (make, model) {
-                (Some(m), Some(md)) if !md.is_empty() => format!("{m} {md}").trim().to_string(),
-                (Some(m), _) => m,
-                (_, Some(md)) => md,
+            let brand = match (make, model) {
+                (Some(m), _) if !m.trim().is_empty() => m.trim().to_lowercase(),
+                (_, Some(md)) if !md.trim().is_empty() => md
+                    .trim()
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .to_lowercase(),
                 _ => continue,
             };
-            if label.is_empty() {
+            if brand.is_empty() {
                 continue;
             }
-            *counts.entry(label).or_insert(0) += 1;
+            *counts.entry(brand).or_insert(0) += 1;
         }
         let mut sorted: Vec<(String, i64)> = counts.into_iter().collect();
         sorted.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
@@ -3352,7 +3356,7 @@ mod tests {
         assert_eq!(papers, vec![("a receipt".to_string(), 1)]);
 
         let cameras = db.get_camera_counts(10);
-        assert_eq!(cameras, vec![("Apple iPhone 15 Pro".to_string(), 1)]);
+        assert_eq!(cameras, vec![("apple".to_string(), 1)]);
 
         let groups = db.get_location_groups(10);
         assert_eq!(groups.len(), 1);

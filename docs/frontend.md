@@ -6,10 +6,10 @@ Tech: Vue 3 + TypeScript + Vuetify 3 + Vite + Pinia
 
 ```
 src/
-├── composables/     # 7 composables (useConnect, useSettings, etc.)
+├── composables/     # 6 composables (useConnect, useSettings, etc.)
 ├── stores/          # 6 Pinia stores
 ├── components/      # 50+ Vue components in 8 subdirectories
-│   ├── connect/     # Connection dialogs (ConnectModeToggle, ConnectJoinView, etc.)
+│   ├── connect/     # Connection dialogs (ConnectJoinView, etc.)
 │   ├── media/       # Media display (MediaGrid, MediaViewer, etc.)
 │   ├── settings/    # Settings panels
 │   ├── sync/        # Sync progress UI
@@ -43,7 +43,6 @@ src/
 | `useLocale` | i18n locale switching |
 | `useMediaUtils` | Media filtering (videos-only, favorites) |
 | `useMediaUrl` | Resolves thumbnail/original URLs via media server |
-| `useTauri` | Typed invoke wrapper for Tauri IPC |
 
 ## Event System
 
@@ -67,7 +66,7 @@ Tauri events bridge Rust backend → Vue frontend:
 
 ## Connection Flow
 
-1. User selects **Host** or **Join** mode via `ConnectModeToggle`
+1. User selects **Host** or **Join** mode in the connect view
 2. **Host**: Generates pairing codes, starts LAN signaling server, registers mDNS service, shows QR + passphrase
 3. **Join**: Discovers LAN hosts via mDNS polling, or scans QR / enters passphrase
 4. After WebRTC handshake, `peer-connected` fires → peer list updates

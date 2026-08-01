@@ -91,7 +91,6 @@
     "faces_count": "{count} volti",
     "enter_to_search": "Cerca \"{query}\"",
     "no_matches": "Nessun risultato per \"{query}\"",
-    "expand": "Filtri avanzati",
     "clear_all": "Cancella tutto",
     "date_picker": {
       "hint": "Scegli una data di inizio e di fine",

@@ -11,10 +11,6 @@ import DateRangePicker from '@/components/search/DateRangePicker.vue'
 import type { FacetGroup, LocationGroup, PhotoTile } from '@/types/search'
 import type { MediaItem } from '@/types/media'
 
-const emit = defineEmits<{
-  (e: 'advanced'): void
-}>()
-
 const { t } = useI18n()
 const searchStore = useSearchStore()
 
@@ -39,11 +35,15 @@ const namedPeople = computed(() =>
   (facets.value?.people ?? []).filter((p) => !q.value || matches(p.name ?? '')),
 )
 
-const peopleRow = computed(() =>
-  q.value
-    ? namedPeople.value.slice(0, 12)
-    : namedPeople.value.slice(0, 14),
+const unnamedPeople = computed(() =>
+  (facets.value?.unnamed_faces ?? []).filter((p) => !q.value || matches(p.name ?? '')),
 )
+
+const peopleRow = computed(() => {
+  const named = namedPeople.value.slice(0, q.value ? 12 : 14)
+  const unnamed = unnamedPeople.value.slice(0, q.value ? 8 : 10)
+  return [...named, ...unnamed]
+})
 
 const locations = computed(() =>
   (facets.value?.locations ?? []).filter((l) => !q.value || matches(l.name)),
@@ -83,7 +83,10 @@ function repositionDropdown(): void {
   const rect = searchWrapRef.value?.getBoundingClientRect()
   if (!rect) return
   const viewportH = window.innerHeight
-  const flipUp = rect.bottom + 480 > viewportH && rect.top > viewportH - rect.bottom
+  const margin = 12
+  const below = viewportH - rect.bottom - margin
+  const above = rect.top - margin
+  const flipUp = below < Math.min(320, above)
   const styles: Record<string, string> = {
     position: 'fixed',
     zIndex: '5000',
@@ -96,11 +99,13 @@ function repositionDropdown(): void {
     styles.left = `${Math.max(8, rect.left + rect.width / 2 - 330)}px`
   }
   if (flipUp) {
-    styles.bottom = `${viewportH - rect.top + 8}px`
+    styles.bottom = `${viewportH - rect.top + margin}px`
     styles.top = 'auto'
+    styles.maxHeight = `${Math.min(720, above)}px`
   } else {
-    styles.top = `${rect.bottom + 8}px`
+    styles.top = `${rect.bottom + margin}px`
     styles.bottom = 'auto'
+    styles.maxHeight = `${Math.min(720, below)}px`
   }
   dropdownStyle.value = styles
 }
@@ -118,7 +123,11 @@ function closeDropdown(): void {
 }
 
 function selectPerson(person: FacetGroup): void {
-  searchStore.addFilter({ type: 'person', value: person.id, label: person.name ?? '' })
+  searchStore.addFilter({
+    type: 'person',
+    value: person.id,
+    label: person.name ?? t('people.unnamed'),
+  })
   closeDropdown()
 }
 
@@ -300,6 +309,33 @@ function iconForFilter(type: string): string {
     }[type] ?? 'mdi-filter-variant'
   )
 }
+
+function brandIcon(name: string): string {
+  const b = name.toLowerCase()
+  if (b === 'apple') return 'mdi-apple'
+  if (b === 'google' || b === 'pixel') return 'mdi-google'
+  if (b === 'microsoft' || b === 'lumia' || b === 'nokia') return 'mdi-microsoft-windows'
+  if (b === 'samsung' || b === 'lg' || b === 'oneplus' || b === 'xiaomi' || b === 'huawei') {
+    return 'mdi-cellphone'
+  }
+  if (
+    b === 'sony' ||
+    b === 'canon' ||
+    b === 'nikon' ||
+    b === 'fujifilm' ||
+    b === 'fuji' ||
+    b === 'panasonic' ||
+    b === 'olympus' ||
+    b === 'pentax' ||
+    b === 'leica' ||
+    b === 'gopro' ||
+    b === 'kodak'
+  ) {
+    return 'mdi-camera'
+  }
+  if (b === 'motorola') return 'mdi-tablet-cellphone'
+  return 'mdi-camera'
+}
 </script>
 
 <template>
@@ -325,10 +361,10 @@ function iconForFilter(type: string): string {
     </div>
 
     <Teleport to="body">
-      <div v-if="dropdownOpen" class="search-dropdown" :style="dropdownStyle">
-        <div v-if="!facets && !searchStore.facetsLoading" class="pa-6 d-flex justify-center">
-          <v-progress-circular indeterminate size="24" width="2" />
-        </div>
+      <div v-if="dropdownOpen" class="search-dropdown" :style="dropdownStyle" @click.stop>
+      <div v-if="!facets" class="pa-6 d-flex justify-center">
+        <v-progress-circular indeterminate size="24" width="2" />
+      </div>
 
         <template v-else>
           <!-- ============ BROWSE MODE ============ -->
@@ -341,20 +377,6 @@ function iconForFilter(type: string): string {
                 <div class="text-h6 font-weight-bold text-zinc-primary">
                   {{ t('search.discover_title') }}
                 </div>
-              </div>
-              <div v-if="stats" class="stat-pills">
-                <span class="stat-pill">
-                  <v-icon size="13">mdi-image-multiple</v-icon>
-                  {{ stats.photos.toLocaleString() }}
-                </span>
-                <span class="stat-pill">
-                  <v-icon size="13">mdi-video</v-icon>
-                  {{ stats.videos.toLocaleString() }}
-                </span>
-                <span class="stat-pill">
-                  <v-icon size="13">mdi-account-group</v-icon>
-                  {{ stats.face_photos.toLocaleString() }}
-                </span>
               </div>
             </div>
 
@@ -452,13 +474,18 @@ function iconForFilter(type: string): string {
                   v-for="person in peopleRow"
                   :key="person.id"
                   class="face-card"
-                  :class="{ 'facet-active': isActive('person', person.id) }"
+                  :class="{ 'facet-active': isActive('person', person.id), 'face-card--unnamed': !person.name }"
                   @click="selectPerson(person)"
                 >
-                  <v-avatar size="56" rounded="xl" class="face-avatar">
-                    <v-img v-if="faceSrc(person)" :src="faceSrc(person)" cover />
-                    <v-icon v-else>mdi-account</v-icon>
-                  </v-avatar>
+                  <div class="face-avatar-wrap">
+                    <v-avatar size="56" rounded="xl" class="face-avatar">
+                      <v-img v-if="faceSrc(person)" :src="faceSrc(person)" cover />
+                      <v-icon v-else>mdi-account</v-icon>
+                    </v-avatar>
+                    <div v-if="!person.name" class="face-unnamed-badge">
+                      <v-icon size="10">mdi-help</v-icon>
+                    </div>
+                  </div>
                   <div class="face-name ellipsis">{{ person.name ?? t('people.unnamed') }}</div>
                   <div class="face-count">{{ person.count }}</div>
                 </div>
@@ -532,7 +559,7 @@ function iconForFilter(type: string): string {
                   :class="{ 'chip-active': searchStore.camera === cam.name }"
                   @click="selectCamera(cam.name)"
                 >
-                  <v-icon size="14" class="mr-1">mdi-camera</v-icon>
+                  <v-icon size="14" class="mr-1">{{ brandIcon(cam.name) }}</v-icon>
                   {{ cam.name }}
                   <span class="cloud-count">{{ cam.count }}</span>
                 </button>
@@ -561,7 +588,7 @@ function iconForFilter(type: string): string {
             </div>
 
             <!-- Time -->
-            <div v-if="stats && stats.photos" class="discover-section">
+            <div class="discover-section">
               <div class="section-header">
                 <span class="text-overline text-zinc-muted">{{ t('search.dates') }}</span>
               </div>
@@ -632,13 +659,19 @@ function iconForFilter(type: string): string {
                   v-for="person in peopleRow"
                   :key="person.id"
                   class="face-card"
+                  :class="{ 'facet-active': isActive('person', person.id), 'face-card--unnamed': !person.name }"
                   @click="selectPerson(person)"
                 >
-                  <v-avatar size="48" rounded="xl" class="face-avatar">
-                    <v-img v-if="faceSrc(person)" :src="faceSrc(person)" cover />
-                    <v-icon v-else>mdi-account</v-icon>
-                  </v-avatar>
-                  <div class="face-name ellipsis">{{ person.name }}</div>
+                  <div class="face-avatar-wrap">
+                    <v-avatar size="48" rounded="xl" class="face-avatar">
+                      <v-img v-if="faceSrc(person)" :src="faceSrc(person)" cover />
+                      <v-icon v-else>mdi-account</v-icon>
+                    </v-avatar>
+                    <div v-if="!person.name" class="face-unnamed-badge">
+                      <v-icon size="10">mdi-help</v-icon>
+                    </div>
+                  </div>
+                  <div class="face-name ellipsis">{{ person.name ?? t('people.unnamed') }}</div>
                   <div class="face-count">{{ person.count }}</div>
                 </div>
               </div>
@@ -689,16 +722,17 @@ function iconForFilter(type: string): string {
                   v-for="cam in cameras"
                   :key="cam.name"
                   class="cloud-chip"
+                  :class="{ 'chip-active': searchStore.camera === cam.name }"
                   @click="selectCamera(cam.name)"
                 >
-                  <v-icon size="14" class="mr-1">mdi-camera</v-icon>
+                  <v-icon size="14" class="mr-1">{{ brandIcon(cam.name) }}</v-icon>
                   {{ cam.name }}
                   <span class="cloud-count">{{ cam.count }}</span>
                 </button>
               </div>
             </div>
 
-            <div v-if="stats && stats.photos" class="discover-section">
+            <div class="discover-section">
               <div class="section-header">
                 <span class="text-overline text-zinc-muted">{{ t('search.dates') }}</span>
               </div>
@@ -738,12 +772,8 @@ function iconForFilter(type: string): string {
           </div>
 
           <v-divider class="border-subtle" />
-          <div class="footer-row pa-2">
-            <button class="advanced-btn" @click="emit('advanced')">
-              <v-icon size="18" class="mr-2">mdi-tune-variant</v-icon>
-              {{ t('search.expand') }}
-            </button>
-            <button v-if="searchStore.hasFilters" class="clear-btn" @click="clearAll">
+          <div v-if="searchStore.hasFilters" class="footer-row pa-2">
+            <button class="clear-btn" @click="clearAll">
               {{ t('search.clear_all') }}
             </button>
           </div>
@@ -795,9 +825,10 @@ function iconForFilter(type: string): string {
 
 .search-dropdown {
   background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-default);
   border-radius: 20px;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.45),
+    0 4px 16px rgba(0, 0, 0, 0.2);
   overflow-y: auto;
   max-height: min(76vh, 640px);
   padding: 10px 0;
@@ -810,24 +841,6 @@ function iconForFilter(type: string): string {
   justify-content: space-between;
   gap: 12px;
   padding: 6px 18px 10px;
-}
-
-.stat-pills {
-  display: flex;
-  gap: 6px;
-}
-
-.stat-pill {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  background: var(--color-bg-hover);
-  border-radius: 999px;
-  padding: 4px 10px;
-  white-space: nowrap;
 }
 
 .magic-grid {
@@ -844,7 +857,6 @@ function iconForFilter(type: string): string {
   gap: 4px;
   padding: 12px 4px 8px;
   border-radius: 14px;
-  border: 1px solid var(--color-border-subtle);
   background: var(--color-bg-hover);
   cursor: pointer;
   user-select: none;
@@ -853,12 +865,12 @@ function iconForFilter(type: string): string {
 
 .magic-card:hover {
   transform: translateY(-2px);
-  border-color: var(--color-border-hover);
+  background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
 }
 
 .magic-card--active {
-  border-color: var(--color-border-hover);
-  background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+  background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+  box-shadow: inset 0 0 0 1px var(--color-border-hover);
 }
 
 .magic-icon {
@@ -941,6 +953,29 @@ function iconForFilter(type: string): string {
 
 .face-avatar {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.face-avatar-wrap {
+  position: relative;
+}
+
+.face-card--unnamed .face-avatar {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-text-muted) 45%, transparent);
+}
+
+.face-unnamed-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  color: var(--color-bg-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-bg-surface);
 }
 
 .face-name {
@@ -1186,22 +1221,6 @@ function iconForFilter(type: string): string {
   justify-content: space-between;
   gap: 8px;
   padding: 4px 10px;
-}
-
-.advanced-btn {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  border-radius: 12px;
-  cursor: pointer;
-  user-select: none;
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--color-text-primary);
-}
-
-.advanced-btn:hover {
-  background: var(--color-bg-hover);
 }
 
 .clear-btn {

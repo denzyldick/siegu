@@ -237,7 +237,6 @@ onMounted(() => {
 <style scoped>
 .date-range-picker {
   background: var(--color-bg-hover);
-  border: 1px solid var(--color-border-subtle);
   border-radius: 16px;
   padding: 12px;
 }
@@ -378,13 +377,13 @@ onMounted(() => {
 }
 
 .drp-cell--inrange {
-  background: color-mix(in srgb, rgb(var(--v-theme-primary)) 18%, transparent);
+  background: color-mix(in srgb, var(--color-bg-btn) 18%, transparent);
   border-radius: 0;
 }
 
 .drp-cell--start,
 .drp-cell--end {
-  background: rgb(var(--v-theme-primary));
+  background: var(--color-bg-btn);
   border-radius: 10px;
 }
 
@@ -411,7 +410,6 @@ onMounted(() => {
   gap: 8px;
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid var(--color-border-subtle);
 }
 
 .drp-today {

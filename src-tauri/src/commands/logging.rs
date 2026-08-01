@@ -120,8 +120,12 @@ pub async fn resolve_photo_locations(app: tauri::AppHandle) -> Result<(), String
     if path.is_empty() {
         return Err("Config path empty".to_string());
     }
-    let db = database::Database::new(&path);
-    let resolved = do_resolve_photo_locations(&db);
+    let resolved = tauri::async_runtime::spawn_blocking(move || {
+        let db = database::Database::new(&path);
+        do_resolve_photo_locations(&db)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
     emit_log(&app, format!("Resolved {} photo locations", resolved));
     Ok(())
 }
