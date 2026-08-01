@@ -92,7 +92,7 @@ impl AnalysisCallbacks for TauriCallbacks {
         let pending: i64 = db
             .connection
             .query_row(
-                "SELECT COUNT(*) FROM photo WHERE sync_needed = 1 AND location NOT LIKE '%/siegu/%' AND location NOT LIKE '%\\siegu\\%'",
+                "SELECT COUNT(*) FROM photo WHERE sync_needed = 1 AND received = 0",
                 [],
                 |r| r.get(0),
             )

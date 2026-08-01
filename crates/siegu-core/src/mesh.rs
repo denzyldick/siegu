@@ -587,7 +587,10 @@ impl MeshManager {
 
                 let sanitized = sanitize_filename(&filename);
                 let temp_dir = sync_temp_dir(config_path);
-                let save_path = temp_dir.join(&sanitized);
+                // Key the temp file by photo id (not basename): concurrent
+                // transfers (semaphore-limited) can share a basename, and a
+                // shared temp path would interleave chunks and fail checksums.
+                let save_path = temp_dir.join(sanitize_filename(&id));
                 if let Some(parent) = save_path.parent() {
                     let _ = tokio::fs::create_dir_all(parent).await;
                 }
@@ -638,7 +641,8 @@ impl MeshManager {
                     let _ = file_state.file.flush().await;
                     drop(file_state.file);
 
-                    let temp_path = sync_temp_dir(config_path).join(&file_state.filename);
+                    let temp_path =
+                        sync_temp_dir(config_path).join(sanitize_filename(&file_state.id));
 
                     let received_checksum = match std::fs::read(&temp_path) {
                         Ok(data) => Self::compute_data_checksum(&data),
@@ -665,7 +669,11 @@ impl MeshManager {
                         &dirs,
                     );
 
-                    let final_path = target_dir.join(&file_state.filename);
+                    let final_path = crate::sync_transport::resolve_receive_target(
+                        &target_dir,
+                        &file_state.relative_path,
+                        &file_state.filename,
+                    );
                     if let Some(parent) = final_path.parent() {
                         let _ = tokio::fs::create_dir_all(parent).await;
                     }
@@ -708,6 +716,7 @@ impl MeshManager {
                                 encoded: &thumb,
                                 caption: caption_clone.as_deref(),
                                 aesthetics_score: aesthetics_clone,
+                                received: true,
                             });
                             db.clear_sync_needed(&id_clone);
                         });
@@ -754,7 +763,7 @@ impl MeshManager {
                 event.on_log("DEBUG handle CatchUp");
                 let db = Database::new(config_path);
                 let ids: Vec<String> = {
-                    let sql = "SELECT id FROM photo WHERE sync_needed = 1 AND location NOT LIKE '%/siegu/%' AND location NOT LIKE '%\\siegu\\%'";
+                    let sql = "SELECT id FROM photo WHERE sync_needed = 1 AND received = 0";
                     if let Ok(mut stmt) = db.connection.prepare(sql) {
                         stmt.query_map([], |row| row.get::<_, String>(0))
                             .map(|rows| rows.flatten().collect())

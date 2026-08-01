@@ -847,9 +847,10 @@ pub fn flush_results_to_db(
         if target_model.is_none() {
             db.update_photo_indexed(photo_id, 2);
         }
-        let _ = db
-            .connection
-            .execute("UPDATE photo SET sync_needed = 1 WHERE id = ?1", [photo_id]);
+        let _ = db.connection.execute(
+            "UPDATE photo SET sync_needed = 1 WHERE id = ?1 AND received = 0",
+            [photo_id],
+        );
 
         Ok(())
     });

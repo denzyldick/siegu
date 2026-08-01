@@ -182,6 +182,9 @@ pub struct ImportedPhoto<'a> {
     pub encoded: &'a str,
     pub caption: Option<&'a str>,
     pub aesthetics_score: Option<f64>,
+    /// True when the photo was imported from a peer over sync (a backup copy).
+    /// Originals scanned from a library folder set this to false.
+    pub received: bool,
 }
 
 /// A detected face with its associated person name (if any).
@@ -359,6 +362,10 @@ impl Database {
         );
         let _ = conn.execute(
             "ALTER TABLE photo ADD COLUMN indexed INTEGER DEFAULT 0;",
+            (),
+        );
+        let _ = conn.execute(
+            "ALTER TABLE photo ADD COLUMN received INTEGER DEFAULT 0;",
             (),
         );
 
@@ -1391,6 +1398,57 @@ impl Database {
         }
     }
 
+    /// Delete rows whose media file no longer exists on disk (immediate prune).
+    /// Only rows rooted at `dir` are considered. Removing the row drops the file
+    /// from the sync manifest, so the next manifest exchange re-requests and
+    /// restores it from any peer that still holds a copy. Returns the number of
+    /// rows removed.
+    pub fn prune_missing_files(&mut self, dir: &str) -> usize {
+        let mut gone: Vec<String> = Vec::new();
+        let prefix = format!("{dir}{}", std::path::MAIN_SEPARATOR);
+        if let Ok(mut stmt) = self
+            .connection
+            .prepare("SELECT id, location FROM photo WHERE location = ?1 OR location LIKE ?2")
+        {
+            if let Ok(rows) = stmt.query_map(rusqlite::params![dir, format!("{prefix}%")], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            }) {
+                for r in rows.flatten() {
+                    if !std::path::Path::new(&r.1).exists() {
+                        gone.push(r.0);
+                    }
+                }
+            }
+        }
+        if gone.is_empty() {
+            return 0;
+        }
+        let tx = match self.connection.transaction() {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::warn!("prune_missing_files: failed to start transaction: {e}");
+                return 0;
+            }
+        };
+        let mut removed = 0;
+        for id in &gone {
+            let _ = tx.execute("DELETE FROM object WHERE photo_id = ?1", [id]);
+            let _ = tx.execute("DELETE FROM faces WHERE photo_id = ?1", [id]);
+            let _ = tx.execute("DELETE FROM properties WHERE photo_id = ?1", [id]);
+            if tx
+                .execute("DELETE FROM photo WHERE id = ?1", [id])
+                .map(|n| n > 0)
+                .unwrap_or(false)
+            {
+                removed += 1;
+            }
+        }
+        if let Err(e) = tx.commit() {
+            tracing::warn!("prune_missing_files: failed to commit: {e}");
+        }
+        removed
+    }
+
     /// Import a photo with its objects and faces within a transaction (for device sync).
     pub fn import_photo(&mut self, photo: ImportedPhoto<'_>) {
         let tx = match self.connection.transaction() {
@@ -1402,8 +1460,8 @@ impl Database {
         };
 
         if let Err(e) = tx.execute(
-            "INSERT OR REPLACE INTO photo (id, location, created, latitude, longitude, encoded, caption, aesthetics_score) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            (photo.id, photo.location, photo.created, photo.latitude, photo.longitude, photo.encoded, photo.caption, photo.aesthetics_score),
+            "INSERT OR REPLACE INTO photo (id, location, created, latitude, longitude, encoded, caption, aesthetics_score, received) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            (photo.id, photo.location, photo.created, photo.latitude, photo.longitude, photo.encoded, photo.caption, photo.aesthetics_score, photo.received),
         ) {
             tracing::warn!("import_photo: failed to upsert photo {}: {e}", photo.id);
             return;
@@ -1503,7 +1561,7 @@ impl Database {
     pub fn store_photo_batch(&mut self, photos: &[Photo]) -> Result<(), String> {
         let tx = self.connection.transaction().map_err(|e| e.to_string())?;
         {
-            let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO photo(id, location, encoded, created, latitude, longitude, indexed) VALUES(?1, ?2, ?3, ?4, ?5, ?6, 1)").map_err(|e| e.to_string())?;
+            let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO photo(id, location, encoded, created, latitude, longitude, indexed, sync_needed) VALUES(?1, ?2, ?3, ?4, ?5, ?6, 1, 1)").map_err(|e| e.to_string())?;
             for p in photos {
                 let _ = stmt.execute((
                     &p.id,
@@ -2414,6 +2472,7 @@ mod tests {
             encoded: "",
             caption: None,
             aesthetics_score: None,
+            received: true,
         });
 
         let info = db.get_photo_sync_info();
@@ -2428,6 +2487,69 @@ mod tests {
             ids.contains(&"sync_siegu"),
             "received files under /siegu/ are part of this device's library and must be in the manifest"
         );
+    }
+
+    #[test]
+    fn test_prune_missing_files_removes_only_gone_rows() {
+        let mut db = test_db();
+        let dir = std::env::temp_dir().join(format!(
+            "siegu_prune_{}_{}",
+            std::process::id(),
+            TEST_COUNTER.fetch_add(1, Ordering::SeqCst)
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        let _ = fs::create_dir_all(&dir);
+        let existing = dir.join("still_here.jpg");
+        fs::write(&existing, b"jpeg").expect("create existing file");
+
+        let existing_path = existing.display().to_string();
+        let gone_path = dir.join("deleted.jpg").display().to_string();
+        let _ = db.store_photo_batch(&[
+            make_photo("prune_existing", &existing_path),
+            make_photo("prune_gone", &gone_path),
+        ]);
+
+        let removed = db.prune_missing_files(&dir.display().to_string());
+        assert_eq!(removed, 1, "only the deleted file's row should be pruned");
+        assert!(db.get_photo_by_id("prune_existing").is_some());
+        assert!(db.get_photo_by_id("prune_gone").is_none());
+    }
+
+    #[test]
+    fn test_ingest_marks_sync_needed_and_import_marks_received() {
+        let mut db = test_db();
+        let _ = db.store_photo_batch(&[make_photo("orig_1", "/tmp/orig.jpg")]);
+        db.import_photo(ImportedPhoto {
+            id: "recv_1",
+            location: "/tmp/siegu/recv.jpg",
+            created: "2024-01-01",
+            latitude: None,
+            longitude: None,
+            objects_json: "[]",
+            faces_json: "[]",
+            encoded: "",
+            caption: None,
+            aesthetics_score: None,
+            received: true,
+        });
+
+        let pending: i64 = db
+            .connection
+            .query_row(
+                "SELECT COUNT(*) FROM photo WHERE sync_needed = 1 AND received = 0",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        assert_eq!(pending, 1, "only the scanned original awaits sync");
+
+        let received: i64 = db
+            .connection
+            .query_row("SELECT COUNT(*) FROM photo WHERE received = 1", [], |r| {
+                r.get(0)
+            })
+            .unwrap_or(0);
+        assert_eq!(received, 1, "imported photo must be flagged as received");
     }
 
     #[test]

@@ -22,6 +22,48 @@ pub fn sanitize_filename(filename: &str) -> String {
     }
 }
 
+/// Sanitize a peer-supplied relative path so it can safely mirror the sender's
+/// directory tree under the sync target folder. Each segment is cleaned like a
+/// filename and traversal (`..`) or any segment that is not a plain name causes
+/// the whole path to be rejected (`None`), in which case callers fall back to
+/// the flat filename.
+pub fn sanitize_relative_path(relative_path: &str) -> Option<PathBuf> {
+    let mut out = PathBuf::new();
+    for raw in relative_path.split(['/', '\\']) {
+        let segment = raw.trim();
+        if segment.is_empty() || segment == "." {
+            continue;
+        }
+        if segment == ".." {
+            return None;
+        }
+        let cleaned = sanitize_filename(segment);
+        if cleaned == "unknown" {
+            continue;
+        }
+        out.push(cleaned);
+    }
+    if out.as_os_str().is_empty() {
+        None
+    } else {
+        Some(out)
+    }
+}
+
+/// Resolve where a received file should land. Prefers the mirrored `relative_path`
+/// under `target_dir`; falls back to the flat sanitized filename when the peer
+/// sent no usable relative path.
+pub fn resolve_receive_target(
+    target_dir: &Path,
+    relative_path: &str,
+    fallback_filename: &str,
+) -> PathBuf {
+    match sanitize_relative_path(relative_path) {
+        Some(rel) => target_dir.join(rel),
+        None => target_dir.join(sanitize_filename(fallback_filename)),
+    }
+}
+
 pub fn resolve_sync_target_dir(
     config_path: &str,
     sync_path: Option<&str>,
@@ -141,6 +183,64 @@ mod tests {
     fn test_sync_temp_dir() {
         let result = sync_temp_dir("/config");
         assert_eq!(result, PathBuf::from("/config/sync_temp"));
+    }
+
+    #[test]
+    fn test_sanitize_relative_path_preserves_tree() {
+        let result = sanitize_relative_path("DCIM/100MEDIA/IMG_0001.jpg").unwrap();
+        assert_eq!(
+            result,
+            PathBuf::from("DCIM").join("100MEDIA").join("IMG_0001.jpg")
+        );
+    }
+
+    #[test]
+    fn test_sanitize_relative_path_rejects_traversal() {
+        assert!(sanitize_relative_path("../secret/photo.jpg").is_none());
+        assert!(sanitize_relative_path("a/../../b.jpg").is_none());
+        assert!(sanitize_relative_path("..").is_none());
+    }
+
+    #[test]
+    fn test_sanitize_relative_path_normalizes_separators() {
+        let result = sanitize_relative_path("DCIM\\100MEDIA\\IMG.jpg").unwrap();
+        assert_eq!(
+            result,
+            PathBuf::from("DCIM").join("100MEDIA").join("IMG.jpg")
+        );
+    }
+
+    #[test]
+    fn test_sanitize_relative_path_absolute_input_is_nested() {
+        let result = sanitize_relative_path("/etc/passwd").unwrap();
+        assert_eq!(result, PathBuf::from("etc").join("passwd"));
+    }
+
+    #[test]
+    fn test_sanitize_relative_path_cleans_segments() {
+        let result = sanitize_relative_path("my<dir>/IMG*.jpg").unwrap();
+        assert_eq!(result, PathBuf::from("my_dir").join("IMG_.jpg"));
+    }
+
+    #[test]
+    fn test_sanitize_relative_path_empty_falls_back() {
+        assert!(sanitize_relative_path("").is_none());
+        assert!(sanitize_relative_path(".").is_none());
+        assert!(sanitize_relative_path("///").is_none());
+    }
+
+    #[test]
+    fn test_resolve_receive_target_mirrors_tree() {
+        let target = Path::new("/sync/siegu");
+        let result = resolve_receive_target(target, "DCIM/100MEDIA/a.jpg", "a.jpg");
+        assert_eq!(result, Path::new("/sync/siegu/DCIM/100MEDIA/a.jpg"));
+    }
+
+    #[test]
+    fn test_resolve_receive_target_fallback() {
+        let target = Path::new("/sync/siegu");
+        let result = resolve_receive_target(target, "..", "IMG_0001.jpg");
+        assert_eq!(result, Path::new("/sync/siegu/IMG_0001.jpg"));
     }
 
     #[test]

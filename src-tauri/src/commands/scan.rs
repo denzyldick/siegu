@@ -249,6 +249,18 @@ pub fn scan_files(app: tauri::AppHandle) {
                 &app,
                 format!("[scan_files] scan_folder completed for: {folder}"),
             );
+
+            // Immediate prune: drop rows whose media file no longer exists on
+            // disk. Once removed from the manifest, the next manifest exchange
+            // re-requests and restores the file from any peer holding a copy.
+            let mut db_prune = database::Database::new(&path);
+            let pruned = db_prune.prune_missing_files(&folder);
+            if pruned > 0 {
+                emit_log(
+                    &app,
+                    format!("[scan_files] Pruned {pruned} missing files from: {folder}"),
+                );
+            }
         }
 
         emit_log(
