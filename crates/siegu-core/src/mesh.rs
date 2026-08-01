@@ -833,7 +833,7 @@ impl MeshManager {
         let port = if signaling_port > 0 {
             signaling_port
         } else {
-            crate::lan_server::start(0).await
+            crate::lan_server::start(0).await.port
         };
         Ok(port)
     }

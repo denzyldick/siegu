@@ -18,7 +18,28 @@ struct Room {
     clients: HashMap<String, Tx>,
 }
 
-pub async fn start(port: u16) -> u16 {
+/// A running LAN signaling server. Holds the bound port and an optional
+/// handle used to stop the listener task when a new server is started.
+pub struct LanServer {
+    pub port: u16,
+    abort: Option<tokio::task::AbortHandle>,
+}
+
+impl LanServer {
+    pub fn new(port: u16) -> Self {
+        Self { port, abort: None }
+    }
+
+    /// Stop the underlying listener task. If this server was created with an
+    /// explicit port (no listener spawned), this is a no-op.
+    pub fn stop(&self) {
+        if let Some(handle) = &self.abort {
+            handle.abort();
+        }
+    }
+}
+
+pub async fn start(port: u16) -> LanServer {
     let rooms: Rooms = Arc::new(RwLock::new(HashMap::new()));
 
     let rooms_filter = warp::any().map({
@@ -37,11 +58,14 @@ pub async fn start(port: u16) -> u16 {
     let listener = TcpListener::bind(addr).await.unwrap();
     let actual_addr = listener.local_addr().unwrap();
 
-    tokio::spawn(async move {
+    let task = tokio::spawn(async move {
         warp::serve(ws_route).incoming(listener).run().await;
     });
 
-    actual_addr.port()
+    LanServer {
+        port: actual_addr.port(),
+        abort: Some(task.abort_handle()),
+    }
 }
 
 async fn handle_connection(socket: warp::ws::WebSocket, room_id: String, rooms: Rooms) {
@@ -266,7 +290,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_server_starts_and_listens() {
-        let port = start(0).await;
+        let server = start(0).await;
+        let port = server.port;
         assert!(port > 0, "Server should bind to a port");
 
         let url = format!("ws://127.0.0.1:{}/test-room", port);
@@ -275,8 +300,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_server_stop_closes_listener() {
+        let server = start(0).await;
+        let port = server.port;
+        assert!(port > 0);
+
+        server.stop();
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        let url = format!("ws://127.0.0.1:{}/test-room", port);
+        let result = connect_async(&url).await;
+        assert!(
+            result.is_err(),
+            "Server should stop accepting connections after stop()"
+        );
+    }
+
+    #[tokio::test]
     async fn test_two_clients_join_same_room() {
-        let port = start(0).await;
+        let port = start(0).await.port;
 
         let mut ws_a = connect_client(port, "room1").await;
         send_join(&mut ws_a, "device-a").await;
@@ -323,7 +365,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sixth_client_rejected() {
-        let port = start(0).await;
+        let port = start(0).await.port;
 
         let mut ws_a = connect_client(port, "room2").await;
         send_join(&mut ws_a, "device-a").await;
@@ -372,7 +414,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_relay_offer_between_peers() {
-        let port = start(0).await;
+        let port = start(0).await.port;
 
         let mut ws_a = connect_client(port, "room3").await;
         send_join(&mut ws_a, "device-a").await;
@@ -403,7 +445,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_relay_answer_between_peers() {
-        let port = start(0).await;
+        let port = start(0).await.port;
 
         let mut ws_a = connect_client(port, "room4").await;
         send_join(&mut ws_a, "device-a").await;
@@ -436,7 +478,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_relay_ice_candidate() {
-        let port = start(0).await;
+        let port = start(0).await.port;
 
         let mut ws_a = connect_client(port, "room5").await;
         send_join(&mut ws_a, "device-a").await;
@@ -468,7 +510,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_peer_disconnected_notification() {
-        let port = start(0).await;
+        let port = start(0).await.port;
 
         let mut ws_a = connect_client(port, "room6").await;
         send_join(&mut ws_a, "device-a").await;
@@ -495,7 +537,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_multiple_rooms_independent() {
-        let port = start(0).await;
+        let port = start(0).await.port;
 
         let mut ws_a = connect_client(port, "alpha").await;
         send_join(&mut ws_a, "device-a").await;
@@ -552,7 +594,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_room_cleanup_on_empty() {
-        let port = start(0).await;
+        let port = start(0).await.port;
 
         let mut ws_a = connect_client(port, "cleanup-room").await;
         send_join(&mut ws_a, "device-a").await;

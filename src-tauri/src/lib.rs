@@ -24,6 +24,7 @@ struct WebRtcState {
     sync_tx:
         Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<transport::SyncMessage>>>>,
     connected: Arc<std::sync::atomic::AtomicBool>,
+    lan_server: std::sync::Mutex<Option<siegu_core::lan_server::LanServer>>,
 }
 
 struct ScanState {
@@ -212,6 +213,7 @@ pub fn run() {
                 active_session: std::sync::Mutex::new(None),
                 sync_tx,
                 connected: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                lan_server: std::sync::Mutex::new(None),
             });
 
             app.manage(ScanState {

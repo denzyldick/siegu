@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -97,20 +97,20 @@ impl MeshTransport {
 
     pub async fn start_lan_server(
         signaling_port: u16,
-    ) -> Result<u16, Box<dyn std::error::Error + Send + Sync>> {
-        let port = if signaling_port > 0 {
-            signaling_port
+    ) -> Result<crate::lan_server::LanServer, Box<dyn std::error::Error + Send + Sync>> {
+        if signaling_port > 0 {
+            Ok(crate::lan_server::LanServer::new(signaling_port))
         } else {
-            crate::lan_server::start(0).await
-        };
-        Ok(port)
+            Ok(crate::lan_server::start(0).await)
+        }
     }
 
     pub async fn start_lan(
         &mut self,
         signaling_port: u16,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let port = Self::start_lan_server(signaling_port).await?;
+        let server = Self::start_lan_server(signaling_port).await?;
+        let port = server.port;
         self.signaling_url = format!("ws://127.0.0.1:{}", port);
         self.event
             .on_log(&format!("Local signaling server started on port {port}"));
@@ -464,6 +464,34 @@ impl MeshTransport {
             self.event.on_log("DEBUG Join sent successfully");
         }
 
+        // A LAN joiner (initiator) must see a peer shortly after joining. If the
+        // connected server is orphaned/stale (e.g. a previous host incarnation),
+        // no peer ever appears and the UI would spin on "joining" forever. Arm a
+        // short watchdog that surfaces a rescan-and-retry error instead.
+        let join_watchdog: Option<Arc<AtomicBool>> = if !is_remote && self.is_initiator {
+            let has_peer = Arc::new(AtomicBool::new(false));
+            let peer_flag = Arc::clone(&has_peer);
+            let event = Arc::clone(&self.event);
+            self.event
+                .on_log("DEBUG [initiator] armed join watchdog (5s)");
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                if !peer_flag.load(Ordering::Relaxed) {
+                    event.on_state_change(
+                        "Join failed: no host session found on this port - rescan and retry",
+                    );
+                }
+            });
+            Some(has_peer)
+        } else {
+            None
+        };
+        let mark_peer = || {
+            if let Some(flag) = &join_watchdog {
+                flag.store(true, Ordering::Relaxed);
+            }
+        };
+
         while let Some(msg) = read.next().await {
             match msg {
                 Ok(WsMessage::Text(text)) => {
@@ -473,6 +501,7 @@ impl MeshTransport {
                     };
                     match signal {
                         SignalMessage::Joined { peer_count, .. } if !is_remote => {
+                            mark_peer();
                             eprintln!(
                                 "[siegu-transport] received Joined peer_count={} is_init={}",
                                 peer_count, self.is_initiator
@@ -498,6 +527,7 @@ impl MeshTransport {
                             }
                         }
                         SignalMessage::PeerJoined { .. } if !is_remote => {
+                            mark_peer();
                             eprintln!("[siegu-transport] received PeerJoined");
                             self.event.on_state_change("Peer Joined");
                             if self.is_initiator {
@@ -514,6 +544,7 @@ impl MeshTransport {
                             }
                         }
                         SignalMessage::Offer { payload, .. } if !is_remote => {
+                            mark_peer();
                             eprintln!("[siegu-transport] received Offer");
                             let sdp: RTCSessionDescription = serde_json::from_str(&payload)?;
                             pc.set_remote_description(sdp).await?;
@@ -535,6 +566,7 @@ impl MeshTransport {
                             .await?;
                         }
                         SignalMessage::Answer { payload, .. } if !is_remote => {
+                            mark_peer();
                             eprintln!("[siegu-transport] received Answer");
                             if let Ok(sdp) = serde_json::from_str::<RTCSessionDescription>(&payload)
                             {
@@ -546,6 +578,7 @@ impl MeshTransport {
                             }
                         }
                         SignalMessage::IceCandidate { payload, .. } if !is_remote => {
+                            mark_peer();
                             eprintln!("[siegu-transport] received ICE candidate");
                             if let Ok(candidate) =
                                 serde_json::from_str::<RTCIceCandidateInit>(&payload)

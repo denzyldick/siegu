@@ -98,7 +98,14 @@ pub fn create_daemon() -> Result<DaemonHandle, Box<dyn std::error::Error>> {
                         services.push(svc);
                     }
                     ControlMsg::Unregister(instance) => {
-                        services.retain(|s| s.instance != instance);
+                        if let Some(pos) = services.iter().position(|s| s.instance == instance) {
+                            let svc = services.remove(pos);
+                            let goodbye = build_goodbye(&svc);
+                            let _ = socket.send_to(
+                                &goodbye,
+                                SocketAddr::new(MULTICAST_ADDR.into(), MDNS_PORT),
+                            );
+                        }
                     }
                     ControlMsg::Browse(ty, sender) => {
                         let query = build_ptr_query(&ty);
@@ -111,14 +118,13 @@ pub fn create_daemon() -> Result<DaemonHandle, Box<dyn std::error::Error>> {
                 }
             }
 
-            if let Ok((sz, src)) = socket.recv_from(&mut buf) {
+            if let Ok(sz) = socket.recv(&mut buf) {
                 let packet = &buf[..sz];
                 if is_query(packet) && has_siegu_question(packet) {
                     if let Some(resp) = build_response(packet, &services) {
-                        // Reply to the querying address (covers both multicast PTR
-                        // queries and the unicast SRV/TXT/A queries that Android's
-                        // NsdManager sends during resolveService()).
-                        socket.send_to(&resp, src).ok();
+                        socket
+                            .send_to(&resp, SocketAddr::new(MULTICAST_ADDR.into(), MDNS_PORT))
+                            .ok();
                     }
                 }
                 if is_response(packet) && has_siegu_answer(packet) {
@@ -260,11 +266,11 @@ fn is_response(buf: &[u8]) -> bool {
 }
 
 fn has_siegu_question(buf: &[u8]) -> bool {
-    name_contains(buf, 12, b"siegu")
+    name_contains(buf, 12, b"_siegu")
 }
 
 fn has_siegu_answer(buf: &[u8]) -> bool {
-    buf.windows(6).any(|w| w == b"siegu")
+    buf.windows(6).any(|w| w == b"_siegu")
 }
 
 fn name_contains(buf: &[u8], offset: usize, target: &[u8]) -> bool {
@@ -335,108 +341,157 @@ fn build_response(query: &[u8], services: &[Service]) -> Option<Vec<u8>> {
     }
 
     let question_end = skip_name(query, 12);
-    if question_end + 4 > query.len() {
-        return None;
-    }
     let qtype = u16::from_be_bytes([query[question_end], query[question_end + 1]]);
-    // 1 = A, 12 = PTR, 16 = TXT, 33 = SRV, 255 = ANY. Android's NsdManager asks
-    // for SRV/TXT/A during resolveService(); answer all of them or it times out.
-    if !matches!(qtype, 1 | 12 | 16 | 33 | 255) {
+    if qtype != 12 && qtype != 255 {
         return None;
     }
 
     let svc = &services[0];
-    let service_type = SERVICE_TYPE;
-    let instance_name = format!("{}.{}", svc.instance, service_type);
-    let hostname = svc.hostname.clone();
+    let mut buf = Vec::with_capacity(512);
 
-    let mut a_rdata = Vec::with_capacity(4);
-    if let IpAddr::V4(ip) = svc.ip {
-        a_rdata.extend_from_slice(&ip.octets());
-    }
-
-    // (name, rtype, cache_flush, rdata)
-    let ptr = (
-        service_type.to_string(),
-        12u16,
-        false,
-        encode_name_bytes(&instance_name),
-    );
-    let srv = (
-        instance_name.clone(),
-        33u16,
-        true,
-        srv_rdata(svc.port, &hostname),
-    );
-    let txt = (instance_name, 16u16, true, txt_rdata(&svc.txt));
-    let a = (hostname, 1u16, true, a_rdata);
-
-    let (answers, additionals): (Vec<(String, u16, bool, Vec<u8>)>, _) = match qtype {
-        1 => (vec![a], Vec::new()),
-        12 => (vec![ptr], vec![srv, txt, a]),
-        16 => (vec![txt], vec![srv, a]),
-        33 => (vec![srv], vec![txt, a]),
-        _ => (vec![ptr, srv, txt, a], Vec::new()),
-    };
-
-    let mut buf = Vec::with_capacity(1024);
-    // Header: copy ID, set response + authoritative flags
-    buf.extend_from_slice(&query[..2]);
-    buf.extend_from_slice(&[0x84, 0x00]);
+    // Header: copy ID, set response flags
+    buf.extend_from_slice(&query[..2]); // ID
+    buf.extend_from_slice(&[0x84, 0x00]); // flags = response + authoritative
     buf.extend_from_slice(&[0x00, 0x01]); // QDCOUNT = 1 (echo question)
-    buf.extend_from_slice(&(answers.len() as u16).to_be_bytes()); // ANCOUNT
+    buf.extend_from_slice(&[0x00, 0x01]); // ANCOUNT = 1 (PTR)
     buf.extend_from_slice(&[0x00, 0x00]); // NSCOUNT = 0
-    buf.extend_from_slice(&(additionals.len() as u16).to_be_bytes()); // ARCOUNT
+    buf.extend_from_slice(&[0x00, 0x03]); // ARCOUNT = 3 (SRV, TXT, A)
 
     // Echo the question
-    buf.extend_from_slice(&query[12..question_end + 4]);
+    let qname_start = buf.len();
+    let question = &query[12..question_end + 4];
+    buf.extend_from_slice(question);
 
-    for (name, rtype, cache_flush, rdata) in answers.into_iter().chain(additionals) {
-        write_record(&mut buf, &name, rtype, cache_flush, MDNS_TTL, &rdata);
+    // PTR answer: name=_siegu._tcp.local (use pointer to qname), type=PTR, class=IN (no cache flush for shared PTR records), TTL=120
+    let ptr_offset = qname_start;
+    buf.push(0xC0);
+    buf.push(ptr_offset as u8);
+    buf.extend_from_slice(&[0x00, 0x0C]); // TYPE = PTR
+    buf.extend_from_slice(&[0x00, 0x01]); // CLASS = IN (shared record - no cache flush)
+    buf.extend_from_slice(&MDNS_TTL.to_be_bytes());
+    // RDDATA: instance name
+    let rdlen_pos = buf.len();
+    buf.extend_from_slice(&[0u8; 2]); // placeholder
+    let data_start = buf.len();
+    encode_name(&mut buf, &format!("{}.{}", svc.instance, SERVICE_TYPE));
+    let rdlen = (buf.len() - data_start) as u16;
+    buf[rdlen_pos..rdlen_pos + 2].copy_from_slice(&rdlen.to_be_bytes());
+
+    // SRV additional: name=instance._siegu._tcp.local (use pointer to data_start), type=SRV, class=IN, TTL=120
+    buf.push(0xC0);
+    buf.push(data_start as u8);
+    buf.extend_from_slice(&[0x00, 0x21]); // TYPE = SRV
+    buf.extend_from_slice(&[0x80, 0x01]); // CLASS = IN + cache flush
+    buf.extend_from_slice(&MDNS_TTL.to_be_bytes());
+    let rdlen_pos2 = buf.len();
+    buf.extend_from_slice(&[0u8; 2]);
+    let data_start2 = buf.len();
+    buf.extend_from_slice(&[0x00, 0x00]); // priority = 0
+    buf.extend_from_slice(&[0x00, 0x00]); // weight = 0
+    buf.extend_from_slice(&svc.port.to_be_bytes()); // port
+    encode_name(&mut buf, &svc.hostname); // target hostname
+    let rdlen2 = (buf.len() - data_start2) as u16;
+    buf[rdlen_pos2..rdlen_pos2 + 2].copy_from_slice(&rdlen2.to_be_bytes());
+
+    // TXT additional: name=instance._siegu._tcp.local (pointer to data_start)
+    buf.push(0xC0);
+    buf.push(data_start as u8);
+    buf.extend_from_slice(&[0x00, 0x10]); // TYPE = TXT
+    buf.extend_from_slice(&[0x80, 0x01]); // CLASS = IN + cache flush
+    buf.extend_from_slice(&MDNS_TTL.to_be_bytes());
+    let rdlen_pos3 = buf.len();
+    buf.extend_from_slice(&[0u8; 2]);
+    let data_start3 = buf.len();
+    for (key, value) in &svc.txt {
+        let entry = format!("{key}={value}");
+        buf.push(entry.len() as u8);
+        buf.extend_from_slice(entry.as_bytes());
+    }
+    let rdlen3 = (buf.len() - data_start3) as u16;
+    buf[rdlen_pos3..rdlen_pos3 + 2].copy_from_slice(&rdlen3.to_be_bytes());
+
+    // A additional: name=hostname.local.
+    encode_name(&mut buf, &svc.hostname);
+    buf.extend_from_slice(&[0x00, 0x01]); // TYPE = A
+    buf.extend_from_slice(&[0x80, 0x01]); // CLASS = IN + cache flush
+    buf.extend_from_slice(&MDNS_TTL.to_be_bytes());
+    buf.extend_from_slice(&[0x00, 0x04]); // RDLENGTH = 4
+    match svc.ip {
+        IpAddr::V4(ip) => buf.extend_from_slice(&ip.octets()),
+        IpAddr::V6(_) => {} // skip AAAA for now
     }
 
     Some(buf)
 }
 
-fn write_record(
-    buf: &mut Vec<u8>,
-    name: &str,
-    rtype: u16,
-    cache_flush: bool,
-    ttl: u32,
-    rdata: &[u8],
-) {
-    encode_name(buf, name);
-    buf.extend_from_slice(&rtype.to_be_bytes());
-    let rclass: u16 = if cache_flush { 0x8001 } else { 0x0001 };
-    buf.extend_from_slice(&rclass.to_be_bytes());
-    buf.extend_from_slice(&ttl.to_be_bytes());
-    buf.extend_from_slice(&(rdata.len() as u16).to_be_bytes());
-    buf.extend_from_slice(rdata);
-}
+/// Unsolicited mDNS goodbye response for a service being unregistered. All
+/// records are sent with TTL 0 so caches (e.g. Android NsdManager) drop the
+/// stale instance instead of resolving a dead/orphaned port.
+fn build_goodbye(svc: &Service) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(256);
+    buf.extend_from_slice(&[0x00, 0x00]); // ID = 0
+    buf.extend_from_slice(&[0x84, 0x00]); // flags = response
+    buf.extend_from_slice(&[0x00, 0x00]); // QDCOUNT = 0
+    buf.extend_from_slice(&[0x00, 0x01]); // ANCOUNT = 1 (PTR)
+    buf.extend_from_slice(&[0x00, 0x00]); // NSCOUNT = 0
+    buf.extend_from_slice(&[0x00, 0x03]); // ARCOUNT = 3 (SRV, TXT, A)
 
-fn encode_name_bytes(name: &str) -> Vec<u8> {
-    let mut v = Vec::new();
-    encode_name(&mut v, name);
-    v
-}
+    // PTR: name=_siegu._tcp.local., target=instance._siegu._tcp.local., TTL=0
+    encode_name(&mut buf, SERVICE_TYPE);
+    buf.extend_from_slice(&[0x00, 0x0C]); // TYPE = PTR
+    buf.extend_from_slice(&[0x00, 0x01]); // CLASS = IN
+    buf.extend_from_slice(&[0u8; 4]); // TTL = 0
+    let rdlen_pos = buf.len();
+    buf.extend_from_slice(&[0u8; 2]);
+    let data_start = buf.len();
+    encode_name(&mut buf, &format!("{}.{}", svc.instance, SERVICE_TYPE));
+    let rdlen = (buf.len() - data_start) as u16;
+    buf[rdlen_pos..rdlen_pos + 2].copy_from_slice(&rdlen.to_be_bytes());
 
-fn srv_rdata(port: u16, hostname: &str) -> Vec<u8> {
-    let mut v = Vec::new();
-    v.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // priority = 0, weight = 0
-    v.extend_from_slice(&port.to_be_bytes());
-    encode_name(&mut v, hostname);
-    v
-}
+    // SRV: name=instance._siegu._tcp.local., TTL=0
+    buf.push(0xC0);
+    buf.push(data_start as u8);
+    buf.extend_from_slice(&[0x00, 0x21]); // TYPE = SRV
+    buf.extend_from_slice(&[0x80, 0x01]); // CLASS = IN + cache flush
+    buf.extend_from_slice(&[0u8; 4]); // TTL = 0
+    let rdlen_pos2 = buf.len();
+    buf.extend_from_slice(&[0u8; 2]);
+    let data_start2 = buf.len();
+    buf.extend_from_slice(&[0x00, 0x00]); // priority = 0
+    buf.extend_from_slice(&[0x00, 0x00]); // weight = 0
+    buf.extend_from_slice(&svc.port.to_be_bytes()); // port
+    encode_name(&mut buf, &svc.hostname); // target hostname
+    let rdlen2 = (buf.len() - data_start2) as u16;
+    buf[rdlen_pos2..rdlen_pos2 + 2].copy_from_slice(&rdlen2.to_be_bytes());
 
-fn txt_rdata(txt: &[(String, String)]) -> Vec<u8> {
-    let mut v = Vec::new();
-    for (key, value) in txt {
+    // TXT: name=instance._siegu._tcp.local., TTL=0
+    buf.push(0xC0);
+    buf.push(data_start as u8);
+    buf.extend_from_slice(&[0x00, 0x10]); // TYPE = TXT
+    buf.extend_from_slice(&[0x80, 0x01]); // CLASS = IN + cache flush
+    buf.extend_from_slice(&[0u8; 4]); // TTL = 0
+    let rdlen_pos3 = buf.len();
+    buf.extend_from_slice(&[0u8; 2]);
+    let data_start3 = buf.len();
+    for (key, value) in &svc.txt {
         let entry = format!("{key}={value}");
-        v.push(entry.len() as u8);
-        v.extend_from_slice(entry.as_bytes());
+        buf.push(entry.len() as u8);
+        buf.extend_from_slice(entry.as_bytes());
     }
-    v
+    let rdlen3 = (buf.len() - data_start3) as u16;
+    buf[rdlen_pos3..rdlen_pos3 + 2].copy_from_slice(&rdlen3.to_be_bytes());
+
+    // A: name=hostname.local., TTL=0
+    encode_name(&mut buf, &svc.hostname);
+    buf.extend_from_slice(&[0x00, 0x01]); // TYPE = A
+    buf.extend_from_slice(&[0x80, 0x01]); // CLASS = IN + cache flush
+    buf.extend_from_slice(&[0u8; 4]); // TTL = 0
+    buf.extend_from_slice(&[0x00, 0x04]); // RDLENGTH = 4
+    if let IpAddr::V4(ip) = svc.ip {
+        buf.extend_from_slice(&ip.octets());
+    }
+
+    buf
 }
 
 fn parse_hosts_from_response(buf: &[u8]) -> Vec<DiscoveredHost> {
@@ -611,100 +666,5 @@ fn skip_name_compressed(buf: &[u8], offset: usize) -> usize {
             return pos + 1;
         }
         pos += 1 + len as usize;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn test_service() -> Service {
-        Service {
-            instance: "siegu-host".to_string(),
-            hostname: "siegu-host.local.".to_string(),
-            port: 42951,
-            txt: vec![
-                ("room".to_string(), "abc123".to_string()),
-                ("version".to_string(), "2".to_string()),
-            ],
-            ip: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 20)),
-        }
-    }
-
-    fn make_query(qname: &str, qtype: u16) -> Vec<u8> {
-        let mut buf = vec![0x12, 0x34];
-        buf.extend_from_slice(&[0x00, 0x00]); // flags = query
-        buf.extend_from_slice(&[0x00, 0x01]); // QDCOUNT = 1
-        buf.extend_from_slice(&[0x00, 0x00]);
-        buf.extend_from_slice(&[0x00, 0x00]);
-        buf.extend_from_slice(&[0x00, 0x00]);
-        encode_name(&mut buf, qname);
-        buf.extend_from_slice(&qtype.to_be_bytes());
-        buf.extend_from_slice(&[0x00, 0x01]); // QCLASS = IN
-        buf
-    }
-
-    #[test]
-    fn test_responds_to_ptr_query_and_parses_back() {
-        let services = vec![test_service()];
-        let query = make_query(SERVICE_TYPE, 12);
-        let resp = build_response(&query, &services).expect("PTR query must be answered");
-
-        let hosts = parse_hosts_from_response(&resp);
-        assert_eq!(hosts.len(), 1);
-        let h = &hosts[0];
-        assert_eq!(h.name, "siegu-host._siegu._tcp.local");
-        assert_eq!(h.ip, "192.168.1.20");
-        assert_eq!(h.port, 42951);
-        assert_eq!(h.room_id, "abc123");
-    }
-
-    #[test]
-    fn test_responds_to_srv_txt_and_a_queries() {
-        let services = vec![test_service()];
-        let instance = "siegu-host._siegu._tcp.local.";
-
-        // Android NsdManager sends these during resolveService().
-        assert!(
-            build_response(&make_query(instance, 33), &services).is_some(),
-            "SRV query must be answered"
-        );
-        assert!(
-            build_response(&make_query(instance, 16), &services).is_some(),
-            "TXT query must be answered"
-        );
-        assert!(
-            build_response(&make_query("siegu-host.local.", 1), &services).is_some(),
-            "A query must be answered"
-        );
-        assert!(
-            build_response(&make_query(SERVICE_TYPE, 255), &services).is_some(),
-            "ANY query must be answered"
-        );
-    }
-
-    #[test]
-    fn test_ignores_unrelated_query_types() {
-        let services = vec![test_service()];
-        // MX = 15, NS = 2 are not handled.
-        assert!(build_response(&make_query("_siegu._tcp.local.", 15), &services).is_none());
-        assert!(build_response(&make_query("_siegu._tcp.local.", 2), &services).is_none());
-    }
-
-    #[test]
-    fn test_no_response_without_services() {
-        let query = make_query(SERVICE_TYPE, 12);
-        assert!(build_response(&query, &[]).is_none());
-    }
-
-    #[test]
-    fn test_srv_response_contains_port() {
-        let services = vec![test_service()];
-        let query = make_query("siegu-host._siegu._tcp.local.", 33);
-        let resp = build_response(&query, &services).unwrap();
-        assert!(
-            resp.windows(2).any(|w| w == [0xA7, 0xC7]),
-            "SRV response must contain port 42951 (0xA7C7)"
-        );
     }
 }

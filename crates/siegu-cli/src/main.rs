@@ -704,9 +704,10 @@ async fn cmd_mesh_host(port: u16, config_dir: &Path) {
     println!("Starting LAN mesh host...");
     println!("Room ID: {room_id}");
 
-    let actual_port = MeshTransport::start_lan_server(port)
+    let server = MeshTransport::start_lan_server(port)
         .await
         .expect("Failed to start LAN signaling server");
+    let actual_port = server.port;
     println!("Signaling server on port {actual_port}");
 
     let sync_tx = Arc::new(tokio::sync::Mutex::new(None));

@@ -172,18 +172,33 @@ async fn start_host_internal(
         .or_else(|_| std::env::var("COMPUTERNAME"))
         .unwrap_or_else(|_| "siegu-host".to_string());
 
-    let daemon = siegu_core::mdns::create_daemon().map_err(|e| e.to_string())?;
-    {
+    let daemon = {
         let mut d = mdns_state.daemon.lock().map_err(|e| e.to_string())?;
-        if let Some(old) = d.take() {
-            old.shutdown();
+        match d.as_ref() {
+            Some(existing) => existing.clone(),
+            None => {
+                let new_daemon = siegu_core::mdns::create_daemon().map_err(|e| e.to_string())?;
+                *d = Some(new_daemon.clone());
+                new_daemon
+            }
         }
-        *d = Some(daemon.clone());
+    };
+
+    // Stop the previous signaling server (if any) so old listeners are not left
+    // running on stale ports that the phone could resolve and then be stranded on.
+    if let Ok(mut ls) = state.lan_server.lock() {
+        if let Some(prev) = ls.take() {
+            prev.stop();
+        }
     }
 
-    let port = MeshTransport::start_lan_server(0)
+    let server = MeshTransport::start_lan_server(0)
         .await
         .map_err(|e| e.to_string())?;
+    let port = server.port;
+    if let Ok(mut ls) = state.lan_server.lock() {
+        *ls = Some(server);
+    }
 
     let ip = get_local_ip().unwrap_or_else(|| "127.0.0.1".to_string());
 
@@ -228,6 +243,7 @@ async fn start_host_internal(
                 Some(connected),
             );
 
+            siegu_core::mdns::unregister_service(&daemon, &hostname_for_task);
             if let Err(e) =
                 siegu_core::mdns::register_service(&daemon, &hostname_for_task, port, &room_id)
             {
