@@ -95,6 +95,12 @@ function handleClearSearch(): void {
   searchStore.clearFilters()
 }
 
+function handleSearchPerson(person: { id: string | number; name: string }): void {
+  searchStore.addFilter({ type: 'person', value: String(person.id), label: person.name })
+  searchStore.clearQuery()
+  uiStore.setPage('home')
+}
+
 function removeFilterChip(index: number): void {
   const filter = searchStore.activeFilters[index]
   if (filter) {
@@ -123,7 +129,10 @@ function removeFilterChip(index: number): void {
         <ProgressBanner />
         <ErrorBoundary>
           <div data-tour="photos" class="w-100">
-            <div v-if="searchStore.activeFilters.length" class="d-flex align-center flex-wrap px-4 pt-2 ga-2">
+            <div
+              v-if="currentPage === 'home' && searchStore.activeFilters.length"
+              class="d-flex align-center flex-wrap px-4 pt-2 ga-2"
+            >
               <v-chip
                 v-for="(filter, index) in searchStore.activeFilters"
                 :key="`${filter.type}-${filter.value}`"
@@ -144,9 +153,10 @@ function removeFilterChip(index: number): void {
               :facets="searchStore.activeFilters"
               :filters="{ favoritesOnly: searchStore.mediaFilters.favoritesOnly, videosOnly: searchStore.mediaFilters.videosOnly, dateRange: 'all', folder: null }"
               @clear-search="handleClearSearch"
+              @search-person="handleSearchPerson"
             />
           </div>
-          <People v-if="currentPage === 'people'" />
+          <People v-if="currentPage === 'people'" @search-person="handleSearchPerson" />
           <Map v-if="currentPage === 'location'" />
           <DeviceList v-if="currentPage === 'devices'" />
           <Setting v-if="currentPage === 'settings'" @done="uiStore.setPage('home')" />
