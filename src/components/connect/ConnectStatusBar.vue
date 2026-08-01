@@ -1,17 +1,14 @@
 <script setup lang="ts">
-import type { SyncProgressState } from '@/composables/useConnect'
-
 defineProps<{
-  status: string
-  isConnected: boolean
-  syncProgress: SyncProgressState
-  showDisconnect: boolean
-  disconnecting: boolean
-}>()
+  status: string;
+  isConnected: boolean;
+  showDisconnect: boolean;
+  disconnecting: boolean;
+}>();
 
 const emit = defineEmits<{
-  disconnect: []
-}>()
+  disconnect: [];
+}>();
 </script>
 
 <template>
@@ -28,28 +25,6 @@ const emit = defineEmits<{
       >mdi-check-circle-outline</v-icon
     >
     {{ status }}
-  </div>
-
-  <div v-if="syncProgress.status" class="mt-4 px-4">
-    <div class="d-flex justify-space-between text-caption text-zinc-secondary mb-1">
-      <span>{{ syncProgress.status }}</span>
-      <span v-if="syncProgress.progress > 0">{{ Math.round(syncProgress.progress) }}%</span>
-    </div>
-    <v-progress-linear
-      v-if="syncProgress.progress === 0 && syncProgress.status.includes('Syncing')"
-      :model-value="0"
-      color="black"
-      height="6"
-      rounded
-      indeterminate
-    ></v-progress-linear>
-    <v-progress-linear
-      v-else
-      :model-value="syncProgress.progress"
-      color="black"
-      height="6"
-      rounded
-    ></v-progress-linear>
   </div>
 
   <div v-if="showDisconnect" class="text-center mt-4">
