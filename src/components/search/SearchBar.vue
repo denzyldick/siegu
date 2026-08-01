@@ -15,6 +15,7 @@ const searchStore = useSearchStore()
 
 const searchWrapRef = ref<HTMLElement | null>(null)
 const dropdownOpen = ref(false)
+const dropdownStyle = ref<Record<string, string>>({})
 
 const facets = computed(() => searchStore.facets)
 const stats = computed(() => facets.value?.stats ?? null)
@@ -57,8 +58,30 @@ function faceSrc(person: FacetGroup): string {
   return getFaceImageSrc(person.representative_crop, person.encoded)
 }
 
+function repositionDropdown(): void {
+  const rect = searchWrapRef.value?.getBoundingClientRect()
+  if (!rect) return
+  const viewportH = window.innerHeight
+  const flipUp = rect.bottom + 420 > viewportH && rect.top > viewportH - rect.bottom
+  const styles: Record<string, string> = {
+    width: `${rect.width}px`,
+    left: `${rect.left}px`,
+    position: 'fixed',
+    zIndex: '5000',
+  }
+  if (flipUp) {
+    styles.bottom = `${viewportH - rect.top + 8}px`
+    styles.top = 'auto'
+  } else {
+    styles.top = `${rect.bottom + 8}px`
+    styles.bottom = 'auto'
+  }
+  dropdownStyle.value = styles
+}
+
 function openDropdown(): void {
   dropdownOpen.value = true
+  repositionDropdown()
   if (!searchStore.facets) {
     searchStore.loadFacets()
   }
@@ -128,13 +151,23 @@ function onDocumentClick(event: MouseEvent): void {
   }
 }
 
+function onScroll(): void {
+  if (dropdownOpen.value) {
+    repositionDropdown()
+  }
+}
+
 onMounted(() => {
   searchStore.loadFacets()
   document.addEventListener('click', onDocumentClick)
+  window.addEventListener('resize', onScroll)
+  window.addEventListener('scroll', onScroll, true)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', onDocumentClick)
+  window.removeEventListener('resize', onScroll)
+  window.removeEventListener('scroll', onScroll, true)
 })
 </script>
 
@@ -177,14 +210,15 @@ onUnmounted(() => {
       </v-tooltip>
     </div>
 
-    <div v-if="dropdownOpen" class="search-dropdown">
-      <v-progress-circular
-        v-if="!facets && !searchStore.facetsLoading"
-        indeterminate
-        size="20"
-        width="2"
-        class="d-block mx-auto my-4"
-      />
+    <Teleport to="body">
+      <div v-if="dropdownOpen" class="search-dropdown" :style="dropdownStyle">
+        <v-progress-circular
+          v-if="!facets && !searchStore.facetsLoading"
+          indeterminate
+          size="20"
+          width="2"
+          class="d-block mx-auto my-4"
+        />
 
       <template v-else>
         <div v-if="q" class="pa-1">
@@ -311,7 +345,8 @@ onUnmounted(() => {
           </div>
         </div>
       </template>
-    </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -356,11 +391,6 @@ onUnmounted(() => {
 }
 
 .search-dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  right: 0;
-  z-index: 2000;
   background: rgb(var(--v-theme-surface));
   border: 1px solid rgba(128, 128, 128, 0.25);
   border-radius: 16px;
