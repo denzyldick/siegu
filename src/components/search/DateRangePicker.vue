@@ -241,6 +241,12 @@ onMounted(() => {
   padding: 12px;
 }
 
+.date-range-picker button {
+  border: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .drp-header {
   display: flex;
   align-items: center;
@@ -266,6 +272,7 @@ onMounted(() => {
   font-size: 11px;
   font-weight: 700;
   color: var(--color-text-muted);
+  background: transparent;
   padding: 3px 8px;
   border-radius: 999px;
   cursor: pointer;
@@ -291,6 +298,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   border-radius: 8px;
+  background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
   user-select: none;
@@ -336,6 +344,7 @@ onMounted(() => {
   gap: 1px;
   height: 38px;
   border-radius: 10px;
+  background: transparent;
   cursor: pointer;
   user-select: none;
   position: relative;
@@ -418,6 +427,7 @@ onMounted(() => {
   font-size: 11px;
   font-weight: 700;
   color: var(--color-text-secondary);
+  background: transparent;
   cursor: pointer;
   user-select: none;
   padding: 3px 8px;

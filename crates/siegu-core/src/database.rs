@@ -524,6 +524,14 @@ impl Database {
             (),
         );
         let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_faces_person_id ON faces(person_id);",
+            (),
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_faces_photo_id ON faces(photo_id);",
+            (),
+        );
+        let _ = conn.execute(
             "CREATE TABLE IF NOT EXISTS peer_device(\
              device_id TEXT PRIMARY KEY, name TEXT, ip TEXT, port INTEGER DEFAULT 0, \
              device_type TEXT DEFAULT '', os TEXT DEFAULT '', \
@@ -1690,9 +1698,21 @@ impl Database {
     /// List all unnamed people grouped by face similarity, ordered by face count.
     pub fn get_anonymous_people_groups(&self) -> Vec<PersonWithFace> {
         let mut results = Vec::new();
-        if let Ok(mut stmt) = self.connection.prepare("SELECT p.id, f.crop_path, f.face_id, f.encoded, p.embedding, (SELECT COUNT(*) FROM faces WHERE person_id = p.id) FROM people p JOIN faces f ON p.id = f.person_id WHERE p.name IS NULL GROUP BY p.id ORDER BY (SELECT COUNT(*) FROM faces WHERE person_id = p.id) DESC") {
+        let sql = "SELECT p.id, f.crop_path, f.face_id, f.encoded, p.embedding, COUNT(*) \
+            FROM people p JOIN faces f ON p.id = f.person_id \
+            WHERE p.name IS NULL GROUP BY p.id ORDER BY COUNT(*) DESC";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([], |row| {
-                let embedding: Option<Vec<f32>> = row.get::<_, Option<Vec<u8>>>(4).ok().flatten().map(|bytes| bytes.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect());
+                let embedding: Option<Vec<f32>> = row
+                    .get::<_, Option<Vec<u8>>>(4)
+                    .ok()
+                    .flatten()
+                    .map(|bytes| {
+                        bytes
+                            .chunks_exact(4)
+                            .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                            .collect()
+                    });
                 Ok(PersonWithFace {
                     id: row.get(0)?,
                     name: "Unnamed Person".to_string(),
@@ -1700,10 +1720,12 @@ impl Database {
                     representative_face_id: row.get(2).ok(),
                     encoded: row.get(3).ok(),
                     embedding,
-                    face_count: row.get(5)?
+                    face_count: row.get(5)?,
                 })
             }) {
-                for p in iter.flatten() { results.push(p); }
+                for p in iter.flatten() {
+                    results.push(p);
+                }
             }
         }
         results
