@@ -55,7 +55,26 @@
     "disabled_title": "Búskeda No Disponibel",
     "disabled_desc": "Búskeda ta rekerí datu indeksá. Por ehèmpel, añadí un karpeta i permite indeksashon pa kompleta promé ku usa búskeda.",
     "disabled_got_it": "Mi comprendé",
-    "recent": "Resiente"
+    "recent": "Resiente",
+    "people": "Hende",
+    "unnamed_faces": "Otro cara",
+    "locations": "Lugarnan",
+    "tags": "Tagnan",
+    "dates": "Fecha",
+    "photos_count": "{count} potrèt",
+    "videos_count": "{count} video",
+    "faces_count": "{count} cara",
+    "enter_to_search": "Buska pa \"{query}\"",
+    "no_matches": "No tin resultado pa \"{query}\"",
+    "expand": "Filtronan avansá",
+    "clear_all": "Limpia tur",
+    "advanced": {
+      "title": "Filtronan avansá",
+      "media_type": "Tipo di media",
+      "favorites": "Favoritonan",
+      "videos": "Videonan",
+      "clear_all": "Limpia tur"
+    }
   },
   "sync": {
     "status_label": "STATUS DI BIBLIOTEKA",

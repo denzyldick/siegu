@@ -38,7 +38,26 @@
     "top_suggestions": "Top Suggestions",
     "disabled_title": "Start indexing to search",
     "disabled_desc": "Your library is still being indexed. Search will become available as your photos are processed.",
-    "disabled_got_it": "Got it"
+    "disabled_got_it": "Got it",
+    "people": "People",
+    "unnamed_faces": "Other faces",
+    "locations": "Locations",
+    "tags": "Tags",
+    "dates": "Dates",
+    "photos_count": "{count} photos",
+    "videos_count": "{count} videos",
+    "faces_count": "{count} faces",
+    "enter_to_search": "Search for \"{query}\"",
+    "no_matches": "No matches for \"{query}\"",
+    "expand": "Advanced filters",
+    "clear_all": "Clear all",
+    "advanced": {
+      "title": "Advanced Filters",
+      "media_type": "Media type",
+      "favorites": "Favorites",
+      "videos": "Videos",
+      "clear_all": "Clear all"
+    }
   },
   "filters": {
     "favorites_only": "Favorites only",

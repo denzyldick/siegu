@@ -55,7 +55,26 @@
     "disabled_title": "Recherche non disponible",
     "disabled_desc": "La recherche nécessite des données indexées. Veuillez ajouter un dossier et laisser l'indexation se terminer avant d'utiliser la recherche.",
     "disabled_got_it": "Compris",
-    "recent": "Récent"
+    "recent": "Récent",
+    "people": "Personnes",
+    "unnamed_faces": "Autres visages",
+    "locations": "Lieux",
+    "tags": "Étiquettes",
+    "dates": "Dates",
+    "photos_count": "{count} photos",
+    "videos_count": "{count} vidéos",
+    "faces_count": "{count} visages",
+    "enter_to_search": "Rechercher « {query} »",
+    "no_matches": "Aucun résultat pour « {query} »",
+    "expand": "Filtres avancés",
+    "clear_all": "Tout effacer",
+    "advanced": {
+      "title": "Filtres avancés",
+      "media_type": "Type de média",
+      "favorites": "Favoris",
+      "videos": "Vidéos",
+      "clear_all": "Tout effacer"
+    }
   },
   "sync": {
     "status_label": "ÉTAT DE LA BIBLIOTHÈQUE",

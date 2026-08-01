@@ -55,7 +55,26 @@
     "disabled_title": "Búsqueda no disponible",
     "disabled_desc": "La búsqueda requiere datos indexados. Añade una carpeta y permite que la indexación se complete antes de usar la búsqueda.",
     "disabled_got_it": "Entendido",
-    "recent": "Reciente"
+    "recent": "Reciente",
+    "people": "Personas",
+    "unnamed_faces": "Otros rostros",
+    "locations": "Ubicaciones",
+    "tags": "Etiquetas",
+    "dates": "Fechas",
+    "photos_count": "{count} fotos",
+    "videos_count": "{count} videos",
+    "faces_count": "{count} rostros",
+    "enter_to_search": "Buscar \"{query}\"",
+    "no_matches": "Sin resultados para \"{query}\"",
+    "expand": "Filtros avanzados",
+    "clear_all": "Borrar todo",
+    "advanced": {
+      "title": "Filtros avanzados",
+      "media_type": "Tipo de medio",
+      "favorites": "Favoritos",
+      "videos": "Videos",
+      "clear_all": "Borrar todo"
+    }
   },
   "sync": {
     "status_label": "ESTADO DE LA BIBLIOTECA",

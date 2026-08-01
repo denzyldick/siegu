@@ -3,6 +3,7 @@ import { platform } from '@tauri-apps/plugin-os';
 import type { MediaItem, ListFilesOptions } from '@/types/media';
 import type { Person, UnnamedFace } from '@/types/person';
 import type { PairingCodes, DiscoveredHost } from '@/types/sync';
+import type { SearchFacetsData } from '@/types/search';
 
 export class TauriError extends Error {
   constructor(
@@ -54,6 +55,11 @@ export async function listFiles(options: ListFilesOptions): Promise<MediaItem[]>
     scan: options.scan ?? false,
     favoritesOnly: options.favoritesOnly ?? false,
     videosOnly: options.videosOnly ?? false,
+    personId: options.personId ?? null,
+    location: options.location ?? null,
+    tag: options.tag ?? null,
+    dateFrom: options.dateFrom ?? null,
+    dateTo: options.dateTo ?? null,
   });
   return parseJsonArray<MediaItem>(raw);
 }
@@ -186,6 +192,11 @@ export async function getTopTags(): Promise<Array<{ title: string; type: string 
 export async function listObjects(query: string): Promise<Array<{ title: string; type: string }>> {
   const raw = await call<string>('list_objects', { query });
   return parseJsonArray<{ title: string; type: string }>(raw);
+}
+
+export async function searchFacets(): Promise<SearchFacetsData> {
+  const raw = await call<string>('search_facets');
+  return parseJsonObject<SearchFacetsData>(raw);
 }
 
 export async function checkModels(): Promise<string[]> {

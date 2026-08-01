@@ -6,6 +6,7 @@ import { useScanStore } from '@/stores/scan'
 import { useModelsStore } from '@/stores/models'
 import { useUiStore } from '@/stores/ui'
 import { useSyncStore } from '@/stores/sync'
+import { useSearchStore } from '@/stores/search'
 import { autoReconnect } from '@/services/tauri'
 import AppDock from '@/components/layout/AppDock.vue'
 import AppToolbar from '@/components/layout/AppToolbar.vue'
@@ -27,6 +28,7 @@ const modelsStore = useModelsStore()
 const uiStore = useUiStore()
 
 const currentPage = computed(() => uiStore.currentPage)
+const searchStore = useSearchStore()
 
 onMounted(async () => {
   try {
@@ -89,7 +91,15 @@ function handleSearch(_query: string): void {
 }
 
 function handleClearSearch(): void {
-  // Handled by AppToolbar internally
+  searchStore.clearQuery()
+  searchStore.clearFilters()
+}
+
+function removeFilterChip(index: number): void {
+  const filter = searchStore.activeFilters[index]
+  if (filter) {
+    searchStore.removeFilter(filter.type)
+  }
 }
 </script>
 
@@ -113,10 +123,26 @@ function handleClearSearch(): void {
         <ProgressBanner />
         <ErrorBoundary>
           <div data-tour="photos" class="w-100">
+            <div v-if="searchStore.activeFilters.length" class="d-flex align-center flex-wrap px-4 pt-2 ga-2">
+              <v-chip
+                v-for="(filter, index) in searchStore.activeFilters"
+                :key="`${filter.type}-${filter.value}`"
+                closable
+                variant="tonal"
+                @click:close="removeFilterChip(index)"
+              >
+                <v-icon start size="16">{{ filter.type === 'person' ? 'mdi-account' : filter.type === 'location' ? 'mdi-map-marker' : filter.type === 'tag' ? 'mdi-tag' : 'mdi-calendar-month' }}</v-icon>
+                {{ filter.label || t('people.unnamed') }}
+              </v-chip>
+              <v-btn size="x-small" variant="text" @click="handleClearSearch">
+                {{ t('search.clear_all') }}
+              </v-btn>
+            </div>
             <MediaLibrary
               v-if="currentPage === 'home'"
-              :search-query="''"
-              :filters="{ favoritesOnly: false, videosOnly: false, dateRange: 'all', folder: null }"
+              :search-query="searchStore.query"
+              :facets="searchStore.activeFilters"
+              :filters="{ favoritesOnly: searchStore.mediaFilters.favoritesOnly, videosOnly: searchStore.mediaFilters.videosOnly, dateRange: 'all', folder: null }"
               @clear-search="handleClearSearch"
             />
           </div>

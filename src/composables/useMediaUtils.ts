@@ -62,3 +62,11 @@ export function getMediaThumbnailSrc(
   if (useFileSrc) return convertFileSrc(location)
   return ''
 }
+
+export function formatMonthLabel(ym: string): string {
+  const [year, month] = ym.split('-')
+  const idx = parseInt(month) - 1
+  if (idx < 0 || idx > 11 || !year) return ym
+  const locale = localStorage.getItem('siegu_language') || 'en'
+  return new Date(parseInt(year), idx).toLocaleString(locale, { month: 'long', year: 'numeric' })
+}

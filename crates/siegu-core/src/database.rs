@@ -12,6 +12,38 @@ pub struct SearchSuggestion {
     pub suggestion_type: String,
 }
 
+/// A named person shown in the search dropdown, with the number of photos
+/// that contain them and a representative face thumbnail.
+#[derive(Debug, Clone, Serialize)]
+pub struct SearchPerson {
+    pub id: String,
+    pub name: String,
+    pub representative_crop: Option<String>,
+    pub encoded: Option<String>,
+    pub photo_count: i64,
+}
+
+/// Library-wide counts shown in the search dropdown footer.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct SearchStats {
+    pub photos: i64,
+    pub videos: i64,
+    pub favorites: i64,
+    pub ocr_photos: i64,
+    pub faces: i64,
+    pub named_people: i64,
+}
+
+/// Optional facet filters combined with AND against the media list.
+#[derive(Debug, Clone, Default)]
+pub struct PhotoFilter {
+    pub person_id: Option<String>,
+    pub location: Option<String>,
+    pub tag: Option<String>,
+    pub date_from: Option<String>,
+    pub date_to: Option<String>,
+}
+
 /// Persisted sync session for auto-reconnect on app restart.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SavedSession {
@@ -760,6 +792,27 @@ impl Database {
         favorites_only: bool,
         videos_only: bool,
     ) -> Vec<Photo> {
+        self.list_photos_filtered(
+            query,
+            offset,
+            limit,
+            favorites_only,
+            videos_only,
+            &PhotoFilter::default(),
+        )
+    }
+
+    /// List photos with search, pagination, favorite/video filters, and facet
+    /// filters (person, location, tag, date range) combined with AND.
+    pub fn list_photos_filtered(
+        &self,
+        query: &str,
+        offset: usize,
+        limit: usize,
+        favorites_only: bool,
+        videos_only: bool,
+        filter: &PhotoFilter,
+    ) -> Vec<Photo> {
         let mut photos = Vec::new();
         let fav_filter = if favorites_only {
             "AND EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite')"
@@ -801,9 +854,51 @@ impl Database {
             String::new()
         };
 
+        // Build facet filters using the next available parameter slots.
+        let mut facet_filters = String::new();
+        let mut extra_params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+        let mut slot = 2usize; // ?1 offset, ?2 limit
+        if !query.is_empty() {
+            slot += 1; // ?3 query
+            if month_param.is_some() {
+                slot += 1; // ?4 month
+            }
+        }
+        if let Some(ref person_id) = filter.person_id {
+            slot += 1;
+            facet_filters.push_str(&format!(
+                " AND EXISTS(SELECT 1 FROM faces WHERE photo_id=p.id AND person_id = ?{slot})"
+            ));
+            extra_params.push(Box::new(person_id.clone()));
+        }
+        if let Some(ref location) = filter.location {
+            slot += 1;
+            facet_filters.push_str(&format!(
+                " AND EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='location_name' AND value = ?{slot})"
+            ));
+            extra_params.push(Box::new(location.clone()));
+        }
+        if let Some(ref tag) = filter.tag {
+            slot += 1;
+            facet_filters.push_str(&format!(
+                " AND EXISTS(SELECT 1 FROM object WHERE photo_id=p.id AND class = ?{slot})"
+            ));
+            extra_params.push(Box::new(tag.clone()));
+        }
+        if let Some(ref date_from) = filter.date_from {
+            slot += 1;
+            facet_filters.push_str(&format!(" AND p.created >= ?{slot}"));
+            extra_params.push(Box::new(date_from.clone()));
+        }
+        if let Some(ref date_to) = filter.date_to {
+            slot += 1;
+            facet_filters.push_str(&format!(" AND p.created <= ?{slot}"));
+            extra_params.push(Box::new(date_to.clone()));
+        }
+
         let sql = format!("SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, 
             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received 
-            FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE 1=1 {fav_filter} {video_filter} {q_filter} ORDER BY p.created DESC LIMIT ?1, ?2");
+            FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE 1=1 {fav_filter} {video_filter} {q_filter} {facet_filters} ORDER BY p.created DESC LIMIT ?1, ?2");
         if let Ok(mut stmt) = self.connection.prepare(&sql) {
             let q_param = if is_uuid {
                 query.to_string()
@@ -818,6 +913,7 @@ impl Database {
                     params.push(Box::new(mp.clone()));
                 }
             }
+            params.extend(extra_params);
             let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
             if let Ok(iter) = stmt.query_map(param_refs.as_slice(), |row| {
                 Ok(Photo {
@@ -859,6 +955,102 @@ impl Database {
         self.enrich_objects(&mut photos);
         self.enrich_properties(&mut photos);
         photos
+    }
+
+    /// Named people with a representative face thumbnail, ordered by the number
+    /// of distinct photos that contain them.
+    pub fn get_search_people(&self, limit: i64) -> Vec<SearchPerson> {
+        let mut people = Vec::new();
+        let sql = "SELECT p.id, p.name, f.crop_path, f.encoded, \
+            (SELECT COUNT(DISTINCT photo_id) FROM faces WHERE person_id = p.id) \
+            FROM people p LEFT JOIN faces f ON p.id = f.person_id \
+            WHERE p.name IS NOT NULL AND TRIM(p.name) != '' \
+            GROUP BY p.id ORDER BY 5 DESC LIMIT ?1";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) = stmt.query_map([limit], |row| {
+                Ok(SearchPerson {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    representative_crop: row.get(2).ok(),
+                    encoded: row.get(3).ok(),
+                    photo_count: row.get(4)?,
+                })
+            }) {
+                for p in iter.flatten() {
+                    people.push(p);
+                }
+            }
+        }
+        people
+    }
+
+    /// Distinct resolved location names with photo counts, most common first.
+    pub fn get_location_counts(&self, limit: i64) -> Vec<(String, i64)> {
+        let mut counts = Vec::new();
+        let sql = "SELECT value, COUNT(*) FROM properties WHERE key = 'location_name' \
+            GROUP BY value ORDER BY COUNT(*) DESC LIMIT ?1";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) = stmt.query_map([limit], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            }) {
+                for c in iter.flatten() {
+                    counts.push(c);
+                }
+            }
+        }
+        counts
+    }
+
+    /// Detected object classes with photo counts, most common first.
+    pub fn get_tag_counts(&self, limit: i64) -> Vec<(String, i64)> {
+        let mut counts = Vec::new();
+        let sql =
+            "SELECT class, COUNT(*) FROM object GROUP BY class ORDER BY COUNT(*) DESC LIMIT ?1";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) = stmt.query_map([limit], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            }) {
+                for c in iter.flatten() {
+                    counts.push(c);
+                }
+            }
+        }
+        counts
+    }
+
+    /// Year-month buckets ("2026-03") with photo counts, newest first.
+    pub fn get_month_counts(&self, limit: i64) -> Vec<(String, i64)> {
+        let mut counts = Vec::new();
+        let sql = "SELECT substr(created, 1, 7) AS ym, COUNT(*) FROM photo \
+            WHERE created IS NOT NULL AND created != '' GROUP BY ym ORDER BY ym DESC LIMIT ?1";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) = stmt.query_map([limit], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            }) {
+                for c in iter.flatten() {
+                    counts.push(c);
+                }
+            }
+        }
+        counts
+    }
+
+    /// Library-wide counts used by the search dropdown footer.
+    pub fn get_search_stats(&self) -> SearchStats {
+        let query_count = |sql: &str| -> i64 {
+            self.connection
+                .query_row(sql, [], |r| r.get(0))
+                .unwrap_or(0)
+        };
+        let video_like = video_sql_like();
+        SearchStats {
+            photos: query_count("SELECT COUNT(*) FROM photo"),
+            videos: query_count(&format!("SELECT COUNT(*) FROM photo WHERE {video_like}")),
+            favorites: query_count("SELECT COUNT(*) FROM properties WHERE key = 'favorite'"),
+            ocr_photos: query_count("SELECT COUNT(DISTINCT photo_id) FROM ocr"),
+            faces: query_count("SELECT COUNT(*) FROM faces"),
+            named_people: query_count("SELECT COUNT(*) FROM people WHERE name IS NOT NULL"),
+        }
     }
 
     /// Toggle the favorite status of a photo. Returns true if now favorited.
@@ -2611,6 +2803,193 @@ mod tests {
         for v in &videos {
             assert!(v.location.ends_with(".mp4"), "expected mp4: {}", v.location);
         }
+    }
+
+    #[test]
+    fn test_list_photos_facet_filters() {
+        let mut db = test_db();
+        db.connection
+            .execute(
+                "INSERT INTO people (id, name) VALUES ('person-1', 'Alice')",
+                (),
+            )
+            .unwrap();
+        for (id, created) in [
+            ("p1", "2026-03-05"),
+            ("p2", "2026-02-10"),
+            ("p3", "2025-12-20"),
+        ] {
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded) VALUES (?1, ?2, ?3, '')",
+                    (id, format!("/{id}.jpg"), created),
+                )
+                .unwrap();
+        }
+        db.connection
+            .execute(
+                "INSERT INTO faces (photo_id, face_id, crop_path, encoded, person_id) VALUES ('p1', 'f1', '', 'enc', 'person-1')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO object (photo_id, class, probability) VALUES ('p2', 'beach', '0.9')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'location_name', 'Paris, France')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO properties (photo_id, key, value) VALUES ('p3', 'location_name', 'Tokyo, Japan')",
+                (),
+            )
+            .unwrap();
+
+        let filter = |f: PhotoFilter| db.list_photos_filtered("", 0, 100, false, false, &f);
+
+        let by_person = filter(PhotoFilter {
+            person_id: Some("person-1".into()),
+            ..Default::default()
+        });
+        assert_eq!(by_person.len(), 1);
+        assert_eq!(by_person[0].id, "p1");
+
+        let by_location = filter(PhotoFilter {
+            location: Some("Tokyo, Japan".into()),
+            ..Default::default()
+        });
+        assert_eq!(by_location.len(), 1);
+        assert_eq!(by_location[0].id, "p3");
+
+        let by_tag = filter(PhotoFilter {
+            tag: Some("beach".into()),
+            ..Default::default()
+        });
+        assert_eq!(by_tag.len(), 1);
+        assert_eq!(by_tag[0].id, "p2");
+
+        let by_date = filter(PhotoFilter {
+            date_from: Some("2026-01-01".into()),
+            date_to: Some("2026-03-31".into()),
+            ..Default::default()
+        });
+        assert_eq!(by_date.len(), 2);
+
+        let combined = filter(PhotoFilter {
+            person_id: Some("person-1".into()),
+            location: Some("Paris, France".into()),
+            ..Default::default()
+        });
+        assert_eq!(combined.len(), 1);
+
+        let empty = filter(PhotoFilter {
+            person_id: Some("person-1".into()),
+            tag: Some("beach".into()),
+            ..Default::default()
+        });
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn test_search_facet_counts() {
+        let mut db = test_db();
+        db.connection
+            .execute(
+                "INSERT INTO photo (id, location, created, encoded) VALUES ('p1', '/a.jpg', '2026-03-01', '')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO photo (id, location, created, encoded) VALUES ('p2', '/b.jpg', '2026-03-15', '')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO photo (id, location, created, encoded) VALUES ('p3', '/c.mp4', '2026-02-01', '')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'location_name', 'Paris, France')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO properties (photo_id, key, value) VALUES ('p2', 'location_name', 'Paris, France')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'favorite', 'true')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO object (photo_id, class, probability) VALUES ('p1', 'cat', '0.9')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO object (photo_id, class, probability) VALUES ('p2', 'cat', '0.8')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO ocr (photo_id, text) VALUES ('p2', 'hello')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO people (id, name) VALUES ('person-1', 'Alice')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO faces (photo_id, face_id, person_id) VALUES ('p1', 'f1', 'person-1')",
+                (),
+            )
+            .unwrap();
+
+        let locations = db.get_location_counts(10);
+        assert_eq!(locations, vec![("Paris, France".to_string(), 2)]);
+
+        let tags = db.get_tag_counts(10);
+        assert_eq!(tags, vec![("cat".to_string(), 2)]);
+
+        let months = db.get_month_counts(10);
+        assert_eq!(
+            months,
+            vec![("2026-03".to_string(), 2), ("2026-02".to_string(), 1)]
+        );
+
+        let people = db.get_search_people(10);
+        assert_eq!(people.len(), 1);
+        assert_eq!(people[0].name, "Alice");
+        assert_eq!(people[0].photo_count, 1);
+
+        let stats = db.get_search_stats();
+        assert_eq!(stats.photos, 3);
+        assert_eq!(stats.videos, 1);
+        assert_eq!(stats.favorites, 1);
+        assert_eq!(stats.ocr_photos, 1);
+        assert_eq!(stats.faces, 1);
+        assert_eq!(stats.named_people, 1);
     }
 
     fn make_photo(id: &str, location: &str) -> Photo {

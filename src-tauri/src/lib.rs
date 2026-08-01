@@ -329,6 +329,7 @@ pub fn run() {
             commands::indexing::abort_indexing,
             // Geocode
             commands::geocode::list_objects,
+            commands::search::search_facets,
             commands::logging::resolve_photo_locations,
             commands::logging::get_location_names,
             // Wallpaper

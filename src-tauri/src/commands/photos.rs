@@ -11,7 +11,44 @@ pub fn do_list_files(
     favorites_only: bool,
     videos_only: bool,
 ) -> Vec<Photo> {
-    db.list_photos(query, offset, limit, favorites_only, videos_only)
+    do_list_files_filtered(
+        db,
+        query,
+        offset,
+        limit,
+        favorites_only,
+        videos_only,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+}
+
+/// Pure business logic — testable without Tauri. Adds optional facet filters.
+#[allow(clippy::too_many_arguments)]
+pub fn do_list_files_filtered(
+    db: &Database,
+    query: &str,
+    offset: usize,
+    limit: usize,
+    favorites_only: bool,
+    videos_only: bool,
+    person_id: Option<String>,
+    location: Option<String>,
+    tag: Option<String>,
+    date_from: Option<String>,
+    date_to: Option<String>,
+) -> Vec<Photo> {
+    let filter = crate::database::PhotoFilter {
+        person_id,
+        location,
+        tag,
+        date_from,
+        date_to,
+    };
+    db.list_photos_filtered(query, offset, limit, favorites_only, videos_only, &filter)
 }
 
 /// Pure business logic — testable without Tauri.
@@ -43,6 +80,7 @@ pub fn do_get_heatmap_data(db: &Database) -> Vec<crate::database::MapPoint> {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn list_files(
     app: tauri::AppHandle,
     offset: usize,
@@ -51,6 +89,11 @@ pub async fn list_files(
     scan: bool,
     favorites_only: bool,
     videos_only: bool,
+    person_id: Option<String>,
+    location: Option<String>,
+    tag: Option<String>,
+    date_from: Option<String>,
+    date_to: Option<String>,
 ) -> Result<String, String> {
     let path = get_config_path(&app);
     if path.is_empty() {
@@ -60,13 +103,18 @@ pub async fn list_files(
         crate::commands::scan::scan_files(app.clone());
     }
     let database = database::Database::new(&path);
-    Ok(serde_json::to_string(&do_list_files(
+    Ok(serde_json::to_string(&do_list_files_filtered(
         &database,
         &query,
         offset,
         limit,
         favorites_only,
         videos_only,
+        person_id,
+        location,
+        tag,
+        date_from,
+        date_to,
     ))
     .unwrap_or("[]".to_string()))
 }

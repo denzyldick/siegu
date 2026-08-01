@@ -5,6 +5,8 @@ import { useScanStore } from '@/stores/scan'
 import { useSearchStore } from '@/stores/search'
 import { useAppStore } from '@/stores/app'
 import { normalizeIndexingCount } from '@/composables/useMediaUtils'
+import SearchBar from '@/components/search/SearchBar.vue'
+import FilterPanel from '@/components/search/FilterPanel.vue'
 
 interface Props {
   isActive: boolean
@@ -23,41 +25,11 @@ const searchStore = useSearchStore()
 const appStore = useAppStore()
 
 const isMobile = computed(() => appStore.os === 'android' || appStore.os === 'ios')
-const hasActiveFilters = computed(() => false)
-const selectedSearch = ref<string | null>(null)
-
-function iconForType(type: string): string {
-  if (type === 'person') return 'mdi-account'
-  if (type === 'location') return 'mdi-map-marker'
-  if (type === 'date') return 'mdi-calendar-month'
-  return 'mdi-tag'
-}
-
-function iconColor(type: string): string {
-  if (type === 'person') return '#0ea5e9'
-  if (type === 'location') return '#f59e0b'
-  if (type === 'date') return '#8b5cf6'
-  return '#10b981'
-}
+const hasActiveFilters = computed(() => searchStore.hasFilters)
+const filterPanelOpen = ref(false)
 
 function formatIndexingCount(count: number): string {
   return normalizeIndexingCount(count).toLocaleString()
-}
-
-function handleSearchKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Enter') {
-    searchStore.addRecentSearch(searchStore.query)
-    emit('search', searchStore.query)
-  }
-}
-
-function handleSearchSelect(value: unknown): void {
-  if (value && typeof value === 'object' && value !== null && 'title' in value) {
-    const title = (value as { title: string }).title
-    searchStore.setQuery(title)
-    searchStore.addRecentSearch(title)
-    emit('search', title)
-  }
 }
 </script>
 
@@ -182,94 +154,20 @@ function handleSearchSelect(value: unknown): void {
       </v-col>
 
       <v-col class="mx-2 flex-grow-1">
-        <div class="search-wrapper">
-          <v-autocomplete
-            v-model="selectedSearch"
-            v-model:search="searchStore.query"
-            :items="searchStore.tags"
-            item-title="title"
-            item-value="title"
-            prepend-inner-icon="mdi-magnify"
-            variant="solo-filled"
-            density="compact"
-            :placeholder="t('search.placeholder')"
-            hide-details
-            flat
-            rounded="lg"
-            class="search-autocomplete w-100"
-            data-tour="search"
-            bg-color="rgb(var(--v-theme-surface))"
-            :menu-props="{ contentClass: 'siegu-list', elevation: 4 }"
-            :no-data-text="!searchStore.tags.length ? t('search.no_data') : ''"
-            :filter="() => true"
-            return-object
-            @keydown="handleSearchKeydown"
-            @update:model-value="handleSearchSelect"
-          >
-            <template v-slot:item="{ props: itemProps, item }">
-              <v-list-item v-bind="itemProps" :title="item.raw.title">
-                <template v-slot:prepend>
-                  <v-icon size="18" class="mr-2" :color="iconColor(item.raw.type)">
-                    {{ iconForType(item.raw.type) }}
-                  </v-icon>
-                </template>
-              </v-list-item>
-            </template>
-            <template v-slot:append-inner>
-              <v-tooltip location="bottom" max-width="280">
-                <template v-slot:activator="{ props: tooltipProps }">
-                  <v-icon v-bind="tooltipProps" size="18" color="#a1a1aa" class="cursor-pointer">
-                    mdi-help-circle-outline
-                  </v-icon>
-                </template>
-                <div class="pa-2">
-                  <div class="text-caption font-weight-bold mb-2">{{ t('search.help_title') }}</div>
-                  <div class="text-caption mb-1">{{ t('search.help_desc') }}</div>
-                  <div class="text-caption mb-1">&#8226; {{ t('search.help_tags') }}</div>
-                  <div class="text-caption mb-1">&#8226; {{ t('search.help_people') }}</div>
-                  <div class="text-caption mb-1">&#8226; {{ t('search.help_location') }}</div>
-                  <div class="text-caption mb-1">&#8226; {{ t('search.help_date') }}</div>
-                  <div class="text-caption mb-1">&#8226; {{ t('search.help_caption') }}</div>
-                  <div class="text-caption">&#8226; {{ t('search.help_ocr') }}</div>
-                </div>
-              </v-tooltip>
-            </template>
-          </v-autocomplete>
-        </div>
+        <SearchBar @search="(query: string) => emit('search', query)" @advanced="filterPanelOpen = true" />
       </v-col>
 
       <v-col cols="auto">
-        <v-menu :close-on-content-click="false" offset-y>
-          <template v-slot:activator="{ props: filterProps }">
-            <v-btn icon size="small" variant="text" v-bind="filterProps" color="#18181b">
-              <v-badge :model-value="hasActiveFilters" color="black" dot px="1">
-                <v-icon size="20">mdi-filter-variant</v-icon>
-              </v-badge>
-            </v-btn>
-          </template>
-          <v-card min-width="250" border class="mt-2 border-subtle" color="surface" rounded="xl">
-            <v-list bg-color="transparent" density="compact" class="px-2 ga-2">
-              <v-list-item class="px-0">
-                <v-list-item-title class="text-zinc-secondary">
-                  {{ t('filters.favorites_only') }}
-                </v-list-item-title>
-              </v-list-item>
-              <v-list-item class="px-0">
-                <v-list-item-title class="text-zinc-secondary">
-                  {{ t('filters.videos_only') }}
-                </v-list-item-title>
-              </v-list-item>
-            </v-list>
-          </v-card>
-        </v-menu>
+        <v-btn icon size="small" variant="text" color="#18181b" @click="filterPanelOpen = true">
+          <v-badge :model-value="hasActiveFilters" color="black" dot px="1">
+            <v-icon size="20">mdi-filter-variant</v-icon>
+          </v-badge>
+        </v-btn>
       </v-col>
     </v-row>
+
+    <FilterPanel v-model="filterPanelOpen" />
   </v-app-bar>
 </template>
 
-<style scoped>
-.search-wrapper {
-  width: 100%;
-  cursor: text;
-}
-</style>
+<style scoped></style>

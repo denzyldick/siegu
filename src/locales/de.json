@@ -55,7 +55,26 @@
     "disabled_title": "Suche nicht verfügbar",
     "disabled_desc": "Die Suche benötigt indizierte Daten. Bitte füge einen Ordner hinzu und lasse die Indizierung abschließen, bevor du die Suche verwendest.",
     "disabled_got_it": "Verstanden",
-    "recent": "Letzte"
+    "recent": "Letzte",
+    "people": "Personen",
+    "unnamed_faces": "Andere Gesichter",
+    "locations": "Orte",
+    "tags": "Tags",
+    "dates": "Daten",
+    "photos_count": "{count} Fotos",
+    "videos_count": "{count} Videos",
+    "faces_count": "{count} Gesichter",
+    "enter_to_search": "Suche nach \"{query}\"",
+    "no_matches": "Keine Treffer für \"{query}\"",
+    "expand": "Erweiterte Filter",
+    "clear_all": "Alles löschen",
+    "advanced": {
+      "title": "Erweiterte Filter",
+      "media_type": "Medientyp",
+      "favorites": "Favoriten",
+      "videos": "Videos",
+      "clear_all": "Alles löschen"
+    }
   },
   "sync": {
     "status_label": "BIBLIOTHEKSSTATUS",

@@ -55,7 +55,26 @@
     "disabled_title": "Zoeken niet beschikbaar",
     "disabled_desc": "Zoeken vereist geïndexeerde data. Voeg een map toe en laat het indexeren voltooien voordat je zoeken gebruikt.",
     "disabled_got_it": "Begrepen",
-    "recent": "Recent"
+    "recent": "Recent",
+    "people": "Mensen",
+    "unnamed_faces": "Andere gezichten",
+    "locations": "Locaties",
+    "tags": "Tags",
+    "dates": "Datums",
+    "photos_count": "{count} foto's",
+    "videos_count": "{count} video's",
+    "faces_count": "{count} gezichten",
+    "enter_to_search": "Zoek naar \"{query}\"",
+    "no_matches": "Geen resultaten voor \"{query}\"",
+    "expand": "Geavanceerde filters",
+    "clear_all": "Alles wissen",
+    "advanced": {
+      "title": "Geavanceerde filters",
+      "media_type": "Mediatype",
+      "favorites": "Favorieten",
+      "videos": "Video's",
+      "clear_all": "Alles wissen"
+    }
   },
   "sync": {
     "status_label": "BIBLIOTHEEKSTATUS",

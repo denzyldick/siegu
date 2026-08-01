@@ -55,7 +55,26 @@
     "disabled_title": "Pesquisa Indisponível",
     "disabled_desc": "A pesquisa requer dados indexados. Adicione uma pasta e permita que a indexação seja concluída antes de usar a pesquisa.",
     "disabled_got_it": "Entendi",
-    "recent": "Recentes"
+    "recent": "Recentes",
+    "people": "Pessoas",
+    "unnamed_faces": "Outros rostos",
+    "locations": "Locais",
+    "tags": "Tags",
+    "dates": "Datas",
+    "photos_count": "{count} fotos",
+    "videos_count": "{count} vídeos",
+    "faces_count": "{count} rostos",
+    "enter_to_search": "Pesquisar por \"{query}\"",
+    "no_matches": "Sem resultados para \"{query}\"",
+    "expand": "Filtros avançados",
+    "clear_all": "Limpar tudo",
+    "advanced": {
+      "title": "Filtros avançados",
+      "media_type": "Tipo de mídia",
+      "favorites": "Favoritos",
+      "videos": "Vídeos",
+      "clear_all": "Limpar tudo"
+    }
   },
   "sync": {
     "status_label": "STATUS DA BIBLIOTECA",

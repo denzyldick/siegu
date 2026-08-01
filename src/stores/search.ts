@@ -1,19 +1,23 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getTopTags, listObjects } from '@/services/tauri'
-
-export interface SearchTag {
-  title: string
-  type: string
-}
+import { getTopTags, listObjects, searchFacets } from '@/services/tauri'
+import type { SearchTag, SearchFacetsData, ActiveFilter, FacetType } from '@/types/search'
 
 export const useSearchStore = defineStore('search', () => {
   const query = ref('')
   const tags = ref<SearchTag[]>([])
   const recentSearches = ref<string[]>([])
   const loading = ref(false)
+  const facets = ref<SearchFacetsData | null>(null)
+  const facetsLoading = ref(false)
+  const activeFilters = ref<ActiveFilter[]>([])
+  const mediaFilters = ref({ favoritesOnly: false, videosOnly: false })
 
   const hasQuery = computed(() => query.value.trim().length > 0)
+  const hasFilters = computed(
+    () => activeFilters.value.length > 0 || mediaFilters.value.favoritesOnly || mediaFilters.value.videosOnly,
+  )
+  const activeFacets = computed(() => activeFilters.value)
 
   async function loadTopTags(): Promise<void> {
     try {
@@ -21,6 +25,18 @@ export const useSearchStore = defineStore('search', () => {
     } catch (error) {
       console.error('[SearchStore] Failed to load top tags:', error)
       tags.value = []
+    }
+  }
+
+  async function loadFacets(): Promise<void> {
+    if (facetsLoading.value) return
+    facetsLoading.value = true
+    try {
+      facets.value = await searchFacets()
+    } catch (error) {
+      console.error('[SearchStore] Failed to load search facets:', error)
+    } finally {
+      facetsLoading.value = false
     }
   }
 
@@ -40,6 +56,30 @@ export const useSearchStore = defineStore('search', () => {
 
   function clearQuery(): void {
     query.value = ''
+  }
+
+  function addFilter(filter: ActiveFilter): void {
+    activeFilters.value = [
+      ...activeFilters.value.filter((f) => f.type !== filter.type),
+      filter,
+    ]
+  }
+
+  function removeFilter(type: FacetType): void {
+    activeFilters.value = activeFilters.value.filter((f) => f.type !== type)
+  }
+
+  function clearFilters(): void {
+    activeFilters.value = []
+    mediaFilters.value = { favoritesOnly: false, videosOnly: false }
+  }
+
+  function toggleFavoriteOnly(): void {
+    mediaFilters.value.favoritesOnly = !mediaFilters.value.favoritesOnly
+  }
+
+  function toggleVideoOnly(): void {
+    mediaFilters.value.videosOnly = !mediaFilters.value.videosOnly
   }
 
   function addRecentSearch(term: string): void {
@@ -78,11 +118,23 @@ export const useSearchStore = defineStore('search', () => {
     tags,
     recentSearches,
     loading,
+    facets,
+    facetsLoading,
+    activeFilters,
+    activeFacets,
+    mediaFilters,
     hasQuery,
+    hasFilters,
     loadTopTags,
+    loadFacets,
     searchObjects,
     setQuery,
     clearQuery,
+    addFilter,
+    removeFilter,
+    clearFilters,
+    toggleFavoriteOnly,
+    toggleVideoOnly,
     addRecentSearch,
     clearRecentSearches,
   }

@@ -55,7 +55,26 @@
     "disabled_title": "Ricerca non disponibile",
     "disabled_desc": "La ricerca richiede dati indicizzati. Aggiungi una cartella e attendi il completamento dell'indicizzazione prima di usare la ricerca.",
     "disabled_got_it": "Ho capito",
-    "recent": "Recenti"
+    "recent": "Recenti",
+    "people": "Persone",
+    "unnamed_faces": "Altri volti",
+    "locations": "Luoghi",
+    "tags": "Tag",
+    "dates": "Date",
+    "photos_count": "{count} foto",
+    "videos_count": "{count} video",
+    "faces_count": "{count} volti",
+    "enter_to_search": "Cerca \"{query}\"",
+    "no_matches": "Nessun risultato per \"{query}\"",
+    "expand": "Filtri avanzati",
+    "clear_all": "Cancella tutto",
+    "advanced": {
+      "title": "Filtri avanzati",
+      "media_type": "Tipo di supporto",
+      "favorites": "Preferiti",
+      "videos": "Video",
+      "clear_all": "Cancella tutto"
+    }
   },
   "sync": {
     "status_label": "STATO LIBRERIA",

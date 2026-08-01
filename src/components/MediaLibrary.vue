@@ -213,6 +213,7 @@ const props = withDefaults(
       dateRange: string;
       folder: string | null;
     };
+    facets?: { type: 'person' | 'location' | 'tag' | 'month'; value: string; label: string }[];
   }>(),
   {
     searchQuery: '',
@@ -223,6 +224,7 @@ const props = withDefaults(
       dateRange: 'all',
       folder: null,
     }),
+    facets: () => [],
   },
 );
 
@@ -396,6 +398,11 @@ async function loadFiles(): Promise<void> {
       response = await invoke<string>('get_person_photos', { personId: props.searchQuery });
       allLoaded.value = true;
     } else {
+      const byType = (type: string) => props.facets?.find((f) => f.type === type);
+      const person = byType('person');
+      const location = byType('location');
+      const tag = byType('tag');
+      const month = byType('month');
       response = await invoke<string>('list_files', {
         offset: paging.value.offset,
         limit: paging.value.limit,
@@ -403,6 +410,11 @@ async function loadFiles(): Promise<void> {
         scan: false,
         favoritesOnly: props.filters?.favoritesOnly ?? false,
         videosOnly: props.filters?.videosOnly ?? false,
+        personId: person ? person.value : null,
+        location: location ? location.value : null,
+        tag: tag ? tag.value : null,
+        dateFrom: month ? `${month.value}-01` : null,
+        dateTo: month ? `${month.value}-31` : null,
       });
     }
 
@@ -488,6 +500,14 @@ watch(
 
 watch(
   () => props.filters,
+  () => {
+    scheduleReload();
+  },
+  { deep: true },
+);
+
+watch(
+  () => props.facets,
   () => {
     scheduleReload();
   },

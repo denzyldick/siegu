@@ -86,6 +86,11 @@ export interface ListFilesOptions {
   favoritesOnly?: boolean;
   videosOnly?: boolean;
   dateRange?: [string, string] | null;
+  personId?: string;
+  location?: string;
+  tag?: string;
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 export interface ListFilesResponse {
