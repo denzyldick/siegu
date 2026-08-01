@@ -26,6 +26,15 @@
 
         <div class="scrim-overlay"></div>
 
+        <button
+          v-if="notSynced"
+          class="action-btn not-synced-badge"
+          :title="$t('media_card.not_synced')"
+          @click.stop="$emit('not-synced')"
+        >
+          <v-icon size="14" color="white">mdi-cloud-upload-outline</v-icon>
+        </button>
+
         <div v-if="isVideo" class="video-indicator">
           <v-icon color="white" size="20">mdi-play</v-icon>
         </div>
@@ -58,7 +67,11 @@
           <v-icon size="12" color="#a1a1aa">mdi-auto-fix</v-icon>
         </div>
       </div>
-      <div class="media-card-caption click-caption" v-if="path.caption" @click.stop="$emit('click')">
+      <div
+        class="media-card-caption click-caption"
+        v-if="path.caption"
+        @click.stop="$emit('click')"
+      >
         {{ path.caption }}
       </div>
       <div class="media-card-details" v-if="hasResults">
@@ -83,114 +96,117 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { convertFileSrc } from '@tauri-apps/api/core'
-import { useMediaUrl } from '@/composables/useMediaUrl'
-import { isVideo as checkIsVideo, formatScore } from '@/composables/useMediaUtils'
-import type { MediaItem } from '@/types/media'
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import { useMediaUrl } from '@/composables/useMediaUrl';
+import { isVideo as checkIsVideo, formatScore } from '@/composables/useMediaUtils';
+import type { MediaItem } from '@/types/media';
 
 const props = defineProps<{
-  path: MediaItem
-  selected: boolean
-  selectionMode: boolean
-}>()
+  path: MediaItem;
+  selected: boolean;
+  selectionMode: boolean;
+}>();
 
 const emit = defineEmits<{
-  'toggle-favorite': [id: string | number]
-  click: []
-  select: [id: string | number]
-}>()
+  'toggle-favorite': [id: string | number];
+  'not-synced': [];
+  click: [];
+  select: [id: string | number];
+}>();
 
-const { videoUrl: buildVideoUrl } = useMediaUrl()
+const { videoUrl: buildVideoUrl } = useMediaUrl();
 
-const containerRef = ref<HTMLElement | null>(null)
-const isVisible = ref(false)
-let observer: IntersectionObserver | null = null
+const containerRef = ref<HTMLElement | null>(null);
+const isVisible = ref(false);
+let observer: IntersectionObserver | null = null;
 
 const isVideo = computed(() => {
-  if (!props.path?.location) return false
-  return checkIsVideo(props.path.location)
-})
+  if (!props.path?.location) return false;
+  return checkIsVideo(props.path.location);
+});
 
 const computedVideoUrl = computed(() => {
-  if (!props.path?.location || !isVideo.value) return ''
-  return buildVideoUrl(props.path.location)
-})
+  if (!props.path?.location || !isVideo.value) return '';
+  return buildVideoUrl(props.path.location);
+});
 
 const imageSrc = computed(() => {
-  if (!props.path?.location) return undefined
-  if (props.path.encoded) return props.path.encoded
+  if (!props.path?.location) return undefined;
+  if (props.path.encoded) return props.path.encoded;
   if (!isVideo.value) {
-    const ext = props.path.location.split('.').pop()?.toLowerCase()
-    if (['heic', 'heif'].includes(ext ?? '')) return undefined
-    return convertFileSrc(props.path.location)
+    const ext = props.path.location.split('.').pop()?.toLowerCase();
+    if (['heic', 'heif'].includes(ext ?? '')) return undefined;
+    return convertFileSrc(props.path.location);
   }
-  return undefined
-})
+  return undefined;
+});
 
 const tags = computed((): string[] => {
-  if (!props.path?.objects) return []
+  if (!props.path?.objects) return [];
   return Object.entries(props.path.objects)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
-    .map((entry) => entry[0])
-})
+    .map((entry) => entry[0]);
+});
 
 const faceCount = computed((): number => {
-  if (!props.path?.properties) return 0
-  const v = props.path.properties['face_count']
-  return v ? parseInt(String(v)) : 0
-})
+  if (!props.path?.properties) return 0;
+  const v = props.path.properties['face_count'];
+  return v ? parseInt(String(v)) : 0;
+});
+
+const notSynced = computed((): boolean => !!props.path?.sync_needed && !props.path?.received);
 
 const hasResults = computed((): boolean => {
-  if (!props.path) return false
+  if (!props.path) return false;
   return (
     (props.path.objects && Object.keys(props.path.objects).length > 0) ||
     props.path.aesthetics_score != null ||
     !!props.path.caption ||
     props.path.indexed >= 2
-  )
-})
+  );
+});
 
 function toggleFavorite(): void {
-  emit('toggle-favorite', props.path.id)
+  emit('toggle-favorite', props.path.id);
 }
 
 function handleClick(): void {
   if (props.selectionMode) {
-    emit('select', props.path.id)
+    emit('select', props.path.id);
   } else {
-    emit('click')
+    emit('click');
   }
 }
 
 function onImageError(): void {
-  const ext = props.path?.location?.split('.').pop()?.toLowerCase()
-  if (['heic', 'heif'].includes(ext ?? '') && !props.path?.encoded) return
-  console.error('[MediaCard] Failed to load:', props.path?.location)
+  const ext = props.path?.location?.split('.').pop()?.toLowerCase();
+  if (['heic', 'heif'].includes(ext ?? '') && !props.path?.encoded) return;
+  console.error('[MediaCard] Failed to load:', props.path?.location);
 }
 
 function onVideoError(): void {
-  console.error('[MediaCard] Failed to load video:', props.path?.location)
+  console.error('[MediaCard] Failed to load video:', props.path?.location);
 }
 
 onMounted(() => {
   if (typeof IntersectionObserver === 'undefined') {
-    isVisible.value = true
-    return
+    isVisible.value = true;
+    return;
   }
   observer = new IntersectionObserver(
     (entries) => {
-      isVisible.value = entries[0].isIntersecting
+      isVisible.value = entries[0].isIntersecting;
     },
     { rootMargin: '200px', threshold: 0.01 },
-  )
-  if (containerRef.value) observer.observe(containerRef.value)
-})
+  );
+  if (containerRef.value) observer.observe(containerRef.value);
+});
 
 onUnmounted(() => {
-  observer?.disconnect()
-})
+  observer?.disconnect();
+});
 </script>
 
 <style scoped>
@@ -327,6 +343,23 @@ onUnmounted(() => {
 
 .action-btn.is-fav {
   background: white;
+}
+
+.not-synced-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: auto;
+  width: 28px;
+  height: 28px;
+  background: rgba(245, 158, 11, 0.9);
+  opacity: 1;
+  transform: none;
+  z-index: 6;
+}
+
+.not-synced-badge:hover {
+  background: #d97706;
 }
 
 .shadow-sm {

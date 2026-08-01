@@ -71,6 +71,7 @@
             @click="openViewerByPhoto(photo)"
             @select="toggleSelection"
             @toggle-favorite="handleToggleFavorite"
+            @not-synced="handleNotSynced"
           />
         </div>
       </DynamicScrollerItem>
@@ -101,6 +102,7 @@
             @click="openViewerByPhoto(photo)"
             @select="toggleSelection"
             @toggle-favorite="handleToggleFavorite"
+            @not-synced="handleNotSynced"
           />
         </div>
       </div>
@@ -189,192 +191,210 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller'
-import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
-import MediaCard from './MediaCard.vue'
-import MediaViewer from './MediaViewer.vue'
-import type { MediaItem } from '@/types/media'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller';
+import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
+import MediaCard from './MediaCard.vue';
+import MediaViewer from './MediaViewer.vue';
+import { useSyncStore } from '@/stores/sync';
+import type { MediaItem } from '@/types/media';
 
-const props = withDefaults(defineProps<{
-  searchQuery?: string
-  isPersonFilter?: boolean
-  filters?: {
-    favoritesOnly: boolean
-    videosOnly: boolean
-    dateRange: string
-    folder: string | null
-  }
-}>(), {
-  searchQuery: '',
-  isPersonFilter: false,
-  filters: () => ({
-    favoritesOnly: false,
-    videosOnly: false,
-    dateRange: 'all',
-    folder: null,
-  }),
-})
+const syncStore = useSyncStore();
+
+const props = withDefaults(
+  defineProps<{
+    searchQuery?: string;
+    isPersonFilter?: boolean;
+    filters?: {
+      favoritesOnly: boolean;
+      videosOnly: boolean;
+      dateRange: string;
+      folder: string | null;
+    };
+  }>(),
+  {
+    searchQuery: '',
+    isPersonFilter: false,
+    filters: () => ({
+      favoritesOnly: false,
+      videosOnly: false,
+      dateRange: 'all',
+      folder: null,
+    }),
+  },
+);
 
 const emit = defineEmits<{
-  'clear-search': []
-  'search-person': [person: { id: string; name: string }]
-}>()
+  'clear-search': [];
+  'search-person': [person: { id: string; name: string }];
+}>();
 
-const loading = ref(false)
-const allLoaded = ref(false)
-const paging = ref({ offset: 0, limit: 50 })
-const images = ref<MediaItem[]>([])
-const imagesMap = ref<Record<string, MediaItem>>({})
-const groups = ref<{ name: string; sortKey: string; images: MediaItem[] }[]>([])
-const groupsMap = ref<Record<string, { name: string; sortKey: string; images: MediaItem[] }>>({})
-const selectedIds = ref<(string | number)[]>([])
-const viewerOpen = ref(false)
-const currentPhotoIndex = ref(0)
-const columns = ref(5)
+const loading = ref(false);
+const allLoaded = ref(false);
+const paging = ref({ offset: 0, limit: 50 });
+const images = ref<MediaItem[]>([]);
+const imagesMap = ref<Record<string, MediaItem>>({});
+const groups = ref<{ name: string; sortKey: string; images: MediaItem[] }[]>([]);
+const groupsMap = ref<Record<string, { name: string; sortKey: string; images: MediaItem[] }>>({});
+const selectedIds = ref<(string | number)[]>([]);
+const viewerOpen = ref(false);
+const currentPhotoIndex = ref(0);
+const columns = ref(5);
 
-let observer: IntersectionObserver | null = null
-let unlistenDiscovered: UnlistenFn | null = null
-let unlistenAnalysisResult: UnlistenFn | null = null
-let unlistenPhotoReceived: UnlistenFn | null = null
-let reloadTimer: ReturnType<typeof setTimeout> | null = null
-let discoveredTimer: ReturnType<typeof setTimeout> | null = null
-let discoveredBuffer: MediaItem[] = []
+async function handleNotSynced(): Promise<void> {
+  await syncStore.reconnect();
+}
+
+let observer: IntersectionObserver | null = null;
+let unlistenDiscovered: UnlistenFn | null = null;
+let unlistenAnalysisResult: UnlistenFn | null = null;
+let unlistenPhotoReceived: UnlistenFn | null = null;
+let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+let discoveredTimer: ReturnType<typeof setTimeout> | null = null;
+let discoveredBuffer: MediaItem[] = [];
 
 const useVirtualScroller = computed(() => {
-  return typeof IntersectionObserver !== 'undefined' && virtualItems.value.length > 12
-})
+  return typeof IntersectionObserver !== 'undefined' && virtualItems.value.length > 12;
+});
 
 const virtualItems = computed(() => {
-  const cols = columns.value
-  const items: Array<{ type: string; key: string; name?: string; count?: number; photos?: MediaItem[] }> = []
+  const cols = columns.value;
+  const items: Array<{
+    type: string;
+    key: string;
+    name?: string;
+    count?: number;
+    photos?: MediaItem[];
+  }> = [];
   for (const group of groups.value) {
     items.push({
       type: 'header',
       key: `h-${group.name}`,
       name: group.name,
       count: group.images.length,
-    })
+    });
     for (let i = 0; i < group.images.length; i += cols) {
       items.push({
         type: 'row',
         key: `r-${group.name}-${i}`,
         photos: group.images.slice(i, i + cols),
-      })
+      });
     }
   }
-  return items
-})
+  return items;
+});
 
 function updateColumns(): void {
-  const width = window.innerWidth
-  if (width < 640) columns.value = 2
-  else if (width < 1024) columns.value = 3
-  else columns.value = 5
+  const width = window.innerWidth;
+  if (width < 640) columns.value = 2;
+  else if (width < 1024) columns.value = 3;
+  else columns.value = 5;
 }
 
 function updateGroups(newImages: MediaItem[]): void {
-  const locale = localStorage.getItem('siegu_language') || 'en'
-  const affectedGroups = new Set<{ name: string; sortKey: string; images: MediaItem[] }>()
+  const locale = localStorage.getItem('siegu_language') || 'en';
+  const affectedGroups = new Set<{ name: string; sortKey: string; images: MediaItem[] }>();
 
   newImages.forEach((image) => {
-    if (imagesMap.value[image.id]) return
-    imagesMap.value[image.id] = image
-    images.value.push(image)
+    if (imagesMap.value[image.id]) return;
+    imagesMap.value[image.id] = image;
+    images.value.push(image);
 
     if (!image._groupKey) {
       if (image.created) {
-        const datePart = image.created.split(' ')[0]
-        const dateParts = datePart.includes(':') ? datePart.split(':') : datePart.split('-')
+        const datePart = image.created.split(' ')[0];
+        const dateParts = datePart.includes(':') ? datePart.split(':') : datePart.split('-');
         if (dateParts.length >= 2) {
-          const year = dateParts[0]
-          const monthIdx = parseInt(dateParts[1]) - 1
+          const year = dateParts[0];
+          const monthIdx = parseInt(dateParts[1]) - 1;
           if (monthIdx >= 0 && monthIdx < 12) {
-            const monthName = new Date(parseInt(year), monthIdx).toLocaleString(locale, { month: 'long' })
-            image._groupKey = `${monthName} ${year}`
-            image._sortKey = `${year}${dateParts[1].padStart(2, '0')}`
+            const monthName = new Date(parseInt(year), monthIdx).toLocaleString(locale, {
+              month: 'long',
+            });
+            image._groupKey = `${monthName} ${year}`;
+            image._sortKey = `${year}${dateParts[1].padStart(2, '0')}`;
           }
         }
       }
       if (!image._groupKey) {
-        image._groupKey = 'Recent'
-        image._sortKey = '999999'
+        image._groupKey = 'Recent';
+        image._sortKey = '999999';
       }
     }
 
-    let group = groupsMap.value[image._groupKey]
+    let group = groupsMap.value[image._groupKey];
     if (!group) {
-      group = { name: image._groupKey, sortKey: image._sortKey ?? '', images: [] }
-      groupsMap.value[image._groupKey] = group
-      groups.value.push(group)
-      groups.value.sort((a, b) => b.sortKey.localeCompare(a.sortKey))
+      group = { name: image._groupKey, sortKey: image._sortKey ?? '', images: [] };
+      groupsMap.value[image._groupKey] = group;
+      groups.value.push(group);
+      groups.value.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
     }
-    group.images.push(image)
-    affectedGroups.add(group)
-  })
+    group.images.push(image);
+    affectedGroups.add(group);
+  });
 
   affectedGroups.forEach((group) => {
-    group.images.sort((a, b) => (b.created || '').localeCompare(a.created || ''))
-  })
+    group.images.sort((a, b) => (b.created || '').localeCompare(a.created || ''));
+  });
 
-  groups.value = [...groups.value]
+  groups.value = [...groups.value];
 }
 
 function handlePhotoUpdated(updatedPhoto: MediaItem): void {
-  const existing = imagesMap.value[updatedPhoto.id]
+  const existing = imagesMap.value[updatedPhoto.id];
   if (existing) {
-    Object.assign(existing, updatedPhoto)
+    Object.assign(existing, updatedPhoto);
   } else {
-    updateGroups([updatedPhoto])
+    updateGroups([updatedPhoto]);
   }
 }
 
 function toggleSelection(id: string | number): void {
-  const index = selectedIds.value.indexOf(id)
-  if (index === -1) selectedIds.value.push(id)
-  else selectedIds.value.splice(index, 1)
+  const index = selectedIds.value.indexOf(id);
+  if (index === -1) selectedIds.value.push(id);
+  else selectedIds.value.splice(index, 1);
 }
 
 function clearSelection(): void {
-  selectedIds.value = []
+  selectedIds.value = [];
 }
 
 async function bulkFavorite(): Promise<void> {
-  const ids = [...selectedIds.value]
+  const ids = [...selectedIds.value];
   for (const id of ids) {
-    await handleToggleFavorite(id)
+    await handleToggleFavorite(id);
   }
-  clearSelection()
+  clearSelection();
 }
 
 function bulkRemove(): void {
-  clearSelection()
+  clearSelection();
 }
 
 function setupInfiniteScroll(): void {
-  if (typeof IntersectionObserver === 'undefined') return
+  if (typeof IntersectionObserver === 'undefined') return;
   observer = new IntersectionObserver(
     (entries) => {
       if (entries[0].isIntersecting && !loading.value && !allLoaded.value) {
-        loadFiles()
+        loadFiles();
       }
     },
     { threshold: 0.01, rootMargin: '600px' },
-  )
-  const sentinel = document.getElementById('scroll-sentinel')
-  if (sentinel) observer.observe(sentinel)
+  );
+  const sentinel = document.getElementById('scroll-sentinel');
+  if (sentinel) observer.observe(sentinel);
 }
 
 async function loadFiles(): Promise<void> {
-  if (loading.value) return
-  loading.value = true
+  if (loading.value) return;
+  loading.value = true;
   try {
-    let response: string
+    let response: string;
     if (props.isPersonFilter && props.searchQuery) {
-      response = await invoke<string>('get_person_photos', { personId: props.searchQuery })
-      allLoaded.value = true
+      response = await invoke<string>('get_person_photos', { personId: props.searchQuery });
+      allLoaded.value = true;
     } else {
       response = await invoke<string>('list_files', {
         offset: paging.value.offset,
@@ -383,156 +403,166 @@ async function loadFiles(): Promise<void> {
         scan: false,
         favoritesOnly: props.filters?.favoritesOnly ?? false,
         videosOnly: props.filters?.videosOnly ?? false,
-      })
+      });
     }
 
-    const newImages: MediaItem[] = JSON.parse(response)
+    const newImages: MediaItem[] = JSON.parse(response);
 
     if (paging.value.offset === 0) {
-      imagesMap.value = {}
-      groupsMap.value = {}
-      groups.value = []
-      images.value = []
-      updateGroups(newImages)
+      imagesMap.value = {};
+      groupsMap.value = {};
+      groups.value = [];
+      images.value = [];
+      updateGroups(newImages);
     } else {
-      updateGroups(newImages)
+      updateGroups(newImages);
     }
 
     if (!props.isPersonFilter) {
       if (newImages.length < paging.value.limit) {
-        allLoaded.value = true
+        allLoaded.value = true;
       } else {
-        paging.value.offset += paging.value.limit
+        paging.value.offset += paging.value.limit;
       }
     }
   } catch (err) {
-    console.error('Failed to list files:', err)
+    console.error('Failed to list files:', err);
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 function scheduleReload(): void {
-  if (reloadTimer) clearTimeout(reloadTimer)
+  if (reloadTimer) clearTimeout(reloadTimer);
   reloadTimer = setTimeout(() => {
-    loading.value = false
-    paging.value.offset = 0
-    allLoaded.value = false
-    loadFiles()
-  }, 200)
+    loading.value = false;
+    paging.value.offset = 0;
+    allLoaded.value = false;
+    loadFiles();
+  }, 200);
 }
 
 async function handleToggleFavorite(id: string | number): Promise<void> {
   try {
-    const isNowFavorite = await invoke<boolean>('toggle_favorite', { id })
-    const photo = imagesMap.value[id]
+    const isNowFavorite = await invoke<boolean>('toggle_favorite', { id });
+    const photo = imagesMap.value[id];
     if (photo) {
-      photo.favorite = isNowFavorite
+      photo.favorite = isNowFavorite;
       if (props.filters?.favoritesOnly && !isNowFavorite) {
-        images.value = images.value.filter((p) => p.id !== id)
-        delete imagesMap.value[id]
+        images.value = images.value.filter((p) => p.id !== id);
+        delete imagesMap.value[id];
         if (photo._groupKey) {
-          const group = groupsMap.value[photo._groupKey]
+          const group = groupsMap.value[photo._groupKey];
           if (group) {
-            group.images = group.images.filter((p: MediaItem) => p.id !== id)
+            group.images = group.images.filter((p: MediaItem) => p.id !== id);
             if (group.images.length === 0) {
-              delete groupsMap.value[photo._groupKey]
-              groups.value = groups.value.filter((g) => g.name !== photo._groupKey)
+              delete groupsMap.value[photo._groupKey];
+              groups.value = groups.value.filter((g) => g.name !== photo._groupKey);
             }
           }
         }
-        selectedIds.value = selectedIds.value.filter((selectedId) => selectedId !== id)
+        selectedIds.value = selectedIds.value.filter((selectedId) => selectedId !== id);
       }
     }
   } catch (err) {
-    console.error('Failed to toggle favorite:', err)
+    console.error('Failed to toggle favorite:', err);
   }
 }
 
 function openViewer(index: number): void {
-  currentPhotoIndex.value = index
-  viewerOpen.value = true
+  currentPhotoIndex.value = index;
+  viewerOpen.value = true;
 }
 
 function openViewerByPhoto(photo: MediaItem): void {
-  const index = images.value.findIndex((p) => p.id === photo.id)
-  if (index !== -1) openViewer(index)
+  const index = images.value.findIndex((p) => p.id === photo.id);
+  if (index !== -1) openViewer(index);
 }
 
-watch(() => props.searchQuery, () => {
-  scheduleReload()
-})
+watch(
+  () => props.searchQuery,
+  () => {
+    scheduleReload();
+  },
+);
 
-watch(() => props.filters, () => {
-  scheduleReload()
-}, { deep: true })
+watch(
+  () => props.filters,
+  () => {
+    scheduleReload();
+  },
+  { deep: true },
+);
 
 onMounted(async () => {
-  loadFiles()
+  loadFiles();
 
   function flushDiscovered(): void {
     if (discoveredBuffer.length > 0) {
-      updateGroups(discoveredBuffer)
-      discoveredBuffer = []
+      updateGroups(discoveredBuffer);
+      discoveredBuffer = [];
     }
-    discoveredTimer = null
+    discoveredTimer = null;
   }
 
   unlistenDiscovered = await listen<MediaItem[]>('photos-discovered', (event) => {
     if (Array.isArray(event.payload)) {
-      discoveredBuffer.push(...event.payload)
+      discoveredBuffer.push(...event.payload);
       if (!discoveredTimer) {
-        discoveredTimer = setTimeout(flushDiscovered, 50)
+        discoveredTimer = setTimeout(flushDiscovered, 50);
       }
     }
-  })
+  });
 
-  unlistenAnalysisResult = await listen<{ id: string | number }>('photo-analysis-result', async (event) => {
-    const id = event.payload.id
-    if (!id) return
-    try {
-      const raw = await invoke<string>('get_photo_by_id', { id })
-      if (raw && raw !== 'null') {
-        const updated = JSON.parse(raw) as MediaItem
-        const existing = imagesMap.value[id]
-        if (existing) {
-          updated._groupKey = existing._groupKey
-          updated._sortKey = existing._sortKey
-          imagesMap.value[id] = updated
-          const idx = images.value.findIndex((p) => p.id === id)
-          if (idx !== -1) images.value[idx] = updated
-          for (const g of groups.value) {
-            const gi = g.images.findIndex((p) => p.id === id)
-            if (gi !== -1) g.images[gi] = updated
+  unlistenAnalysisResult = await listen<{ id: string | number }>(
+    'photo-analysis-result',
+    async (event) => {
+      const id = event.payload.id;
+      if (!id) return;
+      try {
+        const raw = await invoke<string>('get_photo_by_id', { id });
+        if (raw && raw !== 'null') {
+          const updated = JSON.parse(raw) as MediaItem;
+          const existing = imagesMap.value[id];
+          if (existing) {
+            updated._groupKey = existing._groupKey;
+            updated._sortKey = existing._sortKey;
+            imagesMap.value[id] = updated;
+            const idx = images.value.findIndex((p) => p.id === id);
+            if (idx !== -1) images.value[idx] = updated;
+            for (const g of groups.value) {
+              const gi = g.images.findIndex((p) => p.id === id);
+              if (gi !== -1) g.images[gi] = updated;
+            }
+            groups.value = [...groups.value];
+          } else {
+            updateGroups([updated]);
           }
-          groups.value = [...groups.value]
-        } else {
-          updateGroups([updated])
         }
+      } catch (e) {
+        console.warn('Failed to fetch updated photo after analysis:', e);
       }
-    } catch (e) {
-      console.warn('Failed to fetch updated photo after analysis:', e)
-    }
-  })
+    },
+  );
 
   unlistenPhotoReceived = await listen('photo-received', () => {
-    scheduleReload()
-  })
+    scheduleReload();
+  });
 
-  updateColumns()
-  window.addEventListener('resize', updateColumns)
-  if (!props.isPersonFilter) setupInfiniteScroll()
-})
+  updateColumns();
+  window.addEventListener('resize', updateColumns);
+  if (!props.isPersonFilter) setupInfiniteScroll();
+});
 
 onUnmounted(() => {
-  window.removeEventListener('resize', updateColumns)
-  observer?.disconnect()
-  unlistenDiscovered?.()
-  unlistenAnalysisResult?.()
-  unlistenPhotoReceived?.()
-  if (reloadTimer) clearTimeout(reloadTimer)
-  if (discoveredTimer) clearTimeout(discoveredTimer)
-})
+  window.removeEventListener('resize', updateColumns);
+  observer?.disconnect();
+  unlistenDiscovered?.();
+  unlistenAnalysisResult?.();
+  unlistenPhotoReceived?.();
+  if (reloadTimer) clearTimeout(reloadTimer);
+  if (discoveredTimer) clearTimeout(discoveredTimer);
+});
 </script>
 
 <style scoped>
