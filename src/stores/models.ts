@@ -1,8 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { checkModels, downloadModels } from '@/services/tauri'
+import { checkModels, downloadModels, getConfig, saveConfig } from '@/services/tauri'
 import { listenEvent } from '@/services/events'
 import type { ModelProgress } from '@/types/models'
+
+function configKeyForModel(modelId: string): string {
+  return 'model_enabled_' + (modelId === 'ultraface' ? 'face' : modelId)
+}
 
 export const useModelsStore = defineStore('models', () => {
   const downloaded = ref<string[]>([])
@@ -14,10 +18,10 @@ export const useModelsStore = defineStore('models', () => {
   async function loadModels(): Promise<void> {
     try {
       downloaded.value = await checkModels()
+      const config = await getConfig()
       for (const model of downloaded.value) {
-        const key = `model_enabled_${model}`
-        const stored = localStorage.getItem(key)
-        enabled.value[model] = stored !== 'false'
+        const key = configKeyForModel(model)
+        enabled.value[model] = config[key] !== 'false'
       }
     } catch (error) {
       console.error('[ModelsStore] Failed to load models:', error)
@@ -37,9 +41,13 @@ export const useModelsStore = defineStore('models', () => {
     }
   }
 
-  function toggleModel(modelId: string): void {
+  async function toggleModel(modelId: string): Promise<void> {
     enabled.value[modelId] = !enabled.value[modelId]
-    localStorage.setItem(`model_enabled_${modelId}`, String(enabled.value[modelId]))
+    try {
+      await saveConfig(configKeyForModel(modelId), enabled.value[modelId] ? 'true' : 'false')
+    } catch (error) {
+      console.error('[ModelsStore] Failed to save model state:', error)
+    }
   }
 
   function isModelEnabled(modelId: string): boolean {

@@ -90,10 +90,13 @@ pub fn should_run_model(
 }
 
 pub fn any_model_enabled(config: &HashMap<String, String>) -> bool {
+    // A model counts as enabled when it has no explicit config entry, mirroring
+    // should_run_model and the app's default (missing key => enabled). This keeps
+    // the CLI in sync with the Tauri app's model toggles.
     ALL_MODEL_NAMES.iter().any(|m| {
         config
             .get(&format!("model_enabled_{m}"))
-            .is_some_and(|v| v == "true")
+            .is_none_or(|v| v == "true")
     })
 }
 
@@ -211,9 +214,24 @@ mod tests {
 
     #[test]
     fn test_any_model_enabled() {
+        // No explicit config => models default to enabled (matches app default).
+        let config = HashMap::new();
+        assert!(any_model_enabled(&config));
+
         let mut config = HashMap::new();
-        assert!(!any_model_enabled(&config));
         config.insert("model_enabled_yolo".to_string(), "true".to_string());
+        assert!(any_model_enabled(&config));
+
+        // All models explicitly disabled => none enabled.
+        let mut config = HashMap::new();
+        for m in ALL_MODEL_NAMES {
+            config.insert(format!("model_enabled_{m}"), "false".to_string());
+        }
+        assert!(!any_model_enabled(&config));
+
+        let mut config = HashMap::new();
+        config.insert("model_enabled_clip".to_string(), "true".to_string());
+        config.insert("model_enabled_face".to_string(), "false".to_string());
         assert!(any_model_enabled(&config));
     }
 
