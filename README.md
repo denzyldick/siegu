@@ -1,4 +1,5 @@
-# Siegu
+<img width="100%" height="307" alt="Gemini_Generated_Image_z1gu69z1gu69z1gu (1)" src="https://github.com/user-attachments/assets/3fe250f6-1f31-429a-8ba6-42e6b48b781a" />
+
 
 [![License: FSL-1.1-Apache-2.0](https://img.shields.io/badge/License-FSL--1.1--Apache--2.0-blue.svg)](LICENSE)
 [![Tauri](https://img.shields.io/badge/built%20with-Tauri-blueviolet)](https://tauri.app/)
