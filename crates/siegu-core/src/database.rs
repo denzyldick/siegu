@@ -1179,12 +1179,21 @@ impl Database {
     }
 
     /// Highest-rated photos by aesthetics score, for the "Best of your library" rail.
+    /// Best-scored photo of each day, most recent day first, for the Best Shots rail.
     pub fn get_best_photos(&self, limit: i64) -> Vec<SearchPhotoTile> {
         let mut tiles = Vec::new();
         let sql = "SELECT p.id, p.location, p.encoded, p.created, p.aesthetics_score, \
             EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite') \
-            FROM photo p WHERE p.aesthetics_score IS NOT NULL AND p.aesthetics_score > 0 \
-            ORDER BY p.aesthetics_score DESC LIMIT ?1";
+            FROM photo p \
+            WHERE p.aesthetics_score IS NOT NULL AND p.aesthetics_score > 0 \
+            AND p.id = ( \
+                SELECT p2.id FROM photo p2 \
+                WHERE p2.aesthetics_score IS NOT NULL AND p2.aesthetics_score > 0 \
+                AND substr(p2.created, 1, 10) = substr(p.created, 1, 10) \
+                ORDER BY p2.aesthetics_score DESC, p2.created ASC \
+                LIMIT 1 \
+            ) \
+            ORDER BY p.created DESC LIMIT ?1";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([limit], |row| {
                 Ok(SearchPhotoTile {
@@ -3435,6 +3444,38 @@ mod tests {
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].name, "Paris, France");
         assert_eq!(groups[0].count, 1);
+    }
+
+    #[test]
+    fn test_get_best_photos_one_per_day() {
+        let mut db = test_db();
+        for (id, created, aesthetics) in [
+            ("d1a", "2026-03-10 09:00:00", Some(0.7)),
+            ("d1b", "2026-03-10 18:00:00", Some(0.95)),
+            ("d1c", "2026-03-10 12:00:00", Some(0.8)),
+            ("d2", "2026-03-09", Some(0.5)),
+            ("d3", "2026-03-08", None),
+        ] {
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded, aesthetics_score) VALUES (?1, ?2, ?3, '', ?4)",
+                    (id, format!("/{id}.jpg"), created, aesthetics),
+                )
+                .unwrap();
+        }
+
+        let best = db.get_best_photos(10);
+        assert_eq!(
+            best.len(),
+            2,
+            "one best shot per day, skipping days without scores"
+        );
+        assert_eq!(
+            best[0].id, "d1b",
+            "best-scored photo of the most recent day"
+        );
+        assert_eq!(best[0].aesthetics_score, Some(0.95));
+        assert_eq!(best[1].id, "d2");
     }
 
     #[test]

@@ -753,3 +753,216 @@ pub fn run_analyze_model(config_dir: &Path, model_id: &str) {
 
     run_tui(ml_context, rx, total);
 }
+
+struct HeadlessCallbacks {
+    tx: mpsc::Sender<TuiEvent>,
+}
+
+impl AnalysisCallbacks for HeadlessCallbacks {
+    fn on_photo_complete(
+        &self,
+        photo_id: &str,
+        location: &str,
+        result: &PhotoResult,
+        remaining: usize,
+        _progress_model: Option<&str>,
+    ) {
+        let _ = self.tx.send(TuiEvent::PhotoComplete {
+            photo_id: photo_id.to_string(),
+            location: location.to_string(),
+            result: result.clone(),
+            remaining,
+        });
+    }
+
+    fn on_progress(&self, completed: usize, total: usize, _avg_ms: f64) {
+        let _ = self.tx.send(TuiEvent::Progress { completed, total });
+    }
+
+    fn on_model_status(&self, model: &str, status: &str, _pending: usize, _total: usize) {
+        let _ = self.tx.send(TuiEvent::ModelStatus {
+            model: model.to_string(),
+            status: status.to_string(),
+        });
+    }
+
+    fn on_log(&self, msg: &str) {
+        let _ = self.tx.send(TuiEvent::Log(msg.to_string()));
+    }
+
+    fn on_scan_complete(&self) {
+        let _ = self.tx.send(TuiEvent::ScanComplete);
+    }
+
+    fn on_metadata_updated(&self, _photo_id: &str, _caption: Option<&str>, _score: Option<f64>) {}
+
+    fn on_ep_selected(&self, _ep: &str) {}
+
+    fn should_abort(&self) -> bool {
+        false
+    }
+}
+
+fn print_e2e_summary(config_dir: &Path) {
+    let db = Database::new(&config_dir.display().to_string());
+    let named = db.get_people();
+    let unnamed = db.get_anonymous_people_groups();
+    let (photos, videos) = db.get_media_counts();
+
+    println!("[e2e] media photos={photos} videos={videos}");
+    println!(
+        "[e2e] people_total={} named={} unnamed={}",
+        named.len() + unnamed.len(),
+        named.len(),
+        unnamed.len()
+    );
+    for p in named {
+        println!(
+            "[e2e] person id={} name={} faces={}",
+            p.id, p.name, p.face_count
+        );
+    }
+    for p in unnamed {
+        println!(
+            "[e2e] person id={} name=unnamed faces={}",
+            p.id, p.face_count
+        );
+    }
+}
+
+fn run_headless_loop(ml_context: MlContext, rx: mpsc::Receiver<TuiEvent>, config_dir: &Path) {
+    loop {
+        match rx.recv() {
+            Ok(TuiEvent::PhotoComplete {
+                photo_id,
+                location,
+                result,
+                ..
+            }) => {
+                let name = Path::new(&location)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or(photo_id.clone());
+                let person_ids: Vec<&str> = result
+                    .faces
+                    .iter()
+                    .filter_map(|f| f.person_id.as_deref())
+                    .collect();
+                println!(
+                    "[e2e] photo={} faces={} people=[{}] nsfw={} aesthetics={} ocr_chars={}",
+                    name,
+                    result.face_count,
+                    person_ids.join(","),
+                    result.nsfw.as_deref().unwrap_or("-"),
+                    result
+                        .aesthetics
+                        .map(|a| format!("{a:.3}"))
+                        .unwrap_or_else(|| "-".to_string()),
+                    result.ocr.as_ref().map(|o| o.chars().count()).unwrap_or(0),
+                );
+            }
+            Ok(TuiEvent::Progress { completed, total }) => {
+                println!("[e2e] progress {completed}/{total}");
+            }
+            Ok(TuiEvent::ModelStatus { model, status }) => {
+                println!("[e2e] model {model} {status}");
+            }
+            Ok(TuiEvent::Log(msg)) => println!("[e2e] log {msg}"),
+            Ok(TuiEvent::ScanComplete) => {
+                print_e2e_summary(config_dir);
+                break;
+            }
+            Ok(_) => {}
+            Err(_) => {
+                print_e2e_summary(config_dir);
+                break;
+            }
+        }
+    }
+}
+
+pub fn run_analyze_all_headless(config_dir: &Path) {
+    let db_path = config_dir.join("siegu.db");
+    if !db_path.exists() {
+        eprintln!("Error: no database found at {}", db_path.display());
+        std::process::exit(1);
+    }
+
+    let db = Database::new(&config_dir.display().to_string());
+    let config = db.get_state();
+    if !siegu_core::ml_worker::any_model_enabled(&config) {
+        eprintln!("Error: no ML models enabled.");
+        std::process::exit(1);
+    }
+
+    let unindexed = db.get_unindexed_photos_batch(0, 100000);
+    if unindexed.is_empty() {
+        println!("All media already analyzed.");
+        print_e2e_summary(config_dir);
+        return;
+    }
+
+    let config_path = config_dir.display().to_string();
+    let (tx, rx) = mpsc::channel();
+    let callbacks = HeadlessCallbacks { tx };
+    let ml_context = start_worker(callbacks, config_path, 32);
+
+    let _ = ml_context.tx.send(siegu_core::ml_worker::Job::ProcessAll);
+
+    run_headless_loop(ml_context, rx, config_dir);
+}
+
+pub fn run_analyze_photo_headless(config_dir: &Path, photo_id: &str) {
+    let db_path = config_dir.join("siegu.db");
+    if !db_path.exists() {
+        eprintln!("Error: no database found");
+        std::process::exit(1);
+    }
+
+    let db = Database::new(&config_dir.display().to_string());
+    if db.get_photo_by_id(photo_id).is_none() {
+        eprintln!("Error: photo not found: {photo_id}");
+        std::process::exit(1);
+    }
+
+    let config_path = config_dir.display().to_string();
+    let (tx, rx) = mpsc::channel();
+    let callbacks = HeadlessCallbacks { tx };
+    let ml_context = start_worker(callbacks, config_path, 32);
+
+    let _ = ml_context
+        .tx
+        .send(siegu_core::ml_worker::Job::AnalyzeSingle(
+            photo_id.to_string(),
+        ));
+
+    run_headless_loop(ml_context, rx, config_dir);
+}
+
+pub fn run_analyze_model_headless(config_dir: &Path, model_id: &str) {
+    let db_path = config_dir.join("siegu.db");
+    if !db_path.exists() {
+        eprintln!("Error: no database found at {}", db_path.display());
+        std::process::exit(1);
+    }
+
+    let status_model = siegu_core::ml_worker::job_status_model(model_id).unwrap_or(model_id);
+    let db = Database::new(&config_dir.display().to_string());
+    let missing = db.get_photos_missing_model(status_model);
+    if missing.is_empty() {
+        println!("No media need '{model_id}' analysis.");
+        print_e2e_summary(config_dir);
+        return;
+    }
+
+    let config_path = config_dir.display().to_string();
+    let (tx, rx) = mpsc::channel();
+    let callbacks = HeadlessCallbacks { tx };
+    let ml_context = start_worker(callbacks, config_path, 32);
+
+    let _ = ml_context.tx.send(siegu_core::ml_worker::Job::ProcessModel(
+        model_id.to_string(),
+    ));
+
+    run_headless_loop(ml_context, rx, config_dir);
+}

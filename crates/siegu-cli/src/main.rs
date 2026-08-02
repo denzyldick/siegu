@@ -205,11 +205,25 @@ enum MeshAction {
 #[derive(Subcommand)]
 enum AnalyzeAction {
     /// Run ML analysis on all unprocessed photos
-    All,
+    All {
+        /// Non-interactive mode: print progress lines and an E2E summary
+        #[arg(long)]
+        headless: bool,
+    },
     /// Run ML analysis on a single photo by ID
-    Photo { id: String },
+    Photo {
+        id: String,
+        /// Non-interactive mode: print progress lines and an E2E summary
+        #[arg(long)]
+        headless: bool,
+    },
     /// Run a specific model on all photos
-    Model { model_id: String },
+    Model {
+        model_id: String,
+        /// Non-interactive mode: print progress lines and an E2E summary
+        #[arg(long)]
+        headless: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -264,9 +278,27 @@ async fn main() {
         Commands::Analyze { action } => {
             let config_dir = resolve_config_dir(&cli.config_dir, &None);
             match action {
-                AnalyzeAction::All => cmd_analyze_all(&config_dir),
-                AnalyzeAction::Photo { id } => cmd_analyze_photo(&config_dir, id),
-                AnalyzeAction::Model { model_id } => cmd_analyze_model(&config_dir, model_id),
+                AnalyzeAction::All { headless } => {
+                    if *headless {
+                        analyze_tui::run_analyze_all_headless(&config_dir);
+                    } else {
+                        analyze_tui::run_analyze_all(&config_dir);
+                    }
+                }
+                AnalyzeAction::Photo { id, headless } => {
+                    if *headless {
+                        analyze_tui::run_analyze_photo_headless(&config_dir, id);
+                    } else {
+                        analyze_tui::run_analyze_photo(&config_dir, id);
+                    }
+                }
+                AnalyzeAction::Model { model_id, headless } => {
+                    if *headless {
+                        analyze_tui::run_analyze_model_headless(&config_dir, model_id);
+                    } else {
+                        analyze_tui::run_analyze_model(&config_dir, model_id);
+                    }
+                }
             }
         }
         Commands::Models { action } => {
@@ -421,18 +453,6 @@ async fn cmd_scan(config_dir: &Path, folder: Option<&str>) {
     println!(
         "\nScan complete: {total_new_all} new photos found ({total_scanned_all} total scanned)"
     );
-}
-
-fn cmd_analyze_all(config_dir: &Path) {
-    analyze_tui::run_analyze_all(config_dir);
-}
-
-fn cmd_analyze_photo(config_dir: &Path, id: &str) {
-    analyze_tui::run_analyze_photo(config_dir, id);
-}
-
-fn cmd_analyze_model(config_dir: &Path, model_id: &str) {
-    analyze_tui::run_analyze_model(config_dir, model_id);
 }
 
 fn cmd_models_list(config_dir: &Path) {
