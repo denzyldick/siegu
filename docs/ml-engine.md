@@ -1,6 +1,6 @@
 # ML Engine
 
-The ML pipeline runs entirely on-device via ONNX Runtime. All 14 models are loaded and executed locally — no cloud API calls.
+The ML pipeline runs entirely on-device via ONNX Runtime. All 9 AI models (14 ONNX model files plus 4 auxiliary tokenizer/dictionary files) are loaded and executed locally — no cloud API calls.
 
 ## Architecture
 
@@ -8,8 +8,8 @@ The ML pipeline runs entirely on-device via ONNX Runtime. All 14 models are load
 crates/siegu-core/src/ml_engine/
 ├── mod.rs            # Re-exports
 ├── ep.rs             # Execution provider: CUDA/DML/CoreML/CPU
-├── models.rs         # LoadedModels — 18 optional model handles
-├── pipeline.rs       # Photo analysis pipeline (10 models)
+├── models.rs         # LoadedModels — 14 ONNX session handles
+├── pipeline.rs       # Photo analysis pipeline (9 model groups)
 ├── preprocessing.rs  # Image preprocessing per model
 ├── whisper.rs        # Audio transcription + mel spectrogram
 └── worker.rs         # Background job processor + AnalysisCallbacks
@@ -17,21 +17,21 @@ crates/siegu-core/src/ml_engine/
 
 ## Model Registry
 
-21 model files across 9 groups, defined in `model_manager.rs`:
+18 files across 9 model groups, defined in `model_manager.rs`. The "expected size" in the registry is a *minimum-valid-size* guard, not the real file size; the sizes below are the actual download sizes:
 
 | Model | Files | Approx Size | Purpose |
 |-------|-------|-------------|---------|
-| **clip** | visual (150MB), text (40MB), tokenizer.json (1KB) | 190MB | Semantic search embeddings |
-| **face** | version-RFB-320.onnx (1MB), arcface.onnx (10MB) | 11MB | Face detection + recognition/grouping (512-dim) |
-| **ocr** | det (2MB), rec (2MB), en_dict.txt (1KB) | 4MB | PP-OCRv4 text recognition |
-| **nsfw** | nsfw.onnx (10MB) | 10MB | Sensitive content detection |
-| **aesthetics** | aesthetics.onnx (10MB) | 10MB | Photo quality scoring (1-10) |
-| **yolo** | yolov8n.onnx (10MB) | 10MB | 80-class object detection |
-| **blip** | encoder (340MB), decoder (640MB), blip_tokenizer.json (500KB) | 980MB | Image captioning |
-| **midas** | midas.onnx (100MB) | 100MB | Depth estimation |
-| **whisper** | encoder (32MB), decoder (118MB), tokenizer.json (3.8MB) | 154MB | Audio transcription |
+| **clip** | visual (~335MB), text (~242MB), tokenizer.json (~2MB) | ~580MB | Semantic search embeddings |
+| **face** | version-RFB-320.onnx (~1MB), arcface.onnx (~166MB) | ~167MB | Face detection + recognition/grouping (512-dim) |
+| **ocr** | det (~2MB), rec (~9MB), en_dict.txt (~1KB) | ~11MB | PP-OCRv3 text recognition |
+| **nsfw** | nsfw.onnx (~327MB) | ~327MB | Sensitive content detection |
+| **aesthetics** | aesthetics.onnx (~1.6GB) | ~1.6GB | Photo quality scoring (1-10) |
+| **yolo** | yolov8n.onnx (~12MB) | ~12MB | 80-class object detection |
+| **blip** | encoder (~329MB), decoder (~170MB), blip_tokenizer.json (~0.5MB) | ~500MB | Image captioning |
+| **midas** | midas.onnx (~120MB) | ~120MB | Depth estimation |
+| **whisper** | encoder (~31MB), decoder (~113MB), tokenizer.json (~3.7MB) | ~148MB | Audio transcription |
 
-**Total**: ~1.4GB on disk
+**Total**: ~3.4GB on disk (varies slightly per platform/version)
 
 ### Download verification
 

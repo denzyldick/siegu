@@ -2,7 +2,7 @@
 
 ## Core Principles
 
-- **Local-First AI**: All 14 models run on-device via ONNX Runtime. No data leaves your computer.
+- **Local-First AI**: All 9 AI models run on-device via ONNX Runtime. No data leaves your computer.
 - **Zero Telemetry**: No analytics, crash reporting, or usage tracking.
 - **No Accounts**: No user accounts, no cloud sync, no sign-up.
 

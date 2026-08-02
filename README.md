@@ -12,7 +12,7 @@
 
 - **Local Semantic Search** — find photos by describing them ("sunset at the beach") using on-device CLIP models
 - **Face Recognition** — automatic face detection and grouping via UltraFace + ArcFace
-- **14 AI Models** — CLIP, BLIP, YOLO, OCR, NSFW, MiDaS, Whisper, and more, all running locally on ONNX Runtime
+- **9 On-Device AI Models** — CLIP, face detection/recognition, OCR, NSFW, aesthetics, YOLO, BLIP, MiDaS, and Whisper, all running locally on ONNX Runtime
 - **Peer-to-Peer Sync** — encrypted WebRTC sync between devices, no cloud required
 - **Mesh Networking** — LAN discovery via mDNS, QR codes, or mnemonic phrases
 - **Smart Library** — EXIF extraction, video indexing, heatmap, map view
