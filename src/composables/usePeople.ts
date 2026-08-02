@@ -38,12 +38,14 @@ export function usePeople() {
     }
   }
 
-  async function saveName(faceId: number, name: string): Promise<void> {
+  async function saveName(faceId: number, name: string): Promise<boolean> {
     try {
       await assignNameToFace(faceId, name)
       await fetchData()
+      return true
     } catch (e) {
       console.error('Failed to assign name:', e)
+      return false
     }
   }
 

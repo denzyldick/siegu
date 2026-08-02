@@ -336,6 +336,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
   font-size: 10px;
   font-weight: 700;
   color: white;

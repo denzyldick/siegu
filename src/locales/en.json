@@ -96,7 +96,8 @@
     "sort_label": "Sort photos",
     "sort_newest": "Newest",
     "sort_best": "Best quality",
-    "sort_random": "Random"
+    "sort_random": "Random",
+    "best_shot": "Best shot of the day"
   },
   "filters": {
     "favorites_only": "Favorites only",
@@ -117,7 +118,7 @@
     "named_count": "{count} named",
     "your_people": "Your People",
     "new_faces": "New Faces",
-    "name_group": "Name this group",
+    "name_group": "Name this person",
     "no_faces": "No faces found yet",
     "no_faces_desc": "Faces will appear here after AI finishes indexing your photos.",
     "who_is_this": "Who is this?",
@@ -133,8 +134,9 @@
     "confirm_merge": "Confirm Merge",
     "grouped_faces": "Grouped Faces",
     "appearances_in_cluster": "{count} appearances in this group",
-    "name_this_group": "Name this group",
-    "confirm_remove_face": "Remove this face from the group?"
+    "name_this_group": "Name this person",
+    "confirm_remove_face": "Remove this face from the group?",
+    "name_dialog_hint": "Type a new name, or pick an existing person to add these faces to."
   },
   "media": {
     "items_count": "{count} items",
@@ -523,9 +525,5 @@
   "update_available": "Update {version} available",
   "download_update": "Download & Install",
   "update_error": "Update check failed",
-  "update_progress": "Downloading update...",
-  "people_rail": {
-    "title": "People",
-    "unnamed": "Unnamed"
-  }
+  "update_progress": "Downloading update..."
 }

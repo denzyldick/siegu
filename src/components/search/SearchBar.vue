@@ -13,6 +13,23 @@ import type { MediaItem } from '@/types/media';
 const { t } = useI18n();
 const searchStore = useSearchStore();
 
+const vEdgeScroll = {
+  mounted(el: HTMLElement) {
+    const update = (): void => {
+      el.classList.toggle('edge-scroll', el.scrollWidth > el.clientWidth + 1);
+    };
+    update();
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(update);
+      ro.observe(el);
+      (el as unknown as { __edgeScrollRO__?: ResizeObserver }).__edgeScrollRO__ = ro;
+    }
+  },
+  unmounted(el: HTMLElement) {
+    (el as unknown as { __edgeScrollRO__?: ResizeObserver }).__edgeScrollRO__?.disconnect();
+  },
+};
+
 const searchWrapRef = ref<HTMLElement | null>(null);
 const dropdownOpen = ref(false);
 const dropdownStyle = ref<Record<string, string>>({});
@@ -48,7 +65,11 @@ const locations = computed(() =>
   (facets.value?.locations ?? []).filter((l) => !q.value || matches(l.name)),
 );
 
-const tags = computed(() => (facets.value?.tags ?? []).filter((l) => !q.value || matches(l.name)));
+const tags = computed(() =>
+  (facets.value?.tags ?? [])
+    .filter((l) => !q.value || matches(l.name))
+    .slice(0, 8),
+);
 
 const papers = computed(() =>
   (facets.value?.papers ?? []).filter((p) => !q.value || matches(p.name)),
@@ -455,7 +476,7 @@ function iconForFilter(type: string): string {
                 <span class="text-overline text-zinc-muted">{{ t('search.best_shots') }}</span>
                 <span class="section-count">{{ bestPhotos.length }}</span>
               </div>
-              <div class="rail">
+              <div v-edge-scroll class="rail">
                 <div
                   v-for="photo in bestPhotos"
                   :key="photo.id"
@@ -463,9 +484,8 @@ function iconForFilter(type: string): string {
                   @click="searchStore.setAestheticsMin(0.6)"
                 >
                   <v-img :src="tileSrc(photo)" cover class="best-img" />
-                  <div class="best-badge">
+                  <div class="best-badge" :title="t('search.best_shot')">
                     <v-icon size="12">mdi-star-four-points</v-icon>
-                    {{ Math.round((photo.aesthetics_score ?? 0) * 100) }}
                   </div>
                   <v-icon v-if="photo.favorite" size="14" color="#f59e0b" class="best-fav"
                     >mdi-heart</v-icon
@@ -480,7 +500,7 @@ function iconForFilter(type: string): string {
                 <span class="text-overline text-zinc-muted">{{ t('search.people') }}</span>
                 <span class="section-count">{{ peopleRow.length }}</span>
               </div>
-              <div class="rail">
+              <div v-edge-scroll class="rail">
                 <div
                   v-for="person in peopleRow"
                   :key="person.id"
@@ -512,7 +532,7 @@ function iconForFilter(type: string): string {
                 <span class="text-overline text-zinc-muted">{{ t('search.locations') }}</span>
                 <span class="section-count">{{ locations.length }}</span>
               </div>
-              <div class="rail">
+              <div v-edge-scroll class="rail">
                 <div
                   v-for="loc in locations"
                   :key="loc.name"
@@ -539,7 +559,7 @@ function iconForFilter(type: string): string {
                 <span class="text-overline text-zinc-muted">{{ t('search.papers.title') }}</span>
                 <span class="section-count">{{ papers.length }}</span>
               </div>
-              <div class="chip-cloud">
+              <div v-edge-scroll class="chip-cloud">
                 <button
                   v-for="p in papers"
                   :key="p.name"
@@ -560,7 +580,7 @@ function iconForFilter(type: string): string {
                 <span class="text-overline text-zinc-muted">{{ t('search.tags') }}</span>
                 <span class="section-count">{{ tags.length }}</span>
               </div>
-              <div class="chip-cloud">
+              <div v-edge-scroll class="chip-cloud">
                 <button
                   v-for="tag in tags"
                   :key="tag.name"
@@ -589,7 +609,7 @@ function iconForFilter(type: string): string {
                 <span class="text-overline text-zinc-muted">{{ t('search.cameras') }}</span>
                 <span class="section-count">{{ cameraChips.length }}</span>
               </div>
-              <div class="chip-cloud">
+              <div v-edge-scroll class="chip-cloud">
                 <button
                   v-for="cam in cameraChips"
                   :key="cam.name"
@@ -654,7 +674,7 @@ function iconForFilter(type: string): string {
               <div class="section-header">
                 <span class="text-overline text-zinc-muted">{{ t('search.people') }}</span>
               </div>
-              <div class="rail">
+              <div v-edge-scroll class="rail">
                 <div
                   v-for="person in peopleRow"
                   :key="person.id"
@@ -684,7 +704,7 @@ function iconForFilter(type: string): string {
               <div class="section-header">
                 <span class="text-overline text-zinc-muted">{{ t('search.locations') }}</span>
               </div>
-              <div class="chip-cloud">
+              <div v-edge-scroll class="chip-cloud">
                 <button
                   v-for="loc in locations"
                   :key="loc.name"
@@ -702,7 +722,7 @@ function iconForFilter(type: string): string {
               <div class="section-header">
                 <span class="text-overline text-zinc-muted">{{ t('search.tags') }}</span>
               </div>
-              <div class="chip-cloud">
+              <div v-edge-scroll class="chip-cloud">
                 <button
                   v-for="tag in tags"
                   :key="tag.name"
@@ -720,7 +740,7 @@ function iconForFilter(type: string): string {
               <div class="section-header">
                 <span class="text-overline text-zinc-muted">{{ t('search.cameras') }}</span>
               </div>
-              <div class="chip-cloud">
+              <div v-edge-scroll class="chip-cloud">
                 <button
                   v-for="cam in cameraChips"
                   :key="cam.name"
@@ -1115,14 +1135,27 @@ function iconForFilter(type: string): string {
 
 .chip-cloud {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
+  overflow-x: auto;
+  padding: 2px;
+  scrollbar-width: none;
+}
+
+.chip-cloud::-webkit-scrollbar {
+  display: none;
+}
+
+.edge-scroll {
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
 }
 
 .cloud-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
   font-size: 12px;
   font-weight: 600;
   color: var(--color-text-secondary);
@@ -1160,6 +1193,7 @@ function iconForFilter(type: string): string {
 .cloud-count {
   font-size: 10px;
   font-weight: 700;
+  white-space: nowrap;
   color: var(--color-text-muted);
   background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
   border-radius: 999px;

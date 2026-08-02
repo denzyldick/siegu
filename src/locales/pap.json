@@ -112,7 +112,8 @@
     "sort_label": "Ordena potret",
     "sort_newest": "Mas resien",
     "sort_best": "Mihó kalidat",
-    "sort_random": "Alatorio"
+    "sort_random": "Alatorio",
+    "best_shot": "Mihó potret di e dia"
   },
   "sync": {
     "status_label": "STATUS DI BIBLIOTEKA",
@@ -185,7 +186,7 @@
     "named_count": "{count} nombrá",
     "your_people": "Bo hendenan",
     "new_faces": "Karanan nobo",
-    "name_group": "Poné nomber na e grupo aki",
+    "name_group": "Pone nòmber na e persona aki",
     "who_is_this": "Ken ta esaki?",
     "name_placeholder": "Skirbi un nomber...",
     "confirm_identity": "Konfirmá identidat",
@@ -197,8 +198,9 @@
     "confirm_merge": "Konfirmá fusion",
     "grouped_faces": "Karanan grupadó",
     "appearances_in_cluster": "{count} aparishon den e grupo aki",
-    "name_this_group": "Poné nomber na e grupo aki",
-    "confirm_remove_face": "Kitá e kara aki for di e grupo?"
+    "name_this_group": "Pone nòmber na e persona aki",
+    "confirm_remove_face": "Kitá e kara aki for di e grupo?",
+    "name_dialog_hint": "Skibi un nòmber nobo òf skohe un persona eksistente pa agregá e karanan aki."
   },
   "map": {
     "title": "Bista di Mapa",
@@ -523,9 +525,5 @@
   "update_available": "Update {version} disponibel",
   "download_update": "Descargá i Instalá",
   "update_error": "Error di update",
-  "update_progress": "Deskargando update...",
-  "people_rail": {
-    "title": "Hende",
-    "unnamed": "Sin nòmber"
-  }
+  "update_progress": "Deskargando update..."
 }

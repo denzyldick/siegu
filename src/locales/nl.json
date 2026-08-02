@@ -112,7 +112,8 @@
     "sort_label": "Foto's sorteren",
     "sort_newest": "Nieuwste",
     "sort_best": "Beste kwaliteit",
-    "sort_random": "Willekeurig"
+    "sort_random": "Willekeurig",
+    "best_shot": "Beste foto van de dag"
   },
   "sync": {
     "status_label": "BIBLIOTHEEKSTATUS",
@@ -185,7 +186,7 @@
     "named_count": "{count} benoemd",
     "your_people": "Jouw personen",
     "new_faces": "Nieuwe gezichten",
-    "name_group": "Geef deze groep een naam",
+    "name_group": "Geef deze persoon een naam",
     "who_is_this": "Wie is dit?",
     "name_placeholder": "Voer een naam in...",
     "confirm_identity": "Bevestig identiteit",
@@ -197,8 +198,9 @@
     "confirm_merge": "Bevestig samenvoeging",
     "grouped_faces": "Gegroepeerde gezichten",
     "appearances_in_cluster": "{count} verschijningen in deze groep",
-    "name_this_group": "Geef deze groep een naam",
-    "confirm_remove_face": "Dit gezicht uit de groep verwijderen?"
+    "name_this_group": "Geef deze persoon een naam",
+    "confirm_remove_face": "Dit gezicht uit de groep verwijderen?",
+    "name_dialog_hint": "Typ een nieuwe naam of kies een bestaande persoon om deze gezichten toe te voegen."
   },
   "map": {
     "title": "Kaartweergave",
@@ -523,9 +525,5 @@
   "update_available": "Update {version} beschikbaar",
   "download_update": "Download en installeer",
   "update_error": "Update fout",
-  "update_progress": "Update wordt gedownload...",
-  "people_rail": {
-    "title": "Mensen",
-    "unnamed": "Onbekend"
-  }
+  "update_progress": "Update wordt gedownload..."
 }

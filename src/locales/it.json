@@ -112,7 +112,8 @@
     "sort_label": "Ordina foto",
     "sort_newest": "Più recenti",
     "sort_best": "Migliore qualità",
-    "sort_random": "Casuale"
+    "sort_random": "Casuale",
+    "best_shot": "Miglior scatto del giorno"
   },
   "sync": {
     "status_label": "STATO LIBRERIA",
@@ -185,7 +186,7 @@
     "named_count": "{count} nominati",
     "your_people": "Le tue persone",
     "new_faces": "Nuovi volti",
-    "name_group": "Dai un nome a questo gruppo",
+    "name_group": "Dai un nome a questa persona",
     "who_is_this": "Chi è?",
     "name_placeholder": "Inserisci un nome...",
     "confirm_identity": "Conferma identità",
@@ -197,8 +198,9 @@
     "confirm_merge": "Conferma unione",
     "grouped_faces": "Volti raggruppati",
     "appearances_in_cluster": "{count} apparizioni in questo gruppo",
-    "name_this_group": "Dai un nome a questo gruppo",
-    "confirm_remove_face": "Rimuovere questo volto dal gruppo?"
+    "name_this_group": "Dai un nome a questa persona",
+    "confirm_remove_face": "Rimuovere questo volto dal gruppo?",
+    "name_dialog_hint": "Scrivi un nuovo nome o scegli una persona esistente per aggiungere questi volti."
   },
   "map": {
     "title": "Vista Mappa",
@@ -523,9 +525,5 @@
   "update_available": "Aggiornamento {version} disponibile",
   "download_update": "Scarica e installa",
   "update_error": "Errore aggiornamento",
-  "update_progress": "Scaricamento aggiornamento...",
-  "people_rail": {
-    "title": "Persone",
-    "unnamed": "Senza nome"
-  }
+  "update_progress": "Scaricamento aggiornamento..."
 }

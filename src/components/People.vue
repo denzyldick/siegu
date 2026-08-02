@@ -56,6 +56,11 @@ async function handleViewCluster(group: Person): Promise<void> {
   clusterDialog.value = true
 }
 
+async function handleSaveName(faceId: number, name: string): Promise<void> {
+  const ok = await saveName(faceId, name)
+  if (ok) nameDialog.value = false
+}
+
 function promptNameFromCluster(): void {
   if (activeCluster.value) promptName(activeCluster.value)
 }
@@ -101,7 +106,7 @@ async function handleRemoveFace(faceId: number): Promise<void> {
       v-model="nameDialog"
       :active-face="activeFace"
       :people="people"
-      @save="saveName"
+      @save="handleSaveName"
     />
 
     <ManageDialog

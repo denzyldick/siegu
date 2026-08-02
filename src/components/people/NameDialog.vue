@@ -43,6 +43,10 @@ function handleSave(): void {
           <v-btn icon="mdi-close" variant="text" size="small" @click="emit('update:modelValue', false)"></v-btn>
         </div>
 
+        <div class="text-body-2 text-zinc-muted mb-4 text-center">
+          {{ $t('people.name_dialog_hint') }}
+        </div>
+
         <div class="d-flex justify-center mb-8">
           <v-avatar size="160" class="border-subtle shadow-xl elevation-2 bg-zinc-100">
             <v-img

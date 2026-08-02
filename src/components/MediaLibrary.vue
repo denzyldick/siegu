@@ -636,7 +636,7 @@ onUnmounted(() => {
 }
 
 .header-blur {
-  background: rgba(250, 250, 250, 0.8);
+  background: color-mix(in srgb, var(--color-bg-primary) 80%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }

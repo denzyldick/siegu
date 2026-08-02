@@ -112,7 +112,8 @@
     "sort_label": "Fotos sortieren",
     "sort_newest": "Neueste",
     "sort_best": "Beste Qualität",
-    "sort_random": "Zufällig"
+    "sort_random": "Zufällig",
+    "best_shot": "Bestes Foto des Tages"
   },
   "sync": {
     "status_label": "BIBLIOTHEKSSTATUS",
@@ -185,7 +186,7 @@
     "named_count": "{count} benannt",
     "your_people": "Deine Personen",
     "new_faces": "Neue Gesichter",
-    "name_group": "Diese Gruppe benennen",
+    "name_group": "Diese Person benennen",
     "who_is_this": "Wer ist das?",
     "name_placeholder": "Gib einen Namen ein...",
     "confirm_identity": "Identität bestätigen",
@@ -197,8 +198,9 @@
     "confirm_merge": "Zusammenführung bestätigen",
     "grouped_faces": "Gruppierte Gesichter",
     "appearances_in_cluster": "{count} Erscheinungen in dieser Gruppe",
-    "name_this_group": "Diese Gruppe benennen",
-    "confirm_remove_face": "Dieses Gesicht aus der Gruppe entfernen?"
+    "name_this_group": "Diese Person benennen",
+    "confirm_remove_face": "Dieses Gesicht aus der Gruppe entfernen?",
+    "name_dialog_hint": "Gib einen neuen Namen ein oder wähle eine bestehende Person, um diese Gesichter hinzuzufügen."
   },
   "map": {
     "title": "Kartenansicht",
@@ -523,9 +525,5 @@
   "update_available": "Update {version} verfügbar",
   "download_update": "Herunterladen & Installieren",
   "update_error": "Update-Fehler",
-  "update_progress": "Update wird heruntergeladen...",
-  "people_rail": {
-    "title": "Personen",
-    "unnamed": "Unbenannt"
-  }
+  "update_progress": "Update wird heruntergeladen..."
 }

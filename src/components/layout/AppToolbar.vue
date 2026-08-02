@@ -20,46 +20,29 @@ const sortOptions = [
         <SearchBar />
       </v-col>
       <v-col cols="auto" class="ml-2">
-        <v-tooltip v-if="sortOptions.length" location="top">
-          <template #activator="{ props: tipProps }">
-            <div v-bind="tipProps">
-              <v-btn-toggle
-                v-model="searchStore.sortOrder"
-                density="compact"
-                variant="outlined"
-                color="primary"
-                group
-                mandatory
-                class="sort-toggle"
-                @update:model-value="searchStore.setSortOrder"
+        <div class="d-flex ga-1">
+          <v-tooltip
+            v-for="opt in sortOptions"
+            :key="opt.value"
+            location="top"
+          >
+            <template #activator="{ props: tipProps }">
+              <v-btn
+                v-bind="tipProps"
+                icon
+                size="small"
+                :variant="searchStore.sortOrder === opt.value ? 'flat' : 'text'"
+                :color="searchStore.sortOrder === opt.value ? 'primary' : undefined"
+                :aria-label="opt.label()"
+                @click="searchStore.setSortOrder(opt.value)"
               >
-                <v-btn
-                  v-for="opt in sortOptions"
-                  :key="opt.value"
-                  :value="opt.value"
-                  :aria-label="opt.label()"
-                  size="small"
-                >
-                  <v-icon size="16">{{ opt.icon }}</v-icon>
-                  <span class="ml-1 d-none d-sm-inline text-caption">{{ opt.label() }}</span>
-                </v-btn>
-              </v-btn-toggle>
-            </div>
-          </template>
-          <span>{{ t('search.sort_label') }}</span>
-        </v-tooltip>
+                <v-icon size="16">{{ opt.icon }}</v-icon>
+              </v-btn>
+            </template>
+            <span>{{ opt.label() }}</span>
+          </v-tooltip>
+        </div>
       </v-col>
     </v-row>
   </v-app-bar>
 </template>
-
-<style scoped>
-.sort-toggle {
-  border-radius: 999px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.04);
-}
-.sort-toggle :deep(.v-btn) {
-  border-radius: 0;
-}
-</style>
