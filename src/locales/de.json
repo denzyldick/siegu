@@ -74,7 +74,7 @@
       "faces": "Gesichter",
       "papers": "Dokumente",
       "surprise": "Überraschen",
-      "nsfw_hide": "NSFW ausblenden"
+      "nsfw": "NSFW"
     },
     "papers": {
       "title": "Dokumente & Screenshots",

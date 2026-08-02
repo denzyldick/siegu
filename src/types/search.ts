@@ -48,6 +48,7 @@ export interface SearchStats {
   faces: number
   named_people: number
   face_photos: number
+  nsfw_photos: number
 }
 
 export interface DayCount {

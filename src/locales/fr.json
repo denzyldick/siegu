@@ -74,7 +74,7 @@
       "faces": "Visages",
       "papers": "Documents",
       "surprise": "Surprends-moi",
-      "nsfw_hide": "Masquer NSFW"
+      "nsfw": "NSFW"
     },
     "papers": {
       "title": "Documents et captures",

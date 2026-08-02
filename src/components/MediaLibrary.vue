@@ -215,7 +215,7 @@ const props = withDefaults(
       videosOnly: boolean;
       facesOnly: boolean;
       papersOnly: boolean;
-      nsfwHide: boolean;
+      nsfwOnly: boolean;
       camera: string | null;
       aestheticsMin: number | null;
       surprise: boolean;
@@ -233,7 +233,7 @@ const props = withDefaults(
       videosOnly: false,
       facesOnly: false,
       papersOnly: false,
-      nsfwHide: false,
+      nsfwOnly: false,
       camera: null,
       aestheticsMin: null,
       surprise: false,
@@ -443,7 +443,7 @@ async function loadFiles(): Promise<void> {
         dateTo: month ? `${month.value}-31` : dateRange ? dateRange[1] : null,
         hasFaces: props.filters?.facesOnly ?? false,
         papers: props.filters?.papersOnly ?? false,
-        nsfwHide: props.filters?.nsfwHide ?? false,
+        nsfwOnly: props.filters?.nsfwOnly ?? false,
         camera: props.filters?.camera ?? null,
         aestheticsMin: props.filters?.aestheticsMin ?? null,
         random: props.filters?.surprise ?? false,

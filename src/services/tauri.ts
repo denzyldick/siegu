@@ -64,7 +64,7 @@ export async function listFiles(options: ListFilesOptions): Promise<MediaItem[]>
     aestheticsMin: options.aestheticsMin ?? null,
     camera: options.camera ?? null,
     papers: options.papers ?? false,
-    nsfwHide: options.nsfwHide ?? false,
+    nsfwOnly: options.nsfwOnly ?? false,
     random: options.random ?? false,
     orderBy: options.orderBy ?? null,
   });

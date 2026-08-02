@@ -34,6 +34,8 @@ pub struct SearchStats {
     pub named_people: i64,
     /// Photos containing at least one detected face.
     pub face_photos: i64,
+    /// Photos classified as NSFW (nsfw score >= 0.8).
+    pub nsfw_photos: i64,
 }
 
 /// A lightweight photo used by the discovery rails (best shots, favorites,
@@ -108,8 +110,8 @@ pub struct PhotoFilter {
     pub camera: Option<String>,
     /// Only photos whose object classes are documents/screenshots (CLIP).
     pub papers: bool,
-    /// Hide photos classified as NSFW (nsfw score >= 0.8).
-    pub nsfw_hide: bool,
+    /// Only show photos classified as NSFW (nsfw score >= 0.8).
+    pub nsfw_only: bool,
     /// Random order instead of newest-first (used by "Surprise me").
     pub random: bool,
     /// Sort order: "newest" (default), "oldest", "best" (aesthetics desc), "random".
@@ -500,6 +502,10 @@ impl Database {
         );
         let _ = conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_photo_created ON photo(created);",
+            (),
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_photo_aesthetics ON photo(aesthetics_score);",
             (),
         );
         let _ = conn.execute(
@@ -1001,9 +1007,9 @@ impl Database {
                 paper_in = paper_class_in_clause()
             ));
         }
-        if filter.nsfw_hide {
+        if filter.nsfw_only {
             facet_filters.push_str(
-                " AND NOT EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='nsfw' AND CAST(value AS REAL) >= 0.8)",
+                " AND EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='nsfw' AND CAST(value AS REAL) >= 0.8)",
             );
         }
 
@@ -1175,6 +1181,9 @@ impl Database {
             faces: query_count("SELECT COUNT(*) FROM faces"),
             named_people: query_count("SELECT COUNT(*) FROM people WHERE name IS NOT NULL"),
             face_photos: query_count("SELECT COUNT(DISTINCT photo_id) FROM faces"),
+            nsfw_photos: query_count(
+                "SELECT COUNT(DISTINCT photo_id) FROM properties WHERE key = 'nsfw' AND CAST(value AS REAL) >= 0.8",
+            ),
         }
     }
 
@@ -1182,18 +1191,17 @@ impl Database {
     /// Best-scored photo of each day, most recent day first, for the Best Shots rail.
     pub fn get_best_photos(&self, limit: i64) -> Vec<SearchPhotoTile> {
         let mut tiles = Vec::new();
-        let sql = "SELECT p.id, p.location, p.encoded, p.created, p.aesthetics_score, \
-            EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite') \
+        let sql = "SELECT id, location, encoded, created, aesthetics_score, favorite FROM ( \
+            SELECT p.id, p.location, p.encoded, p.created, p.aesthetics_score, \
+                EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite') AS favorite, \
+                ROW_NUMBER() OVER ( \
+                    PARTITION BY substr(p.created, 1, 10) \
+                    ORDER BY p.aesthetics_score DESC, p.created ASC \
+                ) AS rn \
             FROM photo p \
             WHERE p.aesthetics_score IS NOT NULL AND p.aesthetics_score > 0 \
-            AND p.id = ( \
-                SELECT p2.id FROM photo p2 \
-                WHERE p2.aesthetics_score IS NOT NULL AND p2.aesthetics_score > 0 \
-                AND substr(p2.created, 1, 10) = substr(p.created, 1, 10) \
-                ORDER BY p2.aesthetics_score DESC, p2.created ASC \
-                LIMIT 1 \
-            ) \
-            ORDER BY p.created DESC LIMIT ?1";
+        ) WHERE rn = 1 \
+        ORDER BY created DESC LIMIT ?1";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([limit], |row| {
                 Ok(SearchPhotoTile {

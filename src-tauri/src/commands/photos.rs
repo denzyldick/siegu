@@ -51,7 +51,7 @@ pub fn do_list_files_filtered(
     aesthetics_min: Option<f64>,
     camera: Option<String>,
     papers: bool,
-    nsfw_hide: bool,
+    nsfw_only: bool,
     random: bool,
     order_by: Option<String>,
 ) -> Vec<Photo> {
@@ -66,7 +66,7 @@ pub fn do_list_files_filtered(
         aesthetics_min,
         camera,
         papers,
-        nsfw_hide,
+        nsfw_only,
         random,
         order_by,
     };
@@ -120,7 +120,7 @@ pub async fn list_files(
     aesthetics_min: Option<f64>,
     camera: Option<String>,
     papers: bool,
-    nsfw_hide: bool,
+    nsfw_only: bool,
     random: bool,
     order_by: Option<String>,
 ) -> Result<String, String> {
@@ -148,7 +148,7 @@ pub async fn list_files(
         aesthetics_min,
         camera,
         papers,
-        nsfw_hide,
+        nsfw_only,
         random,
         order_by,
     ))
@@ -467,7 +467,7 @@ mod tests {
     }
 
     #[test]
-    fn list_files_nsfw_hide() {
+    fn list_files_nsfw_only() {
         let (mut db, _dir) = test_db();
         db.store_photo_batch(&[
             make_photo("safe", "/safe.jpg"),
@@ -492,9 +492,9 @@ mod tests {
             true, false, None,
         );
         let ids: Vec<_> = result.iter().map(|p| p.id.as_str()).collect();
-        assert!(ids.contains(&"safe"));
-        assert!(ids.contains(&"clean"));
-        assert!(!ids.contains(&"risky"));
+        assert!(ids.contains(&"risky"));
+        assert!(!ids.contains(&"safe"));
+        assert!(!ids.contains(&"clean"));
     }
 
     #[test]

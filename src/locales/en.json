@@ -58,7 +58,7 @@
       "faces": "Faces",
       "papers": "Papers",
       "surprise": "Surprise me",
-      "nsfw_hide": "Hide NSFW"
+      "nsfw": "NSFW"
     },
     "papers": {
       "title": "Papers & screenshots",

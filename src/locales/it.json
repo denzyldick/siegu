@@ -74,7 +74,7 @@
       "faces": "Volti",
       "papers": "Documenti",
       "surprise": "Sorpresami",
-      "nsfw_hide": "Nascondi NSFW"
+      "nsfw": "NSFW"
     },
     "papers": {
       "title": "Documenti e screenshot",

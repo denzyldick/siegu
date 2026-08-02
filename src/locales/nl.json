@@ -74,7 +74,7 @@
       "faces": "Gezichten",
       "papers": "Documenten",
       "surprise": "Verrass me",
-      "nsfw_hide": "NSFW verbergen"
+      "nsfw": "NSFW"
     },
     "papers": {
       "title": "Documenten en schermafbeeldingen",

@@ -205,7 +205,7 @@ function toggleMedia(type: 'favorites' | 'videos' | 'faces' | 'papers' | 'nsfw')
   if (type === 'videos') searchStore.toggleVideoOnly();
   if (type === 'faces') searchStore.toggleFacesOnly();
   if (type === 'papers') searchStore.togglePapersOnly();
-  if (type === 'nsfw') searchStore.toggleNsfwHide();
+  if (type === 'nsfw') searchStore.toggleNsfwOnly();
   closeDropdown();
 }
 
@@ -252,7 +252,7 @@ function isActive(type: string, value: string): boolean {
 }
 
 function isMediaActive(
-  key: 'favoritesOnly' | 'videosOnly' | 'facesOnly' | 'papersOnly' | 'nsfwHide',
+  key: 'favoritesOnly' | 'videosOnly' | 'facesOnly' | 'papersOnly' | 'nsfwOnly',
 ): boolean {
   return searchStore.mediaFilters[key];
 }
@@ -263,6 +263,7 @@ function activeCount(type: string): number {
     videos: stats.value?.videos ?? 0,
     faces: stats.value?.face_photos ?? 0,
     papers: (facets.value?.papers ?? []).reduce((sum, p) => sum + p.count, 0),
+    nsfw: stats.value?.nsfw_photos ?? 0,
   };
   return counts[type] as number;
 }
@@ -385,7 +386,7 @@ function iconForFilter(type: string): string {
             </div>
 
             <!-- Magic toggles -->
-            <div class="magic-grid">
+            <div v-edge-scroll class="magic-grid">
               <button
                 class="magic-card"
                 :class="{ 'magic-card--active': isMediaActive('favoritesOnly') }"
@@ -431,17 +432,16 @@ function iconForFilter(type: string): string {
                 <div class="magic-count">{{ activeCount('papers') }}</div>
               </button>
               <button
+                v-if="activeCount('nsfw') > 0"
                 class="magic-card"
-                :class="{ 'magic-card--active': isMediaActive('nsfwHide') }"
+                :class="{ 'magic-card--active': isMediaActive('nsfwOnly') }"
                 @click="toggleMedia('nsfw')"
               >
                 <div class="magic-icon" style="--magic: #ef4444">
-                  <v-icon size="20">mdi-eye-off-outline</v-icon>
+                  <v-icon size="20">mdi-alert-octagon</v-icon>
                 </div>
-                <div class="magic-label">{{ t('search.magic.nsfw_hide') }}</div>
-                <div class="magic-count">
-                  {{ isMediaActive('nsfwHide') ? 'ON' : 'OFF' }}
-                </div>
+                <div class="magic-label">{{ t('search.magic.nsfw') }}</div>
+                <div class="magic-count">{{ activeCount('nsfw') }}</div>
               </button>
               <button class="magic-card" @click="surpriseMe">
                 <div class="magic-icon" style="--magic: #f43f5e">
@@ -886,18 +886,27 @@ function iconForFilter(type: string): string {
 }
 
 .magic-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
   gap: 8px;
   padding: 4px 18px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.magic-grid::-webkit-scrollbar {
+  display: none;
 }
 
 .magic-card {
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 12px 4px 8px;
+  min-width: 64px;
+  padding: 12px 10px 8px;
   border-radius: 14px;
   border: none;
   -webkit-appearance: none;

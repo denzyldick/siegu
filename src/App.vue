@@ -154,7 +154,7 @@ function removeFilterChip(index: number): void {
                 videosOnly: searchStore.mediaFilters.videosOnly,
                 facesOnly: searchStore.mediaFilters.facesOnly,
                 papersOnly: searchStore.mediaFilters.papersOnly,
-                nsfwHide: searchStore.mediaFilters.nsfwHide,
+                nsfwOnly: searchStore.mediaFilters.nsfwOnly,
                 camera: searchStore.camera,
                 aestheticsMin: searchStore.aestheticsMin,
                 surprise: searchStore.surprise,

@@ -15,7 +15,7 @@ export const useSearchStore = defineStore('search', () => {
     videosOnly: false,
     facesOnly: false,
     papersOnly: false,
-    nsfwHide: false,
+    nsfwOnly: false,
   })
   const camera = ref<string | null>(null)
   const aestheticsMin = ref<number | null>(null)
@@ -115,7 +115,7 @@ export const useSearchStore = defineStore('search', () => {
       videosOnly: false,
       facesOnly: false,
       papersOnly: false,
-      nsfwHide: false,
+      nsfwOnly: false,
     }
     camera.value = null
     aestheticsMin.value = null
@@ -140,8 +140,8 @@ export const useSearchStore = defineStore('search', () => {
     mediaFilters.value.papersOnly = !mediaFilters.value.papersOnly
   }
 
-  function toggleNsfwHide(): void {
-    mediaFilters.value.nsfwHide = !mediaFilters.value.nsfwHide
+  function toggleNsfwOnly(): void {
+    mediaFilters.value.nsfwOnly = !mediaFilters.value.nsfwOnly
   }
 
   function addRecentSearch(term: string): void {
@@ -207,7 +207,7 @@ export const useSearchStore = defineStore('search', () => {
     toggleVideoOnly,
     toggleFacesOnly,
     togglePapersOnly,
-    toggleNsfwHide,
+    toggleNsfwOnly,
     addRecentSearch,
     clearRecentSearches,
   }
