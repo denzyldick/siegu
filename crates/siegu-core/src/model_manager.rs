@@ -109,7 +109,7 @@ pub const MODEL_REGISTRY: &[ModelFile] = &[
         model_name: "face",
         filename: "arcface.onnx",
         url: "https://huggingface.co/crj/dl-ws/resolve/main/arcface_w600k_r50.onnx",
-        expected_size: 10_000_000,
+        expected_size: 174_383_860,
         sha256: "",
     },
     ModelFile {
