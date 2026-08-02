@@ -1,4 +1,5 @@
-<img width="100%" height="307" alt="Gemini_Generated_Image_z1gu69z1gu69z1gu (1)" src="https://github.com/user-attachments/assets/3fe250f6-1f31-429a-8ba6-42e6b48b781a" />
+<img width="1584" height="672" alt="Siegu banner" src="https://github.com/user-attachments/assets/b0c940f9-2122-4bc6-a6b5-7d316430e3bb" />
+
 
 
 [![License: FSL-1.1-Apache-2.0](https://img.shields.io/badge/License-FSL--1.1--Apache--2.0-blue.svg)](LICENSE)
