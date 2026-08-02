@@ -512,21 +512,8 @@ async fn cmd_models_download(config_dir: &Path, names: Option<&[String]>) {
 
         println!("Downloading: {} from {}", entry.model_name, entry.url);
 
-        let response = match client.get(entry.url).send().await {
-            Ok(r) => r,
-            Err(e) => {
-                eprintln!("  ERROR: request failed: {e}");
-                continue;
-            }
-        };
-
-        if !response.status().is_success() {
-            eprintln!("  ERROR: status {}", response.status());
-            continue;
-        }
-
-        let total_size = response.content_length();
-        let pb = ProgressBar::new(total_size.unwrap_or(0));
+        let total_size = entry.expected_size;
+        let pb = ProgressBar::new(total_size);
         pb.set_style(
             ProgressStyle::with_template(
                 "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})",
@@ -535,39 +522,41 @@ async fn cmd_models_download(config_dir: &Path, names: Option<&[String]>) {
         );
         pb.set_message(entry.model_name.to_string());
 
-        let tmp_path = path.with_extension("tmp");
-        let mut file = tokio::fs::File::create(&tmp_path).await.unwrap();
-        let mut downloaded: u64 = 0;
-        let mut stream = response.bytes_stream();
-
-        use futures_util::StreamExt;
-        while let Some(chunk) = stream.next().await {
-            let chunk = match chunk {
-                Ok(c) => c,
-                Err(e) => {
-                    eprintln!("  ERROR: stream error: {e}");
-                    break;
+        let result = siegu_core::model_manager::download_file(
+            &client,
+            &entry.url,
+            &entry.filename,
+            entry.expected_size,
+            &models_dir,
+            |downloaded, total| {
+                if let Some(total) = total {
+                    pb.set_length(total);
                 }
-            };
-            tokio::io::AsyncWriteExt::write_all(&mut file, &chunk)
-                .await
-                .unwrap();
-            downloaded += chunk.len() as u64;
-            pb.set_position(downloaded);
-        }
+                pb.set_position(downloaded);
+            },
+        )
+        .await;
 
-        drop(file);
-        tokio::fs::rename(&tmp_path, &path).await.unwrap();
-        pb.finish_with_message(format!("{}: done", entry.model_name));
-
-        if !entry.sha256.is_empty() {
-            match siegu_core::model_manager::verify_sha256(&path, &entry.sha256) {
-                Ok(true) => println!("  SHA-256 verified"),
-                Ok(false) => {
-                    eprintln!("  WARNING: SHA-256 mismatch! File may be corrupted.");
-                    let _ = tokio::fs::remove_file(&path).await;
+        match result {
+            Ok(siegu_core::model_manager::DownloadOutcome::Skipped) => {
+                println!("{}: already downloaded, skipping", entry.model_name);
+            }
+            Ok(siegu_core::model_manager::DownloadOutcome::Completed) => {
+                pb.finish_with_message(format!("{}: done", entry.model_name));
+                if !entry.sha256.is_empty() {
+                    match siegu_core::model_manager::verify_sha256(&path, &entry.sha256) {
+                        Ok(true) => println!("  SHA-256 verified"),
+                        Ok(false) => {
+                            eprintln!("  WARNING: SHA-256 mismatch! File may be corrupted.");
+                            let _ = tokio::fs::remove_file(&path).await;
+                        }
+                        Err(e) => eprintln!("  WARNING: could not verify hash: {e}"),
+                    }
                 }
-                Err(e) => eprintln!("  WARNING: could not verify hash: {e}"),
+            }
+            Err(e) => {
+                eprintln!("  ERROR: {e}");
+                pb.abandon();
             }
         }
     }

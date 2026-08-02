@@ -1,5 +1,6 @@
 use crate::common::get_config_path;
 use crate::ml;
+use std::collections::HashMap;
 use std::path::Path;
 use tauri::Emitter;
 
@@ -32,7 +33,7 @@ pub async fn download_models(
     state: tauri::State<'_, ml::MlContext>,
 ) -> Result<(), String> {
     use crate::common::emit_log;
-    use tokio::io::AsyncWriteExt;
+    use siegu_core::model_manager::{download_file, remote_size, DownloadOutcome};
 
     let path = get_config_path(&app);
     if path.is_empty() {
@@ -42,13 +43,14 @@ pub async fn download_models(
     std::fs::create_dir_all(&models_dir).map_err(|e| e.to_string())?;
 
     let resolved = siegu_core::model_manager::resolve_files_for_models(&models);
-    let files_to_download: Vec<(String, String, String, String)> = resolved
+    let files_to_download: Vec<(String, String, String, u64, String)> = resolved
         .iter()
         .map(|(entry, _)| {
             (
                 entry.model_name.to_string(),
                 entry.url.to_string(),
                 entry.filename.to_string(),
+                entry.expected_size,
                 entry.sha256.to_string(),
             )
         })
@@ -78,85 +80,72 @@ pub async fn download_models(
                 }
             };
 
-        for (model_name, url, filename, expected_hash) in files_to_download {
-            let path = models_dir.join(&filename);
+        let mut model_totals: HashMap<String, u64> = HashMap::new();
+        for (_, url, _, expected_size, _) in &files_to_download {
+            let est = remote_size(&client, url).await.unwrap_or(*expected_size);
+            *model_totals.entry(url.clone()).or_insert(0) += est;
+        }
+
+        let mut model_done: HashMap<String, u64> = HashMap::new();
+
+        for (model_name, url, filename, expected_size, expected_hash) in files_to_download {
             emit_log(&app, format!("Initiating download: {filename}"));
-            let mut response = match client.get(&url).send().await {
-                Ok(r) => {
-                    emit_log(
-                        &app,
-                        format!("Response received for {}: Status {}", filename, r.status()),
-                    );
-                    r
-                }
-                Err(e) => {
-                    emit_log(&app, format!("ERROR: Request failed for {filename}: {e}"));
-                    continue;
-                }
-            };
 
-            if !response.status().is_success() {
-                emit_log(
-                    &app,
-                    format!(
-                        "ERROR: Download failed for {filename}: Status {}",
-                        response.status()
-                    ),
+            let base = *model_done.get(&model_name).unwrap_or(&0);
+            let total = model_totals.get(&url).copied().or(Some(expected_size));
+            let mut last_reported: u64 = 0;
+
+            let emit_progress = |app: &tauri::AppHandle, model: &str, downloaded: u64| {
+                let _ = app.emit(
+                    "download-progress",
+                    DownloadProgress {
+                        model: model.to_string(),
+                        downloaded,
+                        total,
+                    },
                 );
-                continue;
-            }
-            let total_size = response.content_length();
-            let tmp_path = path.with_extension("tmp");
-            let mut file = match tokio::fs::File::create(&tmp_path).await {
-                Ok(f) => f,
-                Err(e) => {
-                    emit_log(
-                        &app,
-                        format!("ERROR: Failed to create temp file {filename}: {e}"),
-                    );
-                    continue;
-                }
             };
-            let mut downloaded: u64 = 0;
-            let mut last_emitted: u64 = 0;
-            let mut success = true;
-            while let Ok(Some(chunk)) = response.chunk().await {
-                if (file.write_all(&chunk).await).is_err() {
-                    success = false;
-                    break;
-                }
-                downloaded += chunk.len() as u64;
 
-                if downloaded - last_emitted > 1024 * 1024 || Some(downloaded) == total_size {
-                    last_emitted = downloaded;
-                    let _ = app.emit(
-                        "download-progress",
-                        DownloadProgress {
-                            model: model_name.clone(),
-                            downloaded,
-                            total: total_size,
-                        },
-                    );
-                }
-            }
+            let mut file_downloaded: u64 = 0;
+            let result = download_file(
+                &client,
+                &url,
+                &filename,
+                expected_size,
+                &models_dir,
+                |downloaded, _file_total| {
+                    file_downloaded = downloaded;
+                    let model_progress = base + downloaded;
+                    if model_progress.saturating_sub(last_reported) > 1024 * 1024
+                        || (total.is_some() && downloaded >= total.unwrap())
+                    {
+                        last_reported = model_progress;
+                        emit_progress(&app, &model_name, model_progress);
+                    }
+                },
+            )
+            .await;
 
-            if success {
-                drop(file);
-                if let Err(e) = tokio::fs::rename(&tmp_path, &path).await {
-                    emit_log(&app, format!("ERROR: Failed to move {filename}: {e}"));
-                    let _ = tokio::fs::remove_file(&tmp_path).await;
-                } else {
+            match result {
+                Ok(DownloadOutcome::Skipped) => {
+                    emit_log(&app, format!("Skipping {filename}: already downloaded"));
+                }
+                Ok(DownloadOutcome::Completed) => {
+                    emit_log(&app, format!("SUCCESS: Finished downloading {filename}"));
                     if !expected_hash.is_empty() {
-                        match siegu_core::model_manager::verify_sha256(&path, &expected_hash) {
+                        match siegu_core::model_manager::verify_sha256(
+                            &models_dir.join(&filename),
+                            &expected_hash,
+                        ) {
                             Ok(true) => {
-                                emit_log(&app, format!("SUCCESS: Finished downloading {filename} (SHA-256 verified)"));
+                                emit_log(&app, format!("{filename}: SHA-256 verified"));
                             }
                             Ok(false) => {
                                 emit_log(
                                     &app,
                                     format!("ERROR: SHA-256 mismatch for {filename}, deleting"),
                                 );
-                                let _ = tokio::fs::remove_file(&path).await;
+                                let _ = std::fs::remove_file(models_dir.join(&filename));
                             }
                             Err(e) => {
                                 emit_log(
@@ -165,13 +154,24 @@ pub async fn download_models(
                                 );
                             }
                         }
-                    } else {
-                        emit_log(&app, format!("SUCCESS: Finished downloading {filename}"));
                     }
                 }
-            } else {
-                let _ = tokio::fs::remove_file(&tmp_path).await;
-                emit_log(&app, format!("ERROR: Download interrupted for {filename}"));
+                Err(e) => {
+                    emit_log(&app, format!("ERROR: Failed to download {filename}: {e}"));
+                    continue;
+                }
+            }
+
+            if let Ok(meta) = std::fs::metadata(models_dir.join(&filename)) {
+                *model_done.entry(model_name.clone()).or_insert(0) += meta.len();
+                let _ = app.emit(
+                    "download-progress",
+                    DownloadProgress {
+                        model: model_name.clone(),
+                        downloaded: *model_done.get(&model_name).unwrap_or(&0),
+                        total,
+                    },
+                );
             }
         }
         let _ = tx.send(ml::Job::ProcessAll);

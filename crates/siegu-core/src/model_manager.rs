@@ -248,6 +248,170 @@ pub fn check_models_downloaded(models_dir: &Path) -> Vec<String> {
     downloaded
 }
 
+/// Smallest file we consider a "real" download (avoid committing truncated files).
+pub const MIN_MODEL_FILE_SIZE: u64 = 1024;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DownloadOutcome {
+    Skipped,
+    Completed,
+}
+
+async fn head_content_length(client: &reqwest::Client, url: &str) -> Option<u64> {
+    match client.head(url).send().await {
+        Ok(resp) if resp.status().is_success() => resp.content_length(),
+        _ => None,
+    }
+}
+
+/// Best-effort remote size of a model file, used for progress totals.
+pub async fn remote_size(client: &reqwest::Client, url: &str) -> Option<u64> {
+    head_content_length(client, url).await
+}
+
+async fn retry_backoff(attempt: u32) {
+    let seconds = 3u64.pow(attempt.saturating_sub(1));
+    tokio::time::sleep(std::time::Duration::from_secs(seconds)).await;
+}
+
+/// Shared model-file downloader used by both the CLI and the Tauri app.
+///
+/// - Skips files that are already present at full size (HEAD content length when available).
+/// - Resumes interrupted downloads from `{filename}.part` via HTTP Range.
+/// - Retries transient failures up to 3 times with 3x backoff.
+/// - Only commits (renames) the part file once the full content length was received.
+///
+/// `on_progress(downloaded_bytes, total)` is invoked as chunks arrive.
+/// SHA-256 verification (if any) is left to the caller.
+pub async fn download_file(
+    client: &reqwest::Client,
+    url: &str,
+    filename: &str,
+    expected_size: u64,
+    models_dir: &Path,
+    on_progress: impl FnMut(u64, Option<u64>) + Send,
+) -> Result<DownloadOutcome, String> {
+    use futures_util::StreamExt;
+    use tokio::io::AsyncWriteExt;
+
+    let mut on_progress = on_progress;
+    let final_path = models_dir.join(filename);
+    let part_path = models_dir.join(format!("{filename}.part"));
+
+    let expected_total = head_content_length(client, url).await;
+
+    if let Ok(meta) = tokio::fs::metadata(&final_path).await {
+        let size = meta.len();
+        let complete = match expected_total {
+            Some(expected) => size >= expected,
+            None => size >= MIN_MODEL_FILE_SIZE && size >= expected_size,
+        };
+        if complete {
+            return Ok(DownloadOutcome::Skipped);
+        }
+    }
+
+    let mut start: u64 = 0;
+    if let Ok(meta) = tokio::fs::metadata(&part_path).await {
+        start = meta.len();
+    }
+
+    let mut attempt = 0u32;
+    loop {
+        attempt += 1;
+        let mut request = client.get(url);
+        if start > 0 {
+            request = request.header(reqwest::header::RANGE, format!("bytes={}-", start));
+        }
+
+        let response = match request.send().await {
+            Ok(r) => r,
+            Err(e) => {
+                if attempt >= 3 {
+                    return Err(format!("request failed after {attempt} attempts: {e}"));
+                }
+                retry_backoff(attempt).await;
+                continue;
+            }
+        };
+
+        let status = response.status();
+        if status == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
+            if start > 0 {
+                tokio::fs::rename(&part_path, &final_path)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                return Ok(DownloadOutcome::Completed);
+            }
+            return Err("server rejected range request".to_string());
+        }
+        if !status.is_success() {
+            return Err(format!("HTTP {}", status));
+        }
+
+        if status == reqwest::StatusCode::OK && start > 0 {
+            info!("{filename}: server ignored Range, restarting from scratch");
+            start = 0;
+        }
+
+        let total = expected_total.or_else(|| response.content_length());
+        let mut file = tokio::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&part_path)
+            .await
+            .map_err(|e| e.to_string())?;
+        if start == 0 {
+            file.set_len(0).await.map_err(|e| e.to_string())?;
+        }
+
+        let mut stream = response.bytes_stream();
+        let mut downloaded = start;
+        let mut stream_error: Option<String> = None;
+        while let Some(chunk) = stream.next().await {
+            match chunk {
+                Ok(c) => {
+                    file.write_all(&c).await.map_err(|e| e.to_string())?;
+                    downloaded += c.len() as u64;
+                    on_progress(downloaded, total);
+                }
+                Err(e) => {
+                    stream_error = Some(e.to_string());
+                    break;
+                }
+            }
+        }
+        drop(file);
+
+        let complete = stream_error.is_none()
+            && match total {
+                Some(t) => downloaded >= t,
+                None => true,
+            };
+
+        if complete {
+            tokio::fs::rename(&part_path, &final_path)
+                .await
+                .map_err(|e| e.to_string())?;
+            return Ok(DownloadOutcome::Completed);
+        }
+
+        if attempt >= 3 {
+            return Err(stream_error.unwrap_or_else(|| {
+                format!(
+                    "incomplete download: {}/{}",
+                    downloaded,
+                    total
+                        .map(|t| t.to_string())
+                        .unwrap_or_else(|| "?".to_string())
+                )
+            }));
+        }
+        start = downloaded;
+        retry_backoff(attempt).await;
+    }
+}
+
 pub fn resolve_files_for_models(models: &[String]) -> Vec<(&'static ModelFile, PathBuf)> {
     let mut result = Vec::new();
     for model in models {
@@ -460,5 +624,118 @@ mod tests {
             "0000000000000000000000000000000000000000000000000000000000000000"
         )
         .unwrap());
+    }
+
+    async fn spawn_file_server(payload: Vec<u8>) -> (String, tokio::task::JoinHandle<()>) {
+        use warp::Filter;
+        let file_path: &'static PathBuf = Box::leak(Box::new(
+            std::env::temp_dir().join(format!("siegu-test-src-{}.bin", uuid::Uuid::new_v4())),
+        ));
+        std::fs::write(file_path, &payload).unwrap();
+        let route = warp::fs::file(file_path);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        drop(listener);
+        let server = warp::serve(route).run(addr);
+        let handle = tokio::spawn(server);
+        (format!("http://{}/file.bin", addr), handle)
+    }
+
+    #[tokio::test]
+    async fn test_download_file_fresh() {
+        let dir = tempfile::tempdir().unwrap();
+        let payload = vec![0xABu8; 64 * 1024];
+        let (url, server) = spawn_file_server(payload.clone()).await;
+        let client = reqwest::Client::new();
+        let models_dir = dir.path().join("models");
+        std::fs::create_dir_all(&models_dir).unwrap();
+
+        let progress = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let p2 = progress.clone();
+        let outcome = download_file(
+            &client,
+            &url,
+            "test.bin",
+            64 * 1024,
+            &models_dir,
+            move |d, _t| {
+                p2.lock().unwrap().push(d);
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(outcome, DownloadOutcome::Completed);
+        assert_eq!(std::fs::read(models_dir.join("test.bin")).unwrap(), payload);
+        assert!(
+            *progress.lock().unwrap().last().unwrap() >= 64 * 1024,
+            "progress should reach full size"
+        );
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn test_download_file_skips_existing_complete() {
+        let dir = tempfile::tempdir().unwrap();
+        let payload = vec![0xABu8; 64 * 1024];
+        let (url, server) = spawn_file_server(payload.clone()).await;
+        let client = reqwest::Client::new();
+        let models_dir = dir.path().join("models");
+        std::fs::create_dir_all(&models_dir).unwrap();
+        std::fs::write(models_dir.join("test.bin"), &payload).unwrap();
+
+        let mut called = false;
+        let outcome = download_file(&client, &url, "test.bin", 64 * 1024, &models_dir, |_, _| {
+            called = true;
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(outcome, DownloadOutcome::Skipped);
+        assert!(!called, "no progress should be reported for a skipped file");
+        assert_eq!(std::fs::read(models_dir.join("test.bin")).unwrap(), payload);
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn test_download_file_resumes_from_part() {
+        let dir = tempfile::tempdir().unwrap();
+        let payload = vec![0xABu8; 64 * 1024];
+        let (url, server) = spawn_file_server(payload.clone()).await;
+        let client = reqwest::Client::new();
+        let models_dir = dir.path().join("models");
+        std::fs::create_dir_all(&models_dir).unwrap();
+
+        let half = payload.len() / 2;
+        std::fs::write(models_dir.join("test.bin.part"), &payload[..half]).unwrap();
+
+        let outcome = download_file(&client, &url, "test.bin", 64 * 1024, &models_dir, |_, _| {})
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, DownloadOutcome::Completed);
+        assert_eq!(std::fs::read(models_dir.join("test.bin")).unwrap(), payload);
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn test_download_file_commits_complete_part() {
+        let dir = tempfile::tempdir().unwrap();
+        let payload = vec![0xABu8; 64 * 1024];
+        let (url, server) = spawn_file_server(payload.clone()).await;
+        let client = reqwest::Client::new();
+        let models_dir = dir.path().join("models");
+        std::fs::create_dir_all(&models_dir).unwrap();
+
+        // Part file already holds the whole payload => server replies 416, we commit it.
+        std::fs::write(models_dir.join("test.bin.part"), &payload).unwrap();
+
+        let outcome = download_file(&client, &url, "test.bin", 64 * 1024, &models_dir, |_, _| {})
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, DownloadOutcome::Completed);
+        assert_eq!(std::fs::read(models_dir.join("test.bin")).unwrap(), payload);
+        server.abort();
     }
 }

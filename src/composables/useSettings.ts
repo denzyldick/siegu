@@ -408,13 +408,7 @@ export function useSettings() {
       ...Object.fromEntries(modelsToDownload.map((m) => [m, true])),
     }
     modelsToDownload.forEach((m) => {
-      if (m === 'clip') {
-        downloadProgress.value['clip-visual'] = { downloaded: 0, total: 1 }
-      } else if (m === 'ocr') {
-        downloadProgress.value['ocr-det'] = { downloaded: 0, total: 1 }
-      } else {
-        downloadProgress.value[m] = { downloaded: 0, total: 1 }
-      }
+      downloadProgress.value[m] = { downloaded: 0, total: 1 }
     })
 
     try {
@@ -429,32 +423,6 @@ export function useSettings() {
   }
 
   function getProgress(model: string): number {
-    if (model === 'clip') {
-      const parts = ['clip-visual', 'clip-text', 'clip-tokenizer']
-      let downloaded = 0
-      let total = 0
-      parts.forEach((p) => {
-        if (downloadProgress.value[p]) {
-          downloaded += downloadProgress.value[p].downloaded
-          total += downloadProgress.value[p].total || 0
-        }
-      })
-      if (total === 0) return downloadedModels.value.includes('clip') ? 100 : 0
-      return (downloaded / total) * 100
-    }
-    if (model === 'ocr') {
-      const parts = ['ocr-det', 'ocr-rec', 'ocr-dict']
-      let downloaded = 0
-      let total = 0
-      parts.forEach((p) => {
-        if (downloadProgress.value[p]) {
-          downloaded += downloadProgress.value[p].downloaded
-          total += downloadProgress.value[p].total || 0
-        }
-      })
-      if (total === 0) return downloadedModels.value.includes('ocr') ? 100 : 0
-      return (downloaded / total) * 100
-    }
     const progress = downloadProgress.value[model]
     if (!progress || !progress.total) return downloadedModels.value.includes(model) ? 100 : 0
     return (progress.downloaded / progress.total) * 100
