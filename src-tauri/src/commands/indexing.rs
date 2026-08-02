@@ -33,7 +33,7 @@ pub fn do_index_faces(
     let mut state_map = HashMap::new();
     state_map.insert("indexing_mode".to_string(), "immediate".to_string());
     db.set_state(state_map);
-    let _ = tx.send(ml::Job::ProcessModel("ultraface".to_string()));
+    let _ = tx.send(ml::Job::ProcessModel("face".to_string()));
     Ok(())
 }
 
@@ -192,7 +192,7 @@ mod tests {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
         do_index_faces(&db, &tx).unwrap();
         let job = rx.try_recv().unwrap();
-        assert!(matches!(job, ml::Job::ProcessModel(ref m) if m == "ultraface"));
+        assert!(matches!(job, ml::Job::ProcessModel(ref m) if m == "face"));
     }
 
     #[test]

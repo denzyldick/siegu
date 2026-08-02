@@ -60,13 +60,12 @@ pub const ALL_MODEL_NAMES: &[&str] = &[
 pub fn job_status_model(model_id: &str) -> Option<&'static str> {
     match model_id {
         "clip" => Some("clip"),
-        "ultraface" | "face" => Some("face"),
+        "ultraface" | "face" | "arcface" => Some("face"),
         "ocr" => Some("ocr"),
         "nsfw" => Some("nsfw"),
         "aesthetics" => Some("aesthetics"),
         "yolo" => Some("yolo"),
         "blip" => Some("blip"),
-        "arcface" => Some("arcface"),
         "midas" => Some("midas"),
         "whisper" => Some("whisper"),
         _ => None,

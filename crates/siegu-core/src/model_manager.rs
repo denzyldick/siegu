@@ -36,7 +36,7 @@ pub const MODEL_REGISTRY: &[ModelFile] = &[
         sha256: "",
     },
     ModelFile {
-        model_name: "ultraface",
+        model_name: "face",
         filename: "version-RFB-320.onnx",
         url: "https://raw.githubusercontent.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB/master/models/onnx/version-RFB-320.onnx",
         expected_size: 1_000_000,
@@ -106,7 +106,7 @@ pub const MODEL_REGISTRY: &[ModelFile] = &[
         sha256: "",
     },
     ModelFile {
-        model_name: "arcface",
+        model_name: "face",
         filename: "arcface.onnx",
         url: "https://huggingface.co/crj/dl-ws/resolve/main/arcface_w600k_r50.onnx",
         expected_size: 10_000_000,
@@ -191,11 +191,14 @@ pub fn check_models_downloaded(models_dir: &Path) -> Vec<String> {
         downloaded.push("clip".to_string());
     }
 
-    let ultraface_path = models_dir.join("version-RFB-320.onnx");
-    if ultraface_path.exists()
-        && ultraface_path.metadata().map(|m| m.len()).unwrap_or(0) > 1024 * 1024
-    {
-        downloaded.push("ultraface".to_string());
+    let face_detector_path = models_dir.join("version-RFB-320.onnx");
+    let face_arcface_path = models_dir.join("arcface.onnx");
+    let face_detector_ok = face_detector_path.exists()
+        && face_detector_path.metadata().map(|m| m.len()).unwrap_or(0) > 1024 * 1024;
+    let face_arcface_ok = face_arcface_path.exists()
+        && face_arcface_path.metadata().map(|m| m.len()).unwrap_or(0) > 1024 * 1024;
+    if face_detector_ok && face_arcface_ok {
+        downloaded.push("face".to_string());
     }
 
     let ocr_files = ["ocr_det.onnx", "ocr_rec.onnx"];
@@ -217,7 +220,7 @@ pub fn check_models_downloaded(models_dir: &Path) -> Vec<String> {
         downloaded.push("ocr".to_string());
     }
 
-    for name in &["nsfw", "aesthetics", "yolo", "blip", "arcface", "midas"] {
+    for name in &["nsfw", "aesthetics", "yolo", "midas"] {
         let filename = match *name {
             "yolo" => "yolov8.onnx",
             _ => &format!("{name}.onnx"),
@@ -225,6 +228,11 @@ pub fn check_models_downloaded(models_dir: &Path) -> Vec<String> {
         if models_dir.join(filename).exists() {
             downloaded.push(name.to_string());
         }
+    }
+
+    let blip_files = ["blip.onnx", "blip_decoder.onnx", "blip_tokenizer.json"];
+    if blip_files.iter().all(|f| models_dir.join(f).exists()) {
+        downloaded.push("blip".to_string());
     }
 
     let whisper_files = [
@@ -305,13 +313,12 @@ pub fn all_model_status(models_dir: &Path) -> Vec<ModelStatus> {
     let downloaded = check_models_downloaded(models_dir);
     let all_models = [
         "clip",
-        "ultraface",
+        "face",
         "ocr",
         "nsfw",
         "aesthetics",
         "yolo",
         "blip",
-        "arcface",
         "midas",
         "whisper",
     ];
@@ -381,8 +388,49 @@ mod tests {
     fn test_all_model_status() {
         let dir = tempfile::tempdir().unwrap();
         let statuses = all_model_status(dir.path());
-        assert_eq!(statuses.len(), 10);
+        assert_eq!(statuses.len(), 9);
         assert!(statuses.iter().all(|s| !s.downloaded));
+        assert!(statuses.iter().any(|s| s.name == "face"));
+        assert!(statuses
+            .iter()
+            .all(|s| s.name != "ultraface" && s.name != "arcface"));
+    }
+
+    #[test]
+    fn test_check_models_downloaded_face_requires_both_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let models_dir = dir.path().join("models");
+        std::fs::create_dir_all(&models_dir).unwrap();
+
+        // Only the face detector present => face not yet downloaded.
+        std::fs::write(
+            models_dir.join("version-RFB-320.onnx"),
+            vec![0u8; 1024 * 1024 + 1],
+        )
+        .unwrap();
+        let result = check_models_downloaded(&models_dir);
+        assert!(!result.iter().any(|m| m == "face"));
+
+        // Both face files present => face downloaded.
+        std::fs::write(models_dir.join("arcface.onnx"), vec![0u8; 1024 * 1024 + 1]).unwrap();
+        let result = check_models_downloaded(&models_dir);
+        assert!(result.iter().any(|m| m == "face"));
+    }
+
+    #[test]
+    fn test_check_models_downloaded_blip_requires_decoder() {
+        let dir = tempfile::tempdir().unwrap();
+        let models_dir = dir.path().join("models");
+        std::fs::create_dir_all(&models_dir).unwrap();
+
+        std::fs::write(models_dir.join("blip.onnx"), vec![0u8; 16]).unwrap();
+        std::fs::write(models_dir.join("blip_tokenizer.json"), vec![0u8; 16]).unwrap();
+        let result = check_models_downloaded(&models_dir);
+        assert!(!result.iter().any(|m| m == "blip"));
+
+        std::fs::write(models_dir.join("blip_decoder.onnx"), vec![0u8; 16]).unwrap();
+        let result = check_models_downloaded(&models_dir);
+        assert!(result.iter().any(|m| m == "blip"));
     }
 
     #[test]

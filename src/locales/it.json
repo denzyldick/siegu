@@ -462,7 +462,7 @@
       "desc": "Trova oggetti e scene nelle tue foto.",
       "search": "Prova a cercare: 'cane', 'spiaggia', 'tramonto'"
     },
-    "ultraface": {
+    "face": {
       "title": "Raggruppamento Volti",
       "desc": "Trova i volti e li raggruppa per persona.",
       "search": "Prova a cercare: 'Mamma', 'Giovanni'"
@@ -491,11 +491,6 @@
       "title": "Oggetto Pro",
       "desc": "Precisione millimetrica per trovare elementi specifici.",
       "search": "Aggiunge tag profondi per 80+ oggetti comuni."
-    },
-    "arcface": {
-      "title": "Volto Pro",
-      "desc": "Riconoscimento avanzato per un migliore raggruppamento.",
-      "search": "Migliora drasticamente la precisione del riconoscimento facciale."
     },
     "midas": {
       "title": "Visione Profondità",

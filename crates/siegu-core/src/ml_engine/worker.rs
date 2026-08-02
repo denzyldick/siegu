@@ -203,7 +203,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
             .any(|m| {
                 config
                     .get(&format!("model_enabled_{m}"))
-                    .is_some_and(|v| v == "true")
+                    .is_none_or(|v| v == "true")
             });
             if !has_enabled_model && target_model.is_none() {
                 let lock = db.lock().unwrap();

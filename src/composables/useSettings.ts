@@ -309,7 +309,14 @@ export function useSettings() {
   }
 
   function configKeyForModel(modelId: string): string {
-    return 'model_enabled_' + (modelId === 'ultraface' ? 'face' : modelId)
+    return 'model_enabled_' + modelId
+  }
+
+  function configKeysForModel(modelId: string): string[] {
+    if (modelId === 'face') {
+      return ['model_enabled_face', 'model_enabled_arcface']
+    }
+    return ['model_enabled_' + modelId]
   }
 
   async function loadModelEnabledStates(): Promise<void> {
@@ -328,22 +335,28 @@ export function useSettings() {
   }
 
   async function toggleModel(modelId: string): Promise<void> {
-    const key = configKeyForModel(modelId)
     modelEnabled.value[modelId] = !modelEnabled.value[modelId]
-    await invoke('save_config', { key, value: modelEnabled.value[modelId] ? 'true' : 'false' })
+    const keys = configKeysForModel(modelId)
+    for (const key of keys) {
+      await invoke('save_config', { key, value: modelEnabled.value[modelId] ? 'true' : 'false' })
+    }
   }
 
   async function enableAllModels(): Promise<void> {
     for (const m of downloadedModels.value) {
       modelEnabled.value[m] = true
-      await invoke('save_config', { key: configKeyForModel(m), value: 'true' })
+      for (const key of configKeysForModel(m)) {
+        await invoke('save_config', { key, value: 'true' })
+      }
     }
   }
 
   async function disableAllModels(): Promise<void> {
     for (const m of downloadedModels.value) {
       modelEnabled.value[m] = false
-      await invoke('save_config', { key: configKeyForModel(m), value: 'false' })
+      for (const key of configKeysForModel(m)) {
+        await invoke('save_config', { key, value: 'false' })
+      }
     }
   }
 
@@ -719,13 +732,12 @@ export function useSettings() {
 
 const MODEL_SIZES: Record<string, string> = {
   clip: '350MB',
-  ultraface: '2MB',
+  face: '168MB',
   ocr: '20MB',
   nsfw: '328MB',
   aesthetics: '1.6GB',
   blip: '329MB',
   yolo: '15MB',
-  arcface: '166MB',
   midas: '508MB',
   whisper: '31MB',
 }

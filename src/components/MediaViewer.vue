@@ -389,8 +389,8 @@ const videoPlayer = ref<HTMLVideoElement | null>(null)
 const thumbnailRail = ref<HTMLElement | null>(null)
 
 const modelInfo = [
-  { id: 'clip' }, { id: 'ultraface' }, { id: 'ocr' }, { id: 'nsfw' },
-  { id: 'aesthetics' }, { id: 'yolo' }, { id: 'blip' }, { id: 'arcface' },
+  { id: 'clip' }, { id: 'face' }, { id: 'ocr' }, { id: 'nsfw' },
+  { id: 'aesthetics' }, { id: 'yolo' }, { id: 'blip' },
   { id: 'midas' }, { id: 'whisper' },
 ]
 

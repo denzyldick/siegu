@@ -462,7 +462,7 @@
       "desc": "Finds objects and scenes in your photos.",
       "search": "Try searching: 'dog', 'beach', 'sunset'"
     },
-    "ultraface": {
+    "face": {
       "title": "Face Grouping",
       "desc": "Finds faces and groups them by person.",
       "search": "Try searching: 'Mom', 'John'"
@@ -491,11 +491,6 @@
       "title": "Object Pro",
       "desc": "Pinpoint accuracy for finding specific items.",
       "search": "Adds deep tags for 80+ common objects."
-    },
-    "arcface": {
-      "title": "Face Pro",
-      "desc": "Advanced recognition for better grouping.",
-      "search": "drastically improves face matching accuracy."
     },
     "midas": {
       "title": "Depth Vision",

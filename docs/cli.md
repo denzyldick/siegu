@@ -45,7 +45,7 @@ siegu analyze photo <photo-id>
 siegu analyze model <model-id>
 ```
 
-Model IDs: `clip`, `ultraface`, `ocr`, `nsfw`, `aesthetics`, `yolo`, `blip`, `arcface`, `midas`, `whisper`
+Model IDs: `clip`, `face`, `ocr`, `nsfw`, `aesthetics`, `yolo`, `blip`, `midas`, `whisper` (`ultraface`/`arcface` are accepted as aliases of `face`)
 
 ### `siegu models`
 
@@ -59,7 +59,7 @@ siegu models list
 siegu models download
 
 # Download specific models
-siegu models download clip ultraface nsfw
+siegu models download clip face nsfw
 
 # Show disk usage per model
 siegu models usage

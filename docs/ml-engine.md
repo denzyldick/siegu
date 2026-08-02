@@ -17,18 +17,17 @@ crates/siegu-core/src/ml_engine/
 
 ## Model Registry
 
-21 model files across 10 groups, defined in `model_manager.rs`:
+21 model files across 9 groups, defined in `model_manager.rs`:
 
 | Model | Files | Approx Size | Purpose |
 |-------|-------|-------------|---------|
 | **clip** | visual (150MB), text (40MB), tokenizer.json (1KB) | 190MB | Semantic search embeddings |
-| **ultraface** | version-RFB-320.onnx (1MB) | 1MB | Face detection |
+| **face** | version-RFB-320.onnx (1MB), arcface.onnx (10MB) | 11MB | Face detection + recognition/grouping (512-dim) |
 | **ocr** | det (2MB), rec (2MB), en_dict.txt (1KB) | 4MB | PP-OCRv4 text recognition |
 | **nsfw** | nsfw.onnx (10MB) | 10MB | Sensitive content detection |
 | **aesthetics** | aesthetics.onnx (10MB) | 10MB | Photo quality scoring (1-10) |
 | **yolo** | yolov8n.onnx (10MB) | 10MB | 80-class object detection |
 | **blip** | encoder (340MB), decoder (640MB), blip_tokenizer.json (500KB) | 980MB | Image captioning |
-| **arcface** | arcface.onnx (10MB) | 10MB | Face recognition (512-dim) |
 | **midas** | midas.onnx (100MB) | 100MB | Depth estimation |
 | **whisper** | encoder (32MB), decoder (118MB), tokenizer.json (3.8MB) | 154MB | Audio transcription |
 

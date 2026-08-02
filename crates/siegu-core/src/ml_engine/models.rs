@@ -44,10 +44,13 @@ pub struct LoadedModels {
 
 /// Checks whether a model is enabled in the user's config.
 /// Config keys follow the pattern `model_enabled_<name>` (e.g., `model_enabled_clip`).
+///
+/// A missing key means the model is enabled by default, mirroring
+/// `should_run_model` and the app's UI toggle state (missing key => enabled).
 fn model_enabled(config: &HashMap<String, String>, name: &str) -> bool {
     config
         .get(&format!("model_enabled_{name}"))
-        .is_some_and(|v| v == "true")
+        .is_none_or(|v| v == "true")
 }
 
 /// Loads all enabled ONNX models from the models directory.

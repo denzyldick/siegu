@@ -462,7 +462,7 @@
       "desc": "Findet Objekte und Szenen in deinen Fotos.",
       "search": "Versuche zu suchen: 'Hund', 'Strand', 'Sonnenuntergang'"
     },
-    "ultraface": {
+    "face": {
       "title": "Gesichtsgruppierung",
       "desc": "Findet Gesichter und gruppiert sie nach Personen.",
       "search": "Versuche zu suchen: 'Mama', 'Hans'"
@@ -491,11 +491,6 @@
       "title": "Objekt Pro",
       "desc": "Punktgenaue Erkennung für spezifische Objekte.",
       "search": "Fügt Deep-Tags für 80+ gängige Objekte hinzu."
-    },
-    "arcface": {
-      "title": "Gesicht Pro",
-      "desc": "Fortgeschrittene Erkennung für bessere Gruppierung.",
-      "search": "Verbessert die Gesichtserkennungsgenauigkeit drastisch."
     },
     "midas": {
       "title": "Tiefenvision",

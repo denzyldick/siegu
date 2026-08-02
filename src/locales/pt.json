@@ -462,7 +462,7 @@
       "desc": "Encontra objetos e cenas em suas fotos.",
       "search": "Tente pesquisar: 'cachorro', 'praia', 'pôr do sol'"
     },
-    "ultraface": {
+    "face": {
       "title": "Agrupamento Facial",
       "desc": "Encontra rostos e os agrupa por pessoa.",
       "search": "Tente pesquisar: 'Mãe', 'João'"
@@ -491,11 +491,6 @@
       "title": "Objeto Pro",
       "desc": "Precisão de pontaria para encontrar itens específicos.",
       "search": "Adiciona tags profundas para mais de 80 objetos comuns."
-    },
-    "arcface": {
-      "title": "Rosto Pro",
-      "desc": "Reconhecimento avançado para melhor agrupamento.",
-      "search": "Melhora drasticamente a precisão da correspondência facial."
     },
     "midas": {
       "title": "Visão de Profundidade",

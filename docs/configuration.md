@@ -28,13 +28,13 @@ Override with `--config-dir` flag on CLI commands.
 | `sync_enabled` | string | — | Enable mesh sync (`true`/`false`) |
 | `max_storage_mb` | integer | `0` (unlimited) | Max storage for synced files (1–1,000,000) |
 | `model_enabled_clip` | string | — | Enable CLIP model (`true`/`false`) |
-| `model_enabled_face` | string | — | Enable face detection |
+| `model_enabled_face` | string | — | Enable face detection, recognition and grouping |
 | `model_enabled_ocr` | string | — | Enable OCR |
 | `model_enabled_nsfw` | string | — | Enable NSFW detection |
 | `model_enabled_aesthetics` | string | — | Enable aesthetics scoring |
 | `model_enabled_yolo` | string | — | Enable object detection |
 | `model_enabled_blip` | string | — | Enable image captioning |
-| `model_enabled_arcface` | string | — | Enable face recognition |
+| `model_enabled_arcface` | string | — | Legacy alias of `model_enabled_face` (kept in sync by the app) |
 | `model_enabled_midas` | string | — | Enable depth estimation |
 | `model_enabled_whisper` | string | — | Enable audio transcription |
 | `model_enabled_sam` | string | — | Enable SAM segmentation |

@@ -462,7 +462,7 @@
       "desc": "Trouve des objets et des scènes dans vos photos.",
       "search": "Essayez de chercher : 'chien', 'plage', 'coucher de soleil'"
     },
-    "ultraface": {
+    "face": {
       "title": "Groupement de visages",
       "desc": "Trouve les visages et les regroupe par personne.",
       "search": "Essayez de chercher : 'Maman', 'Jean'"
@@ -491,11 +491,6 @@
       "title": "Objet Pro",
       "desc": "Précision ciblée pour trouver des éléments spécifiques.",
       "search": "Ajoute des tags profonds pour 80+ objets courants."
-    },
-    "arcface": {
-      "title": "Visage Pro",
-      "desc": "Reconnaissance avancée pour un meilleur groupement.",
-      "search": "Améliore considérablement la précision de correspondance des visages."
     },
     "midas": {
       "title": "Vision de profondeur",

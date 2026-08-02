@@ -5,7 +5,14 @@ import { listenEvent } from '@/services/events'
 import type { ModelProgress } from '@/types/models'
 
 function configKeyForModel(modelId: string): string {
-  return 'model_enabled_' + (modelId === 'ultraface' ? 'face' : modelId)
+  return 'model_enabled_' + modelId
+}
+
+function configKeysForModel(modelId: string): string[] {
+  if (modelId === 'face') {
+    return ['model_enabled_face', 'model_enabled_arcface']
+  }
+  return ['model_enabled_' + modelId]
 }
 
 export const useModelsStore = defineStore('models', () => {
@@ -44,7 +51,9 @@ export const useModelsStore = defineStore('models', () => {
   async function toggleModel(modelId: string): Promise<void> {
     enabled.value[modelId] = !enabled.value[modelId]
     try {
-      await saveConfig(configKeyForModel(modelId), enabled.value[modelId] ? 'true' : 'false')
+      for (const key of configKeysForModel(modelId)) {
+        await saveConfig(key, enabled.value[modelId] ? 'true' : 'false')
+      }
     } catch (error) {
       console.error('[ModelsStore] Failed to save model state:', error)
     }

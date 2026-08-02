@@ -462,7 +462,7 @@
       "desc": "Ta haña ophetonan i scennan den bo fotonan.",
       "search": "Try searching: 'kònkòf', 'playa', 'puesta di sol'"
     },
-    "ultraface": {
+    "face": {
       "title": "Agrupashon di Kara",
       "desc": "Ta haña karanan i ta grupá nan pa persona.",
       "search": "Try searching: 'Mama', 'Juan'"
@@ -491,11 +491,6 @@
       "title": "Opheto Pro",
       "desc": "Presishon puntual pa haña ophetonan específico.",
       "search": "Ta añadí tagnan profundo pa 80+ opheto communal."
-    },
-    "arcface": {
-      "title": "Kara Pro",
-      "desc": "Rekonosementu avansá pa mihó agrupashon.",
-      "search": "Ta mehorá drásticamente e presishon di rekonosementu di kara."
     },
     "midas": {
       "title": "Vishon di Profundidat",

@@ -416,7 +416,7 @@ pub fn analyze_image(
                                                 best_match_id = Some(person_id.clone());
                                             }
                                         }
-                                        if highest_similarity > 0.75 {
+                                        if highest_similarity > 0.5 {
                                             assigned_person_id = best_match_id;
                                         }
                                     }

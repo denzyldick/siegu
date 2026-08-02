@@ -481,7 +481,15 @@ async fn cmd_models_download(config_dir: &Path, names: Option<&[String]>) {
     let to_download: Vec<_> = if let Some(names) = names {
         siegu_core::model_manager::MODEL_REGISTRY
             .iter()
-            .filter(|e| names.iter().any(|n| n == &e.model_name))
+            .filter(|e| {
+                names.iter().any(|n| {
+                    let normalized = match n.as_str() {
+                        "ultraface" | "arcface" => "face",
+                        other => other,
+                    };
+                    normalized == e.model_name
+                })
+            })
             .collect()
     } else {
         siegu_core::model_manager::MODEL_REGISTRY.iter().collect()

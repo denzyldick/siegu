@@ -462,7 +462,7 @@
       "desc": "Vindt objecten en scènes in je foto's.",
       "search": "Probeer te zoeken: 'hond', 'strand', 'zonsondergang'"
     },
-    "ultraface": {
+    "face": {
       "title": "Gezichtsgroepering",
       "desc": "Vindt gezichten en groepeert ze per persoon.",
       "search": "Probeer te zoeken: 'Mama', 'Jan'"
@@ -491,11 +491,6 @@
       "title": "Object Pro",
       "desc": "Nauwkeurige detectie voor het vinden van specifieke items.",
       "search": "Voegt diepe tags toe voor 80+ veelvoorkomende objecten."
-    },
-    "arcface": {
-      "title": "Gezicht Pro",
-      "desc": "Geavanceerde herkenning voor betere groepering.",
-      "search": "Verbetert de nauwkeurigheid van gezichtsherkenning drastisch."
     },
     "midas": {
       "title": "Dieptezicht",
