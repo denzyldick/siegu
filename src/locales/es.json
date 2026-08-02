@@ -73,7 +73,8 @@
       "videos": "Videos",
       "faces": "Rostros",
       "papers": "Documentos",
-      "surprise": "Sorpréndeme"
+      "surprise": "Sorpréndeme",
+      "nsfw_hide": "Ocultar NSFW"
     },
     "papers": {
       "title": "Documentos y capturas",
@@ -107,7 +108,11 @@
       "quality": "Calidad",
       "reset_quality": "Restablecer",
       "clear_all": "Borrar todo"
-    }
+    },
+    "sort_label": "Ordenar fotos",
+    "sort_newest": "Más recientes",
+    "sort_best": "Mejor calidad",
+    "sort_random": "Aleatorio"
   },
   "sync": {
     "status_label": "ESTADO DE LA BIBLIOTECA",
@@ -165,7 +170,8 @@
     "remove": "Eliminar",
     "recent": "Reciente",
     "label_photos": "Fotos:",
-    "label_videos": "Vídeos:"
+    "label_videos": "Vídeos:",
+    "all_photos": "Todas las fotos"
   },
   "people": {
     "title": "Personas y rostros",
@@ -354,7 +360,8 @@
     "aesthetics_score": "Puntuación estética",
     "faces_detected": "Rostros detectados",
     "fully_indexed": "Totalmente indexado",
-    "not_synced": "No respaldado en otro dispositivo — toca para reconectar"
+    "not_synced": "No respaldado en otro dispositivo — toca para reconectar",
+    "nsfw": "NSFW detectado"
   },
   "media_thumbnail": {
     "alt_thumb": "Miniatura de foto"
@@ -446,7 +453,12 @@
     "wallpaper_set": "Fondo de pantalla establecido correctamente",
     "wallpaper_error": "Error al establecer el fondo de pantalla",
     "opened_in_explorer": "Abierto en el explorador de archivos",
-    "explorer_error": "Error al abrir en el explorador de archivos"
+    "explorer_error": "Error al abrir en el explorador de archivos",
+    "recognized_text": "Texto reconocido",
+    "copy": "Copiar",
+    "copy_text": "Copiar texto",
+    "copied": "Texto copiado",
+    "copy_failed": "Error al copiar"
   },
   "folder_picker": {
     "select_folder": "Seleccionar carpeta",
@@ -511,5 +523,9 @@
   "update_available": "Actualización {version} disponible",
   "download_update": "Descargar e instalar",
   "update_error": "Error de actualización",
-  "update_progress": "Descargando actualización..."
+  "update_progress": "Descargando actualización...",
+  "people_rail": {
+    "title": "Personas",
+    "unnamed": "Sin nombre"
+  }
 }

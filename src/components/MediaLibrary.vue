@@ -199,9 +199,11 @@ import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
 import MediaCard from './MediaCard.vue';
 import MediaViewer from './MediaViewer.vue';
 import { useSyncStore } from '@/stores/sync';
+import { useI18n } from 'vue-i18n';
 import type { MediaItem } from '@/types/media';
 import type { FacetType } from '@/types/search';
 
+const { t } = useI18n();
 const syncStore = useSyncStore();
 
 const props = withDefaults(
@@ -213,9 +215,11 @@ const props = withDefaults(
       videosOnly: boolean;
       facesOnly: boolean;
       papersOnly: boolean;
+      nsfwHide: boolean;
       camera: string | null;
       aestheticsMin: number | null;
       surprise: boolean;
+      orderBy: string;
       dateRange: string;
       folder: string | null;
     };
@@ -229,9 +233,11 @@ const props = withDefaults(
       videosOnly: false,
       facesOnly: false,
       papersOnly: false,
+      nsfwHide: false,
       camera: null,
       aestheticsMin: null,
       surprise: false,
+      orderBy: 'newest',
       dateRange: 'all',
       folder: null,
     }),
@@ -282,10 +288,11 @@ const virtualItems = computed(() => {
     photos?: MediaItem[];
   }> = [];
   for (const group of groups.value) {
+    const name = group.name === 'All photos' ? t('media.all_photos') : group.name;
     items.push({
       type: 'header',
       key: `h-${group.name}`,
-      name: group.name,
+      name,
       count: group.images.length,
     });
     for (let i = 0; i < group.images.length; i += cols) {
@@ -308,6 +315,8 @@ function updateColumns(): void {
 
 function updateGroups(newImages: MediaItem[]): void {
   const locale = localStorage.getItem('siegu_language') || 'en';
+  const sortBy = props.filters?.orderBy ?? 'newest';
+  const flat = sortBy === 'best' || sortBy === 'random';
   const affectedGroups = new Set<{ name: string; sortKey: string; images: MediaItem[] }>();
 
   newImages.forEach((image) => {
@@ -316,7 +325,10 @@ function updateGroups(newImages: MediaItem[]): void {
     images.value.push(image);
 
     if (!image._groupKey) {
-      if (image.created) {
+      if (flat) {
+        image._groupKey = 'All photos';
+        image._sortKey = '0';
+      } else if (image.created) {
         const datePart = image.created.split(' ')[0];
         const dateParts = datePart.includes(':') ? datePart.split(':') : datePart.split('-');
         if (dateParts.length >= 2) {
@@ -349,6 +361,7 @@ function updateGroups(newImages: MediaItem[]): void {
   });
 
   affectedGroups.forEach((group) => {
+    if (flat) return;
     group.images.sort((a, b) => (b.created || '').localeCompare(a.created || ''));
   });
 
@@ -430,9 +443,11 @@ async function loadFiles(): Promise<void> {
         dateTo: month ? `${month.value}-31` : dateRange ? dateRange[1] : null,
         hasFaces: props.filters?.facesOnly ?? false,
         papers: props.filters?.papersOnly ?? false,
+        nsfwHide: props.filters?.nsfwHide ?? false,
         camera: props.filters?.camera ?? null,
         aestheticsMin: props.filters?.aestheticsMin ?? null,
         random: props.filters?.surprise ?? false,
+        orderBy: props.filters?.orderBy ?? null,
       });
     }
 

@@ -73,7 +73,8 @@
       "videos": "Vidéos",
       "faces": "Visages",
       "papers": "Documents",
-      "surprise": "Surprends-moi"
+      "surprise": "Surprends-moi",
+      "nsfw_hide": "Masquer NSFW"
     },
     "papers": {
       "title": "Documents et captures",
@@ -107,7 +108,11 @@
       "quality": "Qualité",
       "reset_quality": "Réinitialiser",
       "clear_all": "Tout effacer"
-    }
+    },
+    "sort_label": "Trier les photos",
+    "sort_newest": "Plus récentes",
+    "sort_best": "Meilleure qualité",
+    "sort_random": "Aléatoire"
   },
   "sync": {
     "status_label": "ÉTAT DE LA BIBLIOTHÈQUE",
@@ -165,7 +170,8 @@
     "remove": "Supprimer",
     "recent": "Récent",
     "label_photos": "Photos :",
-    "label_videos": "Vidéos :"
+    "label_videos": "Vidéos :",
+    "all_photos": "Toutes les photos"
   },
   "people": {
     "title": "Personnes et visages",
@@ -354,7 +360,8 @@
     "aesthetics_score": "Score d'esthétique",
     "faces_detected": "Visages détectés",
     "fully_indexed": "Entièrement indexé",
-    "not_synced": "Non sauvegardé sur un autre appareil — touchez pour reconnecter"
+    "not_synced": "Non sauvegardé sur un autre appareil — touchez pour reconnecter",
+    "nsfw": "NSFW détecté"
   },
   "media_thumbnail": {
     "alt_thumb": "Vignette photo"
@@ -446,7 +453,12 @@
     "wallpaper_set": "Fond d'écran défini avec succès",
     "wallpaper_error": "Échec de la définition du fond d'écran",
     "opened_in_explorer": "Ouvert dans l'explorateur de fichiers",
-    "explorer_error": "Échec de l'ouverture dans l'explorateur de fichiers"
+    "explorer_error": "Échec de l'ouverture dans l'explorateur de fichiers",
+    "recognized_text": "Texte reconnu",
+    "copy": "Copier",
+    "copy_text": "Copier le texte",
+    "copied": "Texte copié",
+    "copy_failed": "Échec de la copie"
   },
   "folder_picker": {
     "select_folder": "Sélectionner un dossier",
@@ -511,5 +523,9 @@
   "update_available": "Mise à jour {version} disponible",
   "download_update": "Télécharger et installer",
   "update_error": "Erreur de mise à jour",
-  "update_progress": "Téléchargement de la mise à jour..."
+  "update_progress": "Téléchargement de la mise à jour...",
+  "people_rail": {
+    "title": "Personnes",
+    "unnamed": "Sans nom"
+  }
 }

@@ -95,7 +95,9 @@ export interface ListFilesOptions {
   aestheticsMin?: number | null;
   camera?: string | null;
   papers?: boolean;
+  nsfwHide?: boolean;
   random?: boolean;
+  orderBy?: string | null;
 }
 
 export interface ListFilesResponse {

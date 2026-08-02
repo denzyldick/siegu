@@ -64,7 +64,9 @@ export async function listFiles(options: ListFilesOptions): Promise<MediaItem[]>
     aestheticsMin: options.aestheticsMin ?? null,
     camera: options.camera ?? null,
     papers: options.papers ?? false,
+    nsfwHide: options.nsfwHide ?? false,
     random: options.random ?? false,
+    orderBy: options.orderBy ?? null,
   });
   return parseJsonArray<MediaItem>(raw);
 }
@@ -73,6 +75,10 @@ export async function getPhotoById(id: number): Promise<MediaItem | null> {
   const raw = await call<string>('get_photo_by_id', { id });
   if (raw === 'null') return null;
   return parseJsonObject<MediaItem>(raw);
+}
+
+export async function getPhotoOcr(id: number): Promise<string> {
+  return call<string>('get_photo_ocr', { id });
 }
 
 export async function getPhotoEncodedBatch(ids: number[]): Promise<Record<number, string>> {

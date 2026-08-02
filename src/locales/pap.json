@@ -73,7 +73,8 @@
       "videos": "Videonan",
       "faces": "Caranan",
       "papers": "Dokumentonan",
-      "surprise": "Sorpredé mi"
+      "surprise": "Sorpredé mi",
+      "nsfw_hide": "Skonde NSFW"
     },
     "papers": {
       "title": "Dokumento i screenshot",
@@ -107,7 +108,11 @@
       "quality": "Kalidad",
       "reset_quality": "Reset",
       "clear_all": "Limpia tur"
-    }
+    },
+    "sort_label": "Ordena potret",
+    "sort_newest": "Mas resien",
+    "sort_best": "Mihó kalidat",
+    "sort_random": "Alatorio"
   },
   "sync": {
     "status_label": "STATUS DI BIBLIOTEKA",
@@ -165,7 +170,8 @@
     "remove": "Kitá",
     "recent": "Resiente",
     "label_photos": "Fotonan:",
-    "label_videos": "Videonan:"
+    "label_videos": "Videonan:",
+    "all_photos": "Tur e potret"
   },
   "people": {
     "title": "Hende & Karnan",
@@ -354,7 +360,8 @@
     "aesthetics_score": "Puntuashon estétiko",
     "faces_detected": "Karanan detectá",
     "fully_indexed": "Kompletamente indeksá",
-    "not_synced": "No respaldá na otro aparato — toca pa reconectá"
+    "not_synced": "No respaldá na otro aparato — toca pa reconectá",
+    "nsfw": "NSFW detektá"
   },
   "media_thumbnail": {
     "alt_thumb": "Miniatura di foto"
@@ -446,7 +453,12 @@
     "wallpaper_set": "Fondo di pantaya poné eksitosamente",
     "wallpaper_error": "No a logra poné fondo di pantaya",
     "opened_in_explorer": "Habri den exploradó di archivo",
-    "explorer_error": "No a logra habri den exploradó di archivo"
+    "explorer_error": "No a logra habri den exploradó di archivo",
+    "recognized_text": "Teksto rekonosí",
+    "copy": "Kopia",
+    "copy_text": "Kopia teksto",
+    "copied": "Teksto kopia",
+    "copy_failed": "Kopia no a funciona"
   },
   "folder_picker": {
     "select_folder": "Selekshoná Karpeta",
@@ -511,5 +523,9 @@
   "update_available": "Update {version} disponibel",
   "download_update": "Descargá i Instalá",
   "update_error": "Error di update",
-  "update_progress": "Deskargando update..."
+  "update_progress": "Deskargando update...",
+  "people_rail": {
+    "title": "Hende",
+    "unnamed": "Sin nòmber"
+  }
 }

@@ -73,7 +73,8 @@
       "videos": "Video",
       "faces": "Volti",
       "papers": "Documenti",
-      "surprise": "Sorpresami"
+      "surprise": "Sorpresami",
+      "nsfw_hide": "Nascondi NSFW"
     },
     "papers": {
       "title": "Documenti e screenshot",
@@ -107,7 +108,11 @@
       "quality": "Qualità",
       "reset_quality": "Ripristina",
       "clear_all": "Cancella tutto"
-    }
+    },
+    "sort_label": "Ordina foto",
+    "sort_newest": "Più recenti",
+    "sort_best": "Migliore qualità",
+    "sort_random": "Casuale"
   },
   "sync": {
     "status_label": "STATO LIBRERIA",
@@ -165,7 +170,8 @@
     "remove": "Rimuovi",
     "recent": "Recenti",
     "label_photos": "Foto:",
-    "label_videos": "Video:"
+    "label_videos": "Video:",
+    "all_photos": "Tutte le foto"
   },
   "people": {
     "title": "Persone & Volti",
@@ -354,7 +360,8 @@
     "aesthetics_score": "Punteggio estetico",
     "faces_detected": "Volti rilevati",
     "fully_indexed": "Completamente indicizzato",
-    "not_synced": "Non salvato su un altro dispositivo — tocca per riconnettere"
+    "not_synced": "Non salvato su un altro dispositivo — tocca per riconnettere",
+    "nsfw": "NSFW rilevato"
   },
   "media_thumbnail": {
     "alt_thumb": "Miniatura foto"
@@ -446,7 +453,12 @@
     "wallpaper_set": "Sfondo impostato con successo",
     "wallpaper_error": "Impossibile impostare lo sfondo",
     "opened_in_explorer": "Aperto nel file explorer",
-    "explorer_error": "Impossibile aprire nel file explorer"
+    "explorer_error": "Impossibile aprire nel file explorer",
+    "recognized_text": "Testo riconosciuto",
+    "copy": "Copia",
+    "copy_text": "Copia testo",
+    "copied": "Testo copiato",
+    "copy_failed": "Copia non riuscita"
   },
   "folder_picker": {
     "select_folder": "Seleziona Cartella",
@@ -511,5 +523,9 @@
   "update_available": "Aggiornamento {version} disponibile",
   "download_update": "Scarica e installa",
   "update_error": "Errore aggiornamento",
-  "update_progress": "Scaricamento aggiornamento..."
+  "update_progress": "Scaricamento aggiornamento...",
+  "people_rail": {
+    "title": "Persone",
+    "unnamed": "Senza nome"
+  }
 }

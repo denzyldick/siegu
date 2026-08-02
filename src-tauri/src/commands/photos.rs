@@ -28,6 +28,8 @@ pub fn do_list_files(
         None,
         false,
         false,
+        false,
+        None,
     )
 }
 
@@ -49,7 +51,9 @@ pub fn do_list_files_filtered(
     aesthetics_min: Option<f64>,
     camera: Option<String>,
     papers: bool,
+    nsfw_hide: bool,
     random: bool,
+    order_by: Option<String>,
 ) -> Vec<Photo> {
     let filter = crate::database::PhotoFilter {
         person_id,
@@ -62,7 +66,9 @@ pub fn do_list_files_filtered(
         aesthetics_min,
         camera,
         papers,
+        nsfw_hide,
         random,
+        order_by,
     };
     db.list_photos_filtered(query, offset, limit, favorites_only, videos_only, &filter)
 }
@@ -114,7 +120,9 @@ pub async fn list_files(
     aesthetics_min: Option<f64>,
     camera: Option<String>,
     papers: bool,
+    nsfw_hide: bool,
     random: bool,
+    order_by: Option<String>,
 ) -> Result<String, String> {
     let path = get_config_path(&app);
     if path.is_empty() {
@@ -140,7 +148,9 @@ pub async fn list_files(
         aesthetics_min,
         camera,
         papers,
+        nsfw_hide,
         random,
+        order_by,
     ))
     .unwrap_or("[]".to_string()))
 }
@@ -153,6 +163,16 @@ pub async fn toggle_favorite(app: tauri::AppHandle, id: String) -> bool {
     }
     let database = database::Database::new(&path);
     do_toggle_favorite(&database, &id)
+}
+
+#[tauri::command]
+pub async fn get_photo_ocr(app: tauri::AppHandle, id: String) -> String {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return String::new();
+    }
+    let database = database::Database::new(&path);
+    database.get_photo_ocr(&id)
 }
 
 #[tauri::command]
@@ -375,6 +395,106 @@ mod tests {
         let result = do_list_files(&db, "", 0, 10, false, false);
         assert_eq!(result[0].id, "ph2");
         assert_eq!(result[1].id, "ph1");
+    }
+
+    #[test]
+    fn list_files_ordered_by_aesthetics() {
+        let (mut db, _dir) = test_db();
+        let mut p1 = make_photo("ph1", "/a.jpg");
+        p1.created = "2026-01-03 10:00:00".to_string();
+        let mut p2 = make_photo("ph2", "/b.jpg");
+        p2.created = "2026-01-02 10:00:00".to_string();
+        let mut p3 = make_photo("ph3", "/c.jpg");
+        p3.created = "2026-01-01 10:00:00".to_string();
+        db.store_photo_batch(&[p1, p2, p3]).unwrap();
+        db.update_photo_metadata("ph1", None, Some(3.0), 2);
+        db.update_photo_metadata("ph2", None, Some(8.0), 2);
+        let result = do_list_files_filtered(
+            &db,
+            "",
+            0,
+            10,
+            false,
+            false,
+            None,
+            None,
+            None,
+            None,
+            None,
+            false,
+            None,
+            None,
+            false,
+            false,
+            false,
+            Some("best".to_string()),
+        );
+        assert_eq!(result[0].id, "ph2");
+        assert_eq!(result[1].id, "ph1");
+        assert_eq!(result[2].id, "ph3");
+    }
+
+    #[test]
+    fn list_files_ordered_by_oldest() {
+        let (mut db, _dir) = test_db();
+        let mut p1 = make_photo("ph1", "/a.jpg");
+        p1.created = "2026-01-01 10:00:00".to_string();
+        let mut p2 = make_photo("ph2", "/b.jpg");
+        p2.created = "2026-01-02 10:00:00".to_string();
+        db.store_photo_batch(&[p1, p2]).unwrap();
+        let result = do_list_files_filtered(
+            &db,
+            "",
+            0,
+            10,
+            false,
+            false,
+            None,
+            None,
+            None,
+            None,
+            None,
+            false,
+            None,
+            None,
+            false,
+            false,
+            false,
+            Some("oldest".to_string()),
+        );
+        assert_eq!(result[0].id, "ph1");
+        assert_eq!(result[1].id, "ph2");
+    }
+
+    #[test]
+    fn list_files_nsfw_hide() {
+        let (mut db, _dir) = test_db();
+        db.store_photo_batch(&[
+            make_photo("safe", "/safe.jpg"),
+            make_photo("risky", "/risky.jpg"),
+            make_photo("clean", "/clean.jpg"),
+        ])
+        .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO properties (photo_id, key, value) VALUES('risky', 'nsfw', '0.95')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO properties (photo_id, key, value) VALUES('clean', 'nsfw', '0.20')",
+                (),
+            )
+            .unwrap();
+        let result = do_list_files_filtered(
+            &db, "", 0, 10, false, false, None, None, None, None, None, false, None, None, false,
+            true, false, None,
+        );
+        let ids: Vec<_> = result.iter().map(|p| p.id.as_str()).collect();
+        assert!(ids.contains(&"safe"));
+        assert!(ids.contains(&"clean"));
+        assert!(!ids.contains(&"risky"));
     }
 
     #[test]

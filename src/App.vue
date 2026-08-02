@@ -13,6 +13,7 @@ import AppToolbar from '@/components/layout/AppToolbar.vue';
 import SyncStatusBanner from '@/components/layout/SyncStatusBanner.vue';
 import OnboardingFlow from '@/components/onboarding/OnboardingFlow.vue';
 import MediaLibrary from '@/components/MediaLibrary.vue';
+import PeopleRail from '@/components/PeopleRail.vue';
 import People from '@/components/People.vue';
 import Map from '@/components/Map.vue';
 import DeviceList from '@/components/DeviceList.vue';
@@ -118,6 +119,9 @@ function removeFilterChip(index: number): void {
       <v-main class="bg-siegu-main">
         <ErrorBoundary>
           <div data-tour="photos" class="w-100">
+            <PeopleRail
+              v-if="currentPage === 'home' && !searchStore.activeFilters.length"
+            />
             <div
               v-if="currentPage === 'home' && searchStore.activeFilters.length"
               class="d-flex align-center flex-wrap px-4 pt-2 ga-2"
@@ -154,9 +158,11 @@ function removeFilterChip(index: number): void {
                 videosOnly: searchStore.mediaFilters.videosOnly,
                 facesOnly: searchStore.mediaFilters.facesOnly,
                 papersOnly: searchStore.mediaFilters.papersOnly,
+                nsfwHide: searchStore.mediaFilters.nsfwHide,
                 camera: searchStore.camera,
                 aestheticsMin: searchStore.aestheticsMin,
                 surprise: searchStore.surprise,
+                orderBy: searchStore.sortOrder,
                 dateRange: 'all',
                 folder: null,
               }"

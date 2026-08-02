@@ -108,8 +108,12 @@ pub struct PhotoFilter {
     pub camera: Option<String>,
     /// Only photos whose object classes are documents/screenshots (CLIP).
     pub papers: bool,
+    /// Hide photos classified as NSFW (nsfw score >= 0.8).
+    pub nsfw_hide: bool,
     /// Random order instead of newest-first (used by "Surprise me").
     pub random: bool,
+    /// Sort order: "newest" (default), "oldest", "best" (aesthetics desc), "random".
+    pub order_by: Option<String>,
 }
 
 /// Persisted sync session for auto-reconnect on app restart.
@@ -997,8 +1001,20 @@ impl Database {
                 paper_in = paper_class_in_clause()
             ));
         }
+        if filter.nsfw_hide {
+            facet_filters.push_str(
+                " AND NOT EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='nsfw' AND CAST(value AS REAL) >= 0.8)",
+            );
+        }
 
-        let order_by = if filter.random {
+        let order_by = if let Some(order) = filter.order_by.as_deref() {
+            match order {
+                "oldest" => "ORDER BY p.created ASC",
+                "best" => "ORDER BY p.aesthetics_score DESC NULLS LAST, p.created DESC",
+                "random" => "ORDER BY RANDOM()",
+                _ => "ORDER BY p.created DESC",
+            }
+        } else if filter.random {
             "ORDER BY RANDOM()"
         } else {
             "ORDER BY p.created DESC"
@@ -1471,6 +1487,25 @@ impl Database {
     }
 
     /// Fetch a single photo by its ID, with objects and properties populated.
+    /// Concatenated OCR text for a photo (all detected text rows).
+    pub fn get_photo_ocr(&self, photo_id: &str) -> String {
+        let mut parts = Vec::new();
+        if let Ok(mut stmt) = self
+            .connection
+            .prepare("SELECT text FROM ocr WHERE photo_id = ?1 ORDER BY rowid")
+        {
+            if let Ok(rows) = stmt.query_map([photo_id], |r| r.get::<_, String>(0)) {
+                for row in rows.flatten() {
+                    let t = row.trim();
+                    if !t.is_empty() {
+                        parts.push(t.to_string());
+                    }
+                }
+            }
+        }
+        parts.join(" ")
+    }
+
     pub fn get_photo_by_id(&self, photo_id: &str) -> Option<Photo> {
         let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, \
              s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received \
@@ -3312,6 +3347,22 @@ mod tests {
         assert_eq!(stats.faces, 1);
         assert_eq!(stats.named_people, 1);
         assert_eq!(stats.face_photos, 1);
+    }
+
+    #[test]
+    fn test_get_photo_ocr_concatenates_rows() {
+        let mut db = test_db();
+        let _ = db.connection.execute(
+            "INSERT INTO photo (id, location, created, encoded) VALUES ('p1', '/a.jpg', '2026-01-01', '')",
+            (),
+        );
+        let _ = db.connection.execute(
+            "INSERT INTO ocr (photo_id, text) VALUES ('p1', 'hello'), ('p1', 'world')",
+            (),
+        );
+        let result = db.get_photo_ocr("p1");
+        assert_eq!(result, "hello world");
+        assert_eq!(db.get_photo_ocr("missing"), "");
     }
 
     #[test]

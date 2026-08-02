@@ -73,7 +73,8 @@
       "videos": "Video's",
       "faces": "Gezichten",
       "papers": "Documenten",
-      "surprise": "Verrass me"
+      "surprise": "Verrass me",
+      "nsfw_hide": "NSFW verbergen"
     },
     "papers": {
       "title": "Documenten en schermafbeeldingen",
@@ -107,7 +108,11 @@
       "quality": "Kwaliteit",
       "reset_quality": "Resetten",
       "clear_all": "Alles wissen"
-    }
+    },
+    "sort_label": "Foto's sorteren",
+    "sort_newest": "Nieuwste",
+    "sort_best": "Beste kwaliteit",
+    "sort_random": "Willekeurig"
   },
   "sync": {
     "status_label": "BIBLIOTHEEKSTATUS",
@@ -165,7 +170,8 @@
     "remove": "Verwijderen",
     "recent": "Recent",
     "label_photos": "Foto's:",
-    "label_videos": "Video's:"
+    "label_videos": "Video's:",
+    "all_photos": "Alle foto's"
   },
   "people": {
     "title": "Personen & Gezichten",
@@ -354,7 +360,8 @@
     "aesthetics_score": "Esthetiekscore",
     "faces_detected": "Gezichten gedetecteerd",
     "fully_indexed": "Volledig geïndexeerd",
-    "not_synced": "Niet geback-upt op een ander apparaat — tik om opnieuw te verbinden"
+    "not_synced": "Niet geback-upt op een ander apparaat — tik om opnieuw te verbinden",
+    "nsfw": "NSFW gedetecteerd"
   },
   "media_thumbnail": {
     "alt_thumb": "Fotominiatuur"
@@ -446,7 +453,12 @@
     "wallpaper_set": "Achtergrond succesvol ingesteld",
     "wallpaper_error": "Achtergrond instellen mislukt",
     "opened_in_explorer": "Geopend in bestandsverkenner",
-    "explorer_error": "Openen in bestandsverkenner mislukt"
+    "explorer_error": "Openen in bestandsverkenner mislukt",
+    "recognized_text": "Herkennde tekst",
+    "copy": "Kopiëren",
+    "copy_text": "Tekst kopiëren",
+    "copied": "Tekst gekopieerd",
+    "copy_failed": "Kopiëren mislukt"
   },
   "folder_picker": {
     "select_folder": "Map selecteren",
@@ -511,5 +523,9 @@
   "update_available": "Update {version} beschikbaar",
   "download_update": "Download en installeer",
   "update_error": "Update fout",
-  "update_progress": "Update wordt gedownload..."
+  "update_progress": "Update wordt gedownload...",
+  "people_rail": {
+    "title": "Mensen",
+    "unnamed": "Onbekend"
+  }
 }

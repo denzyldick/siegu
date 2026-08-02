@@ -179,11 +179,12 @@ function onDateRangeChange(range: [string, string] | null): void {
   }
 }
 
-function toggleMedia(type: 'favorites' | 'videos' | 'faces' | 'papers'): void {
+function toggleMedia(type: 'favorites' | 'videos' | 'faces' | 'papers' | 'nsfw'): void {
   if (type === 'favorites') searchStore.toggleFavoriteOnly();
   if (type === 'videos') searchStore.toggleVideoOnly();
   if (type === 'faces') searchStore.toggleFacesOnly();
   if (type === 'papers') searchStore.togglePapersOnly();
+  if (type === 'nsfw') searchStore.toggleNsfwHide();
   closeDropdown();
 }
 
@@ -229,7 +230,9 @@ function isActive(type: string, value: string): boolean {
   return searchStore.activeFilters.some((f) => f.type === type && f.value === value);
 }
 
-function isMediaActive(key: 'favoritesOnly' | 'videosOnly' | 'facesOnly' | 'papersOnly'): boolean {
+function isMediaActive(
+  key: 'favoritesOnly' | 'videosOnly' | 'facesOnly' | 'papersOnly' | 'nsfwHide',
+): boolean {
   return searchStore.mediaFilters[key];
 }
 
@@ -405,6 +408,19 @@ function iconForFilter(type: string): string {
                 </div>
                 <div class="magic-label">{{ t('search.magic.papers') }}</div>
                 <div class="magic-count">{{ activeCount('papers') }}</div>
+              </button>
+              <button
+                class="magic-card"
+                :class="{ 'magic-card--active': isMediaActive('nsfwHide') }"
+                @click="toggleMedia('nsfw')"
+              >
+                <div class="magic-icon" style="--magic: #ef4444">
+                  <v-icon size="20">mdi-eye-off-outline</v-icon>
+                </div>
+                <div class="magic-label">{{ t('search.magic.nsfw_hide') }}</div>
+                <div class="magic-count">
+                  {{ isMediaActive('nsfwHide') ? 'ON' : 'OFF' }}
+                </div>
               </button>
               <button class="magic-card" @click="surpriseMe">
                 <div class="magic-icon" style="--magic: #f43f5e">

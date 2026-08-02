@@ -39,6 +39,11 @@
           <v-icon color="white" size="20">mdi-play</v-icon>
         </div>
 
+        <div v-if="nsfwScore >= NSFW_THRESHOLD" class="nsfw-badge" :title="$t('media_card.nsfw')">
+          <v-icon size="14" color="white">mdi-alert-octagon</v-icon>
+          <span>{{ Math.round(nsfwScore * 100) }}%</span>
+        </div>
+
         <div v-if="selectionMode" class="selection-indicator">
           <div class="check-circle" :class="{ checked: selected }">
             <v-icon v-if="selected" color="white" size="16">mdi-check</v-icon>
@@ -154,6 +159,15 @@ const faceCount = computed((): number => {
   if (!props.path?.properties) return 0;
   const v = props.path.properties['face_count'];
   return v ? parseInt(String(v)) : 0;
+});
+
+const NSFW_THRESHOLD = 0.8;
+
+const nsfwScore = computed((): number => {
+  if (!props.path?.properties) return 0;
+  const v = props.path.properties['nsfw'];
+  const score = parseFloat(String(v));
+  return Number.isFinite(score) ? score : 0;
 });
 
 const notSynced = computed((): boolean => !!props.path?.sync_needed && !props.path?.received);
@@ -312,6 +326,23 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 5;
+}
+
+.nsfw-badge {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  background: rgba(220, 38, 38, 0.9);
+  backdrop-filter: blur(8px);
+  border-radius: 999px;
+  padding: 3px 8px;
   z-index: 5;
 }
 

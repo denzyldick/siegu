@@ -17,7 +17,8 @@
     "aesthetics_score": "Aesthetics score",
     "faces_detected": "Faces detected",
     "fully_indexed": "Fully indexed",
-    "not_synced": "Not backed up on another device — tap to reconnect"
+    "not_synced": "Not backed up on another device — tap to reconnect",
+    "nsfw": "NSFW detected"
   },
   "media_thumbnail": {
     "alt_thumb": "Photo thumbnail"
@@ -56,7 +57,8 @@
       "videos": "Videos",
       "faces": "Faces",
       "papers": "Papers",
-      "surprise": "Surprise me"
+      "surprise": "Surprise me",
+      "nsfw_hide": "Hide NSFW"
     },
     "papers": {
       "title": "Papers & screenshots",
@@ -90,7 +92,11 @@
       "quality": "Quality",
       "reset_quality": "Reset",
       "clear_all": "Clear all"
-    }
+    },
+    "sort_label": "Sort photos",
+    "sort_newest": "Newest",
+    "sort_best": "Best quality",
+    "sort_random": "Random"
   },
   "filters": {
     "favorites_only": "Favorites only",
@@ -146,7 +152,8 @@
     "remove": "Remove",
     "recent": "Recent",
     "label_photos": "Photos:",
-    "label_videos": "Videos:"
+    "label_videos": "Videos:",
+    "all_photos": "All photos"
   },
   "map": {
     "title": "Map View",
@@ -298,7 +305,12 @@
     "wallpaper_set": "Wallpaper set successfully",
     "wallpaper_error": "Failed to set wallpaper",
     "opened_in_explorer": "Opened in file explorer",
-    "explorer_error": "Failed to open in file explorer"
+    "explorer_error": "Failed to open in file explorer",
+    "recognized_text": "Recognized text",
+    "copy": "Copy",
+    "copy_text": "Copy text",
+    "copied": "Text copied",
+    "copy_failed": "Copy failed"
   },
   "folder_picker": {
     "select_folder": "Select Folder",
@@ -511,5 +523,9 @@
   "update_available": "Update {version} available",
   "download_update": "Download & Install",
   "update_error": "Update check failed",
-  "update_progress": "Downloading update..."
+  "update_progress": "Downloading update...",
+  "people_rail": {
+    "title": "People",
+    "unnamed": "Unnamed"
+  }
 }

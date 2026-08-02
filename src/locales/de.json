@@ -73,7 +73,8 @@
       "videos": "Videos",
       "faces": "Gesichter",
       "papers": "Dokumente",
-      "surprise": "Überraschen"
+      "surprise": "Überraschen",
+      "nsfw_hide": "NSFW ausblenden"
     },
     "papers": {
       "title": "Dokumente & Screenshots",
@@ -107,7 +108,11 @@
       "quality": "Qualität",
       "reset_quality": "Zurücksetzen",
       "clear_all": "Alles löschen"
-    }
+    },
+    "sort_label": "Fotos sortieren",
+    "sort_newest": "Neueste",
+    "sort_best": "Beste Qualität",
+    "sort_random": "Zufällig"
   },
   "sync": {
     "status_label": "BIBLIOTHEKSSTATUS",
@@ -165,7 +170,8 @@
     "remove": "Entfernen",
     "recent": "Letzte",
     "label_photos": "Fotos:",
-    "label_videos": "Videos:"
+    "label_videos": "Videos:",
+    "all_photos": "Alle Fotos"
   },
   "people": {
     "title": "Personen & Gesichter",
@@ -354,7 +360,8 @@
     "aesthetics_score": "Ästhetikbewertung",
     "faces_detected": "Gesichter erkannt",
     "fully_indexed": "Vollständig indiziert",
-    "not_synced": "Nicht auf einem anderen Gerät gesichert — Tippen zum erneuten Verbinden"
+    "not_synced": "Nicht auf einem anderen Gerät gesichert — Tippen zum erneuten Verbinden",
+    "nsfw": "NSFW erkannt"
   },
   "media_thumbnail": {
     "alt_thumb": "Fotominiatur"
@@ -446,7 +453,12 @@
     "wallpaper_set": "Hintergrundbild erfolgreich festgelegt",
     "wallpaper_error": "Fehler beim Festlegen des Hintergrundbilds",
     "opened_in_explorer": "Im Datei-Explorer geöffnet",
-    "explorer_error": "Fehler beim Öffnen im Datei-Explorer"
+    "explorer_error": "Fehler beim Öffnen im Datei-Explorer",
+    "recognized_text": "Erkannter Text",
+    "copy": "Kopieren",
+    "copy_text": "Text kopieren",
+    "copied": "Text kopiert",
+    "copy_failed": "Kopieren fehlgeschlagen"
   },
   "folder_picker": {
     "select_folder": "Ordner auswählen",
@@ -511,5 +523,9 @@
   "update_available": "Update {version} verfügbar",
   "download_update": "Herunterladen & Installieren",
   "update_error": "Update-Fehler",
-  "update_progress": "Update wird heruntergeladen..."
+  "update_progress": "Update wird heruntergeladen...",
+  "people_rail": {
+    "title": "Personen",
+    "unnamed": "Unbenannt"
+  }
 }

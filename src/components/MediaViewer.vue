@@ -215,6 +215,28 @@
 
             <v-divider class="opacity-5 mb-4" v-if="currentPhoto?.caption"></v-divider>
 
+            <div class="mb-6" v-if="photoOcr && !ocrLoading">
+              <div class="text-caption text-zinc-muted mb-1 text-uppercase tracking-widest">
+                {{ $t('media_viewer.recognized_text') }}
+              </div>
+              <div class="text-body-2 text-zinc-secondary ocr-text">{{ photoOcr }}</div>
+              <v-btn
+                size="x-small"
+                variant="text"
+                class="mt-1 text-none"
+                :title="$t('media_viewer.copy_text')"
+                @click="copyOcrText"
+              >
+                <v-icon size="14" class="mr-1">mdi-content-copy</v-icon>
+                {{ $t('media_viewer.copy') }}
+              </v-btn>
+            </div>
+
+            <v-divider
+              class="opacity-5 mb-4"
+              v-if="photoOcr && !ocrLoading && hasExif"
+            ></v-divider>
+
             <div class="mb-6" v-if="hasExif">
               <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">
                 {{ $t('media_viewer.camera_settings') }}
@@ -347,7 +369,10 @@ import { revealItemInDir, openPath } from '@tauri-apps/plugin-opener'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import MediaThumbnail from './MediaThumbnail.vue'
 import { isVideo as checkIsVideo } from '@/composables/useMediaUtils'
+import { useI18n } from 'vue-i18n'
 import type { MediaItem } from '@/types/media'
+
+const { t } = useI18n()
 
 interface DetectedFace {
   photo_id: string
@@ -375,6 +400,8 @@ const showInfo = ref(false)
 const os = ref('')
 const mediaPort = ref<number | null>(null)
 const detectedFaces = ref<DetectedFace[]>([])
+const photoOcr = ref('')
+const ocrLoading = ref(false)
 const isAnalyzing = ref(false)
 const isAnalyzingModel = ref<string | null>(null)
 const runStartTime = ref(0)
@@ -534,6 +561,32 @@ async function fetchFaces(): Promise<void> {
     detectedFaces.value = JSON.parse(facesStr)
   } catch (e) {
     console.error('Failed to fetch faces', e)
+  }
+}
+
+async function loadOcr(): Promise<void> {
+  if (!currentPhoto.value || isVideo.value) {
+    photoOcr.value = ''
+    return
+  }
+  ocrLoading.value = true
+  try {
+    photoOcr.value = await invoke<string>('get_photo_ocr', { id: currentPhoto.value.id })
+  } catch (e) {
+    console.error('Failed to fetch OCR text', e)
+    photoOcr.value = ''
+  } finally {
+    ocrLoading.value = false
+  }
+}
+
+async function copyOcrText(): Promise<void> {
+  if (!photoOcr.value) return
+  try {
+    await navigator.clipboard.writeText(photoOcr.value)
+    snackbar.value = { show: true, text: t('media_viewer.copied'), error: false }
+  } catch {
+    snackbar.value = { show: true, text: t('media_viewer.copy_failed'), error: true }
   }
 }
 
@@ -728,6 +781,7 @@ watch(() => props.index, () => {
   isAnalyzingModel.value = null
   if (runTimer) { clearInterval(runTimer); runTimer = null }
   fetchFaces()
+  loadOcr()
   scrollToActiveThumb()
   if (isVideo.value) showInfo.value = false
 })
@@ -777,6 +831,15 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.ocr-text {
+  max-height: 140px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .viewer-content-container {
   flex: 1;
   width: 100%;

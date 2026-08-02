@@ -15,10 +15,12 @@ export const useSearchStore = defineStore('search', () => {
     videosOnly: false,
     facesOnly: false,
     papersOnly: false,
+    nsfwHide: false,
   })
   const camera = ref<string | null>(null)
   const aestheticsMin = ref<number | null>(null)
   const surprise = ref(false)
+  const sortOrder = ref<'newest' | 'oldest' | 'best' | 'random'>('newest')
   const dateRange = ref<[string, string] | null>(null)
   let locationsResolved = false
 
@@ -97,6 +99,15 @@ export const useSearchStore = defineStore('search', () => {
     surprise.value = false
   }
 
+  function setSortOrder(order: 'newest' | 'oldest' | 'best' | 'random'): void {
+    sortOrder.value = order
+    if (order === 'random') {
+      surprise.value = true
+    } else if (surprise.value) {
+      surprise.value = false
+    }
+  }
+
   function clearFilters(): void {
     activeFilters.value = []
     mediaFilters.value = {
@@ -104,10 +115,12 @@ export const useSearchStore = defineStore('search', () => {
       videosOnly: false,
       facesOnly: false,
       papersOnly: false,
+      nsfwHide: false,
     }
     camera.value = null
     aestheticsMin.value = null
     surprise.value = false
+    sortOrder.value = 'newest'
     dateRange.value = null
   }
 
@@ -125,6 +138,10 @@ export const useSearchStore = defineStore('search', () => {
 
   function togglePapersOnly(): void {
     mediaFilters.value.papersOnly = !mediaFilters.value.papersOnly
+  }
+
+  function toggleNsfwHide(): void {
+    mediaFilters.value.nsfwHide = !mediaFilters.value.nsfwHide
   }
 
   function addRecentSearch(term: string): void {
@@ -170,6 +187,7 @@ export const useSearchStore = defineStore('search', () => {
     camera,
     aestheticsMin,
     surprise,
+    sortOrder,
     dateRange,
     hasQuery,
     hasFilters,
@@ -181,6 +199,7 @@ export const useSearchStore = defineStore('search', () => {
     setCamera,
     setAestheticsMin,
     setDateRange,
+    setSortOrder,
     toggleSurprise,
     clearSurprise,
     clearFilters,
@@ -188,6 +207,7 @@ export const useSearchStore = defineStore('search', () => {
     toggleVideoOnly,
     toggleFacesOnly,
     togglePapersOnly,
+    toggleNsfwHide,
     addRecentSearch,
     clearRecentSearches,
   }

@@ -73,7 +73,8 @@
       "videos": "Vídeos",
       "faces": "Rostos",
       "papers": "Documentos",
-      "surprise": "Surpreenda-me"
+      "surprise": "Surpreenda-me",
+      "nsfw_hide": "Ocultar NSFW"
     },
     "papers": {
       "title": "Documentos e capturas de tela",
@@ -107,7 +108,11 @@
       "quality": "Qualidade",
       "reset_quality": "Redefinir",
       "clear_all": "Limpar tudo"
-    }
+    },
+    "sort_label": "Ordenar fotos",
+    "sort_newest": "Mais recentes",
+    "sort_best": "Melhor qualidade",
+    "sort_random": "Aleatório"
   },
   "sync": {
     "status_label": "STATUS DA BIBLIOTECA",
@@ -165,7 +170,8 @@
     "remove": "Remover",
     "recent": "Recentes",
     "label_photos": "Fotos:",
-    "label_videos": "Vídeos:"
+    "label_videos": "Vídeos:",
+    "all_photos": "Todas as fotos"
   },
   "people": {
     "title": "Pessoas & Rostos",
@@ -354,7 +360,8 @@
     "aesthetics_score": "Pontuação estética",
     "faces_detected": "Rostos detectados",
     "fully_indexed": "Totalmente indexado",
-    "not_synced": "Não copiado para outro dispositivo — toque para reconectar"
+    "not_synced": "Não copiado para outro dispositivo — toque para reconectar",
+    "nsfw": "NSFW detectado"
   },
   "media_thumbnail": {
     "alt_thumb": "Miniatura de foto"
@@ -446,7 +453,12 @@
     "wallpaper_set": "Papel de parede definido com sucesso",
     "wallpaper_error": "Falha ao definir papel de parede",
     "opened_in_explorer": "Aberto no explorador de arquivos",
-    "explorer_error": "Falha ao abrir no explorador de arquivos"
+    "explorer_error": "Falha ao abrir no explorador de arquivos",
+    "recognized_text": "Texto reconhecido",
+    "copy": "Copiar",
+    "copy_text": "Copiar texto",
+    "copied": "Texto copiado",
+    "copy_failed": "Falha ao copiar"
   },
   "folder_picker": {
     "select_folder": "Selecionar Pasta",
@@ -511,5 +523,9 @@
   "update_available": "Atualização {version} disponível",
   "download_update": "Baixar e instalar",
   "update_error": "Erro na atualização",
-  "update_progress": "Baixando atualização..."
+  "update_progress": "Baixando atualização...",
+  "people_rail": {
+    "title": "Pessoas",
+    "unnamed": "Sem nome"
+  }
 }
