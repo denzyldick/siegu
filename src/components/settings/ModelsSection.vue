@@ -246,7 +246,7 @@
                   <template v-slot:activator="{ props }">
                     <v-btn
                       v-bind="props"
-                      variant="tonal"
+                      variant="flat"
                       size="small"
                       color="primary"
                       icon="mdi-play"
@@ -280,7 +280,7 @@
       <v-btn
         v-else-if="selectedModels.length > 0"
         variant="text"
-        color="black"
+        color="primary"
         size="small"
         class="font-weight-bold"
         prepend-icon="mdi-check-all"

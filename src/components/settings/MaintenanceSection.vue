@@ -68,7 +68,7 @@
             :max="maxThreads"
             :step="1"
             hide-details
-            color="black"
+            color="primary"
             track-color="#f4f4f5"
             @update:model-value="$emit('save-performance')"
           ></v-slider>

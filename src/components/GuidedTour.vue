@@ -3,7 +3,7 @@
     <div class="tour-spotlight" :style="spotlightStyle" v-if="targetRect"></div>
     <div class="tour-card" :class="cardPosition" @click.stop>
       <div class="tour-card-inner">
-        <v-icon size="32" color="black" class="mb-3">{{ currentStep.icon }}</v-icon>
+        <v-icon size="32" color="primary" class="mb-3">{{ currentStep.icon }}</v-icon>
         <h3 class="text-h6 font-weight-bold text-zinc-primary mb-1">{{ $t(currentStep.titleKey) }}</h3>
         <p class="text-body-2 text-zinc-secondary mb-6">{{ $t(currentStep.descKey) }}</p>
         <div class="d-flex align-center justify-space-between">
@@ -24,7 +24,7 @@
           </div>
           <v-btn
             v-if="step < steps.length - 1"
-            color="black"
+            color="primary"
             variant="flat"
             size="small"
             class="font-weight-bold px-6"
@@ -34,7 +34,7 @@
           </v-btn>
           <v-btn
             v-else
-            color="black"
+            color="primary"
             variant="flat"
             size="small"
             class="font-weight-bold px-6"

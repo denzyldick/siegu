@@ -74,7 +74,7 @@ const emit = defineEmits<{
       <v-card-actions class="pa-6 bg-zinc-50 border-top-subtle">
         <v-btn
           block
-          color="black"
+          color="primary"
           variant="flat"
           height="56"
           class="rounded-xl font-weight-bold text-none"

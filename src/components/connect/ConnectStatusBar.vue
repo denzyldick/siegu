@@ -30,7 +30,7 @@ const emit = defineEmits<{
   <div v-if="showDisconnect" class="text-center mt-4">
     <v-btn
       variant="flat"
-      color="black"
+      color="primary"
       size="small"
       @click="emit('disconnect')"
       :loading="disconnecting"

@@ -147,7 +147,7 @@
               <v-btn
                 block
                 variant="flat"
-                color="black"
+                color="primary"
                 prepend-icon="mdi-auto-fix"
                 :loading="isAnalyzing"
                 @click="analyzePhoto"

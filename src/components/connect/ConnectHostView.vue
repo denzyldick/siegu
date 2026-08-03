@@ -62,7 +62,7 @@
     <v-btn
       v-if="!copied"
       variant="outlined"
-      color="black"
+      color="primary"
       size="small"
       class="text-none text-caption"
       prepend-icon="mdi-content-copy"

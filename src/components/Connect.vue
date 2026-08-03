@@ -132,14 +132,14 @@
           <div class="d-flex ga-3">
             <v-btn
               variant="outlined"
-              color="black"
+              color="primary"
               class="text-none flex-1"
               @click="confirmDialog = false"
             >
               Back
             </v-btn>
             <v-btn
-              color="black"
+              color="primary"
               variant="flat"
               class="text-none flex-1"
               @click="proceedFromConfirm"

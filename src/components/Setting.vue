@@ -88,7 +88,7 @@
         />
 
         <UpdateSection
-          v-if="!embedded"
+          v-if="!embedded && !isStoreManaged"
           :status="updateStatus"
           :status-text="updateStatusText"
           :btn-text="updateBtnText"
@@ -257,7 +257,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettings } from '@/composables/useSettings'
 import FolderPicker from './FolderPicker.vue'
@@ -306,6 +306,7 @@ const {
   updateBtnText,
   updateBtnIcon,
   updateSupported,
+  currentPlatform,
   signalingUrl,
   signalingToken,
   signalingTesting,
@@ -345,6 +346,10 @@ const {
 
 const currentLang = ref(localStorage.getItem('siegu_language') || 'en')
 const currentTheme = ref(localStorage.getItem('siegu_theme') || 'system')
+
+const isStoreManaged = computed(
+  () => currentPlatform.value === 'android' || currentPlatform.value === 'ios',
+)
 
 const { t } = useI18n()
 
