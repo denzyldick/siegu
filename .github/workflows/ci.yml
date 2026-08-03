@@ -48,8 +48,8 @@ jobs:
       - name: Install dependencies (macOS only)
         if: matrix.platform == 'macos-latest'
         run: |
-          brew install ffmpeg
-          echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          brew install ffmpeg atk gtk+3
+          echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$(brew --prefix atk)/lib/pkgconfig:$(brew --prefix gtk+3)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
       - name: Cache FFmpeg (Windows)
         if: matrix.platform == 'windows-latest'
@@ -274,8 +274,8 @@ jobs:
       - name: Install dependencies (macOS only)
         if: matrix.platform == 'macos-latest'
         run: |
-          brew install ffmpeg
-          echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          brew install ffmpeg atk gtk+3
+          echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$(brew --prefix atk)/lib/pkgconfig:$(brew --prefix gtk+3)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
       - name: Cache FFmpeg (Windows)
         if: matrix.platform == 'windows-latest'

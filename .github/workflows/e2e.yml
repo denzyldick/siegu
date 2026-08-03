@@ -36,7 +36,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/siegu-e2e-models
-          key: siegu-e2e-models-v1
+          key: siegu-e2e-models-v2
 
       - name: Build CLI
         run: cargo build --release -p siegu-cli
