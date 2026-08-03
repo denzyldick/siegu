@@ -294,6 +294,7 @@ mod tests {
         assert!(!path_within_roots(&roots, &file));
     }
 
+    #[cfg(unix)]
     #[test]
     fn path_within_roots_rejects_symlink_escape() {
         let root = tempfile::tempdir().unwrap();

@@ -48,8 +48,8 @@ jobs:
       - name: Install dependencies (macOS only)
         if: matrix.platform == 'macos-latest'
         run: |
-          brew install ffmpeg atk gtk+3
-          echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$(brew --prefix atk)/lib/pkgconfig:$(brew --prefix gtk+3)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          brew install ffmpeg
+          echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
       - name: Cache FFmpeg (Windows)
         if: matrix.platform == 'windows-latest'
@@ -172,7 +172,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android, x86_64-linux-android
+          targets: aarch64-linux-android
           components: rustfmt
 
       - uses: Swatinem/rust-cache@v2
@@ -187,7 +187,7 @@ jobs:
         run: cargo install cargo-ndk
 
       - name: Ensure rust targets are installed
-        run: rustup target add aarch64-linux-android x86_64-linux-android || true
+        run: rustup target add aarch64-linux-android || true
 
       - name: Patch ffmpeg-sys-next for Android cross-compilation
         run: |
@@ -206,10 +206,6 @@ jobs:
       - name: Check Rust lib for Android (aarch64)
         working-directory: src-tauri
         run: cargo ndk -t aarch64-linux-android -P 24 check
-
-      - name: Check Rust lib for Android (x86_64)
-        working-directory: src-tauri
-        run: cargo ndk -t x86_64-linux-android -P 24 check
 
   test-ios:
     if: github.event_name != 'release'
@@ -274,8 +270,8 @@ jobs:
       - name: Install dependencies (macOS only)
         if: matrix.platform == 'macos-latest'
         run: |
-          brew install ffmpeg atk gtk+3
-          echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$(brew --prefix atk)/lib/pkgconfig:$(brew --prefix gtk+3)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          brew install ffmpeg
+          echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
       - name: Cache FFmpeg (Windows)
         if: matrix.platform == 'windows-latest'
@@ -354,7 +350,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android, x86_64-linux-android
+          targets: aarch64-linux-android
           components: rustfmt
 
       - uses: Swatinem/rust-cache@v2
@@ -369,7 +365,7 @@ jobs:
         run: cargo install cargo-ndk
 
       - name: Ensure rust targets are installed
-        run: rustup target add aarch64-linux-android x86_64-linux-android || true
+        run: rustup target add aarch64-linux-android || true
 
       - name: Patch ffmpeg-sys-next for Android cross-compilation
         run: |
@@ -393,20 +389,11 @@ jobs:
             --manifest-path src-tauri/Cargo.toml \
             build --features "tauri/custom-protocol tauri/custom-protocol" --lib --release
 
-      - name: Build Rust lib for x86_64
-        run: |
-          cargo ndk -t x86_64-linux-android -P 24 \
-            --manifest-path src-tauri/Cargo.toml \
-            build --features "tauri/custom-protocol tauri/custom-protocol" --lib --release
-
       - name: Copy .so to jniLibs
         run: |
           mkdir -p src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a
-          mkdir -p src-tauri/gen/android/app/src/main/jniLibs/x86_64
           cp target/aarch64-linux-android/release/libsiegu_lib.so \
              src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a/
-          cp target/x86_64-linux-android/release/libsiegu_lib.so \
-             src-tauri/gen/android/app/src/main/jniLibs/x86_64/
 
       - name: Generate tauri.build.gradle.kts
         working-directory: src-tauri/gen/android
