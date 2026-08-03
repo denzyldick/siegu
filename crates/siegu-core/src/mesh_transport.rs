@@ -23,7 +23,7 @@ use webrtc::peer_connection::configuration::RTCConfiguration;
 use webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState;
 use webrtc::peer_connection::sdp::session_description::RTCSessionDescription;
 
-use crate::database::{Database, PhotoSyncInfo};
+use crate::database::PhotoSyncInfo;
 use crate::mesh::{IncomingFile, MeshManager, SyncEvent, SyncMessage, PROTOCOL_VERSION};
 use crate::signal::SignalMessage;
 
@@ -65,6 +65,7 @@ pub struct MeshTransport {
 }
 
 impl MeshTransport {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         room_id: String,
         is_initiator: bool,
@@ -762,6 +763,7 @@ impl MeshTransport {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::database::Database;
     use crate::mesh::{SyncEvent, SyncProgress, PROTOCOL_VERSION};
 
     struct TestEvent;

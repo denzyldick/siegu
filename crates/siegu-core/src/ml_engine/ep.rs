@@ -13,6 +13,7 @@ use ort::session::Session;
 /// Graph optimization is disabled (`Disable`) to avoid issues with certain
 /// model architectures (e.g., Whisper decoder with dynamic KV cache shapes).
 /// Execution providers are tried in priority order; the first successful one wins.
+#[allow(clippy::vec_init_then_push)]
 pub fn build_session(path: &std::path::Path) -> Result<Session, String> {
     let mut builder = Session::builder()
         .map_err(|e| format!("Session builder error: {e}"))?

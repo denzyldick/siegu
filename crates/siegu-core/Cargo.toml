@@ -50,6 +50,7 @@ aes-gcm = { workspace = true }
 default = ["ml"]
 ml = ["dep:ort", "dep:tokenizers"]
 video-thumbs = ["dep:ffmpeg-next"]
+cuda = []
 
 [dependencies.ort]
 version = "2.0.0-rc.12"

@@ -3,6 +3,7 @@ use crate::database;
 use crate::database::{Database, Photo};
 
 /// Pure business logic — testable without Tauri.
+#[allow(dead_code)]
 pub fn do_list_files(
     db: &Database,
     query: &str,

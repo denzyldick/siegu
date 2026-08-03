@@ -424,6 +424,7 @@ impl MeshManager {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn handle_sync_message(
         msg: SyncMessage,
         dc: &Arc<webrtc::data_channel::RTCDataChannel>,
@@ -912,29 +913,6 @@ impl MeshManager {
             }
         }
         total
-    }
-}
-
-struct NullSyncEvent;
-
-impl SyncEvent for NullSyncEvent {
-    fn on_state_change(&self, _: &str) {}
-    fn on_log(&self, _: &str) {}
-    fn on_sync_progress(&self, _: SyncProgress) {}
-    fn on_photo_received(&self, _: String, _: String) {}
-    fn on_sync_error(&self, _: String) {}
-    fn on_peer_connected(&self, _: String, _: String, _: String, _: Vec<String>, _: u8) {}
-    fn on_peer_disconnected(&self, _: String) {}
-    fn on_device_registered(&self, _: &Database) {}
-    fn on_metadata_updated(&self, _: &str, _: Option<&str>, _: Option<f64>) {}
-    fn get_config_path(&self) -> String {
-        String::new()
-    }
-    fn get_sync_path(&self) -> Option<String> {
-        None
-    }
-    fn get_directories(&self) -> Vec<String> {
-        Vec::new()
     }
 }
 

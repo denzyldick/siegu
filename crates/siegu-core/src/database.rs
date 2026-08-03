@@ -228,7 +228,7 @@ pub fn is_video_path(path: &str) -> bool {
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_ascii_lowercase();
-    scanner::VIDEO_EXTENSIONS.iter().any(|v| *v == ext.as_str())
+    scanner::VIDEO_EXTENSIONS.contains(&ext.as_str())
 }
 
 const MONTH_NAMES: &[(u8, &str, &str)] = &[
@@ -1319,12 +1319,9 @@ impl Database {
         for (_, (make, model)) in by_photo {
             let brand = match (make, model) {
                 (Some(m), _) if !m.trim().is_empty() => m.trim().to_lowercase(),
-                (_, Some(md)) if !md.trim().is_empty() => md
-                    .trim()
-                    .split_whitespace()
-                    .next()
-                    .unwrap_or("")
-                    .to_lowercase(),
+                (_, Some(md)) if !md.trim().is_empty() => {
+                    md.split_whitespace().next().unwrap_or("").to_lowercase()
+                }
                 _ => continue,
             };
             if brand.is_empty() {

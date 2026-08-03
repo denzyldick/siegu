@@ -352,7 +352,7 @@ pub async fn stop_webrtc_session(
     }
     if let Ok(mut d) = mdns_state.daemon.lock() {
         if let Some(daemon) = d.take() {
-            let _ = daemon.shutdown();
+            daemon.shutdown();
             emit_log(&app, "mDNS daemon shut down".to_string());
         }
     }
@@ -391,7 +391,7 @@ pub async fn remove_device(app: tauri::AppHandle, id: String) -> Result<(), Stri
 pub async fn rename_device(
     app: tauri::AppHandle,
     id: String,
-    newName: String,
+    new_name: String,
 ) -> Result<(), String> {
     use crate::database;
     let path = get_config_path(&app);
@@ -399,7 +399,7 @@ pub async fn rename_device(
         return Err("Config error".to_string());
     }
     let db = database::Database::new(&path);
-    do_rename_device(&db, &id, &newName)
+    do_rename_device(&db, &id, &new_name)
 }
 
 #[tauri::command]

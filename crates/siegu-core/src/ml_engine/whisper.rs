@@ -334,7 +334,7 @@ fn merge_kv(old: &KvCache, new: &KvCache) -> KvCache {
     old.iter()
         .zip(new.iter())
         .map(|(o, n)| {
-            if n.shape().iter().any(|&d| d == 0) {
+            if n.shape().contains(&0) {
                 o.clone()
             } else {
                 n.clone()
@@ -346,7 +346,7 @@ fn merge_kv(old: &KvCache, new: &KvCache) -> KvCache {
 /// Converts a KV cache tensor to an ORT Value with the given input name.
 fn kv_to_tensor(kv: &Array4<f32>, name: &str) -> ort::value::Value {
     let shape = kv.shape().to_vec();
-    let data = kv.clone().into_raw_vec();
+    let data = kv.clone().into_raw_vec_and_offset().0;
     whisper_debug!("kv_to_tensor: {name} shape={shape:?}");
     match ort::value::Value::from_array((shape, data)) {
         Ok(v) => v.into_dyn(),
@@ -409,7 +409,7 @@ pub fn whisper_transcribe(
         mel.shape()
     );
     let mel_shape = mel.shape().to_vec();
-    let mel_data = mel.into_raw_vec();
+    let mel_data = mel.into_raw_vec_and_offset().0;
     let enc_input = ort::value::Value::from_array((mel_shape, mel_data)).unwrap();
 
     // ── Run the encoder to get hidden states ──────────────────────────
@@ -468,13 +468,15 @@ pub fn whisper_transcribe(
      -> Option<(Vec<i64>, KvCache)> {
         let seq_len = input_ids.len();
         let ids_arr = Array2::from_shape_vec((1, seq_len), input_ids).ok()?;
-        let ids_tensor =
-            ort::value::Value::from_array((ids_arr.shape().to_vec(), ids_arr.into_raw_vec()))
-                .ok()?;
+        let ids_tensor = ort::value::Value::from_array((
+            ids_arr.shape().to_vec(),
+            ids_arr.into_raw_vec_and_offset().0,
+        ))
+        .ok()?;
 
         let enc_hidden_tensor = ort::value::Value::from_array((
             enc_data.shape().to_vec(),
-            enc_data.clone().into_raw_vec(),
+            enc_data.clone().into_raw_vec_and_offset().0,
         ))
         .ok()?;
 
@@ -487,7 +489,7 @@ pub fn whisper_transcribe(
         let use_cache_arr = Array1::from_vec(vec![use_cache_branch]);
         let use_cache_tensor = ort::value::Value::from_array((
             use_cache_arr.shape().to_vec(),
-            use_cache_arr.into_raw_vec(),
+            use_cache_arr.into_raw_vec_and_offset().0,
         ))
         .ok()?;
         inputs.insert("use_cache_branch".into(), use_cache_tensor.into_dyn());
@@ -603,7 +605,7 @@ pub fn whisper_transcribe(
     ];
     let text_tokens: Vec<u32> = generated_tokens
         .iter()
-        .filter(|&&t| t >= 0 && t < SOT && !skip_tokens.contains(&(t as u32)))
+        .filter(|&&t| (0..SOT).contains(&t) && !skip_tokens.contains(&(t as u32)))
         .map(|&t| t as u32)
         .collect();
 

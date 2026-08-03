@@ -35,7 +35,7 @@ impl SyncEvent for TauriSyncEvent {
 
         // Attribute the received file to the active peer so its card shows live counts.
         let is_video = crate::database::is_video_path(&path);
-        if let Ok(mut peer) = self.active_peer.try_lock() {
+        if let Ok(peer) = self.active_peer.try_lock() {
             if let Some(peer_id) = peer.as_ref() {
                 let db = Database::new(&self.config_path);
                 if is_video {

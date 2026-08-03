@@ -6,7 +6,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use siegu_core::database::Database;
 use siegu_core::mesh_transport::MeshTransport;
 use siegu_core::scanner::ScanGuard;
-use siegu_core::{MeshManager, PeerDevice, SavedSession, SyncEvent, SyncProgress};
+use siegu_core::{PeerDevice, SavedSession, SyncEvent, SyncProgress};
 
 mod analyze_tui;
 
@@ -331,31 +331,28 @@ async fn main() {
                 ConfigAction::Keys => cmd_config_keys(),
             }
         }
-        Commands::Mesh { action } => {
-            let config_dir = resolve_config_dir(&cli.config_dir, &None);
-            match action {
-                MeshAction::Host { port, config } => {
-                    let config_dir = resolve_config_dir(&cli.config_dir, config);
-                    cmd_mesh_host(*port, &config_dir).await;
-                }
-                MeshAction::Join { room, config } => {
-                    let config_dir = resolve_config_dir(&cli.config_dir, config);
-                    cmd_mesh_join(room, &config_dir).await;
-                }
-                MeshAction::Status { config } => {
-                    let config_dir = resolve_config_dir(&cli.config_dir, config);
-                    cmd_mesh_status(&config_dir);
-                }
-                MeshAction::Disconnect { config } => {
-                    let config_dir = resolve_config_dir(&cli.config_dir, config);
-                    cmd_mesh_disconnect(&config_dir);
-                }
-                MeshAction::Quota { config } => {
-                    let config_dir = resolve_config_dir(&cli.config_dir, config);
-                    cmd_mesh_quota(&config_dir);
-                }
+        Commands::Mesh { action } => match action {
+            MeshAction::Host { port, config } => {
+                let config_dir = resolve_config_dir(&cli.config_dir, config);
+                cmd_mesh_host(*port, &config_dir).await;
             }
-        }
+            MeshAction::Join { room, config } => {
+                let config_dir = resolve_config_dir(&cli.config_dir, config);
+                cmd_mesh_join(room, &config_dir).await;
+            }
+            MeshAction::Status { config } => {
+                let config_dir = resolve_config_dir(&cli.config_dir, config);
+                cmd_mesh_status(&config_dir);
+            }
+            MeshAction::Disconnect { config } => {
+                let config_dir = resolve_config_dir(&cli.config_dir, config);
+                cmd_mesh_disconnect(&config_dir);
+            }
+            MeshAction::Quota { config } => {
+                let config_dir = resolve_config_dir(&cli.config_dir, config);
+                cmd_mesh_quota(&config_dir);
+            }
+        },
     }
 }
 
@@ -462,7 +459,7 @@ fn cmd_models_list(config_dir: &Path) {
     println!();
 
     for entry in siegu_core::model_manager::MODEL_REGISTRY {
-        let path = models_dir.join(&entry.filename);
+        let path = models_dir.join(entry.filename);
         let exists = path.exists();
         let size = if exists {
             std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0)
@@ -524,7 +521,7 @@ async fn cmd_models_download(config_dir: &Path, names: Option<&[String]>) {
         .expect("Failed to create HTTP client");
 
     for entry in &to_download {
-        let path = models_dir.join(&entry.filename);
+        let path = models_dir.join(entry.filename);
         if path.exists() {
             println!("{}: already downloaded, skipping", entry.model_name);
             continue;
@@ -544,8 +541,8 @@ async fn cmd_models_download(config_dir: &Path, names: Option<&[String]>) {
 
         let result = siegu_core::model_manager::download_file(
             &client,
-            &entry.url,
-            &entry.filename,
+            entry.url,
+            entry.filename,
             entry.expected_size,
             &models_dir,
             |downloaded, total| {
@@ -564,7 +561,7 @@ async fn cmd_models_download(config_dir: &Path, names: Option<&[String]>) {
             Ok(siegu_core::model_manager::DownloadOutcome::Completed) => {
                 pb.finish_with_message(format!("{}: done", entry.model_name));
                 if !entry.sha256.is_empty() {
-                    match siegu_core::model_manager::verify_sha256(&path, &entry.sha256) {
+                    match siegu_core::model_manager::verify_sha256(&path, entry.sha256) {
                         Ok(true) => println!("  SHA-256 verified"),
                         Ok(false) => {
                             eprintln!("  WARNING: SHA-256 mismatch! File may be corrupted.");
@@ -652,9 +649,7 @@ async fn cmd_serve(port: u16) {
     println!("Starting LAN signaling server on port {port}...");
     println!("Press Ctrl+C to stop.");
 
-    match siegu_core::lan_server::start(port).await {
-        _ => {}
-    }
+    let _ = siegu_core::lan_server::start(port).await;
 }
 
 async fn cmd_sync(server: &str) {

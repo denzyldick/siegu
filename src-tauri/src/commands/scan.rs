@@ -155,7 +155,7 @@ pub fn scan_files(app: tauri::AppHandle) {
         let db_clone = Arc::clone(database);
         let batch_for_blocking = batch.to_vec();
         let app_for_blocking = app_handle.clone();
-        tauri::async_runtime::spawn_blocking(move || {
+        let _ = tauri::async_runtime::spawn_blocking(move || {
             if let Ok(mut db) = db_clone.lock() {
                 if let Err(e) = store_batch_to_db(&mut db, &batch_for_blocking) {
                     emit_log(
@@ -254,7 +254,7 @@ pub fn scan_files(app: tauri::AppHandle) {
             // disk. Once removed from the manifest, the next manifest exchange
             // re-requests and restores the file from any peer holding a copy.
             let mut db_prune = database::Database::new(&path);
-            let pruned = db_prune.prune_missing_files(&folder);
+            let pruned = db_prune.prune_missing_files(folder);
             if pruned > 0 {
                 emit_log(
                     &app,

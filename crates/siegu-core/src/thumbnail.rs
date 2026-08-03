@@ -100,13 +100,11 @@ fn generate_image_thumbnail(path: &str) -> Option<String> {
 #[cfg(feature = "video-thumbs")]
 fn generate_video_thumbnail(path: &str) -> Option<String> {
     let mut ctx = ffmpeg_next::format::input(path).ok()?;
-    let streams = ctx.streams();
-    let best = streams.best(ffmpeg_next::media::Type::Video)?;
-    let stream_index = best.index();
-    let time_base = best.time_base();
-    let params = best.parameters().clone();
-    drop(best);
-    drop(streams);
+    let (stream_index, time_base, params) = {
+        let streams = ctx.streams();
+        let best = streams.best(ffmpeg_next::media::Type::Video)?;
+        (best.index(), best.time_base(), best.parameters().clone())
+    };
     let codec_id = params.id();
     let codec = ffmpeg_next::codec::decoder::find(codec_id)?;
     let codec_ctx = ffmpeg_next::codec::context::Context::from_parameters(params).ok()?;

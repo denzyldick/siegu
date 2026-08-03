@@ -20,6 +20,7 @@ use siegu_core::ml_engine::worker::{start_worker, AnalysisCallbacks};
 use siegu_core::ml_engine::PhotoResult;
 use siegu_core::ml_worker::MlContext;
 
+#[allow(clippy::large_enum_variant)]
 enum TuiEvent {
     PhotoComplete {
         photo_id: String,
@@ -419,7 +420,7 @@ fn render_findings(f: &mut ratatui::Frame, app: &App, area: Rect) {
             for (cls, count) in sorted_objects.iter().take(available.saturating_sub(1)) {
                 lines.push(Line::from(vec![
                     Span::styled("  ", Style::default()),
-                    Span::styled(format!("{cls}"), Style::default().fg(Color::Green)),
+                    Span::styled(cls.to_string(), Style::default().fg(Color::Green)),
                     Span::styled(format!(" ×{count}"), Style::default().fg(Color::DarkGray)),
                 ]));
             }
@@ -830,7 +831,7 @@ fn print_e2e_summary(config_dir: &Path) {
     }
 }
 
-fn run_headless_loop(ml_context: MlContext, rx: mpsc::Receiver<TuiEvent>, config_dir: &Path) {
+fn run_headless_loop(_ml_context: MlContext, rx: mpsc::Receiver<TuiEvent>, config_dir: &Path) {
     loop {
         match rx.recv() {
             Ok(TuiEvent::PhotoComplete {

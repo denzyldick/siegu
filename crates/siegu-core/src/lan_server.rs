@@ -95,7 +95,7 @@ pub async fn start_with_config(config: ServerConfig) -> LanServer {
     let remote_route = warp::path("ws")
         .and(warp::ws())
         .and(ctx_filter.clone())
-        .and(remote_addr.clone())
+        .and(remote_addr)
         .map(
             |ws: warp::ws::Ws,
              ctx: Arc<ServerContext>,

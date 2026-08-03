@@ -1,6 +1,3 @@
-use crate::common::get_config_path;
-use tauri::Manager;
-
 #[tauri::command]
 pub async fn set_wallpaper(app: tauri::AppHandle, path: String) -> Result<(), String> {
     set_wallpaper_impl(&app, &path)

@@ -22,10 +22,10 @@ pub fn normalize_signaling_url(raw: &str) -> String {
         return s;
     }
     if !s.contains("://") {
-        s = if s.starts_with("wss:") {
-            format!("wss://{}", &s["wss:".len()..])
-        } else if s.starts_with("ws:") {
-            format!("ws://{}", &s["ws:".len()..])
+        s = if let Some(rest) = s.strip_prefix("wss:") {
+            format!("wss://{rest}")
+        } else if let Some(rest) = s.strip_prefix("ws:") {
+            format!("ws://{rest}")
         } else {
             format!("wss://{s}")
         };

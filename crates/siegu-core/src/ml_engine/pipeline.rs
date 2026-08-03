@@ -146,6 +146,7 @@ pub fn analyze_photo(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn analyze_image(
     photo_id: &str,
     frame_index: usize,
@@ -163,7 +164,7 @@ pub fn analyze_image(
     if should_run_model(target_model, "clip", Some(config)) && ai_status.clip == 0 {
         if let Some(ref visual_model) = models.clip_visual {
             let start = Instant::now();
-            let input = preprocessing::clip_preprocess(&img);
+            let input = preprocessing::clip_preprocess(img);
             if let Ok(data) = run_model(visual_model, input, "pixel_values") {
                 let mut visual_embedding = data;
                 let norm: f32 = visual_embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -201,7 +202,7 @@ pub fn analyze_image(
     if should_run_model(target_model, "aesthetics", Some(config)) && ai_status.aesthetics == 0 {
         if let Some(ref model) = models.aesthetics {
             let start = Instant::now();
-            let input = preprocessing::aesthetics_preprocess(&img);
+            let input = preprocessing::aesthetics_preprocess(img);
             if let Ok(data) = run_model(model, input, "input") {
                 result.aesthetics = Some(data[0] as f64);
                 result.completed_models.push("aesthetics");
@@ -216,7 +217,7 @@ pub fn analyze_image(
     if should_run_model(target_model, "nsfw", Some(config)) && ai_status.nsfw == 0 {
         if let Some(ref model) = models.nsfw {
             let start = Instant::now();
-            let input = preprocessing::nsfw_preprocess(&img);
+            let input = preprocessing::nsfw_preprocess(img);
             if let Ok(data) = run_model(model, input, "pixel_values") {
                 let nsfw_score = if data.len() >= 2 {
                     let e0 = data[0].exp();
@@ -236,43 +237,42 @@ pub fn analyze_image(
 
     // OCR
     if should_run_model(target_model, "ocr", Some(config)) && ai_status.ocr == 0 {
-        if models.ocr_det.is_some() {
-            if let Some(ref rec_model) = models.ocr_rec {
-                if !models.ocr_alphabet.is_empty() {
-                    let start = Instant::now();
-                    let input = preprocessing::ocr_preprocess(&img);
-                    if let Ok(rec_logits) = run_model(rec_model, input, "x") {
-                        let seq_len = rec_logits.len() / models.ocr_alphabet.len();
-                        let num_classes = models.ocr_alphabet.len();
-                        let mut recognized_text = String::new();
-                        let mut last_char_idx = 0;
-                        for i in 0..seq_len {
-                            let chunk = &rec_logits[i * num_classes..(i + 1) * num_classes];
-                            let mut max_val = -f32::INFINITY;
-                            let mut max_idx = 0;
-                            for (idx, &val) in chunk.iter().enumerate() {
-                                if val > max_val {
-                                    max_val = val;
-                                    max_idx = idx;
-                                }
+        match &models.ocr_rec {
+            Some(ref rec_model) if models.ocr_det.is_some() && !models.ocr_alphabet.is_empty() => {
+                let start = Instant::now();
+                let input = preprocessing::ocr_preprocess(img);
+                if let Ok(rec_logits) = run_model(rec_model, input, "x") {
+                    let seq_len = rec_logits.len() / models.ocr_alphabet.len();
+                    let num_classes = models.ocr_alphabet.len();
+                    let mut recognized_text = String::new();
+                    let mut last_char_idx = 0;
+                    for i in 0..seq_len {
+                        let chunk = &rec_logits[i * num_classes..(i + 1) * num_classes];
+                        let mut max_val = -f32::INFINITY;
+                        let mut max_idx = 0;
+                        for (idx, &val) in chunk.iter().enumerate() {
+                            if val > max_val {
+                                max_val = val;
+                                max_idx = idx;
                             }
-                            if max_idx != 0 && max_idx != last_char_idx {
-                                if let Some(c) = models.ocr_alphabet.get(max_idx) {
-                                    recognized_text.push_str(c);
-                                }
+                        }
+                        if max_idx != 0 && max_idx != last_char_idx {
+                            if let Some(c) = models.ocr_alphabet.get(max_idx) {
+                                recognized_text.push_str(c);
                             }
-                            last_char_idx = max_idx;
                         }
-                        if !recognized_text.trim().is_empty() {
-                            result.ocr = Some(recognized_text);
-                        }
+                        last_char_idx = max_idx;
                     }
-                    result.completed_models.push("ocr");
-                    result
-                        .model_timings
-                        .insert("ocr".to_string(), start.elapsed().as_secs_f64());
+                    if !recognized_text.trim().is_empty() {
+                        result.ocr = Some(recognized_text);
+                    }
                 }
+                result.completed_models.push("ocr");
+                result
+                    .model_timings
+                    .insert("ocr".to_string(), start.elapsed().as_secs_f64());
             }
+            _ => {}
         }
     }
 
@@ -280,7 +280,7 @@ pub fn analyze_image(
     if should_run_model(target_model, "yolo", Some(config)) && ai_status.yolo == 0 {
         if let Some(ref model) = models.yolo {
             let start = Instant::now();
-            let input = preprocessing::yolo_preprocess(&img);
+            let input = preprocessing::yolo_preprocess(img);
             if let Ok(data) = run_model(model, input, "images") {
                 let num_classes = 80;
                 let num_anchors = 8400;
@@ -322,7 +322,7 @@ pub fn analyze_image(
     if should_run_face || should_run_arcface {
         if let Some(ref face_model) = models.face_detector {
             let start = Instant::now();
-            let input = preprocessing::face_preprocess(&img);
+            let input = preprocessing::face_preprocess(img);
             if let Ok(data) = run_model(face_model, input, "input") {
                 if data.len() >= 4420 * 6 {
                     let scores = &data[..4420 * 2];
@@ -458,7 +458,7 @@ pub fn analyze_image(
     // BLIP caption generation
     if should_run_model(target_model, "blip", Some(config)) && ai_status.blip == 0 {
         let start = Instant::now();
-        let caption = generate_blip_caption(&img, models);
+        let caption = generate_blip_caption(img, models);
         if let Some(caption) = caption {
             result.caption = Some(caption);
             result.completed_models.push("blip");
@@ -472,7 +472,7 @@ pub fn analyze_image(
     if should_run_model(target_model, "midas", Some(config)) && ai_status.midas == 0 {
         if let Some(ref model) = models.midas {
             let start = Instant::now();
-            let input = preprocessing::midas_preprocess(&img);
+            let input = preprocessing::midas_preprocess(img);
             if let Ok(_data) = run_model(model, input, "pixel_values") {
                 result.completed_models.push("midas");
                 result
@@ -526,18 +526,24 @@ pub fn generate_blip_caption(img: &image::RgbImage, models: &mut LoadedModels) -
         let enc_arr = ndarray::Array3::from_shape_vec((1, 577, 768), enc_hidden.clone()).ok()?;
         let enc_mask_arr = ndarray::Array2::from_shape_vec((1, 577), enc_attn_mask.clone()).ok()?;
 
-        let ids_tensor =
-            ort::value::Value::from_array((ids_arr.shape().to_vec(), ids_arr.into_raw_vec()))
-                .ok()?;
-        let mask_tensor =
-            ort::value::Value::from_array((mask_arr.shape().to_vec(), mask_arr.into_raw_vec()))
-                .ok()?;
-        let enc_tensor =
-            ort::value::Value::from_array((enc_arr.shape().to_vec(), enc_arr.into_raw_vec()))
-                .ok()?;
+        let ids_tensor = ort::value::Value::from_array((
+            ids_arr.shape().to_vec(),
+            ids_arr.into_raw_vec_and_offset().0,
+        ))
+        .ok()?;
+        let mask_tensor = ort::value::Value::from_array((
+            mask_arr.shape().to_vec(),
+            mask_arr.into_raw_vec_and_offset().0,
+        ))
+        .ok()?;
+        let enc_tensor = ort::value::Value::from_array((
+            enc_arr.shape().to_vec(),
+            enc_arr.into_raw_vec_and_offset().0,
+        ))
+        .ok()?;
         let enc_mask_tensor = ort::value::Value::from_array((
             enc_mask_arr.shape().to_vec(),
-            enc_mask_arr.into_raw_vec(),
+            enc_mask_arr.into_raw_vec_and_offset().0,
         ))
         .ok()?;
 
@@ -562,7 +568,7 @@ pub fn generate_blip_caption(img: &image::RgbImage, models: &mut LoadedModels) -
                 .map(|(i, _)| i as i64)?
         };
 
-        if next_token == eos as i64 {
+        if next_token == eos {
             break;
         }
         tokens.push(next_token as u32);
