@@ -56,6 +56,8 @@ zeroize = { version = "1", features = ["derive"] }
 sysinfo = "0.33"
 tokio-tungstenite = { version = "0.28.0", features = ["rustls-tls-webpki-roots"] }
 futures-util = "0.3.32"
+mime_guess = "2.0.5"
+percent-encoding = "2.3.1"
 url = "2.5.8"
 uuid = { version = "1.23.3", features = ["v4"] }
 rayon = "1.10.0"

@@ -268,9 +268,7 @@ async fn start_host_internal(
             );
 
             siegu_core::mdns::unregister_service(&daemon, &hostname_for_task);
-            if let Err(e) =
-                siegu_core::mdns::register_service(&daemon, &hostname_for_task, port, &room_id)
-            {
+            if let Err(e) = siegu_core::mdns::register_service(&daemon, &hostname_for_task, port) {
                 emit_log(&app_handle, format!("mDNS registration failed: {e}"));
             } else {
                 emit_log(

@@ -132,33 +132,32 @@ pub async fn download_models(
                 }
                 Ok(DownloadOutcome::Completed) => {
                     emit_log(&app, format!("SUCCESS: Finished downloading {filename}"));
-                    if !expected_hash.is_empty() {
-                        match siegu_core::model_manager::verify_sha256(
-                            &models_dir.join(&filename),
-                            &expected_hash,
-                        ) {
-                            Ok(true) => {
-                                emit_log(&app, format!("{filename}: SHA-256 verified"));
-                            }
-                            Ok(false) => {
-                                emit_log(
-                                    &app,
-                                    format!("ERROR: SHA-256 mismatch for {filename}, deleting"),
-                                );
-                                let _ = std::fs::remove_file(models_dir.join(&filename));
-                            }
-                            Err(e) => {
-                                emit_log(
-                                    &app,
-                                    format!("WARNING: Could not verify hash for {filename}: {e}"),
-                                );
-                            }
-                        }
-                    }
                 }
                 Err(e) => {
                     emit_log(&app, format!("ERROR: Failed to download {filename}: {e}"));
                     continue;
+                }
+            }
+
+            let final_path = models_dir.join(&filename);
+            if final_path.exists() {
+                match siegu_core::model_manager::verify_sha256(&final_path, &expected_hash) {
+                    Ok(true) => {
+                        emit_log(&app, format!("{filename}: SHA-256 verified"));
+                    }
+                    Ok(false) => {
+                        emit_log(
+                            &app,
+                            format!("ERROR: SHA-256 mismatch for {filename}, deleting"),
+                        );
+                        let _ = std::fs::remove_file(&final_path);
+                    }
+                    Err(e) => {
+                        emit_log(
+                            &app,
+                            format!("WARNING: Could not verify hash for {filename}: {e}"),
+                        );
+                    }
                 }
             }
 

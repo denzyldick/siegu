@@ -159,24 +159,23 @@ fn bind_multicast_socket() -> Result<UdpSocket, Box<dyn std::error::Error>> {
     Ok(UdpSocket::from(sock))
 }
 
+/// Register a service for LAN discovery. Note: no room credential is published
+/// in the TXT records — the room key must be derived from the passphrase by
+/// the joiner, never broadcast on the wire.
 pub fn register_service(
     daemon: &DaemonHandle,
     hostname: &str,
     port: u16,
-    room_id: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let ip = local_ip()?;
     let svc = Service {
         instance: hostname.to_string(),
         hostname: format!("{}.local.", hostname.trim_end_matches('.')),
         port,
-        txt: vec![
-            ("room".to_string(), room_id.to_string()),
-            (
-                "version".to_string(),
-                crate::mesh::PROTOCOL_VERSION.to_string(),
-            ),
-        ],
+        txt: vec![(
+            "version".to_string(),
+            crate::mesh::PROTOCOL_VERSION.to_string(),
+        )],
         ip,
     };
     daemon.control.send(ControlMsg::Register(svc))?;
@@ -666,5 +665,57 @@ fn skip_name_compressed(buf: &[u8], offset: usize) -> usize {
             return pos + 1;
         }
         pos += 1 + len as usize;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn broadcast_response_does_not_leak_room_id() {
+        let svc = Service {
+            instance: "testhost".to_string(),
+            hostname: "testhost.local.".to_string(),
+            port: 9999,
+            txt: vec![("version".to_string(), "1".to_string())],
+            ip: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+        };
+
+        let query = build_ptr_query(SERVICE_TYPE);
+        let resp = build_response(&query, &[svc]).expect("response");
+        let s = String::from_utf8_lossy(&resp);
+
+        assert!(
+            s.contains("version=1"),
+            "version TXT should still be advertised"
+        );
+        assert!(
+            !s.contains("room="),
+            "room credential must never be broadcast via mDNS"
+        );
+    }
+
+    #[test]
+    fn parse_hosts_without_txt_room_still_resolves() {
+        // A response with no room= TXT (new behaviour) must still yield a
+        // DiscoveredHost, with an empty room_id.
+        let svc = Service {
+            instance: "testhost".to_string(),
+            hostname: "testhost.local.".to_string(),
+            port: 9999,
+            txt: vec![("version".to_string(), "1".to_string())],
+            ip: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+        };
+
+        let query = build_ptr_query(SERVICE_TYPE);
+        let buf = build_response(&query, &[svc]).expect("response");
+
+        let hosts = parse_hosts_from_response(&buf);
+        assert_eq!(hosts.len(), 1);
+        assert_eq!(hosts[0].name, "testhost._siegu._tcp.local");
+        assert_eq!(hosts[0].port, 9999);
+        assert_eq!(hosts[0].ip, "127.0.0.1");
+        assert_eq!(hosts[0].room_id, "");
     }
 }

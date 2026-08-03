@@ -5,7 +5,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let daemon = mdns::create_daemon()?;
     println!("[1] Created daemon");
 
-    mdns::register_service(&daemon, "siegu-test-single", 9998, "test-room")?;
+    mdns::register_service(&daemon, "siegu-test-single", 9998)?;
     println!("[1] Registered _siegu._tcp on port 9998");
 
     println!("[2] Browsing for _siegu._tcp...");

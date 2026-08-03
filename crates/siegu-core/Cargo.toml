@@ -52,7 +52,13 @@ ml = ["dep:ort", "dep:tokenizers"]
 video-thumbs = ["dep:ffmpeg-next"]
 cuda = []
 
-[dependencies.ort]
+[target.'cfg(target_os = "windows")'.dependencies.ort]
+version = "2.0.0-rc.12"
+default-features = false
+features = ["ndarray", "std", "copy-dylibs", "download-binaries", "tls-rustls", "directml"]
+optional = true
+
+[target.'cfg(not(target_os = "windows"))'.dependencies.ort]
 version = "2.0.0-rc.12"
 default-features = false
 features = ["ndarray", "std", "copy-dylibs", "download-binaries", "tls-rustls"]

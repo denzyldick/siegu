@@ -560,20 +560,24 @@ async fn cmd_models_download(config_dir: &Path, names: Option<&[String]>) {
             }
             Ok(siegu_core::model_manager::DownloadOutcome::Completed) => {
                 pb.finish_with_message(format!("{}: done", entry.model_name));
-                if !entry.sha256.is_empty() {
-                    match siegu_core::model_manager::verify_sha256(&path, entry.sha256) {
-                        Ok(true) => println!("  SHA-256 verified"),
-                        Ok(false) => {
-                            eprintln!("  WARNING: SHA-256 mismatch! File may be corrupted.");
-                            let _ = tokio::fs::remove_file(&path).await;
-                        }
-                        Err(e) => eprintln!("  WARNING: could not verify hash: {e}"),
-                    }
-                }
             }
             Err(e) => {
                 eprintln!("  ERROR: {e}");
                 pb.abandon();
+            }
+        }
+
+        if path.exists() {
+            match siegu_core::model_manager::verify_sha256(&path, entry.sha256) {
+                Ok(true) => println!("{}: SHA-256 verified", entry.model_name),
+                Ok(false) => {
+                    eprintln!(
+                        "  WARNING: SHA-256 mismatch for {}, deleting",
+                        entry.filename
+                    );
+                    let _ = tokio::fs::remove_file(&path).await;
+                }
+                Err(e) => eprintln!("  WARNING: could not verify hash: {e}"),
             }
         }
     }
@@ -744,8 +748,7 @@ async fn cmd_mesh_host(port: u16, config_dir: &Path) {
 
     let daemon = match siegu_core::mdns::create_daemon() {
         Ok(d) => {
-            if let Err(e) = siegu_core::mdns::register_service(&d, &hostname, actual_port, &room_id)
-            {
+            if let Err(e) = siegu_core::mdns::register_service(&d, &hostname, actual_port) {
                 eprintln!("mDNS registration failed: {e}");
             } else {
                 println!("mDNS registered as {hostname}");

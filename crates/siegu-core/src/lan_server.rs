@@ -24,6 +24,7 @@ const MAX_TOTAL_CONNECTIONS: usize = 1024;
 const WINDOW_ATTEMPTS: usize = 20;
 const WINDOW_SECS: u64 = 60;
 const MAX_MESSAGE_BYTES: usize = 64 * 1024;
+const MAX_ROOMS: usize = 64;
 
 struct Room {
     clients: HashMap<String, Tx>,
@@ -164,11 +165,9 @@ fn send(tx: &Tx, msg: &SignalMessage) {
 }
 
 fn generate_room_code() -> String {
-    const CHARS: &[u8] = b"ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-    let mut rng = rand::thread_rng();
-    (0..6)
-        .map(|_| CHARS[rng.gen_range(0..CHARS.len())] as char)
-        .collect()
+    let mut bytes = [0u8; 16];
+    rand::thread_rng().fill(&mut bytes);
+    hex::encode(bytes)
 }
 
 #[derive(Default)]
@@ -297,6 +296,15 @@ async fn handle_connection(
                     let room_id_val = room_id_w.read().await.clone();
                     let room_key = room_id_val.clone().unwrap_or_default();
                     let mut rooms = rooms_write.write().await;
+                    if !rooms.contains_key(&room_key) && rooms.len() >= MAX_ROOMS {
+                        send(
+                            &tx_write,
+                            &SignalMessage::Error {
+                                message: "Server at room capacity".to_string(),
+                            },
+                        );
+                        break;
+                    }
                     let room = rooms.entry(room_key).or_insert_with(|| Room {
                         clients: HashMap::new(),
                     });
@@ -359,6 +367,15 @@ async fn handle_connection(
                         let ck = uuid::Uuid::new_v4().to_string();
                         {
                             let mut rooms = rooms_write.write().await;
+                            if rooms.len() >= MAX_ROOMS {
+                                send(
+                                    &tx_write,
+                                    &SignalMessage::Error {
+                                        message: "Server at room capacity".to_string(),
+                                    },
+                                );
+                                break;
+                            }
                             let room = rooms.entry(key.clone()).or_insert_with(|| Room {
                                 clients: HashMap::new(),
                             });
@@ -546,7 +563,7 @@ async fn handle_connection(
                     } else if !d_id.is_empty() {
                         room.clients.remove(&d_id);
                     }
-                    for (_, client) in room.clients.iter() {
+                    for client in room.clients.values() {
                         send(
                             client,
                             &SignalMessage::PeerDisconnected {

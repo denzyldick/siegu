@@ -43,11 +43,20 @@ pub fn hash_pairing_code(input: String) -> Result<String, String> {
         sanitized
     };
 
-    let mut hasher = Sha256::new();
-    hasher.update(raw_payload.as_bytes());
-    let room_id = hex::encode(hasher.finalize());
+    let salt = b"siegu-pairing-salt-v1";
+    let mut digest = Sha256::new();
+    digest.update(salt);
+    digest.update(raw_payload.as_bytes());
+    let mut current = digest.finalize();
 
-    Ok(room_id)
+    for _ in 0..10_000 {
+        let mut d = Sha256::new();
+        d.update(salt);
+        d.update(current);
+        current = d.finalize();
+    }
+
+    Ok(hex::encode(current))
 }
 
 #[cfg(test)]

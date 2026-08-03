@@ -4,7 +4,8 @@ use sysinfo::System;
 use tracing::info;
 
 /// Known model files with their URLs and expected SHA-256 hashes.
-/// Hashes are hex-encoded. Empty string means "skip verification".
+/// Hashes are hex-encoded and always pinned; an empty hash is treated as
+/// a verification failure (never a "skip").
 pub struct ModelFile {
     pub model_name: &'static str,
     pub filename: &'static str,
@@ -18,127 +19,127 @@ pub const MODEL_REGISTRY: &[ModelFile] = &[
         model_name: "clip",
         filename: "clip-vit-base-patch32-visual.onnx",
         url: "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model.onnx",
-        expected_size: 150_000_000,
-        sha256: "",
+        expected_size: 351_685_709,
+        sha256: "fd6e1402a588279d1723c7534d4bcba5bc0b14b47dfab0e46f8c47b8270d7d40",
     },
     ModelFile {
         model_name: "clip",
         filename: "clip-vit-base-patch32-text.onnx",
         url: "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/text_model.onnx",
-        expected_size: 40_000_000,
-        sha256: "",
+        expected_size: 254_058_553,
+        sha256: "3f6571f5bad13a97c469c1622e1cfc4d9aef78b79fdbfcff804ca357bfada8cc",
     },
     ModelFile {
         model_name: "clip",
         filename: "tokenizer.json",
         url: "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/tokenizer.json",
-        expected_size: 1_000,
-        sha256: "",
+        expected_size: 2_224_119,
+        sha256: "f7f3b7af117d467b58374797691a6438d3e6b9e9cef800dfd5dced7f697a90cd",
     },
     ModelFile {
         model_name: "face",
         filename: "version-RFB-320.onnx",
         url: "https://raw.githubusercontent.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB/master/models/onnx/version-RFB-320.onnx",
-        expected_size: 1_000_000,
-        sha256: "",
+        expected_size: 1_270_727,
+        sha256: "34cd7e60aeff28744c657de7a3dc64e872d506741de66987f3426f2b79f88017",
     },
     ModelFile {
         model_name: "ocr",
         filename: "ocr_det.onnx",
         url: "https://huggingface.co/SWHL/RapidOCR/resolve/main/PP-OCRv4/en_PP-OCRv3_det_infer.onnx",
-        expected_size: 2_000_000,
-        sha256: "",
+        expected_size: 2_423_224,
+        sha256: "f139598bc2af4e4b6fe98dec11574e30edfdd91fc94ac1425c18ace3bd5a866b",
     },
     ModelFile {
         model_name: "ocr",
         filename: "ocr_rec.onnx",
         url: "https://huggingface.co/SWHL/RapidOCR/resolve/main/PP-OCRv3/en_PP-OCRv3_rec_infer.onnx",
-        expected_size: 2_000_000,
-        sha256: "",
+        expected_size: 8_967_018,
+        sha256: "ef7abd8bd3629ae57ea2c28b425c1bd258a871b93fd2fe7c433946ade9b5d9ea",
     },
     ModelFile {
         model_name: "ocr",
         filename: "en_dict.txt",
         url: "https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/release/2.6/ppocr/utils/en_dict.txt",
-        expected_size: 1_000,
-        sha256: "",
+        expected_size: 190,
+        sha256: "5662df9d2d03f0e8ca0d3b0649d6acbab904b6a14b3d3521463c71c37c668ce3",
     },
     ModelFile {
         model_name: "nsfw",
         filename: "nsfw.onnx",
         url: "https://huggingface.co/onnx-community/nsfw_image_detection-ONNX/resolve/main/onnx/model.onnx",
-        expected_size: 10_000_000,
-        sha256: "",
+        expected_size: 343_401_688,
+        sha256: "a4316a4fb750169ac4fcabaabee1fcbd982b0ee8c0cc63fe3e944954bb9a7d9c",
     },
     ModelFile {
         model_name: "aesthetics",
         filename: "aesthetics.onnx",
         url: "https://huggingface.co/fsw/aesthetic-predictor-v2-5_onnx/resolve/main/aesthetic_predictor_v2_5.onnx",
-        expected_size: 10_000_000,
-        sha256: "",
+        expected_size: 1_718_811_155,
+        sha256: "7dd2f7424eb799f60fd63289b2b0c437fe2f06121695325e80e298718818a826",
     },
     ModelFile {
         model_name: "yolo",
         filename: "yolov8.onnx",
         url: "https://huggingface.co/webml/yolov8n/resolve/main/onnx/yolov8n.onnx",
-        expected_size: 10_000_000,
-        sha256: "",
+        expected_size: 12_823_574,
+        sha256: "190ba5f1e61411a001683e349d6b2cdb0804c0dc67a5e34cd8ff6fd00ee54b4d",
     },
     ModelFile {
         model_name: "blip",
         filename: "blip.onnx",
         url: "https://huggingface.co/onnx-community/Salesforce_blip-image-captioning-base/resolve/main/split_0.onnx",
-        expected_size: 340_000_000,
-        sha256: "",
+        expected_size: 345_122_738,
+        sha256: "1641f50623c959c20b6ee0dbc9628bad83fe9108fe190c5fc4e0a24a73785938",
     },
     ModelFile {
         model_name: "blip",
         filename: "blip_decoder.onnx",
         url: "https://huggingface.co/onnx-community/Salesforce_blip-image-captioning-base/resolve/main/split_1.onnx",
-        expected_size: 640_000_000,
-        sha256: "",
+        expected_size: 647_427_238,
+        sha256: "6440987e079271614aa19034cf0fa25ec0e31d35efe64674130b8e8cfa860466",
     },
     ModelFile {
         model_name: "blip",
         filename: "blip_tokenizer.json",
         url: "https://huggingface.co/Salesforce/blip-image-captioning-base/resolve/main/tokenizer.json",
-        expected_size: 500_000,
-        sha256: "",
+        expected_size: 711_396,
+        sha256: "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66",
     },
     ModelFile {
         model_name: "face",
         filename: "arcface.onnx",
         url: "https://huggingface.co/crj/dl-ws/resolve/main/arcface_w600k_r50.onnx",
         expected_size: 174_383_860,
-        sha256: "",
+        sha256: "4c06341c33c2ca1f86781dab0e829f88ad5b64be9fba56e56bc9ebdefc619e43",
     },
     ModelFile {
         model_name: "midas",
         filename: "midas.onnx",
         url: "https://huggingface.co/Xenova/dpt-hybrid-midas/resolve/main/onnx/model.onnx",
-        expected_size: 100_000_000,
-        sha256: "",
+        expected_size: 533_061_339,
+        sha256: "2eca68239006c64af94bdfa68464f34d7627c3dca7bb02932636e616c55a39ff",
     },
     ModelFile {
         model_name: "whisper",
         filename: "whisper.onnx",
         url: "https://huggingface.co/onnx-community/whisper-tiny-ONNX/resolve/main/onnx/encoder_model.onnx",
-        expected_size: 32_000_000,
-        sha256: "",
+        expected_size: 32_883_618,
+        sha256: "8dd994fe489eaa52c229d3ecbd7aeb330ed474c1659017bb7c1f4f4768dd567e",
     },
     ModelFile {
         model_name: "whisper",
         filename: "whisper-decoder.onnx",
         url: "https://huggingface.co/onnx-community/whisper-tiny-ONNX/resolve/main/onnx/decoder_model_merged.onnx",
-        expected_size: 118_000_000,
-        sha256: "",
+        expected_size: 118_505_132,
+        sha256: "e14be07f61380497504049289b94f161745cf8e71f489ecb210b464b156d3f58",
     },
     ModelFile {
         model_name: "whisper",
         filename: "whisper-tokenizer.json",
         url: "https://huggingface.co/onnx-community/whisper-tiny-ONNX/resolve/main/tokenizer.json",
-        expected_size: 3_800_000,
-        sha256: "",
+        expected_size: 3_930_494,
+        sha256: "7b469ff15eb7816315aa45eec391f5943d639b9d73d110f5c003df5192fd54e3",
     },
 ];
 
@@ -157,7 +158,7 @@ pub struct ModelStatus {
 
 pub fn verify_sha256(path: &Path, expected_hash: &str) -> Result<bool, std::io::Error> {
     if expected_hash.is_empty() {
-        return Ok(true);
+        return Ok(false);
     }
     let bytes = std::fs::read(path)?;
     let mut hasher = Sha256::new();
@@ -524,6 +525,18 @@ mod tests {
     }
 
     #[test]
+    fn test_model_registry_all_hashes_pinned() {
+        for entry in MODEL_REGISTRY {
+            assert_eq!(
+                entry.sha256.len(),
+                64,
+                "{} must have a pinned SHA-256 hash",
+                entry.filename
+            );
+        }
+    }
+
+    #[test]
     fn test_total_disk_usage_empty_dir() {
         let dir = tempfile::tempdir().unwrap();
         assert_eq!(total_model_disk_usage(dir.path()), 0);
@@ -598,11 +611,11 @@ mod tests {
     }
 
     #[test]
-    fn test_verify_sha256_empty_hash_always_passes() {
+    fn test_verify_sha256_empty_hash_fails() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.bin");
         std::fs::write(&path, b"hello").unwrap();
-        assert!(verify_sha256(&path, "").unwrap());
+        assert!(!verify_sha256(&path, "").unwrap());
     }
 
     #[test]

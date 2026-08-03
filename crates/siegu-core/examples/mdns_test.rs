@@ -4,7 +4,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let daemon = mdns::create_daemon()?;
     println!("Daemon created, registering _siegu._tcp on port 9876");
 
-    mdns::register_service(&daemon, "siegu-mdns-test", 9876, "test-room")?;
+    mdns::register_service(&daemon, "siegu-mdns-test", 9876)?;
     println!("Registered. Running for 60 seconds...");
     println!("Check from Android now!");
 
