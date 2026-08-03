@@ -542,5 +542,8 @@
   "download_update": "Download & Install",
   "update_error": "Update check failed",
   "update_progress": "Downloading update...",
-  "update_not_supported": "Auto-updates aren't supported on this platform. Download the latest version from the Siegu website."
+  "update_not_supported": "Auto-updates aren't supported on this platform. Download the latest version from the Siegu website.",
+  "about_title": "About",
+  "about_open_source_licenses": "Open Source Licenses",
+  "about_licenses_intro": "Siegu is built on the following open-source software:"
 }

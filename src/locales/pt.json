@@ -542,5 +542,8 @@
   "download_update": "Baixar e instalar",
   "update_error": "Erro na atualização",
   "update_progress": "Baixando atualização...",
-  "update_not_supported": "Atualizações automáticas não são suportadas nesta plataforma. Baixe a versão mais recente no site do Siegu."
+  "update_not_supported": "Atualizações automáticas não são suportadas nesta plataforma. Baixe a versão mais recente no site do Siegu.",
+  "about_title": "Sobre",
+  "about_open_source_licenses": "Licenças de código aberto",
+  "about_licenses_intro": "Siegu é construído com o seguinte software de código aberto:"
 }

@@ -542,5 +542,8 @@
   "download_update": "Descargá i Instalá",
   "update_error": "Error di update",
   "update_progress": "Deskargando update...",
-  "update_not_supported": "Update outomátiko no ta wòrdu sostené riba e plataforma aki. Descargá e vershon mas resien for di e website di Siegu."
+  "update_not_supported": "Update outomátiko no ta wòrdu sostené riba e plataforma aki. Descargá e vershon mas resien for di e website di Siegu.",
+  "about_title": "Tokante di Siegu",
+  "about_open_source_licenses": "Lisensia open source",
+  "about_licenses_intro": "Siegu ta trahá riba e siguiente software open source:"
 }

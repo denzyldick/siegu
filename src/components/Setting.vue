@@ -97,6 +97,8 @@
           @check-update="checkUpdate"
           @download-update="downloadUpdate"
         />
+
+        <AboutSection />
       </v-col>
     </v-row>
 
@@ -268,6 +270,7 @@ import AppearanceSection from './settings/AppearanceSection.vue'
 import MaintenanceSection from './settings/MaintenanceSection.vue'
 import SignallingSection from './settings/SignallingSection.vue'
 import UpdateSection from './settings/UpdateSection.vue'
+import AboutSection from './settings/AboutSection.vue'
 
 const props = defineProps<{
   embedded?: boolean

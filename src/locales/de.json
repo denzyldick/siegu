@@ -542,5 +542,8 @@
   "download_update": "Herunterladen & Installieren",
   "update_error": "Update-Fehler",
   "update_progress": "Update wird heruntergeladen...",
-  "update_not_supported": "Automatische Updates werden auf dieser Plattform nicht unterstützt. Lade die neueste Version von der Siegu-Website herunter."
+  "update_not_supported": "Automatische Updates werden auf dieser Plattform nicht unterstützt. Lade die neueste Version von der Siegu-Website herunter.",
+  "about_title": "Über Siegu",
+  "about_open_source_licenses": "Open-Source-Lizenzen",
+  "about_licenses_intro": "Siegu basiert auf folgender Open-Source-Software:"
 }

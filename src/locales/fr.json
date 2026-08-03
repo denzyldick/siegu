@@ -542,5 +542,8 @@
   "download_update": "Télécharger et installer",
   "update_error": "Erreur de mise à jour",
   "update_progress": "Téléchargement de la mise à jour...",
-  "update_not_supported": "Les mises à jour automatiques ne sont pas prises en charge sur cette plateforme. Téléchargez la dernière version sur le site Web de Siegu."
+  "update_not_supported": "Les mises à jour automatiques ne sont pas prises en charge sur cette plateforme. Téléchargez la dernière version sur le site Web de Siegu.",
+  "about_title": "À propos",
+  "about_open_source_licenses": "Licences open source",
+  "about_licenses_intro": "Siegu est développé avec les logiciels open source suivants :"
 }

@@ -542,5 +542,8 @@
   "download_update": "Scarica e installa",
   "update_error": "Errore aggiornamento",
   "update_progress": "Scaricamento aggiornamento...",
-  "update_not_supported": "Gli aggiornamenti automatici non sono supportati su questa piattaforma. Scarica l'ultima versione dal sito Web di Siegu."
+  "update_not_supported": "Gli aggiornamenti automatici non sono supportati su questa piattaforma. Scarica l'ultima versione dal sito Web di Siegu.",
+  "about_title": "Informazioni",
+  "about_open_source_licenses": "Licenze open source",
+  "about_licenses_intro": "Siegu è costruito con il seguente software open source:"
 }

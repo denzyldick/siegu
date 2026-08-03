@@ -542,5 +542,8 @@
   "download_update": "Download en installeer",
   "update_error": "Update fout",
   "update_progress": "Update wordt gedownload...",
-  "update_not_supported": "Automatische updates worden niet ondersteund op dit platform. Download de nieuwste versie van de Siegu-website."
+  "update_not_supported": "Automatische updates worden niet ondersteund op dit platform. Download de nieuwste versie van de Siegu-website.",
+  "about_title": "Over Siegu",
+  "about_open_source_licenses": "Open-sourcelicenties",
+  "about_licenses_intro": "Siegu is gebouwd met de volgende open-sourcesoftware:"
 }
