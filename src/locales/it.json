@@ -253,6 +253,7 @@
     "download": "Scarica",
     "download_selected": "Scarica Selezionati ({count})",
     "all_selected_ready": "Tutti i selezionati pronti",
+    "select_for_download": "Seleziona per il download",
     "models_ready": "{count} di {total} modelli pronti",
     "run_now": "Esegui Ora",
     "update": "Aggiorna",
@@ -278,15 +279,27 @@
     "system_logs": "Log di Sistema",
     "no_logs": "Nessun log registrato ancora.",
     "clear_logs": "Cancella Cronologia Log",
-    "update_model": "Aggiorna modello",
+    "copy_logs": "Copia i log di sistema",
+    "logs_copied": "Log di sistema copiati negli appunti",
+    "logs_copy_failed": "Impossibile copiare i log di sistema",
+    "redownload": "Riscarica",
     "eta_label": "ETA: {time}",
     "indexing_jobs": "Indicizzazione di {count} lavori AI",
     "disable_model": "Disabilita",
     "enable_model": "Abilita",
-    "enable_all": "Abilita tutto",
-    "disable_all": "Disabilita tutto",
     "logs_cleared": "Log cancellati",
     "scan_threads_saved": "ML threads saved",
+    "signalling": "Segnalazione",
+    "signalling_url": "URL di segnalazione",
+    "signalling_url_desc": "Dove i dispositivi si incontrano per scambiare i dati di connessione WebRTC. Usa il server gestito o il tuo server di segnalazione self-hosted.",
+    "signalling_token": "Token di segnalazione (facoltativo)",
+    "signalling_token_placeholder": "Obbligatorio se il tuo server richiede un token",
+    "signalling_test": "Testa connessione",
+    "signalling_save": "Salva",
+    "signalling_saved": "Impostazioni di segnalazione salvate",
+    "signalling_reset": "Impostazioni di segnalazione ripristinate al server predefinito",
+    "signalling_save_failed": "Salvataggio non riuscito: {error}",
+    "signalling_ping_failed": "Test non riuscito: {error}",
     "model_enabled": "{model} abilitato",
     "model_disabled": "{model} disabilitato",
     "analysis_started": "Analisi {model} avviata",
@@ -311,6 +324,9 @@
     "theme_system": "Sistema",
     "theme_light": "Chiaro",
     "theme_dark": "Scuro"
+  },
+  "open_with": {
+    "opened_in_siegu": "Aperto in Siegu: {file}"
   },
   "language": {
     "label": "Lingua",
@@ -525,5 +541,6 @@
   "update_available": "Aggiornamento {version} disponibile",
   "download_update": "Scarica e installa",
   "update_error": "Errore aggiornamento",
-  "update_progress": "Scaricamento aggiornamento..."
+  "update_progress": "Scaricamento aggiornamento...",
+  "update_not_supported": "Gli aggiornamenti automatici non sono supportati su questa piattaforma. Scarica l'ultima versione dal sito Web di Siegu."
 }

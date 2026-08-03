@@ -253,6 +253,7 @@
     "download": "Herunterladen",
     "download_selected": "Ausgewählte herunterladen ({count})",
     "all_selected_ready": "Alle ausgewählten bereit",
+    "select_for_download": "Zum Herunterladen auswählen",
     "models_ready": "{count} von {total} Modellen bereit",
     "run_now": "Jetzt ausführen",
     "update": "Aktualisieren",
@@ -278,15 +279,27 @@
     "system_logs": "Systemprotokolle",
     "no_logs": "Noch keine Protokolle aufgezeichnet.",
     "clear_logs": "Protokollverlauf löschen",
-    "update_model": "Modell aktualisieren",
+    "copy_logs": "Systemprotokolle kopieren",
+    "logs_copied": "Systemprotokolle in die Zwischenablage kopiert",
+    "logs_copy_failed": "Systemprotokolle konnten nicht kopiert werden",
+    "redownload": "Erneut herunterladen",
     "eta_label": "ETA: {time}",
     "indexing_jobs": "Indiziere {count} KI-Aufgaben",
     "disable_model": "Deaktivieren",
     "enable_model": "Aktivieren",
-    "enable_all": "Alle aktivieren",
-    "disable_all": "Alle deaktivieren",
     "logs_cleared": "Protokolle gelöscht",
     "scan_threads_saved": "ML threads saved",
+    "signalling": "Signalisierung",
+    "signalling_url": "Signalisierungs-URL",
+    "signalling_url_desc": "Wo Geräte WebRTC-Verbindungsdaten austauschen. Nutzen Sie den verwalteten Server oder Ihren eigenen selbst gehosteten Signalisierungsserver.",
+    "signalling_token": "Signalisierungs-Token (optional)",
+    "signalling_token_placeholder": "Erforderlich, wenn Ihr Server ein Token verlangt",
+    "signalling_test": "Verbindung testen",
+    "signalling_save": "Speichern",
+    "signalling_saved": "Signalisierungseinstellungen gespeichert",
+    "signalling_reset": "Signalisierungseinstellungen auf den Standardserver zurückgesetzt",
+    "signalling_save_failed": "Speichern fehlgeschlagen: {error}",
+    "signalling_ping_failed": "Test fehlgeschlagen: {error}",
     "model_enabled": "{model} aktiviert",
     "model_disabled": "{model} deaktiviert",
     "analysis_started": "{model}-Analyse gestartet",
@@ -311,6 +324,9 @@
     "theme_system": "System",
     "theme_light": "Hell",
     "theme_dark": "Dunkel"
+  },
+  "open_with": {
+    "opened_in_siegu": "In Siegu geöffnet: {file}"
   },
   "language": {
     "label": "Sprache",
@@ -525,5 +541,6 @@
   "update_available": "Update {version} verfügbar",
   "download_update": "Herunterladen & Installieren",
   "update_error": "Update-Fehler",
-  "update_progress": "Update wird heruntergeladen..."
+  "update_progress": "Update wird heruntergeladen...",
+  "update_not_supported": "Automatische Updates werden auf dieser Plattform nicht unterstützt. Lade die neueste Version von der Siegu-Website herunter."
 }

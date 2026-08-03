@@ -31,18 +31,13 @@
             <v-btn
               size="small"
               variant="flat"
-              color="#000000"
-              theme="dark"
+              color="primary"
               @click="$emit('cleanup-db')"
               :loading="isCleaning"
               class="siegu-btn px-4"
             >
-              <div class="d-flex align-center">
-                <div class="siegu-icon-circle siegu-icon-circle-md mr-3">
-                  <v-icon color="#ffffff" size="small">mdi-wrench-outline</v-icon>
-                </div>
-                <span class="font-weight-bold">{{ $t('settings.clean') }}</span>
-              </div>
+              <v-icon start size="16">mdi-trash-can-outline</v-icon>
+              <span class="font-weight-bold">{{ $t('settings.clean') }}</span>
             </v-btn>
           </template>
         </v-list-item>
@@ -60,7 +55,7 @@
               {{ $t('settings.scan_threads') }}
             </div>
             <v-chip
-              size="x-small"
+              size="small"
               color="#000000"
               variant="flat"
               class="font-weight-bold text-white"
@@ -87,13 +82,13 @@
                 <template v-slot:activator="{ props }">
                   <v-btn
                     variant="tonal"
-                    size="x-small"
-                    color="black"
+                    size="small"
+                    color="primary"
                     v-bind="props"
                     class="font-weight-bold"
                   >
                     {{ getModeLabel(performance.indexingMode) }}
-                    <v-icon size="12" class="ml-1">mdi-chevron-down</v-icon>
+                    <v-icon size="14" class="ml-1">mdi-chevron-down</v-icon>
                   </v-btn>
                 </template>
                 <v-list density="compact" class="siegu-list">
@@ -145,6 +140,16 @@
             variant="text"
             size="small"
             class="text-none font-weight-bold"
+            color="primary"
+            prepend-icon="mdi-content-copy"
+            @click.stop="$emit('copy-logs')"
+          >
+            {{ $t('settings.copy_logs') }}
+          </v-btn>
+          <v-btn
+            variant="text"
+            size="small"
+            class="text-none font-weight-bold"
             color="error"
             prepend-icon="mdi-trash-can-outline"
             @click.stop="$emit('clear-logs')"
@@ -172,6 +177,7 @@ defineEmits<{
   'save-performance': []
   'set-indexing-mode': [mode: string]
   'clear-logs': []
+  'copy-logs': []
 }>()
 
 const indexingModes = [{ value: 'immediate' }, { value: 'idle' }, { value: 'manual' }]

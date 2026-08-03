@@ -39,12 +39,28 @@
     },
     "notification": null
   },
-  "bundle": {
+    "bundle": {
     "active": true,
     "targets": "all",
     "createUpdaterArtifacts": true,
     "shortDescription": "Privacy-first local media management.",
     "longDescription": "Siegu is a cross-platform, privacy-first media backup and synchronization application.",
+    "fileAssociations": [
+      {
+        "ext": ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "heic", "heif", "avif"],
+        "name": "Siegu Image",
+        "description": "Open image in Siegu",
+        "mimeType": "image/*",
+        "role": "Viewer"
+      },
+      {
+        "ext": ["mp4", "webm", "mov", "avi", "mkv", "m4v"],
+        "name": "Siegu Video",
+        "description": "Open video in Siegu",
+        "mimeType": "video/*",
+        "role": "Viewer"
+      }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/64x64.png",

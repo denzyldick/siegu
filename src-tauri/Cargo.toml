@@ -26,7 +26,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 webrtc = { rev = "5aa49c0", git = "https://github.com/webrtc-rs/webrtc" }
 jwalk = "0.8.1"
-image-base64 = "0.1.0"
 rusqlite = { version = "0.40.1", features = ["bundled"] }
 rand = "0.8.6"
 #tch = "0.14.0"
@@ -85,6 +84,3 @@ webkit2gtk = { version = "2", features = ["v2_40"] }
 
 [target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
 ffmpeg-next = { version = "8.1.0", features = ["build"] }
-
-[target.'cfg(target_os = "android")'.dependencies]
-tract-onnx = "0.21.0"

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue';
+import { onMounted, computed, ref } from 'vue';
+import { listen } from '@tauri-apps/api/event';
 import { useI18n } from 'vue-i18n';
 import { useAppStore } from '@/stores/app';
 import { useScanStore } from '@/stores/scan';
@@ -29,7 +30,21 @@ const uiStore = useUiStore();
 const currentPage = computed(() => uiStore.currentPage);
 const searchStore = useSearchStore();
 
+const openedFile = ref<string | null>(null);
+const fileSnackbar = ref(false);
+
+function openedFileName(path: string): string {
+  const parts = path.split(/[\\/]/);
+  return parts[parts.length - 1] || path;
+}
+
 onMounted(async () => {
+  listen<string>('file-opened', (event) => {
+    openedFile.value = event.payload;
+    fileSnackbar.value = true;
+    uiStore.setPage('home');
+  });
+
   try {
     await appStore.checkInitialized();
   } catch (e) {
@@ -177,6 +192,14 @@ function removeFilterChip(index: number): void {
     </template>
 
     <SyncStatusBanner />
+    <v-snackbar v-model="fileSnackbar" timeout="5000" color="surface" location="bottom">
+      <div class="d-flex align-center ga-2">
+        <v-icon color="primary" size="20">mdi-file-image-outline</v-icon>
+        <span>
+          {{ t('open_with.opened_in_siegu', { file: openedFile ? openedFileName(openedFile) : '' }) }}
+        </span>
+      </div>
+    </v-snackbar>
     <GuidedTour
       :active="appStore.showTour"
       @finish="appStore.dismissTour()"

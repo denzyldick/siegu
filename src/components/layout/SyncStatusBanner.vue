@@ -74,16 +74,15 @@ async function reconnect(): Promise<void> {
         <template v-if="isOffline">
           <v-divider vertical class="mx-2 opacity-10" length="16" />
           <v-btn
-            variant="flat"
-            color="black"
+            icon="mdi-refresh"
+            variant="text"
             size="small"
-            class="text-none text-caption px-2"
+            class="text-zinc-primary"
+            :title="t('sync.reconnect')"
+            :aria-label="t('sync.reconnect')"
             :loading="reconnecting"
             @click="reconnect"
-          >
-            <v-icon start size="14">mdi-refresh</v-icon>
-            {{ t('sync.reconnect') }}
-          </v-btn>
+          />
         </template>
         <v-divider v-else vertical class="mx-2 opacity-10" length="16" />
         <v-btn

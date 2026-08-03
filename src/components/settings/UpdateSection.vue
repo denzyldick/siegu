@@ -22,7 +22,9 @@
             <span class="font-weight-bold text-zinc-primary">{{ $t('update_desc') }}</span>
           </template>
           <template v-slot:subtitle>
-            <span class="text-zinc-secondary">{{ statusText }}</span>
+            <span class="text-zinc-secondary">{{
+              supported ? statusText : $t('update_not_supported')
+            }}</span>
           </template>
           <template v-slot:append>
             <v-btn
@@ -31,7 +33,7 @@
               color="#000000"
               theme="dark"
               :loading="status === 'checking'"
-              :disabled="status === 'downloading'"
+              :disabled="!supported || status === 'downloading'"
               @click="status === 'available' ? $emit('download-update') : $emit('check-update')"
               class="siegu-btn px-4"
             >
@@ -55,6 +57,7 @@ defineProps<{
   statusText: string
   btnText: string
   btnIcon: string
+  supported: boolean
 }>()
 
 defineEmits<{

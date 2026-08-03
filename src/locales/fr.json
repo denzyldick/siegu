@@ -253,6 +253,7 @@
     "download": "Télécharger",
     "download_selected": "Télécharger la sélection ({count})",
     "all_selected_ready": "Toute la sélection est prête",
+    "select_for_download": "Sélectionner pour télécharger",
     "models_ready": "{count} sur {total} modèles prêts",
     "run_now": "Lancer maintenant",
     "update": "Mettre à jour",
@@ -278,15 +279,27 @@
     "system_logs": "Journaux système",
     "no_logs": "Aucun journal enregistré pour l'instant.",
     "clear_logs": "Effacer l'historique des journaux",
-    "update_model": "Mettre à jour le modèle",
+    "copy_logs": "Copier les journaux système",
+    "logs_copied": "Journaux système copiés dans le presse-papiers",
+    "logs_copy_failed": "Échec de la copie des journaux système",
+    "redownload": "Re-télécharger",
     "eta_label": "ETA : {time}",
     "indexing_jobs": "Indexation de {count} tâches IA",
     "disable_model": "Désactiver",
     "enable_model": "Activer",
-    "enable_all": "Activer tout",
-    "disable_all": "Désactiver tout",
     "logs_cleared": "Journaux effacés",
     "scan_threads_saved": "ML threads saved",
+    "signalling": "Signalisation",
+    "signalling_url": "URL de signalisation",
+    "signalling_url_desc": "Où les appareils se retrouvent pour échanger les informations de connexion WebRTC. Utilisez le serveur géré ou votre propre serveur de signalisation auto-hébergé.",
+    "signalling_token": "Jeton de signalisation (facultatif)",
+    "signalling_token_placeholder": "Requis si votre serveur exige un jeton",
+    "signalling_test": "Tester la connexion",
+    "signalling_save": "Enregistrer",
+    "signalling_saved": "Paramètres de signalisation enregistrés",
+    "signalling_reset": "Paramètres de signalisation réinitialisés au serveur par défaut",
+    "signalling_save_failed": "Échec de l'enregistrement : {error}",
+    "signalling_ping_failed": "Échec du test : {error}",
     "model_enabled": "{model} activé",
     "model_disabled": "{model} désactivé",
     "analysis_started": "Analyse {model} démarrée",
@@ -311,6 +324,9 @@
     "theme_system": "Système",
     "theme_light": "Clair",
     "theme_dark": "Sombre"
+  },
+  "open_with": {
+    "opened_in_siegu": "Ouvert dans Siegu : {file}"
   },
   "language": {
     "label": "Langue",
@@ -525,5 +541,6 @@
   "update_available": "Mise à jour {version} disponible",
   "download_update": "Télécharger et installer",
   "update_error": "Erreur de mise à jour",
-  "update_progress": "Téléchargement de la mise à jour..."
+  "update_progress": "Téléchargement de la mise à jour...",
+  "update_not_supported": "Les mises à jour automatiques ne sont pas prises en charge sur cette plateforme. Téléchargez la dernière version sur le site Web de Siegu."
 }

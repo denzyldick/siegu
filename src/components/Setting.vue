@@ -1,8 +1,8 @@
 <template>
-  <v-container :class="embedded ? 'pa-0' : 'pb-16 bg-siegu-main'" fluid>
+  <v-container :class="embedded ? 'pa-0' : 'pb-16 pt-2 bg-siegu-main'" fluid>
     <v-row justify="center">
       <v-col cols="12" :md="embedded ? 12 : 8" :lg="embedded ? 12 : 6">
-        <div v-if="!embedded" class="d-flex align-center justify-space-between mb-8">
+        <div v-if="!embedded" class="d-flex align-center justify-space-between mb-6">
           <div>
             <div class="d-flex align-center mb-1">
               <v-icon color="#18181b" size="28" class="mr-3">mdi-cog-outline</v-icon>
@@ -48,8 +48,6 @@
           :toggle-model="toggleModel"
           @download-models="downloadModels"
           @run-model="runModel"
-          @enable-all-models="enableAllModels"
-          @disable-all-models="disableAllModels"
           @update-selected-models="onUpdateSelectedModels"
         />
 
@@ -73,6 +71,20 @@
           @save-performance="savePerformanceConfig"
           @set-indexing-mode="setIndexingMode"
           @clear-logs="clearLogs"
+          @copy-logs="copyLogs"
+        />
+
+        <SignallingSection
+          v-if="!embedded"
+          :model-value="signalingUrl"
+          :token="signalingToken"
+          :testing="signalingTesting"
+          :saving="signallingSaving"
+          :ping-result="signalingPingResult"
+          @update:model-value="onSignallingUrl"
+          @update:token="onSignallingToken"
+          @test="testSignalling"
+          @save="saveSignalling"
         />
 
         <UpdateSection
@@ -81,6 +93,7 @@
           :status-text="updateStatusText"
           :btn-text="updateBtnText"
           :btn-icon="updateBtnIcon"
+          :supported="updateSupported"
           @check-update="checkUpdate"
           @download-update="downloadUpdate"
         />
@@ -245,6 +258,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useSettings } from '@/composables/useSettings'
 import FolderPicker from './FolderPicker.vue'
 import FoldersSection from './settings/FoldersSection.vue'
@@ -252,6 +266,7 @@ import ModelsSection from './settings/ModelsSection.vue'
 import LanguageSection from './settings/LanguageSection.vue'
 import AppearanceSection from './settings/AppearanceSection.vue'
 import MaintenanceSection from './settings/MaintenanceSection.vue'
+import SignallingSection from './settings/SignallingSection.vue'
 import UpdateSection from './settings/UpdateSection.vue'
 
 const props = defineProps<{
@@ -290,6 +305,11 @@ const {
   updateStatusText,
   updateBtnText,
   updateBtnIcon,
+  updateSupported,
+  signalingUrl,
+  signalingToken,
+  signalingTesting,
+  signalingPingResult,
   performance,
   maxThreads,
   isModelProcessing,
@@ -310,13 +330,14 @@ const {
   startConfirmedRemoveFolder,
   onFolderSelected,
   toggleModel,
-  enableAllModels,
-  disableAllModels,
   downloadModels,
   runModel,
   savePerformanceConfig,
   setIndexingMode,
+  saveSignallingConfig,
+  testSignalling,
   clearLogs,
+  showSnackbar,
   checkUpdate,
   downloadUpdate,
   startConfirmedCleanup,
@@ -325,8 +346,39 @@ const {
 const currentLang = ref(localStorage.getItem('siegu_language') || 'en')
 const currentTheme = ref(localStorage.getItem('siegu_theme') || 'system')
 
+const { t } = useI18n()
+
+async function copyLogs(): Promise<void> {
+  try {
+    const text = logs.value.map((log) => `[${log.time}] ${log.message}`).join('\n')
+    await navigator.clipboard.writeText(text)
+    showSnackbar(t('settings.logs_copied'))
+  } catch {
+    showSnackbar(t('settings.logs_copy_failed'), true)
+  }
+}
+
 function cleanupDb(): void {
   cleanupDialog.show = true
+}
+
+const signallingSaving = ref(false)
+
+function onSignallingUrl(v: string): void {
+  signalingUrl.value = v
+}
+
+function onSignallingToken(v: string): void {
+  signalingToken.value = v
+}
+
+async function saveSignalling(): Promise<void> {
+  signallingSaving.value = true
+  try {
+    await saveSignallingConfig()
+  } finally {
+    signallingSaving.value = false
+  }
 }
 
 function confirmDownload(): void {

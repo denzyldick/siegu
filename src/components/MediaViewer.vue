@@ -13,7 +13,32 @@
             class="viewer-nav-btn top-left"
             @click="close"
           ></v-btn>
-          <v-menu close-on-content-click>
+          <template v-if="isMobile">
+            <v-btn
+              icon="mdi-dots-vertical"
+              variant="text"
+              color="#71717a"
+              class="viewer-nav-btn top-left-more"
+              @click="moreMenuOpen = true"
+            ></v-btn>
+            <v-bottom-sheet v-model="moreMenuOpen">
+              <v-list density="compact" class="siegu-list">
+                <v-list-item
+                  v-for="item in moreItems"
+                  :key="item.key"
+                  @click="closeMoreMenu(item.action)"
+                  :prepend-icon="item.icon"
+                >
+                  <v-list-item-title>{{ $t('media_viewer.' + item.key) }}</v-list-item-title>
+                </v-list-item>
+              </v-list>
+            </v-bottom-sheet>
+          </template>
+          <v-menu
+            v-else
+            location="bottom start"
+            close-on-content-click
+          >
             <template v-slot:activator="{ props: menuProps }">
               <v-btn
                 v-bind="menuProps"
@@ -25,21 +50,12 @@
             </template>
             <v-list density="compact" class="siegu-list">
               <v-list-item
-                v-if="os !== 'ios'"
-                @click="handleSetWallpaper"
-                prepend-icon="mdi-wallpaper"
+                v-for="item in moreItems"
+                :key="item.key"
+                @click="item.action()"
+                :prepend-icon="item.icon"
               >
-                <v-list-item-title>{{ $t('media_viewer.set_wallpaper') }}</v-list-item-title>
-              </v-list-item>
-              <v-list-item
-                v-if="!isMobile"
-                @click="handleShowInExplorer"
-                prepend-icon="mdi-folder-open-outline"
-              >
-                <v-list-item-title>{{ $t('media_viewer.show_in_explorer') }}</v-list-item-title>
-              </v-list-item>
-              <v-list-item @click="handleOpenWith" prepend-icon="mdi-open-in-new">
-                <v-list-item-title>{{ $t('media_viewer.open_with_app') }}</v-list-item-title>
+                <v-list-item-title>{{ $t('media_viewer.' + item.key) }}</v-list-item-title>
               </v-list-item>
             </v-list>
           </v-menu>
@@ -75,7 +91,7 @@
             <div class="media-wrapper">
               <img v-if="currentPhoto && !isVideo" :src="currentPhotoSrc" class="viewer-image" />
               <video
-                v-if="currentPhoto && isVideo"
+                v-if="currentPhoto && isVideo && computedVideoUrl"
                 ref="videoPlayer"
                 :src="computedVideoUrl"
                 class="viewer-image"
@@ -369,10 +385,12 @@ import { revealItemInDir, openPath } from '@tauri-apps/plugin-opener'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import MediaThumbnail from './MediaThumbnail.vue'
 import { isVideo as checkIsVideo } from '@/composables/useMediaUtils'
+import { useMediaUrl } from '@/composables/useMediaUrl'
 import { useI18n } from 'vue-i18n'
 import type { MediaItem } from '@/types/media'
 
 const { t } = useI18n()
+const { ensurePort, videoUrl: buildVideoUrl } = useMediaUrl()
 
 interface DetectedFace {
   photo_id: string
@@ -398,7 +416,7 @@ const emit = defineEmits<{
 
 const showInfo = ref(false)
 const os = ref('')
-const mediaPort = ref<number | null>(null)
+const moreMenuOpen = ref(false)
 const detectedFaces = ref<DetectedFace[]>([])
 const photoOcr = ref('')
 const ocrLoading = ref(false)
@@ -439,9 +457,8 @@ const isVideo = computed(() => {
 })
 
 const computedVideoUrl = computed(() => {
-  if (!currentPhoto.value || !isVideo.value || !mediaPort.value) return ''
-  const encoded = encodeURIComponent(currentPhoto.value.location)
-  return `http://127.0.0.1:${mediaPort.value}/media/${encoded}`
+  if (!currentPhoto.value || !isVideo.value) return ''
+  return buildVideoUrl(currentPhoto.value.location) ?? ''
 })
 
 const currentPhotoSrc = computed(() => {
@@ -737,6 +754,36 @@ async function handleOpenWith(): Promise<void> {
   }
 }
 
+const moreItems = computed(() => {
+  const items: Array<{ key: string; icon: string; action: () => void }> = [
+    {
+      key: 'set_wallpaper',
+      icon: 'mdi-wallpaper',
+      action: handleSetWallpaper,
+    },
+    {
+      key: 'show_in_explorer',
+      icon: 'mdi-folder-open-outline',
+      action: handleShowInExplorer,
+    },
+    {
+      key: 'open_with_app',
+      icon: 'mdi-open-in-new',
+      action: handleOpenWith,
+    },
+  ]
+  return items.filter((item) => {
+    if (item.key === 'set_wallpaper' && os.value === 'ios') return false
+    if (item.key === 'show_in_explorer' && isMobile.value) return false
+    return true
+  })
+})
+
+function closeMoreMenu(action: () => void): void {
+  moreMenuOpen.value = false
+  action()
+}
+
 function formatElapsed(start: number, tick: number): string {
   if (!start) return '0s'
   void tick
@@ -783,7 +830,10 @@ watch(() => props.index, () => {
   fetchFaces()
   loadOcr()
   scrollToActiveThumb()
-  if (isVideo.value) showInfo.value = false
+  if (isVideo.value) {
+    showInfo.value = false
+    void ensurePort()
+  }
 })
 
 watch(() => props.photos, (newPhotos) => {
@@ -810,12 +860,6 @@ onMounted(async () => {
   try {
     os.value = await invoke<string>('get_os')
   } catch (e) { /* ignore */ }
-  if (!window.__pv_mediaPort) {
-    try {
-      window.__pv_mediaPort = await invoke<number>('get_media_server_port')
-    } catch (e) { /* ignore */ }
-  }
-  mediaPort.value = window.__pv_mediaPort
   listenForEta()
   try {
     downloadedModels.value = await invoke<string[]>('check_models')

@@ -8,7 +8,6 @@ declare module '*.vue' {
 
 interface Window {
   __img_mediaPort: number | null
-  __pv_mediaPort: number | null
   __rail_mediaPort: number | null
   __siegu_mediaPort: number | null
   $scan: unknown

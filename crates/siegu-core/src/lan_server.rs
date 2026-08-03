@@ -1,21 +1,48 @@
 #![allow(dead_code)]
 
 use futures_util::{SinkExt, StreamExt};
+use rand::Rng;
 use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::sync::Arc;
+use std::net::{IpAddr, SocketAddr};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use tokio::net::TcpListener;
 use tokio::sync::{mpsc, RwLock};
+use warp::reply::Reply;
 use warp::Filter;
 
 use crate::mesh::MAX_MESH_DEVICES;
+use crate::server::hash_pairing_code;
 use crate::signal::SignalMessage;
 
 type Tx = mpsc::UnboundedSender<warp::ws::Message>;
 type Rooms = Arc<RwLock<HashMap<String, Room>>>;
 
+const MAX_CONNECTIONS_PER_IP: usize = 8;
+const MAX_TOTAL_CONNECTIONS: usize = 1024;
+const WINDOW_ATTEMPTS: usize = 20;
+const WINDOW_SECS: u64 = 60;
+const MAX_MESSAGE_BYTES: usize = 64 * 1024;
+
 struct Room {
     clients: HashMap<String, Tx>,
+}
+
+/// Server-wide runtime state shared across connections.
+struct ServerContext {
+    rooms: Rooms,
+    token: Option<String>,
+    limiter: RateLimiter,
+    conn_counts: Mutex<HashMap<IpAddr, usize>>,
+    global_count: AtomicUsize,
+}
+
+/// Configuration for a standalone signalling server.
+pub struct ServerConfig {
+    pub port: u16,
+    /// When set, every `Join`/`JoinRoom`/`CreateRoom` must carry this token.
+    pub token: Option<String>,
 }
 
 /// A running LAN signaling server. Holds the bound port and an optional
@@ -39,27 +66,71 @@ impl LanServer {
     }
 }
 
+/// Start a LAN signaling server with the default (in-app) configuration.
 pub async fn start(port: u16) -> LanServer {
-    let rooms: Rooms = Arc::new(RwLock::new(HashMap::new()));
+    start_with_config(ServerConfig { port, token: None }).await
+}
 
-    let rooms_filter = warp::any().map({
-        let rooms = rooms.clone();
-        move || rooms.clone()
+/// Start a signalling server with optional security configuration. Serves both
+/// the LAN room-path protocol (`/room_id`, used by `ws://` clients) and the
+/// remote protocol (`/ws`, used by `wss://` clients speaking `CreateRoom` /
+/// `JoinRoom` / `Relay`).
+pub async fn start_with_config(config: ServerConfig) -> LanServer {
+    let ctx = Arc::new(ServerContext {
+        rooms: Arc::new(RwLock::new(HashMap::new())),
+        token: config.token,
+        limiter: RateLimiter::default(),
+        conn_counts: Mutex::new(HashMap::new()),
+        global_count: AtomicUsize::new(0),
     });
 
-    let ws_route = warp::path::param::<String>()
-        .and(warp::ws())
-        .and(rooms_filter)
-        .map(|room_id: String, ws: warp::ws::Ws, rooms: Rooms| {
-            ws.on_upgrade(move |socket| handle_connection(socket, room_id, rooms))
-        });
+    let ctx_filter = warp::any().map({
+        let ctx = ctx.clone();
+        move || ctx.clone()
+    });
+    let remote_addr = warp::addr::remote();
 
-    let addr: SocketAddr = ([0, 0, 0, 0], port).into();
+    let health = warp::path("healthz").map(|| -> warp::reply::Response { "ok".into_response() });
+
+    let remote_route = warp::path("ws")
+        .and(warp::ws())
+        .and(ctx_filter.clone())
+        .and(remote_addr.clone())
+        .map(
+            |ws: warp::ws::Ws,
+             ctx: Arc<ServerContext>,
+             addr: Option<SocketAddr>|
+             -> warp::reply::Response {
+                ws.on_upgrade(move |socket| handle_connection(socket, ctx, addr, None, true))
+                    .into_response()
+            },
+        );
+
+    let lan_route = warp::path::param::<String>()
+        .and(warp::ws())
+        .and(ctx_filter)
+        .and(remote_addr)
+        .map(
+            |room_id: String,
+             ws: warp::ws::Ws,
+             ctx: Arc<ServerContext>,
+             addr: Option<SocketAddr>|
+             -> warp::reply::Response {
+                ws.on_upgrade(move |socket| {
+                    handle_connection(socket, ctx, addr, Some(room_id), false)
+                })
+                .into_response()
+            },
+        );
+
+    let routes = remote_route.or(lan_route).or(health).boxed();
+
+    let addr: SocketAddr = ([0, 0, 0, 0], config.port).into();
     let listener = TcpListener::bind(addr).await.unwrap();
     let actual_addr = listener.local_addr().unwrap();
 
     let task = tokio::spawn(async move {
-        warp::serve(ws_route).incoming(listener).run().await;
+        warp::serve(routes).incoming(listener).run().await;
     });
 
     LanServer {
@@ -68,7 +139,69 @@ pub async fn start(port: u16) -> LanServer {
     }
 }
 
-async fn handle_connection(socket: warp::ws::WebSocket, room_id: String, rooms: Rooms) {
+fn admission_reject(ctx: &Arc<ServerContext>, remote: Option<SocketAddr>) -> Option<String> {
+    if ctx.global_count.load(Ordering::Relaxed) >= MAX_TOTAL_CONNECTIONS {
+        return Some("Server is at capacity, try again later".to_string());
+    }
+    let ip = remote?.ip();
+    if !ctx.limiter.allow(ip) {
+        return Some("Too many connection attempts, try again shortly".to_string());
+    }
+    let mut counts = ctx.conn_counts.lock().unwrap();
+    let n = counts.entry(ip).or_insert(0);
+    if *n >= MAX_CONNECTIONS_PER_IP {
+        return Some("Too many connections from this address".to_string());
+    }
+    *n += 1;
+    ctx.global_count.fetch_add(1, Ordering::Relaxed);
+    None
+}
+
+fn send(tx: &Tx, msg: &SignalMessage) {
+    if let Ok(json) = serde_json::to_string(msg) {
+        let _ = tx.send(warp::ws::Message::text(json));
+    }
+}
+
+fn generate_room_code() -> String {
+    const CHARS: &[u8] = b"ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+    let mut rng = rand::thread_rng();
+    (0..6)
+        .map(|_| CHARS[rng.gen_range(0..CHARS.len())] as char)
+        .collect()
+}
+
+#[derive(Default)]
+struct RateLimiter {
+    attempts: Mutex<HashMap<IpAddr, Vec<Instant>>>,
+}
+
+impl RateLimiter {
+    fn allow(&self, ip: IpAddr) -> bool {
+        let mut map = self.attempts.lock().unwrap();
+        if map.len() > 10_000 {
+            let cutoff = Instant::now() - Duration::from_secs(WINDOW_SECS);
+            map.retain(|_, v| v.last().map(|t| *t >= cutoff).unwrap_or(false));
+        }
+        let now = Instant::now();
+        let cutoff = now - Duration::from_secs(WINDOW_SECS);
+        let bucket = map.entry(ip).or_default();
+        bucket.retain(|t| *t >= cutoff);
+        if bucket.len() >= WINDOW_ATTEMPTS {
+            return false;
+        }
+        bucket.push(now);
+        true
+    }
+}
+
+async fn handle_connection(
+    socket: warp::ws::WebSocket,
+    ctx: Arc<ServerContext>,
+    remote: Option<SocketAddr>,
+    path_room: Option<String>,
+    remote_protocol: bool,
+) {
     let (mut ws_sender, mut ws_receiver) = socket.split();
     let (tx, mut rx) = mpsc::unbounded_channel();
 
@@ -80,139 +213,350 @@ async fn handle_connection(socket: warp::ws::WebSocket, room_id: String, rooms: 
         }
     });
 
-    let device_id = Arc::new(RwLock::new(String::new()));
-    let did = device_id.clone();
-    let rooms_write = rooms.clone();
-    let room_id_write = room_id.clone();
+    if let Some(reason) = admission_reject(&ctx, remote) {
+        eprintln!(
+            "siegu-signal: rejected connection from {} ({reason})",
+            remote
+                .map(|a| a.ip())
+                .map_or_else(|| "?".into(), |ip| ip.to_string())
+        );
+        let tx_reject = tx.clone();
+        send(&tx_reject, &SignalMessage::Error { message: reason });
+        let _ = tokio::time::timeout(Duration::from_millis(100), &mut send_task).await;
+        send_task.abort();
+        return;
+    }
+
+    eprintln!(
+        "siegu-signal: connection open (total={})",
+        ctx.global_count.load(Ordering::Relaxed)
+    );
+
+    let room_id: Arc<RwLock<Option<String>>> = Arc::new(RwLock::new(path_room));
+    let conn_key: Arc<RwLock<String>> = Arc::new(RwLock::new(String::new()));
+    let did: Arc<RwLock<String>> = Arc::new(RwLock::new(String::new()));
+
+    let rooms_write = ctx.rooms.clone();
+    let conn_key_w = conn_key.clone();
+    let room_id_w = room_id.clone();
+    let did_w = did.clone();
     let tx_write = tx.clone();
+    let ctx_r = ctx.clone();
 
     let mut recv_task = tokio::spawn(async move {
         while let Some(Ok(msg)) = ws_receiver.next().await {
-            if msg.is_text() || msg.is_binary() {
-                let text = match msg.to_str() {
-                    Ok(t) => t.to_string(),
-                    Err(_) => continue,
-                };
-                if let Ok(signal) = serde_json::from_str::<SignalMessage>(&text) {
-                    match signal {
-                        SignalMessage::Join { device_id: id, .. } => {
-                            *did.write().await = id.clone();
+            if !(msg.is_text() || msg.is_binary()) {
+                continue;
+            }
+            if msg.as_bytes().len() > MAX_MESSAGE_BYTES {
+                send(
+                    &tx_write,
+                    &SignalMessage::Error {
+                        message: "Message too large".to_string(),
+                    },
+                );
+                break;
+            }
+            let text = match msg.to_str() {
+                Ok(t) => t.to_string(),
+                Err(_) => continue,
+            };
+            let signal: SignalMessage = match serde_json::from_str(&text) {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
 
+            if let Some(expected) = &ctx_r.token {
+                let sent = match &signal {
+                    SignalMessage::Join { token, .. } => token.as_deref(),
+                    SignalMessage::JoinRoom { token, .. } => token.as_deref(),
+                    SignalMessage::CreateRoom { token } => token.as_deref(),
+                    _ => None,
+                };
+                if sent != Some(expected) {
+                    eprintln!(
+                        "siegu-signal: rejected join with invalid token from {}",
+                        remote
+                            .map(|a| a.ip())
+                            .map_or_else(|| "?".into(), |ip| ip.to_string())
+                    );
+                    send(
+                        &tx_write,
+                        &SignalMessage::Error {
+                            message: "Invalid or missing signalling token".to_string(),
+                        },
+                    );
+                    break;
+                }
+            }
+
+            match signal {
+                SignalMessage::Join { device_id: id, .. } => {
+                    *did_w.write().await = id.clone();
+
+                    let room_id_val = room_id_w.read().await.clone();
+                    let room_key = room_id_val.clone().unwrap_or_default();
+                    let mut rooms = rooms_write.write().await;
+                    let room = rooms.entry(room_key).or_insert_with(|| Room {
+                        clients: HashMap::new(),
+                    });
+
+                    if room.clients.len() >= MAX_MESH_DEVICES {
+                        send(
+                            &tx_write,
+                            &SignalMessage::Error {
+                                message: format!("Room is full (max {} devices)", MAX_MESH_DEVICES),
+                            },
+                        );
+                        break;
+                    }
+
+                    room.clients.insert(id.clone(), tx_write.clone());
+                    *conn_key_w.write().await = id.clone();
+
+                    let existing_peers: Vec<String> =
+                        room.clients.keys().filter(|k| *k != &id).cloned().collect();
+                    send(
+                        &tx_write,
+                        &SignalMessage::PeerList {
+                            peers: existing_peers,
+                        },
+                    );
+
+                    for (other_id, client) in room.clients.iter() {
+                        if other_id != &id {
+                            send(
+                                client,
+                                &SignalMessage::PeerJoined {
+                                    device_id: id.clone(),
+                                },
+                            );
+                        }
+                    }
+
+                    let peer_count = room.clients.len();
+                    send(
+                        &tx_write,
+                        &SignalMessage::Joined {
+                            device_id: id,
+                            room_id: room_id_val.unwrap_or_default(),
+                            peer_count,
+                        },
+                    );
+                }
+                SignalMessage::CreateRoom { .. } => {
+                    if remote_protocol {
+                        let mut raw = generate_room_code();
+                        let mut key = hash_pairing_code(raw.clone()).unwrap_or_default();
+                        {
+                            let rooms = rooms_write.read().await;
+                            if rooms.contains_key(&key) {
+                                drop(rooms);
+                                raw = generate_room_code();
+                                key = hash_pairing_code(raw.clone()).unwrap_or_default();
+                            }
+                        }
+                        let ck = uuid::Uuid::new_v4().to_string();
+                        {
                             let mut rooms = rooms_write.write().await;
-                            let room = rooms.entry(room_id_write.clone()).or_insert_with(|| Room {
+                            let room = rooms.entry(key.clone()).or_insert_with(|| Room {
                                 clients: HashMap::new(),
                             });
+                            room.clients.insert(ck.clone(), tx_write.clone());
+                        }
+                        *room_id_w.write().await = Some(key);
+                        *conn_key_w.write().await = ck;
+                        send(&tx_write, &SignalMessage::RoomCreated { code: raw });
+                    }
+                }
+                SignalMessage::JoinRoom { code, .. } => {
+                    if remote_protocol {
+                        let mut rooms = rooms_write.write().await;
+                        let key = if rooms.contains_key(&code) {
+                            code
+                        } else {
+                            match hash_pairing_code(code.clone()) {
+                                Ok(h) if rooms.contains_key(&h) => h,
+                                _ => {
+                                    send(
+                                        &tx_write,
+                                        &SignalMessage::Error {
+                                            message:
+                                                "Room not found. Check the code and try again."
+                                                    .to_string(),
+                                        },
+                                    );
+                                    break;
+                                }
+                            }
+                        };
+                        let room = rooms.entry(key.clone()).or_insert_with(|| Room {
+                            clients: HashMap::new(),
+                        });
 
-                            if room.clients.len() >= MAX_MESH_DEVICES {
-                                let err = SignalMessage::Error {
+                        if room.clients.len() >= MAX_MESH_DEVICES {
+                            send(
+                                &tx_write,
+                                &SignalMessage::Error {
                                     message: format!(
                                         "Room is full (max {} devices)",
                                         MAX_MESH_DEVICES
                                     ),
-                                };
-                                let _ = tx_write.send(warp::ws::Message::text(
-                                    serde_json::to_string(&err).unwrap(),
-                                ));
-                                break;
-                            }
+                                },
+                            );
+                            break;
+                        }
 
-                            room.clients.insert(id.clone(), tx_write.clone());
+                        let ck = uuid::Uuid::new_v4().to_string();
+                        room.clients.insert(ck.clone(), tx_write.clone());
+                        *room_id_w.write().await = Some(key.clone());
+                        *conn_key_w.write().await = ck.clone();
 
-                            let existing_peers: Vec<String> =
-                                room.clients.keys().filter(|k| *k != &id).cloned().collect();
-                            let peer_list = SignalMessage::PeerList {
+                        send(&tx_write, &SignalMessage::RoomJoined);
+
+                        let existing_peers: Vec<String> =
+                            room.clients.keys().filter(|k| *k != &ck).cloned().collect();
+                        send(
+                            &tx_write,
+                            &SignalMessage::PeerList {
                                 peers: existing_peers,
-                            };
-                            let _ = tx_write.send(warp::ws::Message::text(
-                                serde_json::to_string(&peer_list).unwrap(),
-                            ));
+                            },
+                        );
 
-                            for (other_id, client) in room.clients.iter() {
-                                if other_id != &id {
-                                    let msg = SignalMessage::PeerJoined {
-                                        device_id: id.clone(),
-                                    };
-                                    let _ = client.send(warp::ws::Message::text(
-                                        serde_json::to_string(&msg).unwrap(),
-                                    ));
-                                }
-                            }
-
-                            let peer_count = room.clients.len();
-                            let joined = SignalMessage::Joined {
-                                device_id: id,
-                                room_id: room_id_write.clone(),
-                                peer_count,
-                            };
-                            let _ = tx_write.send(warp::ws::Message::text(
-                                serde_json::to_string(&joined).unwrap(),
-                            ));
+                        let notify: Vec<Tx> = room.clients.values().cloned().collect();
+                        for client in notify {
+                            send(
+                                &client,
+                                &SignalMessage::PeerJoined {
+                                    device_id: String::new(),
+                                },
+                            );
                         }
-                        SignalMessage::Offer { payload, target } => {
-                            let d_id = did.read().await.clone();
-                            let msg = SignalMessage::Offer {
+                    }
+                }
+                SignalMessage::Offer { payload, target } => {
+                    if !remote_protocol {
+                        let d_id = did_w.read().await.clone();
+                        let rid = room_id_w.read().await.clone();
+                        relay(
+                            &rooms_write,
+                            rid,
+                            &d_id,
+                            &target,
+                            SignalMessage::Offer {
                                 payload,
                                 target: target.clone(),
-                            };
-                            relay(&rooms_write, &room_id_write, &d_id, &target, msg).await;
-                        }
-                        SignalMessage::Answer { payload, target } => {
-                            let d_id = did.read().await.clone();
-                            let msg = SignalMessage::Answer {
+                            },
+                        )
+                        .await;
+                    }
+                }
+                SignalMessage::Answer { payload, target } => {
+                    if !remote_protocol {
+                        let d_id = did_w.read().await.clone();
+                        let rid = room_id_w.read().await.clone();
+                        relay(
+                            &rooms_write,
+                            rid,
+                            &d_id,
+                            &target,
+                            SignalMessage::Answer {
                                 payload,
                                 target: target.clone(),
-                            };
-                            relay(&rooms_write, &room_id_write, &d_id, &target, msg).await;
-                        }
-                        SignalMessage::IceCandidate { payload, target } => {
-                            let d_id = did.read().await.clone();
-                            let msg = SignalMessage::IceCandidate {
+                            },
+                        )
+                        .await;
+                    }
+                }
+                SignalMessage::IceCandidate { payload, target } => {
+                    if !remote_protocol {
+                        let d_id = did_w.read().await.clone();
+                        let rid = room_id_w.read().await.clone();
+                        relay(
+                            &rooms_write,
+                            rid,
+                            &d_id,
+                            &target,
+                            SignalMessage::IceCandidate {
                                 payload,
                                 target: target.clone(),
-                            };
-                            relay(&rooms_write, &room_id_write, &d_id, &target, msg).await;
-                        }
-                        SignalMessage::DeviceAnnounce {
-                            device_id: id,
-                            metadata,
-                        } => {
-                            let d_id = did.read().await.clone();
-                            let msg = SignalMessage::DeviceAnnounce {
-                                device_id: d_id,
-                                metadata,
-                            };
+                            },
+                        )
+                        .await;
+                    }
+                }
+                SignalMessage::Relay { payload, .. } => {
+                    if remote_protocol {
+                        let ck = conn_key_w.read().await.clone();
+                        let rid = room_id_w.read().await.clone();
+                        if let Some(rid) = rid {
                             let rooms = rooms_write.read().await;
-                            if let Some(room) = rooms.get(&room_id_write) {
-                                for (peer_id, client) in &room.clients {
-                                    if peer_id != &id {
-                                        let _ = client.send(warp::ws::Message::text(
-                                            serde_json::to_string(&msg).unwrap(),
-                                        ));
+                            if let Some(room) = rooms.get(&rid) {
+                                for (id, client) in &room.clients {
+                                    if id != &ck {
+                                        send(
+                                            client,
+                                            &SignalMessage::Relay {
+                                                from: None,
+                                                payload: payload.clone(),
+                                            },
+                                        );
                                     }
                                 }
                             }
                         }
-                        _ => {}
                     }
                 }
+                SignalMessage::DeviceAnnounce {
+                    device_id: id,
+                    metadata,
+                } => {
+                    let d_id = did_w.read().await.clone();
+                    let rid = room_id_w.read().await.clone();
+                    let rooms = rooms_write.read().await;
+                    if let Some(rid) = rid {
+                        if let Some(room) = rooms.get(&rid) {
+                            for (peer_id, client) in &room.clients {
+                                if peer_id != &id {
+                                    send(
+                                        client,
+                                        &SignalMessage::DeviceAnnounce {
+                                            device_id: d_id.clone(),
+                                            metadata: metadata.clone(),
+                                        },
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
             }
         }
 
         let d_id = did.read().await.clone();
-        if !d_id.is_empty() {
-            let mut rooms = rooms_write.write().await;
-            if let Some(room) = rooms.get_mut(&room_id_write) {
-                room.clients.remove(&d_id);
-                for (_, client) in room.clients.iter() {
-                    let msg = SignalMessage::PeerDisconnected {
-                        device_id: d_id.clone(),
-                    };
-                    let _ = client.send(warp::ws::Message::text(
-                        serde_json::to_string(&msg).unwrap(),
-                    ));
-                }
-                if room.clients.is_empty() {
-                    rooms.remove(&room_id_write);
+        let ck = conn_key.read().await.clone();
+        let rid = room_id.read().await.clone();
+        if let Some(rid_val) = rid {
+            if !ck.is_empty() || !d_id.is_empty() {
+                let mut rooms = rooms_write.write().await;
+                if let Some(room) = rooms.get_mut(&rid_val) {
+                    if !ck.is_empty() {
+                        room.clients.remove(&ck);
+                    } else if !d_id.is_empty() {
+                        room.clients.remove(&d_id);
+                    }
+                    for (_, client) in room.clients.iter() {
+                        send(
+                            client,
+                            &SignalMessage::PeerDisconnected {
+                                device_id: d_id.clone(),
+                            },
+                        );
+                    }
+                    if room.clients.is_empty() {
+                        rooms.remove(&rid_val);
+                    }
                 }
             }
         }
@@ -222,27 +566,43 @@ async fn handle_connection(socket: warp::ws::WebSocket, room_id: String, rooms: 
         _ = (&mut send_task) => recv_task.abort(),
         _ = (&mut recv_task) => send_task.abort(),
     };
+
+    if let Some(addr) = remote {
+        if let Ok(mut counts) = ctx.conn_counts.lock() {
+            if let Some(n) = counts.get_mut(&addr.ip()) {
+                *n = n.saturating_sub(1);
+                if *n == 0 {
+                    counts.remove(&addr.ip());
+                }
+            }
+        }
+    }
+    ctx.global_count.fetch_sub(1, Ordering::Relaxed);
+    eprintln!(
+        "siegu-signal: connection closed (total={})",
+        ctx.global_count.load(Ordering::Relaxed)
+    );
 }
 
 async fn relay(
     rooms: &RwLock<HashMap<String, Room>>,
-    room_id: &str,
+    room_id: Option<String>,
     sender_id: &str,
     target_id: &str,
     msg: SignalMessage,
 ) {
     let rooms = rooms.read().await;
-    if let Some(room) = rooms.get(room_id) {
-        if target_id == "peer" {
-            for (id, client) in &room.clients {
-                if id != sender_id {
-                    let json = serde_json::to_string(&msg).unwrap();
-                    let _ = client.send(warp::ws::Message::text(json));
+    if let Some(room_id) = room_id {
+        if let Some(room) = rooms.get(&room_id) {
+            if target_id == "peer" {
+                for (id, client) in &room.clients {
+                    if id != sender_id {
+                        send(client, &msg);
+                    }
                 }
+            } else if let Some(client) = room.clients.get(target_id) {
+                send(client, &msg);
             }
-        } else if let Some(client) = room.clients.get(target_id) {
-            let json = serde_json::to_string(&msg).unwrap();
-            let _ = client.send(warp::ws::Message::text(json));
         }
     }
 }
@@ -256,8 +616,8 @@ mod tests {
 
     type TestStream = tokio_tungstenite::WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
-    async fn connect_client(port: u16, room_id: &str) -> TestStream {
-        let url = format!("ws://127.0.0.1:{}/{}", port, room_id);
+    async fn connect_client(port: u16, path: &str) -> TestStream {
+        let url = format!("ws://127.0.0.1:{}/{}", port, path);
         let (ws, _) = connect_async(&url).await.unwrap();
         ws
     }
@@ -265,8 +625,19 @@ mod tests {
     async fn send_join(ws: &mut TestStream, device_id: &str) {
         let join = SignalMessage::Join {
             device_id: device_id.to_string(),
+            token: None,
         };
         ws.send(Message::Text(serde_json::to_string(&join).unwrap().into()))
+            .await
+            .unwrap();
+    }
+
+    async fn send_join_room(ws: &mut TestStream, code: &str) {
+        let msg = SignalMessage::JoinRoom {
+            code: code.to_string(),
+            token: None,
+        };
+        ws.send(Message::Text(serde_json::to_string(&msg).unwrap().into()))
             .await
             .unwrap();
     }
@@ -611,6 +982,187 @@ mod tests {
                 assert_eq!(peer_count, 1, "Room should be fresh after cleanup");
             }
             other => panic!("Expected Joined, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_remote_create_and_join_room() {
+        let port = start(0).await.port;
+
+        let mut ws_host = connect_client(port, "ws").await;
+        ws_host
+            .send(Message::Text(
+                serde_json::to_string(&SignalMessage::CreateRoom { token: None })
+                    .unwrap()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+
+        let code = match recv_signal(&mut ws_host).await {
+            SignalMessage::RoomCreated { code } => code,
+            other => panic!("Expected RoomCreated, got {other:?}"),
+        };
+
+        let mut ws_peer = connect_client(port, "ws").await;
+        let key = hash_pairing_code(code.clone()).unwrap();
+        send_join_room(&mut ws_peer, &key).await;
+
+        match recv_signal(&mut ws_peer).await {
+            SignalMessage::RoomJoined => {}
+            other => panic!("Expected RoomJoined, got {other:?}"),
+        }
+
+        loop {
+            match recv_signal(&mut ws_peer).await {
+                SignalMessage::PeerJoined { .. } => break,
+                SignalMessage::PeerList { .. } => continue,
+                other => panic!("Expected PeerJoined for peer, got {other:?}"),
+            }
+        }
+
+        loop {
+            match recv_signal(&mut ws_host).await {
+                SignalMessage::PeerJoined { .. } => break,
+                SignalMessage::PeerList { .. } => continue,
+                other => panic!("Expected PeerJoined for host, got {other:?}"),
+            }
+        }
+
+        let relay = SignalMessage::Relay {
+            from: None,
+            payload: serde_json::json!({"type": "offer", "payload": "sdp", "target": "peer"}),
+        };
+        ws_peer
+            .send(Message::Text(serde_json::to_string(&relay).unwrap().into()))
+            .await
+            .unwrap();
+
+        match recv_signal(&mut ws_host).await {
+            SignalMessage::Relay { payload, .. } => {
+                assert_eq!(payload["type"], "offer");
+            }
+            other => panic!("Expected Relay, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_join_unknown_room_rejected() {
+        let port = start(0).await.port;
+
+        let mut ws = connect_client(port, "ws").await;
+        send_join_room(&mut ws, "deadbeefdeadbeefdeadbeefdeadbeef").await;
+
+        match recv_signal(&mut ws).await {
+            SignalMessage::Error { message } => {
+                assert!(
+                    message.contains("Room not found"),
+                    "Expected room not found, got: {message}"
+                );
+            }
+            other => panic!("Expected Error, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_token_required() {
+        let server = start_with_config(ServerConfig {
+            port: 0,
+            token: Some("s3cret".to_string()),
+        })
+        .await;
+        let port = server.port;
+
+        let mut ws_bad = connect_client(port, "room-token").await;
+        send_join(&mut ws_bad, "device-bad").await;
+
+        match recv_signal(&mut ws_bad).await {
+            SignalMessage::Error { message } => {
+                assert!(
+                    message.contains("token"),
+                    "Expected token error, got: {message}"
+                );
+            }
+            other => panic!("Expected Error, got {other:?}"),
+        }
+
+        let mut ws_good = connect_client(port, "room-token").await;
+        ws_good
+            .send(Message::Text(
+                serde_json::to_string(&SignalMessage::Join {
+                    device_id: "device-good".to_string(),
+                    token: Some("s3cret".to_string()),
+                })
+                .unwrap()
+                .into(),
+            ))
+            .await
+            .unwrap();
+
+        match recv_until_joined(&mut ws_good).await {
+            SignalMessage::Joined { device_id, .. } => {
+                assert_eq!(device_id, "device-good");
+            }
+            other => panic!("Expected Joined, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_rate_limit_rejects_bursts() {
+        let server = start_with_config(ServerConfig {
+            port: 0,
+            token: None,
+        })
+        .await;
+        let port = server.port;
+
+        let mut rejects = 0;
+        for _ in 0..(WINDOW_ATTEMPTS + 5) {
+            let mut ws = connect_client(port, "ws").await;
+            match tokio::time::timeout(std::time::Duration::from_millis(500), ws.next()).await {
+                Ok(Some(Ok(msg))) => {
+                    if msg.is_close() {
+                        rejects += 1;
+                        continue;
+                    }
+                    let text = msg.to_text().unwrap_or("");
+                    if text.contains("\"type\":\"error\"") || text.contains("\"type\": \"error\"") {
+                        rejects += 1;
+                    }
+                }
+                Ok(Some(Err(_))) => rejects += 1,
+                Ok(None) => rejects += 1,
+                Err(_) => {}
+            }
+            drop(ws);
+        }
+
+        assert!(rejects > 0, "Expected at least one rate-limited rejection");
+    }
+
+    #[tokio::test]
+    async fn test_oversize_message_rejected() {
+        let port = start(0).await.port;
+
+        let mut ws = connect_client(port, "room-big").await;
+        let big = "x".repeat(MAX_MESSAGE_BYTES + 1);
+        let payload = serde_json::json!({
+            "type": "relay",
+            "from": null,
+            "payload": { "big": big }
+        });
+        ws.send(Message::Text(payload.to_string().into()))
+            .await
+            .unwrap();
+
+        match recv_signal(&mut ws).await {
+            SignalMessage::Error { message } => {
+                assert!(
+                    message.contains("too large"),
+                    "Expected too-large error, got: {message}"
+                );
+            }
+            other => panic!("Expected Error, got {other:?}"),
         }
     }
 }

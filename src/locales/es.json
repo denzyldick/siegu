@@ -253,6 +253,7 @@
     "download": "Descargar",
     "download_selected": "Descargar seleccionados ({count})",
     "all_selected_ready": "Todos los seleccionados están listos",
+    "select_for_download": "Seleccionar para descargar",
     "models_ready": "{count} de {total} modelos listos",
     "run_now": "Ejecutar ahora",
     "update": "Actualizar",
@@ -278,15 +279,27 @@
     "system_logs": "Registros del sistema",
     "no_logs": "Aún no hay registros.",
     "clear_logs": "Borrar historial de registros",
-    "update_model": "Actualizar modelo",
+    "copy_logs": "Copiar registros del sistema",
+    "logs_copied": "Registros del sistema copiados al portapapeles",
+    "logs_copy_failed": "No se pudieron copiar los registros del sistema",
+    "redownload": "Descargar de nuevo",
     "eta_label": "ETA: {time}",
     "indexing_jobs": "Indexando {count} trabajos de IA",
     "disable_model": "Desactivar",
     "enable_model": "Activar",
-    "enable_all": "Activar todas",
-    "disable_all": "Desactivar todas",
     "logs_cleared": "Registros borrados",
     "scan_threads_saved": "ML threads saved",
+    "signalling": "Señalización",
+    "signalling_url": "URL de señalización",
+    "signalling_url_desc": "Dónde se encuentran los dispositivos para intercambiar datos de conexión WebRTC. Usa el servidor gestionado o tu propio servidor de señalización autoalojado.",
+    "signalling_token": "Token de señalización (opcional)",
+    "signalling_token_placeholder": "Necesario si tu servidor exige un token",
+    "signalling_test": "Probar conexión",
+    "signalling_save": "Guardar",
+    "signalling_saved": "Ajustes de señalización guardados",
+    "signalling_reset": "Ajustes de señalización restablecidos al servidor predeterminado",
+    "signalling_save_failed": "Error al guardar: {error}",
+    "signalling_ping_failed": "Error en la prueba: {error}",
     "model_enabled": "{model} activado",
     "model_disabled": "{model} desactivado",
     "analysis_started": "Análisis de {model} iniciado",
@@ -311,6 +324,9 @@
     "theme_system": "Sistema",
     "theme_light": "Claro",
     "theme_dark": "Oscuro"
+  },
+  "open_with": {
+    "opened_in_siegu": "Abierto en Siegu: {file}"
   },
   "language": {
     "label": "Idioma",
@@ -525,5 +541,6 @@
   "update_available": "Actualización {version} disponible",
   "download_update": "Descargar e instalar",
   "update_error": "Error de actualización",
-  "update_progress": "Descargando actualización..."
+  "update_progress": "Descargando actualización...",
+  "update_not_supported": "Las actualizaciones automáticas no son compatibles con esta plataforma. Descarga la última versión desde el sitio web de Siegu."
 }

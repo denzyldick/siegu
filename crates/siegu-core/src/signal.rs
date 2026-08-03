@@ -4,7 +4,11 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "type")]
 pub enum SignalMessage {
     #[serde(rename = "join")]
-    Join { device_id: String },
+    Join {
+        device_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        token: Option<String>,
+    },
     #[serde(rename = "joined")]
     Joined {
         device_id: String,
@@ -25,11 +29,18 @@ pub enum SignalMessage {
     Error { message: String },
 
     #[serde(rename = "create_room")]
-    CreateRoom,
+    CreateRoom {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        token: Option<String>,
+    },
     #[serde(rename = "room_created")]
     RoomCreated { code: String },
     #[serde(rename = "join_room")]
-    JoinRoom { code: String },
+    JoinRoom {
+        code: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        token: Option<String>,
+    },
     #[serde(rename = "room_joined")]
     RoomJoined,
     #[serde(rename = "relay")]
@@ -56,6 +67,7 @@ mod tests {
     fn test_serialize_join() {
         let msg = SignalMessage::Join {
             device_id: "abc".to_string(),
+            token: None,
         };
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains(r#""type":"join""#));
@@ -85,6 +97,7 @@ mod tests {
         let messages = vec![
             SignalMessage::Join {
                 device_id: "d1".into(),
+                token: None,
             },
             SignalMessage::Joined {
                 device_id: "d1".into(),
@@ -112,9 +125,12 @@ mod tests {
             SignalMessage::Error {
                 message: "err".into(),
             },
-            SignalMessage::CreateRoom,
+            SignalMessage::CreateRoom { token: None },
             SignalMessage::RoomCreated { code: "abc".into() },
-            SignalMessage::JoinRoom { code: "abc".into() },
+            SignalMessage::JoinRoom {
+                code: "abc".into(),
+                token: None,
+            },
             SignalMessage::RoomJoined,
             SignalMessage::Relay {
                 from: Some("d1".into()),

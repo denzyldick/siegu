@@ -253,6 +253,7 @@
     "download": "Descargá",
     "download_selected": "Descargá Selekshoná ({count})",
     "all_selected_ready": "Tur Selekshoná Klá",
+    "select_for_download": "Selekshoná pa descargá",
     "models_ready": "{count} di {total} modelo klá",
     "run_now": "Ehekutá Awor",
     "update": "Aktualisá",
@@ -278,15 +279,27 @@
     "system_logs": "Lognan di Sistema",
     "no_logs": "No a registrá log ainda.",
     "clear_logs": "Limpia Históriko di Log",
-    "update_model": "Aktualisá Modelo",
+    "copy_logs": "Kopia lognan di sistema",
+    "logs_copied": "Lognan di sistema kopia na clipboard",
+    "logs_copy_failed": "No a logra kopia lognan di sistema",
+    "redownload": "Descargá di nobo",
     "eta_label": "ETA: {time}",
     "indexing_jobs": "Indeksando {count} trabou di AI",
     "disable_model": "Desaktivá",
     "enable_model": "Aktivá",
-    "enable_all": "Aktivá tur",
-    "disable_all": "Desaktivá tur",
     "logs_cleared": "Log limpjá",
     "scan_threads_saved": "ML threads saved",
+    "signalling": "Señalishon",
+    "signalling_url": "URL di señalishon",
+    "signalling_url_desc": "Kaminda aparatonan topa pa intercambia informashon di konekshon WebRTC. Usa e server manehá of bo propio server di señalishon self-hosted.",
+    "signalling_token": "Token di señalishon (opshonal)",
+    "signalling_token_placeholder": "Mester si bo server ta eksigí un token",
+    "signalling_test": "Probá konekshon",
+    "signalling_save": "Grabá",
+    "signalling_saved": "Konfigurashon di señalishon graba",
+    "signalling_reset": "Konfigurashon di señalishon reestablesé na e server default",
+    "signalling_save_failed": "No por a graba: {error}",
+    "signalling_ping_failed": "Fayo di prueba: {error}",
     "model_enabled": "{model} aktivá",
     "model_disabled": "{model} desaktivá",
     "analysis_started": "Analisis di {model} inisiá",
@@ -311,6 +324,9 @@
     "theme_system": "Sistema",
     "theme_light": "Klaru",
     "theme_dark": "Skur"
+  },
+  "open_with": {
+    "opened_in_siegu": "Habri na Siegu: {file}"
   },
   "language": {
     "label": "Idioma",
@@ -525,5 +541,6 @@
   "update_available": "Update {version} disponibel",
   "download_update": "Descargá i Instalá",
   "update_error": "Error di update",
-  "update_progress": "Deskargando update..."
+  "update_progress": "Deskargando update...",
+  "update_not_supported": "Update outomátiko no ta wòrdu sostené riba e plataforma aki. Descargá e vershon mas resien for di e website di Siegu."
 }

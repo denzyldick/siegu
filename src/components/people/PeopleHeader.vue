@@ -14,7 +14,7 @@ function formatCount(value: number): string {
 </script>
 
 <template>
-  <div class="header-banner px-6 pt-8 pb-10 bg-white border-bottom-subtle w-100">
+  <div class="header-banner px-6 pt-4 pb-8 bg-white border-bottom-subtle w-100">
     <div class="w-100">
       <div class="d-flex align-center justify-space-between flex-wrap ga-4">
         <div>

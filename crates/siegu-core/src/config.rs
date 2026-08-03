@@ -54,6 +54,8 @@ pub const ALLOWED_CONFIG_KEYS: &[&str] = &[
     "auto_scan",
     "sync_enabled",
     "max_storage_mb",
+    "signaling_url",
+    "signaling_token",
 ];
 
 pub fn is_valid_config_key(key: &str) -> bool {
@@ -115,6 +117,28 @@ pub fn validate_config_value(key: &str, value: &str) -> Result<(), ConfigError> 
                 });
             }
         }
+        "signaling_url" => {
+            let trimmed = value.trim();
+            let has_scheme = trimmed.contains("://");
+            if !has_scheme && !trimmed.is_empty() {
+                return Err(ConfigError::InvalidType {
+                    key: key.to_string(),
+                    expected: "scheme://host[:port][/path]".to_string(),
+                    got: value.to_string(),
+                });
+            }
+            if has_scheme {
+                let scheme: String = trimmed.split("://").next().unwrap_or("").to_lowercase();
+                if !["ws", "wss", "http", "https"].contains(&scheme.as_str()) {
+                    return Err(ConfigError::InvalidType {
+                        key: key.to_string(),
+                        expected: "ws|wss|http|https".to_string(),
+                        got: value.to_string(),
+                    });
+                }
+            }
+        }
+        "signaling_token" => {}
         _ => {}
     }
     Ok(())
@@ -240,6 +264,28 @@ mod tests {
             validate_config_value("tier", "premium"),
             Err(ConfigError::InvalidType { .. })
         ));
+    }
+
+    #[test]
+    fn test_validate_config_signaling_url() {
+        assert!(validate_config_value("signaling_url", "wss://siegu.io/ws").is_ok());
+        assert!(validate_config_value("signaling_url", "ws://192.168.1.5:8080").is_ok());
+        assert!(validate_config_value("signaling_url", "http://host:8080/ws").is_ok());
+        assert!(matches!(
+            validate_config_value("signaling_url", "ftp://bad"),
+            Err(ConfigError::InvalidType { .. })
+        ));
+        assert!(matches!(
+            validate_config_value("signaling_url", "no-scheme-here"),
+            Err(ConfigError::InvalidType { .. })
+        ));
+        assert!(validate_config_value("signaling_url", "").is_ok());
+    }
+
+    #[test]
+    fn test_validate_config_signaling_token() {
+        assert!(validate_config_value("signaling_token", "s3cret").is_ok());
+        assert!(validate_config_value("signaling_token", "").is_ok());
     }
 
     #[test]

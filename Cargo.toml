@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/siegu-core",
     "crates/siegu-cli",
+    "crates/siegu-signal",
     "src-tauri",
 ]
 

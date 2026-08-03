@@ -1,4 +1,5 @@
 import { ref, reactive, computed, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { platform } from '@tauri-apps/plugin-os'
@@ -19,15 +20,43 @@ import type {
   UpdateStatus,
 } from '@/types/settings'
 import type { Update } from '@tauri-apps/plugin-updater'
+import {
+  DEFAULT_SIGNALING_URL,
+  appendToken,
+  pingSignalling,
+} from '@/services/signalling'
+import type { PingResult } from '@/services/signalling'
 
 let listenersSetUp = false
 const cleanupFns: Array<() => void> = []
 
+function detectPlatformFromUserAgent(): string {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
+  if (/android/i.test(ua)) return 'android'
+  if (/iphone|ipad|ipod/i.test(ua)) return 'ios'
+  if (/mac/i.test(ua)) return 'macos'
+  if (/win/i.test(ua)) return 'windows'
+  if (/linux/i.test(ua)) return 'linux'
+  return ''
+}
+
+function detectPlatform(): string {
+  try {
+    const detected = platform()
+    if (detected) return detected
+  } catch {
+    // plugin unavailable — fall back to user agent
+  }
+  return detectPlatformFromUserAgent()
+}
+
 export function useSettings() {
+  const { t } = useI18n()
 
   const directories = ref<DirectoryEntry[]>([])
   const showFolderPicker = ref(false)
   const isAndroid = ref(false)
+  const currentPlatform = ref(detectPlatformFromUserAgent())
 
   const downloadedModels = ref<string[]>([])
   const selectedModels = ref<string[]>([...AI_MODEL_IDS])
@@ -59,6 +88,11 @@ export function useSettings() {
   const isCleaning = ref(false)
   const updateStatus = ref<UpdateStatus>('idle')
   const updateInfo = ref<Update | null>(null)
+
+  const signalingUrl = ref('')
+  const signalingToken = ref('')
+  const signalingTesting = ref(false)
+  const signalingPingResult = ref<PingResult | null>(null)
 
   const uiNow = ref(Date.now())
 
@@ -160,10 +194,13 @@ export function useSettings() {
   async function init(): Promise<void> {
     startClock()
     await setupEventListeners()
-    isAndroid.value = (await platform()) === 'android'
+    const detectedPlatform = detectPlatform()
+    isAndroid.value = detectedPlatform === 'android'
+    currentPlatform.value = detectedPlatform
     await checkExistingModels()
     await loadPerformanceConfig()
     await loadModelEnabledStates()
+    await loadSignallingConfig()
     await fetchLogs()
     await listDirectories()
   }
@@ -342,24 +379,6 @@ export function useSettings() {
     }
   }
 
-  async function enableAllModels(): Promise<void> {
-    for (const m of downloadedModels.value) {
-      modelEnabled.value[m] = true
-      for (const key of configKeysForModel(m)) {
-        await invoke('save_config', { key, value: 'true' })
-      }
-    }
-  }
-
-  async function disableAllModels(): Promise<void> {
-    for (const m of downloadedModels.value) {
-      modelEnabled.value[m] = false
-      for (const key of configKeysForModel(m)) {
-        await invoke('save_config', { key, value: 'false' })
-      }
-    }
-  }
-
   async function loadPerformanceConfig(): Promise<void> {
     try {
       const configStr = await invoke<string>('get_config')
@@ -392,6 +411,48 @@ export function useSettings() {
       showSnackbar('Manual indexing enabled')
     } else {
       showSnackbar(`Indexing mode set to ${mode}`)
+    }
+  }
+
+  async function loadSignallingConfig(): Promise<void> {
+    try {
+      const config = JSON.parse(await invoke<string>('get_config')) as Record<string, string>
+      signalingUrl.value = config.signaling_url || ''
+      signalingToken.value = config.signaling_token || ''
+    } catch {
+      signalingUrl.value = ''
+      signalingToken.value = ''
+    }
+  }
+
+  function effectiveSignalingUrl(): string {
+    const base = signalingUrl.value.trim() || DEFAULT_SIGNALING_URL
+    return appendToken(base, signalingToken.value)
+  }
+
+  async function saveSignallingConfig(): Promise<void> {
+    const base = signalingUrl.value.trim()
+    try {
+      await invoke('save_config', { key: 'signaling_url', value: base })
+      await invoke('save_config', { key: 'signaling_token', value: signalingToken.value.trim() })
+      signalingPingResult.value = null
+      showSnackbar(base ? t('settings.signalling_saved') : t('settings.signalling_reset'))
+    } catch (e) {
+      showSnackbar(t('settings.signalling_save_failed', { error: e }), true)
+    }
+  }
+
+  async function testSignalling(): Promise<void> {
+    if (signalingTesting.value) return
+    signalingTesting.value = true
+    signalingPingResult.value = null
+    const url = effectiveSignalingUrl()
+    try {
+      signalingPingResult.value = await pingSignalling(url)
+    } catch (e) {
+      signalingPingResult.value = { ok: false, message: t('settings.signalling_ping_failed', { error: e }) }
+    } finally {
+      signalingTesting.value = false
     }
   }
 
@@ -535,6 +596,7 @@ export function useSettings() {
   }
 
   async function checkUpdate(): Promise<void> {
+    if (!updateSupported.value) return
     updateStatus.value = 'checking'
     try {
       const update = await check()
@@ -550,6 +612,7 @@ export function useSettings() {
   }
 
   async function downloadUpdate(): Promise<void> {
+    if (!updateSupported.value) return
     if (!updateInfo.value) return
     updateStatus.value = 'downloading'
     try {
@@ -592,7 +655,11 @@ export function useSettings() {
 
   const activeModelSummary = computed(() => {
     if (!visibleActivityModel.value) return ''
-    return `${getModelStatusLabel(visibleActivityModel.value.id)}: ${visibleActivityModel.value.id}`
+    return `${getModelStatusLabel(visibleActivityModel.value.id)}: ${t('models.' + visibleActivityModel.value.id + '.title')}`
+  })
+
+  const updateSupported = computed(() => {
+    return currentPlatform.value === 'windows' || currentPlatform.value === 'macos'
   })
 
   const updateStatusText = computed(() => {
@@ -628,6 +695,7 @@ export function useSettings() {
     directories,
     showFolderPicker,
     isAndroid,
+    currentPlatform,
     downloadedModels,
     selectedModels,
     downloadProgress,
@@ -650,11 +718,16 @@ export function useSettings() {
     updateStatus,
     updateInfo,
     uiNow,
+    signalingUrl,
+    signalingToken,
+    signalingTesting,
+    signalingPingResult,
     sortedModels,
     isAnyModelProcessing,
     missingSelectedCount,
     visibleActivityModel,
     activeModelSummary,
+    updateSupported,
     updateStatusText,
     updateBtnText,
     updateBtnIcon,
@@ -676,11 +749,13 @@ export function useSettings() {
     getModeLabel,
     checkExistingModels,
     toggleModel,
-    enableAllModels,
-    disableAllModels,
     loadPerformanceConfig,
     savePerformanceConfig,
     setIndexingMode,
+    loadSignallingConfig,
+    saveSignallingConfig,
+    testSignalling,
+    effectiveSignalingUrl,
     downloadModels,
     getProgress,
     isModelProcessing,

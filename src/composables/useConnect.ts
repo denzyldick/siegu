@@ -10,6 +10,7 @@ import {
   requestStartSync,
 } from '@/services/tauri'
 import type { DiscoveredHost, PeerDevice } from '@/types/sync'
+import { getConfiguredSignalingUrl } from '@/services/signalling'
 
 export type ConnectMode = 'host' | 'join'
 
@@ -110,14 +111,14 @@ export function useConnect() {
     }
   }
 
-  function getSignalingUrl(): string {
+  async function getSignalingUrl(): Promise<string> {
     if (selectedLanHost.value) {
       return `ws://${selectedLanHost.value.ip}:${selectedLanHost.value.port}`
     }
     if (hostIp.value && hostPort.value) {
       return `ws://${hostIp.value}:${hostPort.value}`
     }
-    return import.meta.env.VITE_SIGNALING_URL || 'wss://siegu.io/ws'
+    return getConfiguredSignalingUrl()
   }
 
   async function initialize(): Promise<void> {
@@ -150,7 +151,7 @@ export function useConnect() {
     }
     loading.value = true
     connectionStatus.value = t('connect.joining_room')
-    const signalingUrl = getSignalingUrl()
+    const signalingUrl = await getSignalingUrl()
     try {
       const roomId = await hashPairingCode(joinPassphrase.value)
       await startWebrtcSession(roomId, true, signalingUrl)

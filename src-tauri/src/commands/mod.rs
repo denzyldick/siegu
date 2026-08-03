@@ -8,5 +8,6 @@ pub mod people;
 pub mod photos;
 pub mod scan;
 pub mod search;
+pub mod signalling;
 pub mod sync;
 pub mod wallpaper;

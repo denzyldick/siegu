@@ -17,6 +17,7 @@ mod wallpaper_plugin;
 pub use siegu_core::database;
 
 use std::sync::Arc;
+use tauri::Emitter;
 use tauri::Manager;
 
 struct WebRtcState {
@@ -66,6 +67,37 @@ fn config_dir_fallback() -> Option<std::path::PathBuf> {
     Some(base)
 }
 
+const OPEN_WITH_EXTENSIONS: &[&str] = &[
+    "jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "heic", "heif", "avif", "mp4", "webm",
+    "mov", "avi", "mkv", "m4v",
+];
+
+/// Find a media file passed on the command line when the OS opens the app
+/// "with" a file (double-click, "Open with… Siegu", etc.).
+fn extract_opened_file(args: Vec<String>) -> Option<String> {
+    for arg in args {
+        let path = std::path::Path::new(&arg);
+        if !path.is_file() {
+            continue;
+        }
+        let ext = path.extension().and_then(|e| e.to_str());
+        if let Some(ext) = ext {
+            let ext = ext.to_ascii_lowercase();
+            if OPEN_WITH_EXTENSIONS.contains(&ext.as_str()) {
+                return Some(arg);
+            }
+        }
+    }
+    None
+}
+
+fn notify_opened_file(app: &tauri::AppHandle, path: &str) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.emit("file-opened", path);
+    }
+    emit_log(app, format!("Opened file: {path}"));
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     std::panic::set_hook(Box::new(|info| {
@@ -96,10 +128,13 @@ pub fn run() {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.show();
             let _ = window.set_focus();
+            if let Some(path) = extract_opened_file(args) {
+                notify_opened_file(app, &path);
+            }
         }
     }));
     builder
@@ -226,6 +261,10 @@ pub fn run() {
 
             app.manage(ShutdownState::default());
 
+            if let Some(path) = extract_opened_file(std::env::args().collect()) {
+                notify_opened_file(app.handle(), &path);
+            }
+
             let app_handle_for_interval = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
@@ -303,6 +342,7 @@ pub fn run() {
             commands::config::save_config,
             commands::config::get_config,
             commands::config::get_os,
+            commands::signalling::ping_signaling,
             // Sync
             commands::sync::start_webrtc_session,
             commands::sync::start_lan_host,

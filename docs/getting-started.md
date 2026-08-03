@@ -59,17 +59,18 @@ npm install
 npm run tauri dev
 ```
 
-The app window opens with an onboarding wizard. Select your photo directories and start scanning.
+The app window opens with an onboarding wizard that walks you through setup.
 
 ---
 
 ## First Run
 
-1. **Onboarding**: Choose your language and theme
-2. **Add folders**: Click "Add Directory" to point at your photo/video library
-3. **Scan**: The scanner finds media, extracts EXIF metadata, and generates thumbnails
-4. **AI models**: Download models via Settings → Models (or `siegu models download`)
-5. **Analyze**: After models are downloaded, run analysis to index faces, captions, objects, etc.
+1. **Welcome**: The wizard opens with a greeting. Choose **Set up locally** or **Set up with sync** (to link another device)
+2. **Folders**: Click "Add Directory" to point at your photo/video library
+3. **AI models**: Download at least two models (the Continue button unlocks once two are ready)
+4. **Sync (optional)**: Link a device to keep libraries in sync across devices, or skip
+5. **Scan**: The scanner finds media, extracts EXIF metadata, and generates thumbnails
+6. **Analyze**: With models downloaded, run analysis to index faces, captions, objects, etc.
 
 > **Tip**: Scanning builds the base library immediately. AI enrichment (search quality, faces, captions) improves as models finish analyzing your photos — you can keep using the app while it runs.
 

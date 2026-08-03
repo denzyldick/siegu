@@ -36,6 +36,20 @@ type WsRead = futures_util::stream::SplitStream<
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
 >;
 
+/// Split `?token=...` out of a signalling URL so it can be sent in the join
+/// message body instead of the WebSocket handshake.
+fn extract_token(url: &str) -> (String, Option<String>) {
+    match url.split_once('?') {
+        Some((base, query)) => {
+            let token = url::form_urlencoded::parse(query.as_bytes())
+                .find(|(k, _)| k == "token")
+                .map(|(_, v)| v.into_owned());
+            (base.trim_end_matches('/').to_string(), token)
+        }
+        None => (url.trim_end_matches('/').to_string(), None),
+    }
+}
+
 pub struct MeshTransport {
     pub room_id: String,
     pub is_initiator: bool,
@@ -138,7 +152,7 @@ impl MeshTransport {
 
         let is_remote = self.signaling_url.contains("wss://");
 
-        let base_url = self.signaling_url.trim_end_matches('/');
+        let (base_url, token) = extract_token(&self.signaling_url);
 
         let connect_fut = if is_remote {
             connect_async(base_url.to_string().into_client_request()?)
@@ -453,12 +467,18 @@ impl MeshTransport {
                     &ws_write,
                     &SignalMessage::JoinRoom {
                         code: self.room_id.clone(),
+                        token: token.clone(),
                     },
                 )
                 .await?;
             } else {
-                self.send_signal(&ws_write, &SignalMessage::CreateRoom)
-                    .await?;
+                self.send_signal(
+                    &ws_write,
+                    &SignalMessage::CreateRoom {
+                        token: token.clone(),
+                    },
+                )
+                .await?;
             }
         } else {
             self.event
@@ -467,6 +487,7 @@ impl MeshTransport {
                 &ws_write,
                 &SignalMessage::Join {
                     device_id: self.device_id.clone(),
+                    token: token.clone(),
                 },
             )
             .await?;

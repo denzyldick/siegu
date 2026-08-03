@@ -161,7 +161,7 @@
         <div class="video-modal-card">
             <button class="modal-close video-close" aria-label="Close Video">&times;</button>
             <div class="video-container">
-                <video controls autoplay class="demo-video">
+                <video controls autoplay playsinline muted loop class="demo-video">
                     <source src="assets/demo.mp4" type="video/mp4">
                 </video>
             </div>
@@ -290,9 +290,8 @@
                 btn.addEventListener('click', () => {
                     videoModal.classList.add('active');
                     document.body.style.overflow = 'hidden';
-                    // If you add a real <video> tag, uncomment below to auto-play
-                    // const vid = videoModal.querySelector('video');
-                    // if(vid) vid.play();
+                    const vid = videoModal.querySelector('video');
+                    if(vid) vid.play();
                 });
             }
         });
@@ -300,9 +299,8 @@
         const closeVideoModal = () => {
             videoModal.classList.remove('active');
             document.body.style.overflow = 'auto';
-            // If you add a real <video> tag, uncomment below to auto-pause
-            // const vid = videoModal.querySelector('video');
-            // if(vid) { vid.pause(); vid.currentTime = 0; }
+            const vid = videoModal.querySelector('video');
+            if(vid) { vid.pause(); vid.currentTime = 0; }
         };
 
         if(videoClose) videoClose.addEventListener('click', closeVideoModal);

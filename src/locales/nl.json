@@ -253,6 +253,7 @@
     "download": "Downloaden",
     "download_selected": "Geselecteerde downloaden ({count})",
     "all_selected_ready": "Alle geselecteerd gereed",
+    "select_for_download": "Selecteren om te downloaden",
     "models_ready": "{count} van {total} modellen gereed",
     "run_now": "Nu uitvoeren",
     "update": "Updaten",
@@ -278,15 +279,27 @@
     "system_logs": "Systeemlogboeken",
     "no_logs": "Nog geen logboeken.",
     "clear_logs": "Logboek wissen",
-    "update_model": "Model updaten",
+    "copy_logs": "Systeemlogboeken kopiëren",
+    "logs_copied": "Systeemlogboeken naar klembord gekopieerd",
+    "logs_copy_failed": "Systeemlogboeken kopiëren mislukt",
+    "redownload": "Opnieuw downloaden",
     "eta_label": "ETA: {time}",
     "indexing_jobs": "{count} AI-taken indexeren",
     "disable_model": "Uitschakelen",
     "enable_model": "Inschakelen",
-    "enable_all": "Alles inschakelen",
-    "disable_all": "Alles uitschakelen",
     "logs_cleared": "Logboeken gewist",
     "scan_threads_saved": "ML threads saved",
+    "signalling": "Signaling",
+    "signalling_url": "Signaling-URL",
+    "signalling_url_desc": "Waar apparaten elkaar ontmoeten om WebRTC-verbindingsgegevens uit te wisselen. Gebruik de beheerde server of je eigen zelfgehoste signaleringsserver.",
+    "signalling_token": "Signaling-token (optioneel)",
+    "signalling_token_placeholder": "Vereist als je server een token afdwingt",
+    "signalling_test": "Verbinding testen",
+    "signalling_save": "Opslaan",
+    "signalling_saved": "Signaling-instellingen opgeslagen",
+    "signalling_reset": "Signaling-instellingen hersteld naar de standaardserver",
+    "signalling_save_failed": "Opslaan mislukt: {error}",
+    "signalling_ping_failed": "Test mislukt: {error}",
     "model_enabled": "{model} ingeschakeld",
     "model_disabled": "{model} uitgeschakeld",
     "analysis_started": "{model} analyse gestart",
@@ -311,6 +324,9 @@
     "theme_system": "Systeem",
     "theme_light": "Licht",
     "theme_dark": "Donker"
+  },
+  "open_with": {
+    "opened_in_siegu": "Geopend in Siegu: {file}"
   },
   "language": {
     "label": "Taal",
@@ -525,5 +541,6 @@
   "update_available": "Update {version} beschikbaar",
   "download_update": "Download en installeer",
   "update_error": "Update fout",
-  "update_progress": "Update wordt gedownload..."
+  "update_progress": "Update wordt gedownload...",
+  "update_not_supported": "Automatische updates worden niet ondersteund op dit platform. Download de nieuwste versie van de Siegu-website."
 }

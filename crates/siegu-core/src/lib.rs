@@ -15,6 +15,7 @@ pub mod scanner;
 pub mod server;
 pub mod shutdown;
 pub mod signal;
+pub mod signalling;
 pub mod sync_transport;
 pub mod thumbnail;
 
@@ -30,3 +31,4 @@ pub use scanner::{extract_photo_metadata, is_media_file, ScanGuard};
 pub use server::{generate_pairing_codes, hash_pairing_code, PairingCodes};
 pub use shutdown::{check_shutdown, ShutdownCoordinator};
 pub use signal::SignalMessage;
+pub use signalling::{normalize_signaling_url, ping_signaling, PingOutcome};

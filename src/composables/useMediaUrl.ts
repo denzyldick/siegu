@@ -11,11 +11,11 @@ async function ensurePort(): Promise<number | null> {
 
   portPromise = (async () => {
     try {
-      const port = await getMediaServerPort()
-      sharedPort.value = port
-      return port
+      sharedPort.value = (await getMediaServerPort()) ?? null
+      return sharedPort.value
     } catch (error) {
       console.error('[useMediaUrl] Failed to get media server port:', error)
+      portPromise = null
       return null
     }
   })()
@@ -24,6 +24,8 @@ async function ensurePort(): Promise<number | null> {
 }
 
 export function useMediaUrl() {
+  void ensurePort()
+
   function videoUrl(location: string): string | null {
     if (!sharedPort.value || !location) return null
     const encoded = encodeURIComponent(location)

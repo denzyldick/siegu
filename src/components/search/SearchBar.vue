@@ -80,7 +80,9 @@ const cameras = computed(() =>
 );
 
 const cameraChips = computed(() =>
-  cameras.value.map((c) => ({ ...c, hasBrand: brandMeta(c.name) !== null })),
+  cameras.value
+    .map((c) => ({ ...c, hasBrand: brandMeta(c.name) !== null }))
+    .filter((c) => c.hasBrand),
 );
 
 const dateRange = computed(() => searchStore.dateRange);
@@ -613,19 +615,12 @@ function iconForFilter(type: string): string {
                 <button
                   v-for="cam in cameraChips"
                   :key="cam.name"
-                  class="cloud-chip"
-                  :class="{
-                    'cloud-chip--brand': cam.hasBrand,
-                    'chip-active': searchStore.camera === cam.name,
-                  }"
-                  :title="cam.hasBrand ? cam.name : undefined"
+                  class="cloud-chip cloud-chip--brand"
+                  :class="{ 'chip-active': searchStore.camera === cam.name }"
+                  :title="cam.name"
                   @click="selectCamera(cam.name)"
                 >
-                  <BrandIcon v-if="cam.hasBrand" :name="cam.name" :size="20" />
-                  <template v-else>
-                    <BrandIcon :name="cam.name" :size="16" class="mr-1" />
-                    {{ cam.name }}
-                  </template>
+                  <BrandIcon :name="cam.name" :size="20" />
                 </button>
               </div>
             </div>
@@ -744,19 +739,12 @@ function iconForFilter(type: string): string {
                 <button
                   v-for="cam in cameraChips"
                   :key="cam.name"
-                  class="cloud-chip"
-                  :class="{
-                    'cloud-chip--brand': cam.hasBrand,
-                    'chip-active': searchStore.camera === cam.name,
-                  }"
-                  :title="cam.hasBrand ? cam.name : undefined"
+                  class="cloud-chip cloud-chip--brand"
+                  :class="{ 'chip-active': searchStore.camera === cam.name }"
+                  :title="cam.name"
                   @click="selectCamera(cam.name)"
                 >
-                  <BrandIcon v-if="cam.hasBrand" :name="cam.name" :size="20" />
-                  <template v-else>
-                    <BrandIcon :name="cam.name" :size="16" class="mr-1" />
-                    {{ cam.name }}
-                  </template>
+                  <BrandIcon :name="cam.name" :size="20" />
                 </button>
               </div>
             </div>
@@ -889,8 +877,8 @@ function iconForFilter(type: string): string {
   display: flex;
   flex-wrap: nowrap;
   align-items: stretch;
-  gap: 8px;
-  padding: 4px 18px 12px;
+  gap: 10px;
+  padding: 8px 18px 14px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -904,9 +892,11 @@ function iconForFilter(type: string): string {
   flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  min-width: 64px;
-  padding: 12px 10px 8px;
+  justify-content: center;
+  gap: 3px;
+  width: 88px;
+  height: 88px;
+  padding: 12px;
   border-radius: 14px;
   border: none;
   -webkit-appearance: none;
@@ -927,9 +917,9 @@ function iconForFilter(type: string): string {
 }
 
 .magic-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1327,7 +1317,7 @@ function iconForFilter(type: string): string {
 @media (max-width: 640px) {
   .magic-grid {
     grid-template-columns: repeat(5, 1fr);
-    padding: 4px 12px 10px;
+    padding: 8px 12px 12px;
   }
 
   .discover-section {

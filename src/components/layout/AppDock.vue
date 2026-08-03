@@ -77,7 +77,7 @@ function navigate(page: 'home' | 'people' | 'location' | 'devices' | 'settings')
                 :src="logo"
                 width="24"
                 height="24"
-                :class="uiStore.currentPage === item.page ? 'opacity-100' : 'opacity-40'"
+                :class="uiStore.currentPage === item.page ? 'siegu-logo--active' : 'opacity-40'"
               />
               <template v-if="isIndexing">
                 <span class="indexing-dot" aria-label="indexing"></span>
@@ -136,8 +136,12 @@ function navigate(page: 'home' | 'people' | 'location' | 'devices' | 'settings')
 }
 
 .siegu-dock-btn--active {
-  color: var(--color-text-primary) !important;
-  background: var(--color-bg-hover) !important;
+  color: var(--color-text-btn) !important;
+  background: var(--color-bg-btn) !important;
+}
+
+.siegu-logo--active {
+  filter: invert(1);
 }
 
 .siegu-logo-wrap {
