@@ -22,7 +22,7 @@ crates/siegu-core/src/ml_engine/
 | Model | Files | Approx Size | Purpose |
 |-------|-------|-------------|---------|
 | **clip** | visual (~335MB), text (~242MB), tokenizer.json (~2MB) | ~580MB | Semantic search embeddings |
-| **face** | version-RFB-320.onnx (~1MB), arcface.onnx (~166MB) | ~167MB | Face detection + recognition/grouping (512-dim) |
+| **face** | face_detection_yunet_2023mar.onnx (~0.2MB), arcface.onnx (~166MB) | ~167MB | Face detection + landmark alignment + recognition/grouping (512-dim) |
 | **ocr** | det (~2MB), rec (~9MB), en_dict.txt (~1KB) | ~11MB | PP-OCRv3 text recognition |
 | **nsfw** | nsfw.onnx (~327MB) | ~327MB | Sensitive content detection |
 | **aesthetics** | aesthetics.onnx (~1.6GB) | ~1.6GB | Photo quality scoring (1-10) |

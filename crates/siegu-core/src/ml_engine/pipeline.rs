@@ -322,123 +322,109 @@ pub fn analyze_image(
     if should_run_face || should_run_arcface {
         if let Some(ref face_model) = models.face_detector {
             let start = Instant::now();
-            let input = preprocessing::face_preprocess(img);
-            if let Ok(data) = run_model(face_model, input, "input") {
-                if data.len() >= 4420 * 6 {
-                    let scores = &data[..4420 * 2];
-                    let boxes = &data[4420 * 2..];
-                    let anchors = face_detector::generate_anchors();
-                    let mut proposals = Vec::new();
-                    for i in 0..anchors.len() {
-                        let score = scores[i * 2 + 1];
-                        if score > 0.6 {
-                            let loc = [
-                                boxes[i * 4],
-                                boxes[i * 4 + 1],
-                                boxes[i * 4 + 2],
-                                boxes[i * 4 + 3],
-                            ];
-                            let decoded = face_detector::decode(&loc, &anchors[i]);
-                            proposals.push((decoded, score));
-                        }
-                    }
-                    let keep = face_detector::nms(&mut proposals, 0.3);
-                    for &idx in &keep {
-                        let bbox = proposals[idx].0;
-                        let xmin = (bbox[0] * orig_w).max(0.0) as u32;
-                        let ymin = (bbox[1] * orig_h).max(0.0) as u32;
-                        let xmax = (bbox[2] * orig_w).min(orig_w) as u32;
-                        let ymax = (bbox[3] * orig_h).min(orig_h) as u32;
-                        if xmax > xmin && ymax > ymin {
-                            let (w, h) = (xmax - xmin, ymax - ymin);
-                            if w > 20 && h > 20 {
-                                let face_crop =
-                                    image::imageops::crop_imm(img, xmin, ymin, w, h).to_image();
-                                let face_id = format!("{photo_id}_f{frame_index}_{xmin}_{ymin}");
-                                let crop_path = format!("{faces_dir}/{face_id}.jpg");
-                                if face_crop.save(&crop_path).is_ok() {
-                                    let mut face_embedding = Vec::new();
-                                    if let Some(ref model) = models.arcface {
-                                        let f_resized = image::imageops::resize(
-                                            &face_crop,
-                                            112,
-                                            112,
-                                            image::imageops::FilterType::Triangle,
-                                        );
-                                        let f_input = preprocessing::arcface_preprocess(&f_resized);
-                                        if let Ok(emb) = run_model(model, f_input, "input.1") {
-                                            let mut e = emb;
-                                            let norm: f32 =
-                                                e.iter().map(|x| x * x).sum::<f32>().sqrt();
-                                            if norm > 0.0 {
-                                                for v in e.iter_mut() {
-                                                    *v /= norm;
-                                                }
-                                            }
-                                            face_embedding = e;
-                                        }
-                                    } else if let Some(ref visual_model) = models.clip_visual {
-                                        let face_resized = image::imageops::resize(
-                                            &face_crop,
-                                            224,
-                                            224,
-                                            image::imageops::FilterType::Triangle,
-                                        );
-                                        let face_input =
-                                            preprocessing::clip_preprocess(&face_resized);
-                                        if let Ok(emb) =
-                                            run_model(visual_model, face_input, "pixel_values")
-                                        {
-                                            let mut e = emb;
-                                            let norm: f32 =
-                                                e.iter().map(|x| x * x).sum::<f32>().sqrt();
-                                            if norm > 0.0 {
-                                                for v in e.iter_mut() {
-                                                    *v /= norm;
-                                                }
-                                            }
-                                            face_embedding = e;
-                                        }
-                                    }
-
-                                    let mut assigned_person_id = None;
-                                    if !face_embedding.is_empty() {
-                                        let mut highest_similarity = 0.0f32;
-                                        let mut best_match_id = None;
-                                        for (person_id, person_centroid) in &models.known_people {
-                                            let dot: f32 = face_embedding
-                                                .iter()
-                                                .zip(person_centroid.iter())
-                                                .map(|(a, b)| a * b)
-                                                .sum();
-                                            if dot > highest_similarity {
-                                                highest_similarity = dot;
-                                                best_match_id = Some(person_id.clone());
-                                            }
-                                        }
-                                        if highest_similarity > 0.5 {
-                                            assigned_person_id = best_match_id;
-                                        }
-                                    }
-
-                                    let mut buffer = std::io::Cursor::new(Vec::new());
-                                    let _ =
-                                        face_crop.write_to(&mut buffer, image::ImageFormat::Jpeg);
-                                    let encoded = format!(
-                                        "data:image/jpeg;base64,{}",
-                                        base64::Engine::encode(
-                                            &base64::engine::general_purpose::STANDARD,
-                                            buffer.get_ref()
-                                        )
+            let input = preprocessing::yunet_preprocess(img);
+            if let Ok(outputs) = run_model_named(face_model, input, "input") {
+                let dets = face_detector::decode_yunet(&outputs, 640, 0.5, 0.3);
+                let sx = orig_w / 640.0;
+                let sy = orig_h / 640.0;
+                let dets = face_detector::scale_yunet_faces(&dets, sx, sy);
+                for det in &dets {
+                    let bbox = det.bbox;
+                    let xmin = bbox[0].max(0.0) as u32;
+                    let ymin = bbox[1].max(0.0) as u32;
+                    let xmax = bbox[2].min(orig_w) as u32;
+                    let ymax = bbox[3].min(orig_h) as u32;
+                    if xmax > xmin && ymax > ymin {
+                        let (w, h) = (xmax - xmin, ymax - ymin);
+                        if w > 20 && h > 20 {
+                            let face_crop =
+                                image::imageops::crop_imm(img, xmin, ymin, w, h).to_image();
+                            let face_id = format!("{photo_id}_f{frame_index}_{xmin}_{ymin}");
+                            let crop_path = format!("{faces_dir}/{face_id}.jpg");
+                            if face_crop.save(&crop_path).is_ok() {
+                                let mut face_embedding = Vec::new();
+                                if let Some(ref model) = models.arcface {
+                                    let lm: [(f32, f32); 5] = [
+                                        (det.landmarks[0], det.landmarks[1]),
+                                        (det.landmarks[2], det.landmarks[3]),
+                                        (det.landmarks[4], det.landmarks[5]),
+                                        (det.landmarks[6], det.landmarks[7]),
+                                        (det.landmarks[8], det.landmarks[9]),
+                                    ];
+                                    let m = face_detector::estimate_partial_affine(
+                                        &lm,
+                                        &face_detector::ALIGN_REF,
                                     );
-                                    result.faces.push(FaceInfo {
-                                        face_id,
-                                        crop_path,
-                                        encoded,
-                                        embedding: face_embedding,
-                                        person_id: assigned_person_id,
-                                    });
+                                    let aligned = face_detector::warp_affine(img, &m, (112, 112));
+                                    let f_input = preprocessing::arcface_preprocess(&aligned);
+                                    if let Ok(emb) = run_model(model, f_input, "input.1") {
+                                        let mut e = emb;
+                                        let norm: f32 = e.iter().map(|x| x * x).sum::<f32>().sqrt();
+                                        if norm > 0.0 {
+                                            for v in e.iter_mut() {
+                                                *v /= norm;
+                                            }
+                                        }
+                                        face_embedding = e;
+                                    }
+                                } else if let Some(ref visual_model) = models.clip_visual {
+                                    let face_resized = image::imageops::resize(
+                                        &face_crop,
+                                        224,
+                                        224,
+                                        image::imageops::FilterType::Triangle,
+                                    );
+                                    let face_input = preprocessing::clip_preprocess(&face_resized);
+                                    if let Ok(emb) =
+                                        run_model(visual_model, face_input, "pixel_values")
+                                    {
+                                        let mut e = emb;
+                                        let norm: f32 = e.iter().map(|x| x * x).sum::<f32>().sqrt();
+                                        if norm > 0.0 {
+                                            for v in e.iter_mut() {
+                                                *v /= norm;
+                                            }
+                                        }
+                                        face_embedding = e;
+                                    }
                                 }
+
+                                let mut assigned_person_id = None;
+                                if !face_embedding.is_empty() {
+                                    let mut highest_similarity = 0.0f32;
+                                    let mut best_match_id = None;
+                                    for (person_id, person_centroid) in &models.known_people {
+                                        let dot: f32 = face_embedding
+                                            .iter()
+                                            .zip(person_centroid.iter())
+                                            .map(|(a, b)| a * b)
+                                            .sum();
+                                        if dot > highest_similarity {
+                                            highest_similarity = dot;
+                                            best_match_id = Some(person_id.clone());
+                                        }
+                                    }
+                                    if highest_similarity > 0.5 {
+                                        assigned_person_id = best_match_id;
+                                    }
+                                }
+
+                                let mut buffer = std::io::Cursor::new(Vec::new());
+                                let _ = face_crop.write_to(&mut buffer, image::ImageFormat::Jpeg);
+                                let encoded = format!(
+                                    "data:image/jpeg;base64,{}",
+                                    base64::Engine::encode(
+                                        &base64::engine::general_purpose::STANDARD,
+                                        buffer.get_ref()
+                                    )
+                                );
+                                result.faces.push(FaceInfo {
+                                    face_id,
+                                    crop_path,
+                                    encoded,
+                                    embedding: face_embedding,
+                                    person_id: assigned_person_id,
+                                });
                             }
                         }
                     }
@@ -779,6 +765,30 @@ fn run_model(
     for i in 0..outputs.len() {
         if let Ok((_shape, data)) = outputs[i].try_extract_tensor::<f32>() {
             results.extend_from_slice(data);
+        }
+    }
+    Ok(results)
+}
+
+/// Like [`run_model`] but returns each named output tensor separately,
+/// preserving the ONNX output names (required for YuNet's multi-branch
+/// cls/obj/bbox/kps decoding).
+fn run_model_named(
+    model: &ModelEngine,
+    input: ndarray::Array4<f32>,
+    input_name: &str,
+) -> Result<HashMap<String, Vec<f32>>, String> {
+    let shape = input.shape().to_vec();
+    let data = input.into_raw_vec_and_offset().0;
+    let tensor = ort::value::Value::from_array((shape, data)).map_err(|e| e.to_string())?;
+    let mut lock = model.lock().map_err(|e| e.to_string())?;
+    let outputs = lock
+        .run(ort::inputs![input_name => tensor])
+        .map_err(|e| e.to_string())?;
+    let mut results = HashMap::new();
+    for (name, output) in outputs {
+        if let Ok((_shape, data)) = output.try_extract_tensor::<f32>() {
+            results.insert(name.to_string(), data.to_vec());
         }
     }
     Ok(results)

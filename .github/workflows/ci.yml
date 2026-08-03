@@ -133,7 +133,7 @@ jobs:
           download_model "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model.onnx" "test_models/clip-vit-base-patch32-visual.onnx"
           download_model "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/text_model.onnx" "test_models/clip-vit-base-patch32-text.onnx"
           download_model "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/tokenizer.json" "test_models/tokenizer.json"
-          download_model "https://raw.githubusercontent.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB/master/models/onnx/version-RFB-320.onnx" "test_models/version-RFB-320.onnx"
+          download_model "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx" "test_models/face_detection_yunet_2023mar.onnx"
           download_model "https://huggingface.co/SWHL/RapidOCR/resolve/main/PP-OCRv4/en_PP-OCRv3_det_infer.onnx" "test_models/ocr_det.onnx"
           download_model "https://huggingface.co/SWHL/RapidOCR/resolve/main/PP-OCRv3/en_PP-OCRv3_rec_infer.onnx" "test_models/ocr_rec.onnx"
           download_model "https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/release/2.6/ppocr/utils/en_dict.txt" "test_models/en_dict.txt"

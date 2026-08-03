@@ -79,7 +79,8 @@ pub fn load_models(
     };
     let face_detector = if model_enabled(config, "face") || model_enabled(config, "ultraface") {
         log("Loading face detector...");
-        let m = load_model(&models_dir, "version-RFB-320.onnx");
+        let m =
+            load_model_with_min_size(&models_dir, "face_detection_yunet_2023mar.onnx", 100 * 1024);
         log("Face detector ready.");
         m
     } else {
@@ -257,8 +258,18 @@ pub fn load_models(
 /// Loads a single ONNX model, returning `None` if the file doesn't exist,
 /// is too small (<1MB, likely corrupt), or fails to build an ORT session.
 fn load_model(models_dir: &Path, filename: &str) -> Option<ModelEngine> {
+    load_model_with_min_size(models_dir, filename, 1024 * 1024)
+}
+
+/// Like [`load_model`] but with an explicit minimum file size, used for
+/// small models such as YuNet (~232KB) that are below the 1MB default gate.
+fn load_model_with_min_size(
+    models_dir: &Path,
+    filename: &str,
+    min_size: u64,
+) -> Option<ModelEngine> {
     let path = models_dir.join(filename);
-    let is_ok = path.exists() && path.metadata().map(|m| m.len()).unwrap_or(0) > 1024 * 1024;
+    let is_ok = path.exists() && path.metadata().map(|m| m.len()).unwrap_or(0) > min_size;
     if !is_ok {
         return None;
     }

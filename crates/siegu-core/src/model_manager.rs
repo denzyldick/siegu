@@ -38,10 +38,10 @@ pub const MODEL_REGISTRY: &[ModelFile] = &[
     },
     ModelFile {
         model_name: "face",
-        filename: "version-RFB-320.onnx",
-        url: "https://raw.githubusercontent.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB/master/models/onnx/version-RFB-320.onnx",
-        expected_size: 1_270_727,
-        sha256: "34cd7e60aeff28744c657de7a3dc64e872d506741de66987f3426f2b79f88017",
+        filename: "face_detection_yunet_2023mar.onnx",
+        url: "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+        expected_size: 232_589,
+        sha256: "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
     },
     ModelFile {
         model_name: "ocr",
@@ -192,10 +192,10 @@ pub fn check_models_downloaded(models_dir: &Path) -> Vec<String> {
         downloaded.push("clip".to_string());
     }
 
-    let face_detector_path = models_dir.join("version-RFB-320.onnx");
+    let face_detector_path = models_dir.join("face_detection_yunet_2023mar.onnx");
     let face_arcface_path = models_dir.join("arcface.onnx");
     let face_detector_ok = face_detector_path.exists()
-        && face_detector_path.metadata().map(|m| m.len()).unwrap_or(0) > 1024 * 1024;
+        && face_detector_path.metadata().map(|m| m.len()).unwrap_or(0) > 100 * 1024;
     let face_arcface_ok = face_arcface_path.exists()
         && face_arcface_path.metadata().map(|m| m.len()).unwrap_or(0) > 1024 * 1024;
     if face_detector_ok && face_arcface_ok {
@@ -581,8 +581,8 @@ mod tests {
 
         // Only the face detector present => face not yet downloaded.
         std::fs::write(
-            models_dir.join("version-RFB-320.onnx"),
-            vec![0u8; 1024 * 1024 + 1],
+            models_dir.join("face_detection_yunet_2023mar.onnx"),
+            vec![0u8; 100 * 1024 + 1],
         )
         .unwrap();
         let result = check_models_downloaded(&models_dir);

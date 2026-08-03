@@ -70,6 +70,18 @@ pub fn arcface_preprocess(img: &image::RgbImage) -> Array4<f32> {
     input
 }
 
+/// YuNet input: raw 0-255 RGB pixels resized to 640x640 (NO /255 scaling).
+pub fn yunet_preprocess(img: &image::RgbImage) -> Array4<f32> {
+    let resized = image::imageops::resize(img, 640, 640, image::imageops::FilterType::Triangle);
+    let mut input = Array4::<f32>::zeros((1, 3, 640, 640));
+    for (x, y, pixel) in resized.enumerate_pixels() {
+        input[[0, 0, y as usize, x as usize]] = pixel[0] as f32;
+        input[[0, 1, y as usize, x as usize]] = pixel[1] as f32;
+        input[[0, 2, y as usize, x as usize]] = pixel[2] as f32;
+    }
+    input
+}
+
 pub fn midas_preprocess(img: &image::RgbImage) -> Array4<f32> {
     let resized = image::imageops::resize(img, 256, 256, image::imageops::FilterType::Triangle);
     let mut input = Array4::<f32>::zeros((1, 3, 256, 256));

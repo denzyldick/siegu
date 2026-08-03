@@ -26,7 +26,7 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 CFG="$WORK/config"
 
-REQUIRED_FILES="version-RFB-320.onnx arcface.onnx nsfw.onnx aesthetics.onnx"
+REQUIRED_FILES="face_detection_yunet_2023mar.onnx arcface.onnx nsfw.onnx aesthetics.onnx"
 
 models_ok() {
   for f in $REQUIRED_FILES; do
@@ -55,7 +55,10 @@ elif [ -n "${SIEGU_MODELS_DIR:-}" ]; then
   mkdir -p "$SIEGU_MODELS_DIR"
   download_models
   cp "$CFG"/models/* "$SIEGU_MODELS_DIR"/
-  rm -rf "$CFG"
+  # Keep the freshly downloaded models available for the scan/analyze below:
+  # swap the throwaway models dir for a symlink into the persistent cache.
+  rm -rf "$CFG/models"
+  ln -s "$SIEGU_MODELS_DIR" "$CFG/models"
 else
   download_models
 fi
