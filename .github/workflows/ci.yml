@@ -93,8 +93,9 @@ jobs:
         run: cargo install cargo-audit
 
       - name: Security audit
+        # Run from the workspace root: the authoritative Cargo.lock lives there
+        # (a stale per-crate lockfile was removed).
         run: cargo audit
-        working-directory: src-tauri
 
       - run: cargo check
         working-directory: src-tauri
