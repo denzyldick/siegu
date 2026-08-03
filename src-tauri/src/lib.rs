@@ -320,6 +320,16 @@ pub fn run() {
             commands::photos::get_photo_encoded_batch,
             commands::photos::get_photos_for_map_click,
             commands::photos::get_heatmap_data,
+            // Albums
+            commands::albums::create_album,
+            commands::albums::rename_album,
+            commands::albums::delete_album,
+            commands::albums::list_albums,
+            commands::albums::get_album,
+            commands::albums::add_album_items,
+            commands::albums::remove_album_items,
+            commands::albums::reorder_album,
+            commands::albums::get_album_contents,
             // Directories
             commands::directories::add_directory,
             commands::directories::list_directories,

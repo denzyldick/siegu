@@ -117,11 +117,34 @@ Stores EXIF metadata (camera make/model, lens, ISO, etc.), GPS reverse-geocode r
 | `level` | TEXT | "info", "warn", "error" |
 | `message` | TEXT | Log message |
 
+## `album` — User-created photo collections (local, free tier)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | TEXT PK | Album id (UUID) |
+| `name` | TEXT | Album display name |
+| `created_at` | TEXT | ISO8601 creation time |
+| `cover_photo_id` | TEXT | Id of the last-added photo used as the cover |
+| `sort_order` | INTEGER | Manual ordering of the albums list |
+
+## `album_item` — Membership of a photo in an album
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `album_id` | TEXT PK | Owning album id |
+| `photo_id` | TEXT PK | Photo id (duplicates are rejected) |
+| `added_at` | TEXT | ISO8601 time the photo was added |
+| `position` | INTEGER | Manual order within the album |
+
+Album contents are served ordered by `position ASC, added_at DESC`. Deleting an album cascades to `album_item`. Sharing albums is out of scope for the free tier (see the paid-tier issue).
+
 ## Indexes
 
 - `photo.location` UNIQUE
 - `photo.created` ASC
 - `photo.latitude` + `photo.longitude` spatial index
+- `album_item(album_id, position)` ASC
+- `album_item(photo_id)`
 
 ## Migrations
 

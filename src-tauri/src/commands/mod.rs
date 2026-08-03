@@ -1,3 +1,4 @@
+pub mod albums;
 pub mod config;
 pub mod directories;
 pub mod geocode;

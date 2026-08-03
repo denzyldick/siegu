@@ -172,7 +172,8 @@
     "recent": "Recenti",
     "label_photos": "Foto:",
     "label_videos": "Video:",
-    "all_photos": "Tutte le foto"
+    "all_photos": "Tutte le foto",
+    "add_to_album": "Aggiungi all'album"
   },
   "people": {
     "title": "Persone & Volti",
@@ -371,7 +372,8 @@
     "delete": "Elimina",
     "remove": "Rimuovi",
     "save": "Salva",
-    "loading": "Caricamento..."
+    "loading": "Caricamento...",
+    "create": "Crea"
   },
   "media_card": {
     "alt_photo": "Foto",
@@ -476,7 +478,8 @@
     "copy": "Copia",
     "copy_text": "Copia testo",
     "copied": "Testo copiato",
-    "copy_failed": "Copia non riuscita"
+    "copy_failed": "Copia non riuscita",
+    "add_to_album": "Aggiungi all'album"
   },
   "folder_picker": {
     "select_folder": "Seleziona Cartella",
@@ -545,5 +548,33 @@
   "update_not_supported": "Gli aggiornamenti automatici non sono supportati su questa piattaforma. Scarica l'ultima versione dal sito Web di Siegu.",
   "about_title": "Informazioni",
   "about_open_source_licenses": "Licenze open source",
-  "about_licenses_intro": "Siegu è costruito con il seguente software open source:"
+  "about_licenses_intro": "Siegu è costruito con il seguente software open source:",
+  "albums": {
+    "title": "Album",
+    "desc": "Raccogli i tuoi ricordi negli album",
+    "new_album": "Nuovo album",
+    "new_album_placeholder": "Nome dell'album...",
+    "no_albums": "Ancora nessun album",
+    "no_albums_hint": "Crea un album per raggruppare foto e video",
+    "add_to_album": "Aggiungi all'album",
+    "no_albums_yet": "Ancora nessun album: creane uno sopra",
+    "items_count": "{count} elementi",
+    "back": "Torna agli album",
+    "rename_album": "Rinomina album",
+    "rename_placeholder": "Nome dell'album...",
+    "delete_album": "Elimina album",
+    "delete_confirm": "Eliminare questo album? Le foto al suo interno resteranno nella tua libreria.",
+    "delete_confirm_title": "Elimina album",
+    "search_in_album": "Cerca dentro questo album...",
+    "no_results_in_album": "Nessuna foto in questo album corrisponde a \"{query}\"",
+    "empty_album": "Questo album è vuoto",
+    "empty_album_hint": "Apri una foto e scegli \"Aggiungi all'album\" per riempirlo",
+    "added_to_album": "Aggiunto a {album}",
+    "remove_from_album": "Rimuovi dall'album",
+    "removed_from_album": "{count} foto rimosse dall'album",
+    "selected": "{count} selezionati",
+    "reorder_hint": "Trascina le foto per riordinarle",
+    "load_more": "Carica altro",
+    "cover_photo": "Copertina dell'album"
+  }
 }

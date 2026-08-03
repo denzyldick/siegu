@@ -172,7 +172,8 @@
     "recent": "Recent",
     "label_photos": "Foto's:",
     "label_videos": "Video's:",
-    "all_photos": "Alle foto's"
+    "all_photos": "Alle foto's",
+    "add_to_album": "Toevoegen aan album"
   },
   "people": {
     "title": "Personen & Gezichten",
@@ -371,7 +372,8 @@
     "delete": "Verwijderen",
     "remove": "Verwijderen",
     "save": "Opslaan",
-    "loading": "Laden..."
+    "loading": "Laden...",
+    "create": "Maken"
   },
   "media_card": {
     "alt_photo": "Foto",
@@ -476,7 +478,8 @@
     "copy": "Kopiëren",
     "copy_text": "Tekst kopiëren",
     "copied": "Tekst gekopieerd",
-    "copy_failed": "Kopiëren mislukt"
+    "copy_failed": "Kopiëren mislukt",
+    "add_to_album": "Toevoegen aan album"
   },
   "folder_picker": {
     "select_folder": "Map selecteren",
@@ -545,5 +548,33 @@
   "update_not_supported": "Automatische updates worden niet ondersteund op dit platform. Download de nieuwste versie van de Siegu-website.",
   "about_title": "Over Siegu",
   "about_open_source_licenses": "Open-sourcelicenties",
-  "about_licenses_intro": "Siegu is gebouwd met de volgende open-sourcesoftware:"
+  "about_licenses_intro": "Siegu is gebouwd met de volgende open-sourcesoftware:",
+  "albums": {
+    "title": "Albums",
+    "desc": "Verzamel je herinneringen in albums",
+    "new_album": "Nieuw album",
+    "new_album_placeholder": "Albumsnaam...",
+    "no_albums": "Nog geen albums",
+    "no_albums_hint": "Maak een album om je foto's en video's te groeperen",
+    "add_to_album": "Toevoegen aan album",
+    "no_albums_yet": "Nog geen albums — maak er hierboven een aan",
+    "items_count": "{count} items",
+    "back": "Terug naar albums",
+    "rename_album": "Album hernoemen",
+    "rename_placeholder": "Albumsnaam...",
+    "delete_album": "Album verwijderen",
+    "delete_confirm": "Dit album verwijderen? De foto's erin blijven in je bibliotheek.",
+    "delete_confirm_title": "Album verwijderen",
+    "search_in_album": "Zoeken in dit album...",
+    "no_results_in_album": "Geen foto's in dit album komen overeen met \"{query}\"",
+    "empty_album": "Dit album is leeg",
+    "empty_album_hint": "Open een foto en kies \"Toevoegen aan album\" om hem te vullen",
+    "added_to_album": "Toegevoegd aan {album}",
+    "remove_from_album": "Uit album verwijderen",
+    "removed_from_album": "{count} foto's uit album verwijderd",
+    "selected": "{count} geselecteerd",
+    "reorder_hint": "Sleep foto's om te herschikken",
+    "load_more": "Meer laden",
+    "cover_photo": "Albumcover"
+  }
 }

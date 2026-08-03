@@ -374,6 +374,11 @@
           <span class="text-body-2">{{ snackbar.text }}</span>
         </div>
       </v-snackbar>
+      <AddToAlbumSheet
+        v-model="addToAlbumOpen"
+        :photo-ids="addToAlbumPhotoIds"
+        @added="onAddedToAlbum"
+      />
     </v-card>
   </v-dialog>
 </template>
@@ -384,6 +389,7 @@ import { invoke, convertFileSrc } from '@tauri-apps/api/core'
 import { revealItemInDir, openPath } from '@tauri-apps/plugin-opener'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import MediaThumbnail from './MediaThumbnail.vue'
+import AddToAlbumSheet from '@/components/albums/AddToAlbumSheet.vue'
 import { isVideo as checkIsVideo } from '@/composables/useMediaUtils'
 import { useMediaUrl } from '@/composables/useMediaUrl'
 import { useI18n } from 'vue-i18n'
@@ -417,6 +423,7 @@ const emit = defineEmits<{
 const showInfo = ref(false)
 const os = ref('')
 const moreMenuOpen = ref(false)
+const addToAlbumOpen = ref(false)
 const detectedFaces = ref<DetectedFace[]>([])
 const photoOcr = ref('')
 const ocrLoading = ref(false)
@@ -754,6 +761,17 @@ async function handleOpenWith(): Promise<void> {
   }
 }
 
+const addToAlbumPhotoIds = computed(() => {
+  if (!currentPhoto.value) return []
+  return [String(currentPhoto.value.id)]
+})
+
+function onAddedToAlbum(albumName: string): void {
+  snackbar.show = true
+  snackbar.error = false
+  snackbar.text = t('albums.added_to_album', { album: albumName })
+}
+
 const moreItems = computed(() => {
   const items: Array<{ key: string; icon: string; action: () => void }> = [
     {
@@ -770,6 +788,14 @@ const moreItems = computed(() => {
       key: 'open_with_app',
       icon: 'mdi-open-in-new',
       action: handleOpenWith,
+    },
+    {
+      key: 'add_to_album',
+      icon: 'mdi-image-plus',
+      action: () => {
+        moreMenuOpen.value = false
+        addToAlbumOpen.value = true
+      },
     },
   ]
   return items.filter((item) => {

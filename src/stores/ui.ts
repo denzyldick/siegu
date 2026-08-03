@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-export type PageId = 'home' | 'people' | 'location' | 'devices' | 'settings'
+export type PageId = 'home' | 'albums' | 'people' | 'location' | 'devices' | 'settings'
 
 export const useUiStore = defineStore('ui', () => {
   const currentPage = ref<PageId>((localStorage.getItem('siegu_page') as PageId) || 'home')

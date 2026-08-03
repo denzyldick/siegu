@@ -172,7 +172,8 @@
     "recent": "Resiente",
     "label_photos": "Fotonan:",
     "label_videos": "Videonan:",
-    "all_photos": "Tur e potret"
+    "all_photos": "Tur e potret",
+    "add_to_album": "Agregá na album"
   },
   "people": {
     "title": "Hende & Karnan",
@@ -371,7 +372,8 @@
     "delete": "Eliminá",
     "remove": "Kitá",
     "save": "Wardá",
-    "loading": "Kargando..."
+    "loading": "Kargando...",
+    "create": "Krea"
   },
   "media_card": {
     "alt_photo": "Foto",
@@ -476,7 +478,8 @@
     "copy": "Kopia",
     "copy_text": "Kopia teksto",
     "copied": "Teksto kopia",
-    "copy_failed": "Kopia no a funciona"
+    "copy_failed": "Kopia no a funciona",
+    "add_to_album": "Agregá na album"
   },
   "folder_picker": {
     "select_folder": "Selekshoná Karpeta",
@@ -545,5 +548,33 @@
   "update_not_supported": "Update outomátiko no ta wòrdu sostené riba e plataforma aki. Descargá e vershon mas resien for di e website di Siegu.",
   "about_title": "Tokante di Siegu",
   "about_open_source_licenses": "Lisensia open source",
-  "about_licenses_intro": "Siegu ta trahá riba e siguiente software open source:"
+  "about_licenses_intro": "Siegu ta trahá riba e siguiente software open source:",
+  "albums": {
+    "title": "Albums",
+    "desc": "Reuní bo memoria den album",
+    "new_album": "Album nobo",
+    "new_album_placeholder": "Nòmber di album...",
+    "no_albums": "Todavía no tin album",
+    "no_albums_hint": "Krea un album pa groupá bo foto i video",
+    "add_to_album": "Agregá na album",
+    "no_albums_yet": "Todavía no tin album — krea un riba aki",
+    "items_count": "{count} elemento",
+    "back": "Bai bek na album",
+    "rename_album": "Renombra album",
+    "rename_placeholder": "Nòmber di album...",
+    "delete_album": "Borra album",
+    "delete_confirm": "Borra e album aki? E fotonan den dje lo keda na bo biblioteca.",
+    "delete_confirm_title": "Borra album",
+    "search_in_album": "Buska den e album aki...",
+    "no_results_in_album": "Niun foto den e album aki ta keda ku \"{query}\"",
+    "empty_album": "E album aki ta bashí",
+    "empty_album_hint": "Habri un foto i skohe \"Agregá na album\" pa yen'é",
+    "added_to_album": "Agregá na {album}",
+    "remove_from_album": "Saka for di album",
+    "removed_from_album": "{count} foto saká for di album",
+    "selected": "{count} selekshoná",
+    "reorder_hint": "Hala foto pa reordená",
+    "load_more": "Subi mas",
+    "cover_photo": "Portada di album"
+  }
 }

@@ -14,6 +14,7 @@ import AppToolbar from '@/components/layout/AppToolbar.vue';
 import SyncStatusBanner from '@/components/layout/SyncStatusBanner.vue';
 import OnboardingFlow from '@/components/onboarding/OnboardingFlow.vue';
 import MediaLibrary from '@/components/MediaLibrary.vue';
+import Albums from '@/components/Albums.vue';
 import People from '@/components/People.vue';
 import Map from '@/components/Map.vue';
 import DeviceList from '@/components/DeviceList.vue';
@@ -182,6 +183,7 @@ function removeFilterChip(index: number): void {
             />
           </div>
           <People v-if="currentPage === 'people'" @search-person="handleSearchPerson" />
+          <Albums v-if="currentPage === 'albums'" />
           <Map v-if="currentPage === 'location'" />
           <DeviceList v-if="currentPage === 'devices'" />
           <Setting v-if="currentPage === 'settings'" @done="uiStore.setPage('home')" />

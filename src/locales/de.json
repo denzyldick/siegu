@@ -172,7 +172,8 @@
     "recent": "Letzte",
     "label_photos": "Fotos:",
     "label_videos": "Videos:",
-    "all_photos": "Alle Fotos"
+    "all_photos": "Alle Fotos",
+    "add_to_album": "Zum Album hinzufügen"
   },
   "people": {
     "title": "Personen & Gesichter",
@@ -371,7 +372,8 @@
     "delete": "Löschen",
     "remove": "Entfernen",
     "save": "Speichern",
-    "loading": "Laden..."
+    "loading": "Laden...",
+    "create": "Erstellen"
   },
   "media_card": {
     "alt_photo": "Foto",
@@ -476,7 +478,8 @@
     "copy": "Kopieren",
     "copy_text": "Text kopieren",
     "copied": "Text kopiert",
-    "copy_failed": "Kopieren fehlgeschlagen"
+    "copy_failed": "Kopieren fehlgeschlagen",
+    "add_to_album": "Zum Album hinzufügen"
   },
   "folder_picker": {
     "select_folder": "Ordner auswählen",
@@ -545,5 +548,33 @@
   "update_not_supported": "Automatische Updates werden auf dieser Plattform nicht unterstützt. Lade die neueste Version von der Siegu-Website herunter.",
   "about_title": "Über Siegu",
   "about_open_source_licenses": "Open-Source-Lizenzen",
-  "about_licenses_intro": "Siegu basiert auf folgender Open-Source-Software:"
+  "about_licenses_intro": "Siegu basiert auf folgender Open-Source-Software:",
+  "albums": {
+    "title": "Alben",
+    "desc": "Sammle deine Erinnerungen in Alben",
+    "new_album": "Neues Album",
+    "new_album_placeholder": "Albumname...",
+    "no_albums": "Noch keine Alben",
+    "no_albums_hint": "Erstelle ein Album, um deine Fotos und Videos zu gruppieren",
+    "add_to_album": "Zum Album hinzufügen",
+    "no_albums_yet": "Noch keine Alben – erstelle oben eines",
+    "items_count": "{count} Elemente",
+    "back": "Zurück zu Alben",
+    "rename_album": "Album umbenennen",
+    "rename_placeholder": "Albumname...",
+    "delete_album": "Album löschen",
+    "delete_confirm": "Dieses Album löschen? Die Fotos darin bleiben in deiner Bibliothek.",
+    "delete_confirm_title": "Album löschen",
+    "search_in_album": "In diesem Album suchen...",
+    "no_results_in_album": "Keine Fotos in diesem Album passen zu \"{query}\"",
+    "empty_album": "Dieses Album ist leer",
+    "empty_album_hint": "Öffne ein Foto und wähle „Zum Album hinzufügen“, um es zu füllen",
+    "added_to_album": "Zu {album} hinzugefügt",
+    "remove_from_album": "Aus Album entfernen",
+    "removed_from_album": "{count} Fotos aus dem Album entfernt",
+    "selected": "{count} ausgewählt",
+    "reorder_hint": "Fotos ziehen, um sie zu sortieren",
+    "load_more": "Mehr laden",
+    "cover_photo": "Albumcover"
+  }
 }

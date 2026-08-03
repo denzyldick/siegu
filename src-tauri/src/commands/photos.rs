@@ -31,6 +31,7 @@ pub fn do_list_files(
         false,
         false,
         None,
+        None,
     )
 }
 
@@ -55,6 +56,7 @@ pub fn do_list_files_filtered(
     nsfw_only: bool,
     random: bool,
     order_by: Option<String>,
+    album_id: Option<String>,
 ) -> Vec<Photo> {
     let filter = crate::database::PhotoFilter {
         person_id,
@@ -70,6 +72,7 @@ pub fn do_list_files_filtered(
         nsfw_only,
         random,
         order_by,
+        album_id,
     };
     db.list_photos_filtered(query, offset, limit, favorites_only, videos_only, &filter)
 }
@@ -124,6 +127,7 @@ pub async fn list_files(
     nsfw_only: bool,
     random: bool,
     order_by: Option<String>,
+    album_id: Option<String>,
 ) -> Result<String, String> {
     let path = get_config_path(&app);
     if path.is_empty() {
@@ -152,6 +156,7 @@ pub async fn list_files(
         nsfw_only,
         random,
         order_by,
+        album_id,
     ))
     .unwrap_or("[]".to_string()))
 }
@@ -429,6 +434,7 @@ mod tests {
             false,
             false,
             Some("best".to_string()),
+            None,
         );
         assert_eq!(result[0].id, "ph2");
         assert_eq!(result[1].id, "ph1");
@@ -462,6 +468,7 @@ mod tests {
             false,
             false,
             Some("oldest".to_string()),
+            None,
         );
         assert_eq!(result[0].id, "ph1");
         assert_eq!(result[1].id, "ph2");
@@ -490,7 +497,7 @@ mod tests {
             .unwrap();
         let result = do_list_files_filtered(
             &db, "", 0, 10, false, false, None, None, None, None, None, false, None, None, false,
-            true, false, None,
+            true, false, None, None,
         );
         let ids: Vec<_> = result.iter().map(|p| p.id.as_str()).collect();
         assert!(ids.contains(&"risky"));
@@ -505,5 +512,44 @@ mod tests {
             .unwrap();
         let result = do_list_files(&db, "", 100, 10, false, false);
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn list_files_scoped_to_album() {
+        let (mut db, _dir) = test_db();
+        db.store_photo_batch(&[make_photo("ph1", "/a.jpg"), make_photo("ph2", "/b.jpg")])
+            .unwrap();
+        let album = db.create_album("Trip").unwrap();
+        db.add_album_items(&album.id, &["ph2".to_string()]).unwrap();
+
+        let in_album = do_list_files_filtered(
+            &db,
+            "",
+            0,
+            10,
+            false,
+            false,
+            None,
+            None,
+            None,
+            None,
+            None,
+            false,
+            None,
+            None,
+            false,
+            false,
+            false,
+            None,
+            Some(album.id.clone()),
+        );
+        assert_eq!(in_album.len(), 1);
+        assert_eq!(in_album[0].id, "ph2");
+
+        let all = do_list_files_filtered(
+            &db, "", 0, 10, false, false, None, None, None, None, None, false, None, None, false,
+            false, false, None, None,
+        );
+        assert_eq!(all.len(), 2);
     }
 }

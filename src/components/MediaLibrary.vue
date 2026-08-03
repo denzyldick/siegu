@@ -29,6 +29,16 @@
               color="rgba(255,255,255,0.1)"
               class="text-white px-6 rounded-xl text-none font-weight-bold"
               size="small"
+              @click="addToAlbumOpen = true"
+            >
+              <v-icon size="16" class="mr-2">mdi-image-plus</v-icon>
+              <span>{{ $t('media.add_to_album') }}</span>
+            </v-btn>
+            <v-btn
+              variant="flat"
+              color="rgba(255,255,255,0.1)"
+              class="text-white px-6 rounded-xl text-none font-weight-bold"
+              size="small"
               @click="bulkRemove"
             >
               {{ $t('media.remove') }}
@@ -187,6 +197,11 @@
       @navigate-to-person="$emit('search-person', $event)"
       @update:photo="handlePhotoUpdated"
     />
+    <AddToAlbumSheet
+      v-model="addToAlbumOpen"
+      :photo-ids="selectedIds.map(String)"
+      @added="onAddedToAlbum"
+    />
   </div>
 </template>
 
@@ -198,6 +213,7 @@ import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller';
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
 import MediaCard from './MediaCard.vue';
 import MediaViewer from './MediaViewer.vue';
+import AddToAlbumSheet from '@/components/albums/AddToAlbumSheet.vue';
 import { useSyncStore } from '@/stores/sync';
 import { useI18n } from 'vue-i18n';
 import type { MediaItem } from '@/types/media';
@@ -261,6 +277,7 @@ const selectedIds = ref<(string | number)[]>([]);
 const viewerOpen = ref(false);
 const currentPhotoIndex = ref(0);
 const columns = ref(5);
+const addToAlbumOpen = ref(false);
 
 async function handleNotSynced(): Promise<void> {
   await syncStore.reconnect();
@@ -396,6 +413,11 @@ async function bulkFavorite(): Promise<void> {
 }
 
 function bulkRemove(): void {
+  clearSelection();
+}
+
+function onAddedToAlbum(albumName: string): void {
+  void albumName
   clearSelection();
 }
 

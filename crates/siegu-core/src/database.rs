@@ -116,6 +116,21 @@ pub struct PhotoFilter {
     pub random: bool,
     /// Sort order: "newest" (default), "oldest", "best" (aesthetics desc), "random".
     pub order_by: Option<String>,
+    /// Only photos that belong to this album.
+    pub album_id: Option<String>,
+}
+
+/// A user-created collection of photos. Albums are local and free for
+/// everyone; sharing them is a separate (paid) feature.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Album {
+    pub id: String,
+    pub name: String,
+    pub created_at: String,
+    pub cover_photo_id: Option<String>,
+    pub sort_order: i64,
+    /// Number of photos currently in the album.
+    pub item_count: i64,
 }
 
 /// Persisted sync session for auto-reconnect on app restart.
@@ -579,6 +594,33 @@ impl Database {
         );
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS logs (timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, level STRING, message TEXT);", ());
 
+        // Albums (local, free tier): user-created collections of photos.
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS album(\
+             id TEXT PRIMARY KEY, name TEXT NOT NULL, \
+             created_at TEXT DEFAULT (datetime('now')), \
+             cover_photo_id TEXT, sort_order INTEGER DEFAULT 0\
+             );",
+            (),
+        );
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS album_item(\
+             album_id TEXT NOT NULL, photo_id TEXT NOT NULL, \
+             added_at TEXT DEFAULT (datetime('now')), \
+             position INTEGER DEFAULT 0, \
+             PRIMARY KEY (album_id, photo_id)\
+             );",
+            (),
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_album_item_album ON album_item(album_id, position);",
+            (),
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_album_item_photo ON album_item(photo_id);",
+            (),
+        );
+
         Self { connection: conn }
     }
 
@@ -1011,6 +1053,13 @@ impl Database {
             facet_filters.push_str(
                 " AND EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='nsfw' AND CAST(value AS REAL) >= 0.8)",
             );
+        }
+        if let Some(ref album_id) = filter.album_id {
+            slot += 1;
+            facet_filters.push_str(&format!(
+                " AND EXISTS(SELECT 1 FROM album_item WHERE album_id=?{slot} AND photo_id=p.id)"
+            ));
+            extra_params.push(Box::new(album_id.clone()));
         }
 
         let order_by = if let Some(order) = filter.order_by.as_deref() {
@@ -2613,6 +2662,275 @@ impl Database {
             "DELETE FROM peer_device WHERE device_id = ?1",
             rusqlite::params![device_id],
         );
+    }
+
+    // ---------- Albums (local, free tier) ----------
+
+    /// Create a new empty album and return the persisted row.
+    pub fn create_album(&self, name: &str) -> Result<Album, String> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err("Album name cannot be empty".to_string());
+        }
+        let id = uuid::Uuid::new_v4().to_string();
+        let sort_order: i64 = self
+            .connection
+            .query_row(
+                "SELECT COALESCE(MAX(sort_order), 0) + 1 FROM album",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(1);
+        self.connection
+            .execute(
+                "INSERT INTO album(id, name, sort_order) VALUES (?1, ?2, ?3)",
+                rusqlite::params![id, name, sort_order],
+            )
+            .map_err(|e| e.to_string())?;
+        self.get_album(&id)
+            .ok_or_else(|| "Failed to create album".to_string())
+    }
+
+    /// Rename an existing album. Rejects blank names.
+    pub fn rename_album(&self, album_id: &str, name: &str) -> Result<(), String> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err("Album name cannot be empty".to_string());
+        }
+        self.connection
+            .execute(
+                "UPDATE album SET name = ?1 WHERE id = ?2",
+                rusqlite::params![name, album_id],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    /// Delete an album and all of its items.
+    pub fn delete_album(&self, album_id: &str) -> Result<(), String> {
+        self.connection
+            .execute(
+                "DELETE FROM album_item WHERE album_id = ?1",
+                rusqlite::params![album_id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.connection
+            .execute(
+                "DELETE FROM album WHERE id = ?1",
+                rusqlite::params![album_id],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    fn album_from_row(row: &rusqlite::Row) -> rusqlite::Result<Album> {
+        Ok(Album {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            created_at: row.get(2)?,
+            cover_photo_id: row.get(3)?,
+            sort_order: row.get(4)?,
+            item_count: row.get(5)?,
+        })
+    }
+
+    /// List all albums ordered by sort_order, with live item counts.
+    pub fn list_albums(&self) -> Vec<Album> {
+        let sql = "SELECT a.id, a.name, a.created_at, a.cover_photo_id, a.sort_order, \
+            (SELECT COUNT(*) FROM album_item WHERE album_id = a.id) AS item_count \
+            FROM album a ORDER BY a.sort_order ASC, a.created_at ASC";
+        let mut albums = Vec::new();
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) = stmt.query_map([], Self::album_from_row) {
+                for album in iter.flatten() {
+                    albums.push(album);
+                }
+            }
+        }
+        albums
+    }
+
+    /// Fetch a single album by id, or None if it does not exist.
+    pub fn get_album(&self, album_id: &str) -> Option<Album> {
+        let sql = "SELECT a.id, a.name, a.created_at, a.cover_photo_id, a.sort_order, \
+            (SELECT COUNT(*) FROM album_item WHERE album_id = a.id) AS item_count \
+            FROM album a WHERE a.id = ?1";
+        self.connection
+            .query_row(sql, rusqlite::params![album_id], Self::album_from_row)
+            .ok()
+    }
+
+    /// Add photos to an album, appending them in position order. Duplicates are
+    /// ignored (album_item PK is (album_id, photo_id)). The cover is updated to
+    /// the last photo actually added.
+    pub fn add_album_items(&self, album_id: &str, photo_ids: &[String]) -> Result<(), String> {
+        let album_exists: bool = self
+            .connection
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM album WHERE id = ?1)",
+                rusqlite::params![album_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(false);
+        if !album_exists {
+            return Err(format!("Album '{album_id}' does not exist"));
+        }
+        let mut max_position: i64 = self
+            .connection
+            .query_row(
+                "SELECT COALESCE(MAX(position), 0) FROM album_item WHERE album_id = ?1",
+                rusqlite::params![album_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let mut last_added: Option<String> = None;
+        for photo_id in photo_ids {
+            let inserted = self
+                .connection
+                .execute(
+                    "INSERT OR IGNORE INTO album_item(album_id, photo_id, position) VALUES (?1, ?2, ?3)",
+                    rusqlite::params![album_id, photo_id, max_position],
+                )
+                .map_err(|e| e.to_string())?;
+            if inserted > 0 {
+                max_position += 1;
+                last_added = Some(photo_id.clone());
+            }
+        }
+        if let Some(ref cover) = last_added {
+            let _ = self.connection.execute(
+                "UPDATE album SET cover_photo_id = ?1 WHERE id = ?2",
+                rusqlite::params![cover, album_id],
+            );
+        }
+        Ok(())
+    }
+
+    /// Remove photos from an album. If the current cover photo is removed, the
+    /// most recently added remaining photo becomes the new cover.
+    pub fn remove_album_items(&self, album_id: &str, photo_ids: &[String]) -> Result<(), String> {
+        for photo_id in photo_ids {
+            self.connection
+                .execute(
+                    "DELETE FROM album_item WHERE album_id = ?1 AND photo_id = ?2",
+                    rusqlite::params![album_id, photo_id],
+                )
+                .map_err(|e| e.to_string())?;
+        }
+        let current_cover: Option<String> = self
+            .connection
+            .query_row(
+                "SELECT cover_photo_id FROM album WHERE id = ?1",
+                rusqlite::params![album_id],
+                |r| r.get(0),
+            )
+            .ok()
+            .flatten();
+        if let Some(ref cover) = current_cover {
+            if photo_ids.contains(cover) {
+                let new_cover: Option<String> = self
+                    .connection
+                    .query_row(
+                        "SELECT photo_id FROM album_item WHERE album_id = ?1 \
+                         ORDER BY position DESC, added_at DESC LIMIT 1",
+                        rusqlite::params![album_id],
+                        |r| r.get(0),
+                    )
+                    .ok()
+                    .flatten();
+                let _ = self.connection.execute(
+                    "UPDATE album SET cover_photo_id = ?1 WHERE id = ?2",
+                    rusqlite::params![new_cover, album_id],
+                );
+            }
+        }
+        Ok(())
+    }
+
+    /// Reorder photos within an album. `ordered_ids` should contain the album's
+    /// photo ids in the new order; ids not present in the album are ignored.
+    pub fn reorder_album(&self, album_id: &str, ordered_ids: &[String]) -> Result<(), String> {
+        for (position, photo_id) in ordered_ids.iter().enumerate() {
+            self.connection
+                .execute(
+                    "UPDATE album_item SET position = ?1 WHERE album_id = ?2 AND photo_id = ?3",
+                    rusqlite::params![position as i64, album_id, photo_id],
+                )
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+
+    /// Paginated album contents ordered by album position (manual order), with
+    /// the newest-added photo first on ties.
+    pub fn get_album_contents(&self, album_id: &str, offset: usize, limit: usize) -> Vec<Photo> {
+        let mut photos = Vec::new();
+        let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, \
+            EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, \
+            p.caption, p.aesthetics_score, \
+            s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, \
+            s.whisper, s.sam, s.superres, p.sync_needed, p.received \
+            FROM photo p \
+            JOIN album_item ai ON ai.photo_id = p.id \
+            LEFT JOIN ai_status s ON p.id = s.photo_id \
+            WHERE ai.album_id = ?3 \
+            ORDER BY ai.position ASC, ai.added_at DESC \
+            LIMIT ?1, ?2";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) = stmt.query_map(
+                rusqlite::params![offset as i64, limit as i64, album_id],
+                |row| {
+                    Ok(Photo {
+                        id: row.get(0)?,
+                        location: row.get(1)?,
+                        encoded: row.get(2)?,
+                        created: row.get(5).unwrap_or_default(),
+                        objects: HashMap::new(),
+                        properties: HashMap::new(),
+                        latitude: row.get(3).unwrap_or(0.0),
+                        longitude: row.get(4).unwrap_or(0.0),
+                        favorite: row.get(6).unwrap_or(false),
+                        indexed: row.get(7).unwrap_or(0),
+                        caption: row.get(8).ok(),
+                        aesthetics_score: row.get(9).ok(),
+                        ai_status: AiStatus {
+                            clip: row.get(10).unwrap_or(0),
+                            face: row.get(11).unwrap_or(0),
+                            ocr: row.get(12).unwrap_or(0),
+                            nsfw: row.get(13).unwrap_or(0),
+                            aesthetics: row.get(14).unwrap_or(0),
+                            yolo: row.get(15).unwrap_or(0),
+                            blip: row.get(16).unwrap_or(0),
+                            arcface: row.get(17).unwrap_or(0),
+                            midas: row.get(18).unwrap_or(0),
+                            whisper: row.get(19).unwrap_or(0),
+                            sam: row.get(20).unwrap_or(0),
+                            superres: row.get(21).unwrap_or(0),
+                        },
+                        sync_needed: row.get(22).unwrap_or(false),
+                        received: row.get(23).unwrap_or(false),
+                    })
+                },
+            ) {
+                for photo in iter.flatten() {
+                    photos.push(photo);
+                }
+            }
+        }
+        self.enrich_objects(&mut photos);
+        self.enrich_properties(&mut photos);
+        photos
+    }
+
+    /// Number of items currently in an album (0 if the album does not exist).
+    pub fn album_item_count(&self, album_id: &str) -> i64 {
+        self.connection
+            .query_row(
+                "SELECT COUNT(*) FROM album_item WHERE album_id = ?1",
+                rusqlite::params![album_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0)
     }
 }
 

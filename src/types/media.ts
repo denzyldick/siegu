@@ -98,6 +98,7 @@ export interface ListFilesOptions {
   nsfwOnly?: boolean;
   random?: boolean;
   orderBy?: string | null;
+  albumId?: string | null;
 }
 
 export interface ListFilesResponse {

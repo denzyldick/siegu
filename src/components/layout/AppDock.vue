@@ -12,6 +12,7 @@ const scanStore = useScanStore()
 
 const navItems = [
   { page: 'home' as const, icon: null, tour: 'dock-home', useLogo: true },
+  { page: 'albums' as const, icon: 'mdi-image-album', tour: 'dock-albums', useLogo: false },
   { page: 'people' as const, icon: 'mdi-account-group-outline', tour: 'dock-people', useLogo: false },
   { page: 'location' as const, icon: 'mdi-map-outline', tour: 'dock-map', useLogo: false },
   { page: 'devices' as const, icon: 'mdi-laptop', tour: 'dock-devices', useLogo: false },
@@ -40,7 +41,7 @@ const tooltipText = computed(() => {
   return statusLabel.value
 })
 
-function navigate(page: 'home' | 'people' | 'location' | 'devices' | 'settings'): void {
+function navigate(page: 'home' | 'albums' | 'people' | 'location' | 'devices' | 'settings'): void {
   uiStore.setPage(page)
 }
 </script>

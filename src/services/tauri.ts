@@ -4,6 +4,7 @@ import type { MediaItem, ListFilesOptions } from '@/types/media';
 import type { Person, UnnamedFace } from '@/types/person';
 import type { PairingCodes, DiscoveredHost } from '@/types/sync';
 import type { SearchFacetsData, DayCount } from '@/types/search';
+import type { Album } from '@/types/albums';
 
 export class TauriError extends Error {
   constructor(
@@ -67,6 +68,7 @@ export async function listFiles(options: ListFilesOptions): Promise<MediaItem[]>
     nsfwOnly: options.nsfwOnly ?? false,
     random: options.random ?? false,
     orderBy: options.orderBy ?? null,
+    albumId: options.albumId ?? null,
   });
   return parseJsonArray<MediaItem>(raw);
 }
@@ -329,4 +331,49 @@ export async function discoverLanDevices(timeoutSecs: number = 3): Promise<Disco
 
 export async function joinNetwork(roomId: string): Promise<void> {
   await call<unknown>('join_network', { roomId });
+}
+
+export async function listAlbums(): Promise<Album[]> {
+  const raw = await call<string>('list_albums');
+  return parseJsonArray<Album>(raw);
+}
+
+export async function createAlbum(name: string): Promise<Album> {
+  const raw = await call<string>('create_album', { name });
+  return parseJsonObject<Album>(raw);
+}
+
+export async function renameAlbum(albumId: string, name: string): Promise<void> {
+  await call<unknown>('rename_album', { albumId, name });
+}
+
+export async function deleteAlbum(albumId: string): Promise<void> {
+  await call<unknown>('delete_album', { albumId });
+}
+
+export async function getAlbum(albumId: string): Promise<Album | null> {
+  const raw = await call<string>('get_album', { albumId });
+  if (raw === 'null') return null;
+  return parseJsonObject<Album>(raw);
+}
+
+export async function addAlbumItems(albumId: string, photoIds: string[]): Promise<void> {
+  await call<unknown>('add_album_items', { albumId, photoIds });
+}
+
+export async function removeAlbumItems(albumId: string, photoIds: string[]): Promise<void> {
+  await call<unknown>('remove_album_items', { albumId, photoIds });
+}
+
+export async function reorderAlbum(albumId: string, orderedIds: string[]): Promise<void> {
+  await call<unknown>('reorder_album', { albumId, orderedIds });
+}
+
+export async function getAlbumContents(
+  albumId: string,
+  offset: number,
+  limit: number,
+): Promise<MediaItem[]> {
+  const raw = await call<string>('get_album_contents', { albumId, offset, limit });
+  return parseJsonArray<MediaItem>(raw);
 }
