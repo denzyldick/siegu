@@ -229,8 +229,11 @@ async fn start_host_internal(
     // Firewall check: attempt TCP connect to self
     if ip != "127.0.0.1" {
         let addr = format!("{}:{}", ip, port);
+        let target: std::net::SocketAddr = addr
+            .parse()
+            .map_err(|e| format!("invalid LAN address {addr}: {e}"))?;
         match std::net::TcpStream::connect_timeout(
-            &addr.parse().unwrap(),
+            &target,
             std::time::Duration::from_secs(2),
         ) {
             Ok(_) => emit_log(app, format!("TCP self-check OK — {addr} reachable")),

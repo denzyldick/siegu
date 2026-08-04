@@ -78,16 +78,24 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
         let _ = std::fs::create_dir_all(&faces_dir);
 
         let db = Arc::new(Mutex::new(Database::new(&db_path)));
-        let config = db.lock().unwrap().get_state();
+        let config = db.lock().unwrap_or_else(|e| e.into_inner()).get_state();
         let num_threads: usize = config
             .get("scan_threads")
             .and_then(|s| s.parse().ok())
             .unwrap_or(2);
 
-        let pool = rayon::ThreadPoolBuilder::new()
+        let pool = match rayon::ThreadPoolBuilder::new()
             .num_threads(num_threads)
             .build()
-            .unwrap();
+        {
+            Ok(pool) => pool,
+            Err(e) => {
+                tracing::error!(
+                    "failed to build rayon thread pool with {num_threads} threads: {e}"
+                );
+                return;
+            }
+        };
 
         let avg_photo_time_ms = 1000f64;
         let mut last_auto_job: Option<Instant> = None;
@@ -103,7 +111,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
             if is_auto {
                 let mode = db
                     .lock()
-                    .unwrap()
+                    .unwrap_or_else(|e| e.into_inner())
                     .get_state()
                     .get("indexing_mode")
                     .cloned()
@@ -123,10 +131,10 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
             }
 
             {
-                let mut m = models.lock().unwrap();
+                let mut m = models.lock().unwrap_or_else(|e| e.into_inner());
                 if m.is_none() {
                     callbacks.on_log("Loading AI models...");
-                    let lock = db.lock().unwrap();
+                    let lock = db.lock().unwrap_or_else(|e| e.into_inner());
                     let config = lock.get_state();
                     let known_people = lock.get_all_people_with_embeddings();
                     drop(lock);
@@ -150,7 +158,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                 }
                 Job::ProcessModel(model_id) => {
                     if let Some(status_model) = ml_worker::job_status_model(model_id) {
-                        let lock = db.lock().unwrap();
+                        let lock = db.lock().unwrap_or_else(|e| e.into_inner());
                         (
                             lock.get_photos_missing_model(status_model),
                             Some(status_model.to_string()),
@@ -163,7 +171,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                     }
                 }
                 Job::ProcessAll => {
-                    let lock = db.lock().unwrap();
+                    let lock = db.lock().unwrap_or_else(|e| e.into_inner());
                     let photos = lock.get_unindexed_photos_batch(0, 10000);
                     (photos.iter().map(|p| p.id.clone()).collect(), None, None)
                 }
@@ -186,7 +194,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                 callbacks.on_model_status(model, "running", photo_ids.len(), photo_ids.len());
             }
 
-            let config = db.lock().unwrap().get_state();
+            let config = db.lock().unwrap_or_else(|e| e.into_inner()).get_state();
             let has_enabled_model = [
                 "clip",
                 "face",
@@ -206,7 +214,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                     .is_none_or(|v| v == "true")
             });
             if !has_enabled_model && target_model.is_none() {
-                let lock = db.lock().unwrap();
+                let lock = db.lock().unwrap_or_else(|e| e.into_inner());
                 for pid in &photo_ids {
                     lock.update_photo_indexed(pid, 1);
                 }
@@ -246,7 +254,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                         }
 
                         let photo_entry = {
-                            let lock = db_ref.lock().unwrap();
+                            let lock = db_ref.lock().unwrap_or_else(|e| e.into_inner());
                             lock.get_photo_by_id(photo_id)
                         };
 
@@ -260,8 +268,15 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                             let is_video = pipeline::is_video_file(&photo_entry.location);
 
                             let mut result = {
-                                let mut m = models_ref.lock().unwrap();
-                                let models = m.as_mut().unwrap();
+                                let mut m = models_ref.lock().unwrap_or_else(|e| e.into_inner());
+                                let Some(models) = m.as_mut() else {
+                                    tracing::error!(
+                                        "AI models not loaded; skipping analysis for {}",
+                                        photo_entry.id
+                                    );
+                                    decrement_pending_count(&pending_count_ref);
+                                    continue;
+                                };
                                 if is_video {
                                     pipeline::analyze_video(
                                         &photo_entry.id,
@@ -286,7 +301,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                             };
 
                             let new_people: Vec<(String, Vec<f32>)> = {
-                                let lock = db_ref.lock().unwrap();
+                                let lock = db_ref.lock().unwrap_or_else(|e| e.into_inner());
                                 let mut new_people = Vec::new();
                                 for face in &mut result.faces {
                                     if face.person_id.is_none() {
@@ -305,14 +320,14 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                                 new_people
                             };
                             if !new_people.is_empty() {
-                                let mut m = models_ref.lock().unwrap();
+                                let mut m = models_ref.lock().unwrap_or_else(|e| e.into_inner());
                                 if let Some(models) = m.as_mut() {
                                     models.known_people.extend(new_people);
                                 }
                             }
 
                             pipeline::flush_results_to_db(
-                                &db_ref.lock().unwrap(),
+                                &db_ref.lock().unwrap_or_else(|e| e.into_inner()),
                                 &photo_entry.id,
                                 &result,
                                 target_model_ref.as_deref(),

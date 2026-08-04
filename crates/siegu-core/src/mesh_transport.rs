@@ -765,7 +765,7 @@ impl MeshTransport {
 mod tests {
     use super::*;
     use crate::database::Database;
-    use crate::mesh::{SyncEvent, SyncProgress, PROTOCOL_VERSION};
+    use crate::mesh::{SyncEvent, SyncProgress};
 
     struct TestEvent;
 

@@ -1161,7 +1161,7 @@ mod tests {
 
     #[test]
     fn test_aggregate_faces_similar_embeddings_dedup() {
-        let base = vec![1.0, 0.0, 0.0];
+        let base = [1.0, 0.0, 0.0];
         let similar: Vec<f32> = base.iter().map(|x| x * 0.99).collect();
         // Normalize both
         let norm_b: f32 = base.iter().map(|x| x * x).sum::<f32>().sqrt();

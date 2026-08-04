@@ -423,7 +423,14 @@ async fn cmd_scan(config_dir: &Path, folder: Option<&str>) {
     use rayon::prelude::*;
 
     let pb = ProgressBar::new_spinner();
-    pb.set_style(ProgressStyle::with_template("{spinner:.green} {msg}").unwrap());
+    let style = match ProgressStyle::with_template("{spinner:.green} {msg}") {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!("failed to build spinner progress style, falling back to default: {e}");
+            ProgressStyle::default_spinner()
+        }
+    };
+    pb.set_style(style);
 
     let mut total_new_all = 0usize;
     let mut total_scanned_all = 0usize;
@@ -540,7 +547,10 @@ async fn cmd_models_download(config_dir: &Path, names: Option<&[String]>) {
         .connect_timeout(std::time::Duration::from_secs(60))
         .redirect(reqwest::redirect::Policy::limited(10))
         .build()
-        .expect("Failed to create HTTP client");
+        .unwrap_or_else(|e| {
+            eprintln!("Error: failed to create HTTP client: {e}");
+            std::process::exit(1);
+        });
 
     for entry in &to_download {
         let path = models_dir.join(entry.filename);
@@ -553,12 +563,18 @@ async fn cmd_models_download(config_dir: &Path, names: Option<&[String]>) {
 
         let total_size = entry.expected_size;
         let pb = ProgressBar::new(total_size);
-        pb.set_style(
-            ProgressStyle::with_template(
-                "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})",
-            )
-            .unwrap(),
-        );
+        let style = match ProgressStyle::with_template(
+            "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})",
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!(
+                    "failed to build download progress style, falling back to default: {e}"
+                );
+                ProgressStyle::default_bar()
+            }
+        };
+        pb.set_style(style);
         pb.set_message(entry.model_name.to_string());
 
         let result = siegu_core::model_manager::download_file(
@@ -755,9 +771,13 @@ async fn cmd_mesh_host(port: u16, server: Option<&str>, room: Option<&str>, conf
         println!("Starting LAN mesh host...");
         println!("Room ID: {room_id}");
 
-        let server = MeshTransport::start_lan_server(port)
-            .await
-            .expect("Failed to start LAN signaling server");
+        let server = match MeshTransport::start_lan_server(port).await {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("Error: failed to start LAN signaling server: {e}");
+                std::process::exit(1);
+            }
+        };
         let actual_port = server.port;
         let signaling_url = format!("ws://127.0.0.1:{actual_port}");
         println!("Signaling server on port {actual_port}");

@@ -31,7 +31,7 @@ type DirCache = Arc<std::sync::Mutex<(std::time::Instant, Vec<String>)>>;
 
 fn load_allowed_roots(config_path: &str, cache: &DirCache) -> Vec<PathBuf> {
     const MAX_AGE: std::time::Duration = std::time::Duration::from_secs(5);
-    let mut guard = cache.lock().unwrap();
+    let mut guard = cache.lock().unwrap_or_else(|e| e.into_inner());
     if guard.0.elapsed() > MAX_AGE {
         guard.1 = database::Database::new(config_path).list_directories();
         guard.0 = std::time::Instant::now();
@@ -145,7 +145,13 @@ pub fn start_media_server(config_path: String) -> u16 {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
     std::thread::spawn(move || {
-        let rt = tokio::runtime::Runtime::new().unwrap();
+        let rt = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => {
+                tracing::error!("media server: failed to create tokio runtime: {e}");
+                return;
+            }
+        };
         rt.block_on(async move {
             let cache: DirCache = Arc::new(std::sync::Mutex::new((
                 std::time::Instant::now(),
@@ -182,8 +188,20 @@ pub fn start_media_server(config_path: String) -> u16 {
                 );
 
             let addr: std::net::SocketAddr = ([127, 0, 0, 1], 0).into();
-            let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-            let addr = listener.local_addr().unwrap();
+            let listener = match tokio::net::TcpListener::bind(addr).await {
+                Ok(l) => l,
+                Err(e) => {
+                    tracing::error!("media server: failed to bind to {addr}: {e}");
+                    return;
+                }
+            };
+            let addr = match listener.local_addr() {
+                Ok(a) => a,
+                Err(e) => {
+                    tracing::error!("media server: failed to read local address: {e}");
+                    return;
+                }
+            };
             let port = addr.port();
             let _ = tx.send(port);
             warp::serve(media).incoming(listener).run().await;

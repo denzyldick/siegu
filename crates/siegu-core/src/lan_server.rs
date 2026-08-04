@@ -127,8 +127,16 @@ pub async fn start_with_config(config: ServerConfig) -> LanServer {
     let routes = remote_route.or(lan_route).or(health).boxed();
 
     let addr: SocketAddr = ([0, 0, 0, 0], config.port).into();
-    let listener = TcpListener::bind(addr).await.unwrap();
-    let actual_addr = listener.local_addr().unwrap();
+    // Fatal: the server must return a bound listener, and the signature cannot signal failure.
+    #[allow(clippy::expect_used)]
+    let listener = TcpListener::bind(addr).await.expect(
+        "failed to bind the LAN signalling server listener; the server cannot start without it",
+    );
+    // Fatal: a successfully bound listener must expose its address; without it the port is unknowable.
+    #[allow(clippy::expect_used)]
+    let actual_addr = listener
+        .local_addr()
+        .expect("failed to read the LAN signalling server bound address");
 
     let task = tokio::spawn(async move {
         warp::serve(routes).incoming(listener).run().await;
@@ -148,7 +156,7 @@ fn admission_reject(ctx: &Arc<ServerContext>, remote: Option<SocketAddr>) -> Opt
     if !ctx.limiter.allow(ip) {
         return Some("Too many connection attempts, try again shortly".to_string());
     }
-    let mut counts = ctx.conn_counts.lock().unwrap();
+    let mut counts = ctx.conn_counts.lock().unwrap_or_else(|e| e.into_inner());
     let n = counts.entry(ip).or_insert(0);
     if *n >= MAX_CONNECTIONS_PER_IP {
         return Some("Too many connections from this address".to_string());
@@ -177,7 +185,7 @@ struct RateLimiter {
 
 impl RateLimiter {
     fn allow(&self, ip: IpAddr) -> bool {
-        let mut map = self.attempts.lock().unwrap();
+        let mut map = self.attempts.lock().unwrap_or_else(|e| e.into_inner());
         if map.len() > 10_000 {
             let cutoff = Instant::now() - Duration::from_secs(WINDOW_SECS);
             map.retain(|_, v| v.last().map(|t| *t >= cutoff).unwrap_or(false));

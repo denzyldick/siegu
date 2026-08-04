@@ -137,6 +137,8 @@ pub fn run() {
             }
         }
     }));
+
+    #[allow(clippy::expect_used)] // Fatal: a Tauri app that fails to launch cannot function
     builder
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_os::init())
@@ -162,7 +164,11 @@ pub fn run() {
 
                 let _tray = TrayIconBuilder::new()
                     .menu(&menu)
-                    .icon(app.default_window_icon().unwrap().clone())
+                    .icon(
+                        app.default_window_icon()
+                            .ok_or("default window icon missing")?
+                            .clone(),
+                    )
                     .on_menu_event(|app, event| match event.id.as_ref() {
                         "quit" => {
                             if let Some(state) = app.try_state::<ShutdownState>() {
@@ -301,7 +307,9 @@ pub fn run() {
         .on_window_event(|_window, event| match event {
             #[cfg(desktop)]
             tauri::WindowEvent::CloseRequested { api, .. } => {
-                _window.hide().unwrap();
+                if let Err(e) = _window.hide() {
+                    tracing::error!("failed to hide window on close requested: {e}");
+                }
                 api.prevent_close();
             }
             _ => {}
@@ -395,5 +403,5 @@ pub fn run() {
             file::read_file_base64,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("fatal: error while running the tauri application");
 }

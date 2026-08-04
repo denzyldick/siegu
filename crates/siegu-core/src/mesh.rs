@@ -1004,7 +1004,7 @@ mod tests {
 
         let chunks = MeshManager::split_manifest_chunks(photos);
         assert_eq!(chunks.len(), 1);
-        assert_eq!(chunks[0].1, false, "single chunk must be the final chunk");
+        assert!(!chunks[0].1, "single chunk must be the final chunk");
     }
 
     #[test]

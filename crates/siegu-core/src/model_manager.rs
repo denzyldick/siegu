@@ -647,7 +647,6 @@ mod tests {
     }
 
     async fn spawn_file_server(payload: Vec<u8>) -> (String, tokio::task::JoinHandle<()>) {
-        use warp::Filter;
         let file_path: &'static PathBuf = Box::leak(Box::new(
             std::env::temp_dir().join(format!("siegu-test-src-{}.bin", uuid::Uuid::new_v4())),
         ));

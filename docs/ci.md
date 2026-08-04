@@ -16,28 +16,37 @@ locally.
 ### `ci.yml`
 
 - **`test`** (matrix: `ubuntu-24.04`, `macos-latest`, `windows-latest`):
-  `cargo fmt --check`, `cargo check`, `cargo test`, `cargo clippy`, and
-  `npm run tauri build -- --no-bundle`. macOS builds ONNX Runtime with the
-  CoreML feature; other platforms use plain or DirectML (see
-  `crates/siegu-core/Cargo.toml` `[target.*.dependencies]`).
+  `cargo fmt --check`, `cargo test`, `cargo clippy --all-targets -- -D warnings`
+  (which subsumes `cargo check`), a second clippy run gating
+  `-D clippy::unwrap_used -D clippy::expect_used` on production code (lib + bins;
+  tests are excluded so they may keep unwraps), and
+  `npm run tauri build -- --no-bundle`. The unwrap/expect gate also runs in the
+  pre-commit hook, so no new panics-on-error can be added to shipped code.
+  macOS builds ONNX Runtime with the CoreML feature; other platforms use plain
+  or DirectML (see `crates/siegu-core/Cargo.toml` `[target.*.dependencies]`).
 - **`test-android`**: `cargo ndk check` for `aarch64` + `x86_64`.
 - **`test-ios`**: `cargo check` for `aarch64-apple-ios`.
-- **ML inference E2E** (Ubuntu only): downloads the model suite to
-  `src-tauri/test_models/` (cache key `ai-test-models-v2`) and runs the two
-  `#[ignore]`d integration tests in `src-tauri/src/ml.rs`:
+- **`test-android-emulator`**: builds the `siegu-core` unit + `sync_e2e` test
+  harnesses for `aarch64-linux-android` and runs them on an arm64 Android
+  emulator (ort only ships arm64 Android binaries).
+- **`test-ios-simulator`**: builds the same harnesses for
+  `aarch64-apple-ios-sim` and runs them on an iOS simulator (Apple Silicon host).
+- **ML inference E2E** (all three desktop OSes): downloads the model suite to
+  `src-tauri/test_models/` (cache key `ai-test-models-v3-${{ runner.os }}`) and
+  runs the two `#[ignore]`d integration tests in `src-tauri/src/ml.rs`:
   `test_full_inference_on_sample` and `test_whisper_smoke`.
 - **Release jobs**: publish installers/artifacts to GitHub Releases.
 
 ### `e2e.yml`
 
-- **`face-grouping`** (Ubuntu): builds the CLI and runs
-  `scripts/e2e-face-grouping.sh`, which downloads face-detection models to
-  `/tmp/siegu-e2e-models` (cache key `siegu-e2e-models-v2`) and asserts that
-  same-person photos are grouped into one album by the AI pipeline.
 - **`sync-cli`** (matrix: Ubuntu, macOS, Windows): builds `siegu-cli` and runs
   `scripts/e2e-sync.sh`. Two CLI processes connect over WebRTC through an
   in-process signaling server, exchange protocol messages, and transfer a photo
-  byte-for-byte (SHA-256 compared). No ML models required.
+  byte-for-byte (SHA-256 compared). No ML models required. On Ubuntu the same
+  CLI build also runs `scripts/e2e-face-grouping.sh` (one release build instead
+  of two), which downloads face-detection models to `/tmp/siegu-e2e-models`
+  (cache key `siegu-e2e-models-v2`) and asserts that same-person photos are
+  grouped into one album by the AI pipeline.
 
 ### Docker publish workflows
 
@@ -55,6 +64,41 @@ locally.
 - Tagging: pushes to `main` get `main` + `<commit-sha>`; version tags get
   `semver` tags + `<commit-sha>` and set `latest` (so `latest` always points at
   the newest release, never at unreleased `main`).
+
+## Platform coverage
+
+What is actually verified per platform, and on which devices the app can run.
+
+| Coverage | macOS | Ubuntu | Windows | Android | iOS |
+|----------|-------|--------|---------|---------|-----|
+| Unit/integration tests + lint | ✅ | ✅ | ✅ | — | — |
+| Real AI inference (full model suite) | ✅ | ✅ | ✅ | — | — |
+| Mesh sync E2E (CLI, in-process signaling) | ✅ | ✅ | ✅ | — | — |
+| ML face-grouping E2E | — | ✅ | — | — | — |
+| Container mesh E2E | — | ✅ | — | — | — |
+| Cross-compile check | — | — | — | ✅ | ✅ |
+| On-device unit tests + mesh sync (`sync_e2e`) | — | — | — | ✅ emulator | ✅ simulator |
+| Release artifacts | ✅ | ✅ | ✅ | — | — |
+
+**Policy**: real AI *inference* is verified on desktop only; mobile guarantees
+compile-time support. The shared runtime (DB, WebRTC mesh) is exercised
+on-device via the Android emulator and iOS simulator jobs at least once — these
+may be disabled if they prove too slow in CI.
+
+**Supported devices** (determined by which prebuilt ONNX Runtime binaries exist
+for `ort`'s `download-binaries` strategy, plus per-OS EP features):
+
+- Windows x86_64 (Win 10/11) — DirectML GPU acceleration
+- Windows 11 on ARM (e.g. Snapdragon X) — CPU
+- macOS on Apple Silicon (M1–M4) — CoreML / Neural Engine
+- Linux x86_64 (glibc distros) — CPU
+- Linux ARM64 (Raspberry Pi 4/5, ARM SBCs) — CPU
+- Android arm64 (every modern phone/tablet, ~2017+) — CPU
+- iPhone/iPad (arm64; iOS 12+) — CoreML
+- iOS Simulator on Apple Silicon (development)
+
+Not supported: Intel Macs, 32-bit platforms, Android x86_64 (emulator images
+must be arm64), Linux musl/Alpine.
 
 ## E2E scripts
 

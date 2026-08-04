@@ -1,5 +1,4 @@
 use siegu_core::mdns;
-use std::time::Duration;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let daemon = mdns::create_daemon()?;

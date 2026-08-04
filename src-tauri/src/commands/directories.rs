@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn remove_directory_full_removes_photos() {
         let (mut db, _dir) = test_db();
-        do_add_directory(&mut db, "/photos");
+        do_add_directory(&db, "/photos");
         db.store_photo_batch(&[make_photo("ph1", "/photos/a.jpg")])
             .unwrap();
         do_remove_directory_full(&mut db, "/photos");

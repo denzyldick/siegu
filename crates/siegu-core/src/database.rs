@@ -464,7 +464,10 @@ impl Database {
     pub fn new(config_path: &str) -> Self {
         let path = format!("{config_path}/siegu.db");
         let _ = fs::create_dir_all(config_path);
-        let conn = Connection::open(&path).expect("Failed to open database connection");
+        // Fatal: the app cannot function without a usable database, and `new` cannot signal failure.
+        #[allow(clippy::expect_used)]
+        let conn = Connection::open(&path)
+            .expect("failed to open the Siegu database; the app cannot function without it");
 
         // Enable WAL mode for better concurrency and set a busy timeout
         let _ = conn.execute("PRAGMA journal_mode=WAL;", ());
@@ -1662,7 +1665,7 @@ impl Database {
         let mut people = Vec::new();
         if let Ok(mut stmt) = self.connection.prepare("SELECT p.id, p.name, f.crop_path, f.face_id, f.encoded, p.embedding, (SELECT COUNT(*) FROM faces WHERE person_id = p.id) FROM people p LEFT JOIN faces f ON p.id = f.person_id WHERE p.name IS NOT NULL GROUP BY p.id") {
             if let Ok(iter) = stmt.query_map([], |row| {
-                let embedding: Option<Vec<f32>> = row.get::<_, Option<Vec<u8>>>(5).ok().flatten().map(|bytes| bytes.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect());
+                let embedding: Option<Vec<f32>> = row.get::<_, Option<Vec<u8>>>(5).ok().flatten().map(|bytes| bytes.chunks_exact(4).map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect());
                 Ok(PersonWithFace { id: row.get(0)?, name: row.get(1)?, representative_crop: row.get(2).ok(), representative_face_id: row.get(3).ok(), encoded: row.get(4).ok(), embedding, face_count: row.get(6)? })
             }) {
                 for p in iter.flatten() { people.push(p); }
@@ -1755,7 +1758,7 @@ impl Database {
                 for row in rows.flatten() {
                     let emb: Vec<f32> = row
                         .chunks_exact(4)
-                        .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                        .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
                         .collect();
                     if emb.len() == 512 {
                         embeddings.push(emb);
@@ -1808,7 +1811,7 @@ impl Database {
                     .map(|bytes| {
                         bytes
                             .chunks_exact(4)
-                            .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                            .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
                             .collect()
                     });
                 Ok(PersonWithFace {
@@ -2208,7 +2211,7 @@ impl Database {
                 let bytes: Vec<u8> = row.get(1)?;
                 let emb: Vec<f32> = bytes
                     .chunks_exact(4)
-                    .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                    .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
                     .collect();
                 Ok((id, emb))
             }) {
@@ -3253,7 +3256,7 @@ mod tests {
     #[test]
     fn test_get_unindexed_photos() {
         let mut db = test_db();
-        let mut p1 = Photo {
+        let p1 = Photo {
             id: "unidx_1".to_string(),
             location: "/tmp/test_unidx1.jpg".to_string(),
             encoded: String::new(),
@@ -3270,7 +3273,7 @@ mod tests {
             sync_needed: true,
             received: false,
         };
-        let mut p2 = Photo {
+        let p2 = Photo {
             id: "unidx_2".to_string(),
             location: "/tmp/test_unidx2.jpg".to_string(),
             encoded: String::new(),
@@ -3495,7 +3498,7 @@ mod tests {
 
     #[test]
     fn test_list_photos_facet_filters() {
-        let mut db = test_db();
+        let db = test_db();
         db.connection
             .execute(
                 "INSERT INTO people (id, name) VALUES ('person-1', 'Alice')",
@@ -3586,7 +3589,7 @@ mod tests {
 
     #[test]
     fn test_search_facet_counts() {
-        let mut db = test_db();
+        let db = test_db();
         db.connection
             .execute(
                 "INSERT INTO photo (id, location, created, encoded) VALUES ('p1', '/a.jpg', '2026-03-01', '')",
@@ -3683,7 +3686,7 @@ mod tests {
 
     #[test]
     fn test_get_photo_ocr_concatenates_rows() {
-        let mut db = test_db();
+        let db = test_db();
         let _ = db.connection.execute(
             "INSERT INTO photo (id, location, created, encoded) VALUES ('p1', '/a.jpg', '2026-01-01', '')",
             (),
@@ -3699,7 +3702,7 @@ mod tests {
 
     #[test]
     fn test_discovery_photo_rails_and_groups() {
-        let mut db = test_db();
+        let db = test_db();
         for (id, created, aesthetics) in [
             ("p1", "2026-03-01", Some(0.9)),
             ("p2", "2026-02-10", Some(0.5)),
@@ -3771,7 +3774,7 @@ mod tests {
 
     #[test]
     fn test_get_best_photos_one_per_day() {
-        let mut db = test_db();
+        let db = test_db();
         for (id, created, aesthetics) in [
             ("d1a", "2026-03-10 09:00:00", Some(0.7)),
             ("d1b", "2026-03-10 18:00:00", Some(0.95)),
@@ -3803,7 +3806,7 @@ mod tests {
 
     #[test]
     fn test_get_day_counts() {
-        let mut db = test_db();
+        let db = test_db();
         for (id, created, location) in [
             ("p1", "2026-03-01T10:00:00", "/a.jpg"),
             ("p2", "2026-03-01T18:00:00", "/b.jpg"),
@@ -3833,7 +3836,7 @@ mod tests {
 
     #[test]
     fn test_list_photos_new_facet_filters() {
-        let mut db = test_db();
+        let db = test_db();
         for (id, created, aesthetics) in [
             ("p1", "2026-03-01", Some(0.9)),
             ("p2", "2026-02-10", Some(0.4)),

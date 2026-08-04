@@ -374,7 +374,13 @@ fn extract_kv(outputs: &ort::session::SessionOutputs, start_idx: usize) -> KvCac
                     shape[2] as usize,
                     shape[3] as usize,
                 ];
-                let arr = Array4::from_shape_vec(s, data.to_vec()).unwrap();
+                let arr = match Array4::from_shape_vec(s, data.to_vec()) {
+                    Ok(arr) => arr,
+                    Err(e) => {
+                        tracing::error!("failed to build decoder KV cache tensor: {e}");
+                        continue;
+                    }
+                };
                 kv.push(arr);
             }
         }
@@ -410,11 +416,14 @@ pub fn whisper_transcribe(
     );
     let mel_shape = mel.shape().to_vec();
     let mel_data = mel.into_raw_vec_and_offset().0;
-    let enc_input = ort::value::Value::from_array((mel_shape, mel_data)).unwrap();
+    let enc_input = match ort::value::Value::from_array((mel_shape, mel_data)) {
+        Ok(v) => v,
+        Err(e) => return format!("Mel input tensor error: {e}"),
+    };
 
     // ── Run the encoder to get hidden states ──────────────────────────
     let (enc_seq_len, hidden_dim, enc_data_arr) = {
-        let mut lock = encoder.lock().unwrap();
+        let mut lock = encoder.lock().unwrap_or_else(|e| e.into_inner());
 
         whisper_debug!("encoder input count: {}", lock.inputs().len());
 
@@ -426,7 +435,10 @@ pub fn whisper_transcribe(
             let seq = *shape.get(1).unwrap_or(&1500) as usize;
             let dim = *shape.get(2).unwrap_or(&384) as usize;
             let s = [1, seq, dim];
-            let arr = Array3::from_shape_vec(s, data.to_vec()).unwrap();
+            let arr = match Array3::from_shape_vec(s, data.to_vec()) {
+                Ok(arr) => arr,
+                Err(e) => return format!("Encoder output tensor error: {e}"),
+            };
             whisper_debug!("encoder output: seq={seq} dim={dim}");
             (seq, dim, arr)
         } else {
@@ -501,7 +513,7 @@ pub fn whisper_transcribe(
             );
         }
 
-        let mut lock = decoder.lock().unwrap();
+        let mut lock = decoder.lock().unwrap_or_else(|e| e.into_inner());
         let outputs = match lock.run(inputs) {
             Ok(o) => o,
             Err(e) => {
@@ -571,7 +583,9 @@ pub fn whisper_transcribe(
     // embedding table has exactly MAX_LENGTH entries (indices 0..MAX_LENGTH-1).
     let max_steps = MAX_LENGTH - initial_tokens_len - 1;
     for step in 0..max_steps {
-        let last = *generated_tokens.last().unwrap();
+        let Some(&last) = generated_tokens.last() else {
+            break;
+        };
         if last == EOT || last >= SOT {
             whisper_debug!("stop at step {step}: token {last}");
             break;
@@ -662,7 +676,7 @@ mod tests {
         let enc_path = models_dir.join("whisper.onnx");
         let dec_path = models_dir.join("whisper-decoder.onnx");
 
-        let mut enc = super::super::ep::build_session(&enc_path).unwrap();
+        let enc = super::super::ep::build_session(&enc_path).unwrap();
         eprintln!("=== ENCODER ===");
         for input in enc.inputs().iter() {
             eprintln!("  input: {:?}", input);
@@ -671,7 +685,7 @@ mod tests {
             eprintln!("  output: {:?}", output);
         }
 
-        let mut dec = super::super::ep::build_session(&dec_path).unwrap();
+        let dec = super::super::ep::build_session(&dec_path).unwrap();
         eprintln!("=== DECODER ===");
         for input in dec.inputs().iter() {
             eprintln!("  input: {:?}", input);
@@ -752,7 +766,7 @@ mod tests {
         let samples = audio.unwrap();
         assert!(!samples.is_empty(), "audio should not be empty");
         assert!(
-            samples.iter().all(|&s| s >= -1.0 && s <= 1.0),
+            samples.iter().all(|&s| (-1.0..=1.0).contains(&s)),
             "audio samples should be normalized"
         );
     }
@@ -797,7 +811,9 @@ mod tests {
 
     #[test]
     fn test_token_constants_sanity() {
-        assert!(EOT < SOT, "EOT (50257) should be less than SOT (50258)");
+        const {
+            assert!(EOT < SOT, "EOT (50257) should be less than SOT (50258)");
+        }
         assert_eq!(SOT, 50258);
         assert_eq!(EOT, 50257);
         assert_eq!(EN_LANG, 50259);

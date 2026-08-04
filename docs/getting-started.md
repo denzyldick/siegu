@@ -19,6 +19,30 @@ Everything happens on your computer. There are no accounts, no analytics, no clo
 
 ---
 
+## Device Support
+
+Siegu is verified against the platforms below. Which device you use also decides
+how the on-device AI models are accelerated (via ONNX Runtime):
+
+| Platform | Devices | AI acceleration |
+|----------|---------|-----------------|
+| **Windows** | Any x64 Windows 10/11 PC or laptop | DirectML (NVIDIA/AMD/Intel GPU) |
+| **Windows on ARM** | Snapdragon X / Arm64 laptops | CPU |
+| **macOS** | Apple Silicon Macs (M1–M4: MacBook Air/Pro, iMac, Mac mini, Mac Studio, Mac Pro) | CoreML (GPU + Neural Engine) |
+| **Linux** | x86_64 desktops/laptops (Ubuntu, Debian, Fedora, Arch, …) | CPU |
+| **Linux ARM64** | Raspberry Pi 4/5, ARM single-board computers | CPU |
+| **Android** | arm64 (arm64-v8a) phones and tablets, ~2017 and newer | CPU |
+| **iOS / iPadOS** | iPhone and iPad (arm64, iOS 12+) | CoreML (GPU + Neural Engine) |
+
+**Not supported**: Intel Macs, 32-bit platforms, Android x86_64 (emulator
+images must be arm64), and Alpine Linux (musl). The iOS Simulator is supported
+for development on Apple Silicon Macs.
+
+Sync works between any two of the supported devices — e.g. an Android phone and
+a Windows PC — over your own network.
+
+---
+
 ## Prerequisites
 
 - **Node.js** v18+

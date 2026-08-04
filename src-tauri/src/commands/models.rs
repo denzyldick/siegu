@@ -117,7 +117,7 @@ pub async fn download_models(
                     file_downloaded = downloaded;
                     let model_progress = base + downloaded;
                     if model_progress.saturating_sub(last_reported) > 1024 * 1024
-                        || (total.is_some() && downloaded >= total.unwrap())
+                        || total.is_some_and(|t| downloaded >= t)
                     {
                         last_reported = model_progress;
                         emit_progress(&app, &model_name, model_progress);

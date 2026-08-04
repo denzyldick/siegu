@@ -112,11 +112,11 @@ impl LogCollector {
     }
 
     pub fn logs(&self) -> Vec<(Level, String)> {
-        self.logs.lock().unwrap().clone()
+        self.logs.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
     pub fn clear(&self) {
-        self.logs.lock().unwrap().clear();
+        self.logs.lock().unwrap_or_else(|e| e.into_inner()).clear();
     }
 }
 
@@ -130,7 +130,10 @@ impl EventBus for LogCollector {
     fn emit(&self, _event: &str, _payload: serde_json::Value) {}
 
     fn log(&self, level: Level, message: &str) {
-        self.logs.lock().unwrap().push((level, message.to_string()));
+        self.logs
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push((level, message.to_string()));
     }
 }
 

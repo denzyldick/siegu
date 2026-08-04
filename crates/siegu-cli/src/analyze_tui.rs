@@ -3,6 +3,8 @@ use std::path::Path;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
+use tracing::error;
+
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use crossterm::execute;
 use crossterm::terminal::{
@@ -624,16 +626,27 @@ fn render_progress(f: &mut ratatui::Frame, app: &App, area: Rect) {
 }
 
 fn run_tui(ml_context: MlContext, rx: mpsc::Receiver<TuiEvent>, total: usize) {
-    enable_raw_mode().unwrap();
+    // Enabling raw mode is required for the interactive TUI; without it the analysis display cannot run.
+    #[allow(clippy::expect_used)]
+    enable_raw_mode().expect("failed to enable raw mode: required for the analysis TUI");
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen).unwrap();
+    // The alternate screen is required for the TUI to render; failure leaves the terminal unusable.
+    #[allow(clippy::expect_used)]
+    execute!(stdout, EnterAlternateScreen)
+        .expect("failed to enter alternate screen: required for the analysis TUI");
     let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend).unwrap();
+    // Terminal construction is required to drive the TUI; failure means rendering cannot proceed.
+    #[allow(clippy::expect_used)]
+    let mut terminal =
+        Terminal::new(backend).expect("failed to initialize the analysis TUI terminal");
 
     let mut app = App::new(total);
 
     loop {
-        terminal.draw(|f| ui(f, &app)).unwrap();
+        if let Err(e) = terminal.draw(|f| ui(f, &app)) {
+            error!("terminal draw failed, exiting analysis TUI: {e}");
+            break;
+        }
 
         while let Ok(event) = rx.try_recv() {
             app.handle_event(event);
@@ -652,16 +665,24 @@ fn run_tui(ml_context: MlContext, rx: mpsc::Receiver<TuiEvent>, total: usize) {
 
         if app.should_quit || app.done {
             if app.done && !app.should_quit {
-                terminal.draw(|f| ui(f, &app)).unwrap();
+                if let Err(e) = terminal.draw(|f| ui(f, &app)) {
+                    error!("final terminal draw failed: {e}");
+                }
                 let _ = event::poll(Duration::from_secs(3));
             }
             break;
         }
     }
 
-    disable_raw_mode().unwrap();
-    execute!(terminal.backend_mut(), LeaveAlternateScreen).unwrap();
-    terminal.show_cursor().unwrap();
+    if let Err(e) = disable_raw_mode() {
+        error!("failed to disable raw mode: {e}");
+    }
+    if let Err(e) = execute!(terminal.backend_mut(), LeaveAlternateScreen) {
+        error!("failed to leave alternate screen: {e}");
+    }
+    if let Err(e) = terminal.show_cursor() {
+        error!("failed to show cursor: {e}");
+    }
 }
 
 pub fn run_analyze_all(config_dir: &Path) {

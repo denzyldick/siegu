@@ -25,7 +25,7 @@ if [ -n "$CHANGED_RS" ] && command -v cargo >/dev/null 2>&1; then
   if [ -n "$CLIPPY_ARGS" ] && cargo clippy --version >/dev/null 2>&1; then
     echo "Running clippy on:$CLIPPY_ARGS"
     # shellcheck disable=SC2086
-    cargo clippy $CLIPPY_ARGS --no-deps -- -D warnings || {
+    cargo clippy $CLIPPY_ARGS --no-deps -- -D warnings -D clippy::unwrap_used -D clippy::expect_used || {
       echo ""
       echo "clippy failed. Fix the lints above, or commit with --no-verify."
       exit 1

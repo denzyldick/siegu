@@ -347,13 +347,19 @@ fn compute_text_embeddings(
                 ids.resize(77, 0);
             }
 
-            let arr = Array2::from_shape_vec((1, 77), ids).unwrap();
+            let arr = match Array2::from_shape_vec((1, 77), ids) {
+                Ok(arr) => arr,
+                Err(e) => {
+                    tracing::error!("failed to build CLIP input tensor for '{text_label}': {e}");
+                    continue;
+                }
+            };
             let shape = arr.shape().to_vec();
             let data = arr.into_raw_vec_and_offset().0;
 
             if let Ok(id_tensor) = ort::value::Value::from_array((shape, data)) {
                 let extracted = {
-                    let mut lock = text_model.lock().unwrap();
+                    let mut lock = text_model.lock().unwrap_or_else(|e| e.into_inner());
                     let outputs = lock.run(ort::inputs!["input_ids" => id_tensor]);
                     match outputs {
                         Ok(out) => {

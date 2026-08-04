@@ -309,7 +309,7 @@ mod tests {
         let mut cls = vec![0f32; cols * 80];
         let mut obj = vec![0f32; cols * 80];
         let mut bbox = vec![0f32; cols * 80 * 4];
-        let mut kps = vec![0f32; cols * 80 * 10];
+        let kps = vec![0f32; cols * 80 * 10];
         let a = 10 * cols + 10;
         let b = 11 * cols + 11;
         cls[a] = 0.9;
