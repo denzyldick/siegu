@@ -1,19 +1,165 @@
 //! Model loading and management for all ML pipelines.
 //!
-//! Each ONNX model is wrapped in `Arc<Mutex<Session>>` so it can be shared
-//! across threads. Models are conditionally loaded based on user config flags
-//! (`model_enabled_<name>` in the app config). Missing models are silently
-//! skipped (returning `None`) so the app degrades gracefully.
+//! Each ONNX model is wrapped in a pooled [`SessionPool`] (see [`ModelEngine`])
+//! so several concurrent inference runs can proceed in parallel. Models are
+//! conditionally loaded based on user config flags (`model_enabled_<name>` in
+//! the app config). Missing models are silently skipped (returning `None`) so
+//! the app degrades gracefully.
 
 use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 
 use ndarray::Array2;
 use ort::session::Session;
 
-/// Thread-safe handle to an ORT inference session.
-pub type ModelEngine = Arc<Mutex<Session>>;
+/// Thread-safe handle to a pool of ORT inference sessions.
+///
+/// `ort::Session::run` requires `&mut self`, so a single shared session would
+/// serialize all inference. Library indexing analyzes many photos in parallel
+/// (the rayon `scan_threads` jobs); pooling a few sessions lets those runs
+/// overlap instead of queueing on one global mutex.
+pub type ModelEngine = Arc<SessionPool>;
+
+/// Pool of interchangeable ONNX sessions for one model.
+///
+/// All sessions run the same graph, so a caller takes whichever slot is free.
+/// A slot is released back to the pool when its guard is dropped. Each slot is
+/// wrapped in its own `Mutex` to satisfy `Session::run(&mut self)`; the
+/// free-list hands out an index to at most one caller at a time, so the slot
+/// mutex never actually contends.
+pub struct SessionPool {
+    sessions: Vec<Mutex<Session>>,
+    free: Mutex<Vec<usize>>,
+    condvar: Condvar,
+}
+
+/// Exclusive access to one pooled session, returned by [`SessionPool::lock`].
+/// Derefs to `&mut Session`; hands its slot back to the pool on drop.
+pub struct SessionGuard<'a> {
+    pool: &'a SessionPool,
+    guard: MutexGuard<'a, Session>,
+    idx: usize,
+}
+
+impl SessionPool {
+    /// Builds a pool from the given sessions. The pool serves at most one run
+    /// at a time per session (i.e., `sessions.len()` concurrent runs).
+    pub fn new(sessions: Vec<Session>) -> Self {
+        let sessions: Vec<Mutex<Session>> = sessions.into_iter().map(Mutex::new).collect();
+        let free = Mutex::new((0..sessions.len()).collect());
+        Self {
+            sessions,
+            free,
+            condvar: Condvar::new(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.sessions.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.sessions.is_empty()
+    }
+
+    /// Blocks until a session is free, then hands out exclusive access.
+    pub fn lock(&self) -> Result<SessionGuard<'_>, String> {
+        let mut free = self.free.lock().map_err(|e| e.to_string())?;
+        if free.is_empty() && self.sessions.is_empty() {
+            return Err("session pool is empty".to_string());
+        }
+        while free.is_empty() {
+            free = self.condvar.wait(free).map_err(|e| e.to_string())?;
+        }
+        let idx = free
+            .pop()
+            .ok_or_else(|| "session pool free-list is empty".to_string())?;
+        let guard = self.sessions[idx].lock().map_err(|e| e.to_string())?;
+        Ok(SessionGuard {
+            pool: self,
+            guard,
+            idx,
+        })
+    }
+
+    /// Number of sessions to build for a model.
+    ///
+    /// Defaults to 2 so concurrent library-indexing jobs can run inference in
+    /// parallel. Heavy models (BLIP captioning, Whisper transcription, the
+    /// 1.6 GB aesthetics model) stay single by default to bound memory, since
+    /// each extra session duplicates the model's weights. `SIEGU_ORT_POOL`
+    /// overrides the default for every model.
+    fn pool_size_for(filename: &str) -> usize {
+        let env_pool = std::env::var("SIEGU_ORT_POOL")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .filter(|&n| n >= 1);
+        match env_pool {
+            Some(n) => n.min(8),
+            None => {
+                if filename.contains("whisper")
+                    || filename.starts_with("blip")
+                    || filename.starts_with("aesthetics")
+                {
+                    1
+                } else {
+                    2
+                }
+            }
+        }
+    }
+}
+
+impl Deref for SessionGuard<'_> {
+    type Target = Session;
+
+    fn deref(&self) -> &Session {
+        &self.guard
+    }
+}
+
+impl DerefMut for SessionGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Session {
+        &mut self.guard
+    }
+}
+
+impl Drop for SessionGuard<'_> {
+    fn drop(&mut self) {
+        if let Ok(mut free) = self.pool.free.lock() {
+            free.push(self.idx);
+            self.pool.condvar.notify_one();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_pool_size_keeps_heavy_models_single() {
+        assert_eq!(SessionPool::pool_size_for("aesthetics.onnx"), 1);
+        assert_eq!(SessionPool::pool_size_for("blip.onnx"), 1);
+        assert_eq!(SessionPool::pool_size_for("blip_decoder.onnx"), 1);
+        assert_eq!(SessionPool::pool_size_for("whisper.onnx"), 1);
+        assert_eq!(SessionPool::pool_size_for("whisper-decoder.onnx"), 1);
+        assert_eq!(
+            SessionPool::pool_size_for("clip-vit-base-patch32-visual.onnx"),
+            2
+        );
+        assert_eq!(SessionPool::pool_size_for("yolov8.onnx"), 2);
+    }
+
+    #[test]
+    fn empty_pool_lock_fails() {
+        let pool = SessionPool::new(Vec::new());
+        assert!(pool.is_empty());
+        assert!(pool.lock().is_err());
+    }
+}
 
 /// Container for all loaded ML models and their associated data.
 ///
@@ -273,9 +419,17 @@ fn load_model_with_min_size(
     if !is_ok {
         return None;
     }
-    super::ep::build_session(&path)
-        .ok()
-        .map(|s| Arc::new(Mutex::new(s)))
+    let pool_size = SessionPool::pool_size_for(filename);
+    let mut sessions = Vec::with_capacity(pool_size);
+    for _ in 0..pool_size {
+        if let Ok(session) = super::ep::build_session(&path) {
+            sessions.push(session);
+        }
+    }
+    if sessions.is_empty() {
+        return None;
+    }
+    Some(Arc::new(SessionPool::new(sessions)))
 }
 
 /// Pre-computes CLIP text embeddings for a fixed vocabulary of common
@@ -359,7 +513,9 @@ fn compute_text_embeddings(
 
             if let Ok(id_tensor) = ort::value::Value::from_array((shape, data)) {
                 let extracted = {
-                    let mut lock = text_model.lock().unwrap_or_else(|e| e.into_inner());
+                    let Some(mut lock) = text_model.lock().ok() else {
+                        continue;
+                    };
                     let outputs = lock.run(ort::inputs!["input_ids" => id_tensor]);
                     match outputs {
                         Ok(out) => {

@@ -423,7 +423,9 @@ pub fn whisper_transcribe(
 
     // ── Run the encoder to get hidden states ──────────────────────────
     let (enc_seq_len, hidden_dim, enc_data_arr) = {
-        let mut lock = encoder.lock().unwrap_or_else(|e| e.into_inner());
+        let Ok(mut lock) = encoder.lock() else {
+            return "Encoder session unavailable".to_string();
+        };
 
         whisper_debug!("encoder input count: {}", lock.inputs().len());
 
@@ -513,7 +515,7 @@ pub fn whisper_transcribe(
             );
         }
 
-        let mut lock = decoder.lock().unwrap_or_else(|e| e.into_inner());
+        let mut lock = decoder.lock().ok()?;
         let outputs = match lock.run(inputs) {
             Ok(o) => o,
             Err(e) => {
@@ -711,8 +713,8 @@ mod tests {
         let enc = super::super::ep::build_session(&enc_path).unwrap();
         let dec = super::super::ep::build_session(&dec_path).unwrap();
         let tok = tokenizers::Tokenizer::from_file(&tok_path).unwrap();
-        let enc = std::sync::Arc::new(std::sync::Mutex::new(enc));
-        let dec = std::sync::Arc::new(std::sync::Mutex::new(dec));
+        let enc = std::sync::Arc::new(super::super::models::SessionPool::new(vec![enc]));
+        let dec = std::sync::Arc::new(super::super::models::SessionPool::new(vec![dec]));
 
         let videos = [
             "/home/denzyl/Pictures/takeout-20260428T162732Z-3-001/Takeout/Google Photos/Moved to van der hoevenplein /VID_20171010_123456.mp4",

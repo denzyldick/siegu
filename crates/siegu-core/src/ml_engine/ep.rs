@@ -18,7 +18,15 @@ pub fn build_session(path: &std::path::Path) -> Result<Session, String> {
     let mut builder = Session::builder()
         .map_err(|e| format!("Session builder error: {e}"))?
         .with_optimization_level(ort::session::builder::GraphOptimizationLevel::Disable)
-        .map_err(|e| format!("Optimization level error: {e}"))?;
+        .map_err(|e| format!("Optimization level error: {e}"))?
+        .with_intra_threads(intra_threads())
+        .map_err(|e| format!("Intra-op thread count error: {e}"))?;
+
+    if let Some(inter) = inter_threads() {
+        builder = builder
+            .with_inter_threads(inter)
+            .map_err(|e| format!("Inter-op thread count error: {e}"))?;
+    }
 
     let mut eps: Vec<ort::ep::ExecutionProviderDispatch> = Vec::new();
 
@@ -67,4 +75,32 @@ pub fn selected_ep() -> String {
     {
         "CPU".to_string()
     }
+}
+
+/// Intra-op threads per inference run.
+///
+/// Defaults to `min(physical cores, 4)`: a full-library index runs several
+/// photos concurrently (see the session pool in `models`), so a single run
+/// using every core would oversubscribe the machine. Override with
+/// `SIEGU_ORT_THREADS`.
+fn intra_threads() -> usize {
+    env_threads("SIEGU_ORT_THREADS").unwrap_or_else(|| {
+        let cores = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4);
+        cores.min(4)
+    })
+}
+
+/// Inter-op threads for a run. ORT manages this internally by default; only
+/// set it when the user explicitly asks via `SIEGU_ORT_INTER_THREADS`.
+fn inter_threads() -> Option<usize> {
+    env_threads("SIEGU_ORT_INTER_THREADS")
+}
+
+fn env_threads(name: &str) -> Option<usize> {
+    std::env::var(name)
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .filter(|&n| n >= 1)
 }
