@@ -26,15 +26,13 @@ git config core.hooksPath .githooks
 
 ## CI
 
-GitHub Actions workflows in `.github/workflows/ci.yml`:
+GitHub Actions workflows in `.github/workflows/` (details in `docs/ci.md`):
 
-| Job | Platform | Checks |
-|-----|----------|--------|
-| `test` | macOS, Ubuntu, Windows | `cargo fmt --check`, `cargo check`, `cargo test`, `cargo clippy`, `tauri build` |
-| `test-android` | Ubuntu | `cargo fmt --check`, `cargo ndk check` (aarch64 + x86_64) |
-| `test-ios` | macOS | `cargo fmt --check`, `cargo check` (aarch64-apple-ios) |
-
-Plus release jobs for all platforms that publish to GitHub Releases.
+| Workflow | Jobs |
+|----------|------|
+| `ci.yml` | `test` (macOS/Ubuntu/Windows: fmt, check, test, clippy, tauri build), `test-android`, `test-ios`, ML inference E2E, release builds |
+| `e2e.yml` | `face-grouping` (ML), `sync-cli` (3-OS mesh sync), `sync-docker` (sync against published signaling image) |
+| `signal-docker.yml` / `landing-page-docker.yml` | Docker publish + build-only PR validation |
 
 ### Formatting
 
@@ -85,6 +83,13 @@ cargo test -p siegu-core
 
 # Run ignored (integration) tests
 cargo test -- --ignored test_full_inference_on_sample
+cargo test -- --ignored test_whisper_smoke
+
+# Run the mesh sync E2E (Rust-level, no models needed)
+cargo test -p siegu-core --test sync_e2e
+
+# Run the CLI-level sync E2E (builds + exercises two real processes)
+bash scripts/e2e-sync.sh
 
 # Run lint
 cargo clippy -- -D warnings

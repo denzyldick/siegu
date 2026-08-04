@@ -50,6 +50,7 @@ fn extract_token(url: &str) -> (String, Option<String>) {
     }
 }
 
+#[derive(Clone)]
 pub struct MeshTransport {
     pub room_id: String,
     pub is_initiator: bool,

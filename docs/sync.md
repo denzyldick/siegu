@@ -43,7 +43,7 @@ For devices on different networks:
 
 ## Signaling Server
 
-LAN mode runs a built-in signaling server (embedded in the app). For remote connections, a standalone Go signaling server is available.
+LAN mode runs a built-in signaling server (embedded in the app). For remote connections, a standalone signaling server (`siegu-signal`, written in Rust) is available.
 
 ### Self-hosting
 
@@ -55,17 +55,13 @@ The server runs on port `8080` with these env vars:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SIGNAL_ADDR` | `:8080` | Listen address |
-| `SIGNAL_MAX_PEERS` | `2` | Max peers per room |
-| `SIGNAL_ROOM_TTL_SECS` | `300` | Room lifetime after host disconnects |
-| `SIGNAL_MAX_MSG_SIZE` | `32768` | Max WebSocket message size (bytes) |
-| `SIGNAL_RATE_PER_SEC` | `10` | Rate limit (requests/sec) |
-| `SIGNAL_RATE_BURST` | `20` | Rate limit burst |
+| `PORT` | `8080` | Listen address |
+| `SIEGU_SIGNAL_TOKEN` | *(unset)* | If set, every join/room request must include this token |
 
 ### Pre-built image
 
 ```
-ghcr.io/denzyldick/signalling-server:latest
+ghcr.io/denzyldick/siegu-signal:latest
 ```
 
 ---

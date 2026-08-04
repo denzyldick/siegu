@@ -14,6 +14,17 @@ on:
       - ".github/workflows/signal-docker.yml"
     tags:
       - "v*"
+  pull_request:
+    branches:
+      - "main"
+    paths:
+      - "crates/siegu-core/src/lan_server.rs"
+      - "crates/siegu-core/src/signal.rs"
+      - "crates/siegu-core/src/mesh_transport.rs"
+      - "crates/siegu-signal/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/signal-docker.yml"
   workflow_dispatch:
 
 env:
@@ -21,7 +32,25 @@ env:
   IMAGE_NAME: "${{ github.repository }}-signal"
 
 jobs:
+  build-image:
+    if: github.event_name == 'pull_request'
+    runs-on: "ubuntu-latest"
+    permissions:
+      contents: "read"
+
+    steps:
+      - name: "Checkout repository"
+        uses: "actions/checkout@v4"
+
+      - name: "Build Docker image (no push)"
+        uses: "docker/build-push-action@v5"
+        with:
+          context: "."
+          file: "crates/siegu-signal/Dockerfile"
+          push: false
+
   build-and-push-image:
+    if: github.event_name != 'pull_request'
     runs-on: "ubuntu-latest"
     permissions:
       contents: "read"

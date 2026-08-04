@@ -1,0 +1,124 @@
+# CI / E2E Testing
+
+All CI runs on GitHub Actions (`.github/workflows/`). This page documents each
+workflow, the model downloads, the E2E scripts, and how to run everything
+locally.
+
+## Workflows
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `ci.yml` | push to `main`, PRs, tags, releases | Rust tests/lint + Tauri build on macOS/Ubuntu/Windows, Android, iOS, and the real ML inference E2E (Ubuntu) |
+| `e2e.yml` | push to `main`, PRs | Cross-platform mesh sync E2E + ML face-grouping E2E |
+| `signal-docker.yml` | push to `main`, PRs, tags | Build/push the signaling-server Docker image; PRs only validate the build |
+| `landing-page-docker.yml` | push to `main`, PRs, tags | Build/push the landing-page Docker image; PRs only validate the build |
+
+### `ci.yml`
+
+- **`test`** (matrix: `ubuntu-24.04`, `macos-latest`, `windows-latest`):
+  `cargo fmt --check`, `cargo check`, `cargo test`, `cargo clippy`, and
+  `npm run tauri build -- --no-bundle`. macOS builds ONNX Runtime with the
+  CoreML feature; other platforms use plain or DirectML (see
+  `crates/siegu-core/Cargo.toml` `[target.*.dependencies]`).
+- **`test-android`**: `cargo ndk check` for `aarch64` + `x86_64`.
+- **`test-ios`**: `cargo check` for `aarch64-apple-ios`.
+- **ML inference E2E** (Ubuntu only): downloads the model suite to
+  `src-tauri/test_models/` (cache key `ai-test-models-v2`) and runs the two
+  `#[ignore]`d integration tests in `src-tauri/src/ml.rs`:
+  `test_full_inference_on_sample` and `test_whisper_smoke`.
+- **Release jobs**: publish installers/artifacts to GitHub Releases.
+
+### `e2e.yml`
+
+- **`face-grouping`** (Ubuntu): builds the CLI and runs
+  `scripts/e2e-face-grouping.sh`, which downloads face-detection models to
+  `/tmp/siegu-e2e-models` (cache key `siegu-e2e-models-v2`) and asserts that
+  same-person photos are grouped into one album by the AI pipeline.
+- **`sync-cli`** (matrix: Ubuntu, macOS, Windows): builds `siegu-cli` and runs
+  `scripts/e2e-sync.sh`. Two CLI processes connect over WebRTC through an
+  in-process signaling server, exchange protocol messages, and transfer a photo
+  byte-for-byte (SHA-256 compared). No ML models required.
+- **`sync-docker`** (Ubuntu): like `sync-cli`, but against the published
+  `ghcr.io/denzyldick/siegu-signal:latest` container instead of the in-process
+  server.
+
+### Docker publish workflows
+
+- `signal-docker.yml` — image `ghcr.io/denzyldick/siegu-signal`, built from
+  `crates/siegu-signal/Dockerfile` (repository root is the build context).
+  Container reads `PORT` (default `8080`) and optional `SIEGU_SIGNAL_TOKEN`,
+  exposes a `/healthz` endpoint, and runs as a non-root user.
+- `landing-page-docker.yml` — image `ghcr.io/denzyldick/siegu-landing-page`,
+  built from `landing-page/Dockerfile` (`node:20-alpine`, `npm ci --omit=dev`).
+- Both add a build-only `build-image` job on PRs so image breakage is caught
+  before merge without publishing.
+
+## E2E scripts
+
+| Script | What it does |
+|--------|--------------|
+| `scripts/e2e-sync.sh` | Builds the CLI, starts a mesh host, joins from a second process, transfers `einstein_1.jpg`, asserts the transferred file matches the source SHA-256. Falls back to the external signaling server when `SIEGU_SIGNAL_URL` is set. |
+| `scripts/e2e-face-grouping.sh` | Runs the full AI pipeline against a small album and asserts same-person faces land in one group. Needs the model suite in `SIEGU_MODELS_DIR` (default: downloads to the script's own cache). |
+
+### Running the sync E2E locally
+
+```bash
+# LAN mode (in-process signaling server)
+bash scripts/e2e-sync.sh
+
+# External signaling server
+docker run --rm -p 8080:8080 ghcr.io/denzyldick/siegu-signal:latest
+SIEGU_SIGNAL_URL=ws://127.0.0.1:8080 bash scripts/e2e-sync.sh
+
+# Or: a bare `siegu serve` on one terminal, then the script with SIEGU_SIGNAL_URL
+```
+
+The Rust-level equivalents live in `crates/siegu-core/tests/sync_e2e.rs` and
+run with `cargo test -p siegu-core --test sync_e2e` (no models needed).
+
+### Running the ML E2E locally
+
+The inference tests need the full model suite (~5 GB) in `src-tauri/test_models/`.
+CI downloads it automatically; locally the tests fail fast with a skip message
+if any file is missing. To force-run them:
+
+```bash
+cd src-tauri
+cargo test -- --ignored test_full_inference_on_sample
+cargo test -- --ignored test_whisper_smoke
+```
+
+`test_full_inference_on_sample` analyzes `tests/fixtures/faces/einstein_1.jpg`,
+runs face detection/recognition, captioning (BLIP), OCR, aesthetics/NSFW
+scoring and MiDaS depth, then asserts a coherent caption and ≥1 detected face.
+
+## Model suite (ci.yml AI step)
+
+All files land in `src-tauri/test_models/`:
+
+| File | Source |
+|------|--------|
+| `clip-vit-base-patch32-visual.onnx` / `-text.onnx`, `tokenizer.json` | `Xenova/clip-vit-base-patch32` |
+| `face_detection_yunet_2023mar.onnx` | opencv_zoo |
+| `ocr_det.onnx`, `ocr_rec.onnx`, `en_dict.txt` | SWHL RapidOCR / PaddleOCR |
+| `nsfw.onnx` | onnx-community nsfw_image_detection |
+| `aesthetics.onnx` | aesthetic-predictor-v2-5 |
+| `yolov8.onnx` | webml/yolov8n |
+| `blip.onnx` (split_0), `blip_decoder.onnx` (split_1), `blip_tokenizer.json` | Salesforce BLIP image-captioning-base |
+| `arcface.onnx` | arcface_w600k_r50 |
+| `midas.onnx` | Xenova dpt-hybrid-midas |
+| `whisper.onnx` (encoder), `whisper-decoder.onnx`, `whisper-tokenizer.json` | onnx-community whisper-tiny |
+
+Cache key is `ai-test-models-v2` — bump it whenever a model URL or file
+changes so CI re-downloads instead of reusing stale files.
+
+## Known issues
+
+- `crates/siegu-signal/Cargo.toml` declares `siegu-core` with
+  `default-features = false`, but because the workspace dependency
+  (`Cargo.toml`) does not pin `default-features`, Cargo **ignores** that and
+  the signaling container compiles the full ML stack anyway. The image still
+  builds; fixing this would mean setting `default-features = false` on the
+  workspace dep and re-enabling the `ml` feature where needed (`siegu-cli`,
+  `src-tauri`). See the "default-features is ignored for siegu-core" warning
+  from `cargo build`.

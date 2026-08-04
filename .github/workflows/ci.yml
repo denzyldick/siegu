@@ -114,7 +114,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: src-tauri/test_models
-          key: ai-test-models-v1
+          key: ai-test-models-v2
 
       - name: AI Pipeline Integration Test
         if: matrix.platform == 'ubuntu-24.04'
@@ -141,11 +141,16 @@ jobs:
           download_model "https://huggingface.co/fsw/aesthetic-predictor-v2-5_onnx/resolve/main/aesthetic_predictor_v2_5.onnx" "test_models/aesthetics.onnx"
           download_model "https://huggingface.co/webml/yolov8n/resolve/main/onnx/yolov8n.onnx" "test_models/yolov8.onnx"
           download_model "https://huggingface.co/onnx-community/Salesforce_blip-image-captioning-base/resolve/main/split_0.onnx" "test_models/blip.onnx"
+          download_model "https://huggingface.co/onnx-community/Salesforce_blip-image-captioning-base/resolve/main/split_1.onnx" "test_models/blip_decoder.onnx"
+          download_model "https://huggingface.co/Salesforce/blip-image-captioning-base/resolve/main/tokenizer.json" "test_models/blip_tokenizer.json"
           download_model "https://huggingface.co/crj/dl-ws/resolve/main/arcface_w600k_r50.onnx" "test_models/arcface.onnx"
           download_model "https://huggingface.co/Xenova/dpt-hybrid-midas/resolve/main/onnx/model.onnx" "test_models/midas.onnx"
-          download_model "https://huggingface.co/Xenova/whisper-tiny.en/resolve/main/onnx/encoder_model.onnx" "test_models/whisper.onnx"
+          download_model "https://huggingface.co/onnx-community/whisper-tiny-ONNX/resolve/main/onnx/encoder_model.onnx" "test_models/whisper.onnx"
+          download_model "https://huggingface.co/onnx-community/whisper-tiny-ONNX/resolve/main/onnx/decoder_model_merged.onnx" "test_models/whisper-decoder.onnx"
+          download_model "https://huggingface.co/onnx-community/whisper-tiny-ONNX/resolve/main/tokenizer.json" "test_models/whisper-tokenizer.json"
 
           cargo test -- --ignored test_full_inference_on_sample
+          cargo test -- --ignored test_whisper_smoke
         working-directory: src-tauri
 
       - name: Build Tauri App (no bundle)

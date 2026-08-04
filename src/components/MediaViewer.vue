@@ -767,9 +767,7 @@ const addToAlbumPhotoIds = computed(() => {
 })
 
 function onAddedToAlbum(albumName: string): void {
-  snackbar.show = true
-  snackbar.error = false
-  snackbar.text = t('albums.added_to_album', { album: albumName })
+  snackbar.value = { show: true, error: false, text: t('albums.added_to_album', { album: albumName }) }
 }
 
 const moreItems = computed(() => {

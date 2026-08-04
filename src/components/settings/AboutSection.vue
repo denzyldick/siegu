@@ -21,7 +21,7 @@
         <span v-if="version" class="text-caption text-zinc-secondary">v{{ version }}</span>
       </div>
       <v-divider class="my-3"></v-divider>
-      <v-expansion-panels variant="flat" class="bg-transparent">
+      <v-expansion-panels class="bg-transparent">
         <v-expansion-panel class="bg-transparent">
           <v-expansion-panel-title class="px-0 text-body-2 font-weight-bold text-zinc-primary">
             <v-icon size="small" color="#71717a" class="mr-2">mdi-xml</v-icon>

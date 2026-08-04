@@ -9,6 +9,12 @@ on:
       - ".github/workflows/landing-page-docker.yml"
     tags:
       - "v*"
+  pull_request:
+    branches:
+      - "main"
+    paths:
+      - "landing-page/**"
+      - ".github/workflows/landing-page-docker.yml"
   workflow_dispatch:
 
 env:
@@ -17,7 +23,24 @@ env:
   IMAGE_NAME: "${{ github.repository }}-landing-page"
 
 jobs:
+  build-image:
+    if: github.event_name == 'pull_request'
+    runs-on: "ubuntu-latest"
+    permissions:
+      contents: "read"
+
+    steps:
+      - name: "Checkout repository"
+        uses: "actions/checkout@v4"
+
+      - name: "Build Docker image (no push)"
+        uses: "docker/build-push-action@v5"
+        with:
+          context: "./landing-page"
+          push: false
+
   build-and-push-image:
+    if: github.event_name != 'pull_request'
     runs-on: "ubuntu-latest"
     permissions:
       contents: "read"

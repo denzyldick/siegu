@@ -175,13 +175,25 @@ enum MeshAction {
     Host {
         #[arg(short, long, default_value = "0")]
         port: u16,
+        /// Connect to an existing signaling server instead of starting a local one
+        #[arg(long)]
+        server: Option<String>,
+        /// Room ID to use when connecting via --server (required with --server)
+        #[arg(long)]
+        room: Option<String>,
         #[arg(short, long)]
         config: Option<String>,
     },
     /// Join a mesh room via signaling server
     Join {
-        /// Room ID or signaling URL
+        /// Room ID
         room: String,
+        /// Signaling server URL (defaults to ws://127.0.0.1:8080)
+        #[arg(long)]
+        server: Option<String>,
+        /// This peer creates the WebRTC offer (needed when joining a --server host)
+        #[arg(long)]
+        initiator: bool,
         #[arg(short, long)]
         config: Option<String>,
     },
@@ -332,13 +344,23 @@ async fn main() {
             }
         }
         Commands::Mesh { action } => match action {
-            MeshAction::Host { port, config } => {
+            MeshAction::Host {
+                port,
+                server,
+                room,
+                config,
+            } => {
                 let config_dir = resolve_config_dir(&cli.config_dir, config);
-                cmd_mesh_host(*port, &config_dir).await;
+                cmd_mesh_host(*port, server.as_deref(), room.as_deref(), &config_dir).await;
             }
-            MeshAction::Join { room, config } => {
+            MeshAction::Join {
+                room,
+                server,
+                initiator,
+                config,
+            } => {
                 let config_dir = resolve_config_dir(&cli.config_dir, config);
-                cmd_mesh_join(room, &config_dir).await;
+                cmd_mesh_join(room, server.as_deref(), *initiator, &config_dir).await;
             }
             MeshAction::Status { config } => {
                 let config_dir = resolve_config_dir(&cli.config_dir, config);
@@ -654,6 +676,8 @@ async fn cmd_serve(port: u16) {
     println!("Press Ctrl+C to stop.");
 
     let _ = siegu_core::lan_server::start(port).await;
+    let _ = tokio::signal::ctrl_c().await;
+    println!("Shutting down...");
 }
 
 async fn cmd_sync(server: &str) {
@@ -710,24 +734,59 @@ fn cmd_config_keys() {
     }
 }
 
-async fn cmd_mesh_host(port: u16, config_dir: &Path) {
+async fn cmd_mesh_host(port: u16, server: Option<&str>, room: Option<&str>, config_dir: &Path) {
     let config_path = config_dir.display().to_string();
     let _ = std::fs::create_dir_all(config_dir);
     let db = Database::new(&config_path);
 
-    let room_id = uuid::Uuid::new_v4().to_string();
+    let room_id = room
+        .map(|r| r.to_string())
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let hostname = std::env::var("HOSTNAME")
         .or_else(|_| std::env::var("COMPUTERNAME"))
         .unwrap_or_else(|_| "siegu-host".to_string());
 
-    println!("Starting LAN mesh host...");
-    println!("Room ID: {room_id}");
+    let (signaling_url, actual_port, daemon) = if let Some(server_url) = server {
+        let url = server_url.trim_end_matches('/').to_string();
+        println!("Connecting to signaling server: {url}");
+        println!("Room ID: {room_id}");
+        (url, 0, None)
+    } else {
+        println!("Starting LAN mesh host...");
+        println!("Room ID: {room_id}");
 
-    let server = MeshTransport::start_lan_server(port)
-        .await
-        .expect("Failed to start LAN signaling server");
-    let actual_port = server.port;
-    println!("Signaling server on port {actual_port}");
+        let server = MeshTransport::start_lan_server(port)
+            .await
+            .expect("Failed to start LAN signaling server");
+        let actual_port = server.port;
+        let signaling_url = format!("ws://127.0.0.1:{actual_port}");
+        println!("Signaling server on port {actual_port}");
+
+        let daemon = match siegu_core::mdns::create_daemon() {
+            Ok(d) => {
+                if let Err(e) = siegu_core::mdns::register_service(&d, &hostname, actual_port) {
+                    eprintln!("mDNS registration failed: {e}");
+                } else {
+                    println!("mDNS registered as {hostname}");
+                }
+                Some(d)
+            }
+            Err(e) => {
+                eprintln!("mDNS init failed: {e}");
+                None
+            }
+        };
+
+        (signaling_url, actual_port, daemon)
+    };
+
+    db.save_session(&SavedSession {
+        room_id: room_id.clone(),
+        signaling_url: signaling_url.clone(),
+        port: actual_port,
+        is_initiator: true,
+        passphrase: String::new(),
+    });
 
     let sync_tx = Arc::new(tokio::sync::Mutex::new(None));
     let event = Arc::new(CliSyncEvent {
@@ -738,36 +797,13 @@ async fn cmd_mesh_host(port: u16, config_dir: &Path) {
     let transport = MeshTransport::new(
         room_id.clone(),
         true,
-        format!("ws://127.0.0.1:{actual_port}"),
+        signaling_url.clone(),
         config_path.clone(),
         uuid::Uuid::new_v4().to_string(),
         hostname.clone(),
         Vec::new(),
         event,
     );
-
-    let daemon = match siegu_core::mdns::create_daemon() {
-        Ok(d) => {
-            if let Err(e) = siegu_core::mdns::register_service(&d, &hostname, actual_port) {
-                eprintln!("mDNS registration failed: {e}");
-            } else {
-                println!("mDNS registered as {hostname}");
-            }
-            Some(d)
-        }
-        Err(e) => {
-            eprintln!("mDNS init failed: {e}");
-            None
-        }
-    };
-
-    db.save_session(&SavedSession {
-        room_id: room_id.clone(),
-        signaling_url: format!("ws://127.0.0.1:{actual_port}"),
-        port: actual_port,
-        is_initiator: true,
-        passphrase: String::new(),
-    });
 
     println!("Waiting for peers... Press Ctrl+C to stop.");
 
@@ -788,7 +824,7 @@ async fn cmd_mesh_host(port: u16, config_dir: &Path) {
     transport_handle.abort();
 }
 
-async fn cmd_mesh_join(room: &str, config_dir: &Path) {
+async fn cmd_mesh_join(room: &str, server: Option<&str>, initiator: bool, config_dir: &Path) {
     let config_path = config_dir.display().to_string();
     let _ = std::fs::create_dir_all(config_dir);
     let db = Database::new(&config_path);
@@ -797,11 +833,9 @@ async fn cmd_mesh_join(room: &str, config_dir: &Path) {
         .or_else(|_| std::env::var("COMPUTERNAME"))
         .unwrap_or_else(|_| "siegu-device".to_string());
 
-    let signaling_url = if room.starts_with("ws://") || room.starts_with("wss://") {
-        room.to_string()
-    } else {
-        format!("ws://127.0.0.1:8080/{}", room)
-    };
+    let signaling_url = server
+        .map(|s| s.trim_end_matches('/').to_string())
+        .unwrap_or_else(|| "ws://127.0.0.1:8080".to_string());
 
     println!("Joining mesh room: {room}");
     println!("Signaling: {signaling_url}");
@@ -814,7 +848,7 @@ async fn cmd_mesh_join(room: &str, config_dir: &Path) {
 
     let transport = MeshTransport::new(
         room.to_string(),
-        false,
+        initiator,
         signaling_url.clone(),
         config_path.clone(),
         uuid::Uuid::new_v4().to_string(),
@@ -827,7 +861,7 @@ async fn cmd_mesh_join(room: &str, config_dir: &Path) {
         room_id: room.to_string(),
         signaling_url,
         port: 0,
-        is_initiator: false,
+        is_initiator: initiator,
         passphrase: String::new(),
     });
 

@@ -71,13 +71,14 @@ OUT="$("$BIN" --config-dir "$CFG" analyze all --headless 2>&1)"
 echo "$OUT"
 
 echo "== assertions =="
-PEOPLE_TOTAL="$(echo "$OUT" | grep -oP 'people_total=\K[0-9]+' | head -1)"
+# NOTE: use grep -oE / sed (not grep -oP) so the script is portable to macOS BSD grep.
+PEOPLE_TOTAL="$(echo "$OUT" | grep -oE 'people_total=[0-9]+' | sed -E 's/people_total=//' | head -1)"
 DISTINCT_PEOPLE="$(echo "$OUT" \
-  | grep -oP 'people=\[[^]]*\]' \
-  | grep -oP '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}' \
+  | grep -oE 'people=\[[^]]*\]' \
+  | grep -oE '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}' \
   | sort -u | wc -l)"
-NSFW_CNT="$(echo "$OUT" | grep -oP 'nsfw=\K[^ ]+' | grep -v '^-$' | wc -l)"
-AES_CNT="$(echo "$OUT" | grep -oP 'aesthetics=\K[^ ]+' | grep -v '^-$' | wc -l)"
+NSFW_CNT="$(echo "$OUT" | grep -oE 'nsfw=[^ ]+' | sed -E 's/nsfw=//' | grep -v '^-$' | wc -l)"
+AES_CNT="$(echo "$OUT" | grep -oE 'aesthetics=[^ ]+' | sed -E 's/aesthetics=//' | grep -v '^-$' | wc -l)"
 
 if [ -z "$PEOPLE_TOTAL" ] || [ "$PEOPLE_TOTAL" != "1" ]; then
   echo "FAIL: expected exactly 1 person group, got '${PEOPLE_TOTAL:-none}'" >&2
