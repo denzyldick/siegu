@@ -38,16 +38,16 @@ locally.
   `scripts/e2e-sync.sh`. Two CLI processes connect over WebRTC through an
   in-process signaling server, exchange protocol messages, and transfer a photo
   byte-for-byte (SHA-256 compared). No ML models required.
-- **`sync-docker`** (Ubuntu): like `sync-cli`, but against the published
-  `ghcr.io/denzyldick/siegu-signal:latest` container instead of the in-process
-  server.
 
 ### Docker publish workflows
 
 - `signal-docker.yml` — image `ghcr.io/denzyldick/siegu-signal`, built from
   `crates/siegu-signal/Dockerfile` (repository root is the build context).
   Container reads `PORT` (default `8080`) and optional `SIEGU_SIGNAL_TOKEN`,
-  exposes a `/healthz` endpoint, and runs as a non-root user.
+  exposes a `/healthz` endpoint, and runs as a non-root user. After publishing,
+  a `mesh-sync-e2e` job runs `scripts/e2e-sync.sh` against the
+  commit-sha-tagged container just pushed (not `latest`), so the exact image
+  built from the current commit is exercised.
 - `landing-page-docker.yml` — image `ghcr.io/denzyldick/siegu-landing-page`,
   built from `landing-page/Dockerfile` (`node:20-alpine`, `npm ci --omit=dev`).
 - Both add a build-only `build-image` job on PRs so image breakage is caught
