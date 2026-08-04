@@ -1,15 +1,16 @@
 use crate::common::{emit_log, get_config_path};
 use crate::database;
-use crate::database::{Database, LogEntry};
+use crate::database::Database;
+use crate::log::{self, LogEntry};
 
 /// Pure business logic — testable without Tauri.
-pub fn do_get_logs(db: &Database, limit: usize) -> Vec<LogEntry> {
-    db.get_logs(limit)
+pub fn do_get_logs(limit: usize) -> Vec<LogEntry> {
+    log::recent_logs(limit)
 }
 
 /// Pure business logic — testable without Tauri.
-pub fn do_clear_logs(db: &Database) {
-    db.clear_logs();
+pub fn do_clear_logs() {
+    log::clear_logs();
 }
 
 /// Pure business logic — testable without Tauri.
@@ -95,23 +96,13 @@ pub async fn cleanup_database(app: tauri::AppHandle, confirm: bool) {
 }
 
 #[tauri::command]
-pub async fn get_logs(app: tauri::AppHandle, limit: usize) -> String {
-    let path = get_config_path(&app);
-    if path.is_empty() {
-        return "[]".to_string();
-    }
-    let database = database::Database::new(&path);
-    serde_json::to_string(&do_get_logs(&database, limit)).unwrap_or("[]".to_string())
+pub async fn get_logs(limit: usize) -> String {
+    serde_json::to_string(&do_get_logs(limit)).unwrap_or("[]".to_string())
 }
 
 #[tauri::command]
-pub async fn clear_logs(app: tauri::AppHandle) {
-    let path = get_config_path(&app);
-    if path.is_empty() {
-        return;
-    }
-    let database = database::Database::new(&path);
-    do_clear_logs(&database);
+pub async fn clear_logs() {
+    do_clear_logs();
 }
 
 #[tauri::command]
@@ -145,18 +136,22 @@ mod tests {
     use super::*;
     use crate::test_helpers::*;
 
+    static LOG_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn get_logs_empty() {
-        let (db, _dir) = test_db();
-        assert!(do_get_logs(&db, 100).is_empty());
+        let _guard = LOG_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        do_clear_logs();
+        assert!(do_get_logs(100).is_empty());
     }
 
     #[test]
     fn get_logs_with_entries() {
-        let (db, _dir) = test_db();
-        db.store_log("info", "Hello world");
-        db.store_log("error", "Something failed");
-        let logs = do_get_logs(&db, 100);
+        let _guard = LOG_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        do_clear_logs();
+        log::push_test_entry("info", "Hello world");
+        log::push_test_entry("error", "Something failed");
+        let logs = do_get_logs(100);
         assert_eq!(logs.len(), 2);
         assert!(logs.iter().any(|l| l.message == "Hello world"));
         assert!(logs.iter().any(|l| l.level == "error"));
@@ -164,21 +159,22 @@ mod tests {
 
     #[test]
     fn get_logs_respects_limit() {
-        let (db, _dir) = test_db();
+        let _guard = LOG_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        do_clear_logs();
         for i in 0..10 {
-            db.store_log("info", &format!("log {i}"));
+            log::push_test_entry("info", &format!("log {i}"));
         }
-        let logs = do_get_logs(&db, 3);
+        let logs = do_get_logs(3);
         assert_eq!(logs.len(), 3);
     }
 
     #[test]
     fn clear_logs_removes_all() {
-        let (db, _dir) = test_db();
-        db.store_log("info", "msg1");
-        db.store_log("info", "msg2");
-        do_clear_logs(&db);
-        assert!(do_get_logs(&db, 100).is_empty());
+        let _guard = LOG_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        log::push_test_entry("info", "msg1");
+        log::push_test_entry("info", "msg2");
+        do_clear_logs();
+        assert!(do_get_logs(100).is_empty());
     }
 
     #[test]

@@ -17,6 +17,7 @@ rusqlite = { version = "0.40.1", features = ["bundled"] }
 thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+chrono = { version = "0.4", features = ["clock"] }
 sha2 = "0.10.9"
 rand = "0.8.6"
 bip39 = { version = "2.2.2", features = ["std"] }

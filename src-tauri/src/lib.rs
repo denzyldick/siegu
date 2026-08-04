@@ -3,6 +3,7 @@ pub use common::{emit_log, get_config_path};
 mod commands;
 pub mod common;
 mod file;
+mod log;
 mod mdns_plugin;
 mod ml;
 mod permission_plugin;
@@ -55,7 +56,7 @@ use tauri::{
 };
 
 /// Best-effort config dir resolution for the panic hook (no AppHandle available there).
-fn config_dir_fallback() -> Option<std::path::PathBuf> {
+pub(crate) fn config_dir_fallback() -> Option<std::path::PathBuf> {
     if let Some(x) = std::env::var_os("XDG_CONFIG_HOME") {
         return Some(std::path::PathBuf::from(x));
     }
@@ -100,22 +101,11 @@ fn notify_opened_file(app: &tauri::AppHandle, path: &str) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    crate::log::init_tracing();
+
     std::panic::set_hook(Box::new(|info| {
-        use std::io::Write;
         let msg = format!("PANIC: {}", info);
-        eprintln!("[siegu] {msg}");
-        if let Some(config_dir) = config_dir_fallback() {
-            let app_config = config_dir.join("io.denzyl.siegu");
-            let _ = std::fs::create_dir_all(&app_config);
-            if let Ok(mut f) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(app_config.join("siegu_debug.log"))
-            {
-                let _ = writeln!(f, "{msg}");
-                let _ = f.flush();
-            }
-        }
+        crate::log::persist_log("error", &msg);
         if std::env::var("RUST_BACKTRACE")
             .map(|v| v != "0")
             .unwrap_or(false)
@@ -149,6 +139,7 @@ pub fn run() {
         .plugin(mdns_plugin::init())
         .plugin(permission_plugin::init())
         .setup(|app| {
+            crate::log::set_app_handle(app.handle().clone());
             if let Err(e) = ffmpeg_next::init() {
                 emit_log(
                     app.handle(),

@@ -52,6 +52,8 @@ sha2 = "0.10.9"
 hex = "0.4.3"
 thiserror = "2"
 tracing = "0.1"
+tracing-subscriber = { workspace = true }
+chrono = { workspace = true }
 zeroize = { version = "1", features = ["derive"] }
 sysinfo = "0.33"
 tokio-tungstenite = { version = "0.28.0", features = ["rustls-tls-webpki-roots"] }

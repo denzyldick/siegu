@@ -595,7 +595,10 @@ impl Database {
             "DELETE FROM config WHERE rowid NOT IN (SELECT MIN(rowid) FROM config GROUP BY key)",
             (),
         );
-        let _ = conn.execute("CREATE TABLE IF NOT EXISTS logs (timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, level STRING, message TEXT);", ());
+        // Logs are no longer stored in SQLite (unbounded disk growth). The app
+        // keeps a bounded in-memory ring buffer for the log viewer and a size-
+        // rotated siegu_debug.log on disk. Drop any legacy table to reclaim space.
+        let _ = conn.execute("DROP TABLE IF EXISTS logs", ());
 
         // Albums (local, free tier): user-created collections of photos.
         let _ = conn.execute(
@@ -657,16 +660,6 @@ impl Database {
         map
     }
 
-    /// Insert a log entry with the given level and message.
-    pub fn store_log(&self, level: &str, message: &str) {
-        if let Err(e) = self.connection.execute(
-            "INSERT INTO logs (level, message) VALUES (?1, ?2)",
-            (level, message),
-        ) {
-            tracing::warn!("store_log: failed to insert log entry: {e}");
-        }
-    }
-
     /// Convert any SQLite storage class to its string representation.
     fn sql_value_to_string(value: rusqlite::types::Value) -> String {
         match value {
@@ -675,33 +668,6 @@ impl Database {
             rusqlite::types::Value::Real(f) => f.to_string(),
             rusqlite::types::Value::Text(s) => s,
             rusqlite::types::Value::Blob(b) => String::from_utf8_lossy(&b).into_owned(),
-        }
-    }
-
-    /// Retrieve the most recent log entries, up to `limit`.
-    pub fn get_logs(&self, limit: usize) -> Vec<LogEntry> {
-        let mut logs = Vec::new();
-        let sql = "SELECT timestamp, level, message FROM logs ORDER BY timestamp DESC LIMIT ?1";
-        if let Ok(mut stmt) = self.connection.prepare(sql) {
-            if let Ok(iter) = stmt.query_map([limit as i64], |row| {
-                Ok(LogEntry {
-                    timestamp: row.get(0)?,
-                    level: row.get(1)?,
-                    message: row.get(2)?,
-                })
-            }) {
-                for log in iter.flatten() {
-                    logs.push(log);
-                }
-            }
-        }
-        logs
-    }
-
-    /// Delete all log entries from the logs table.
-    pub fn clear_logs(&self) {
-        if let Err(e) = self.connection.execute("DELETE FROM logs", ()) {
-            tracing::warn!("clear_logs: {e}");
         }
     }
 
@@ -2512,13 +2478,6 @@ pub struct PersonWithFace {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct LogEntry {
-    pub timestamp: String,
-    pub level: String,
-    pub message: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
 pub struct DeviceInfo {
     pub id: String,
     pub title: String,
@@ -3002,28 +2961,6 @@ mod tests {
         let dirs = db.list_directories();
         assert!(!dirs.contains(&"/home/test/photos".to_string()));
         assert!(dirs.contains(&"/home/test/videos".to_string()));
-    }
-
-    #[test]
-    fn test_log_store_retrieve() {
-        let db = test_db();
-        db.store_log("info", "Test message 1");
-        db.store_log("error", "Test error");
-        db.store_log("info", "Test message 2");
-
-        let logs = db.get_logs(10);
-        assert!(logs.len() >= 3);
-        assert!(logs.iter().any(|l| l.message.contains("Test error")));
-    }
-
-    #[test]
-    fn test_clear_logs() {
-        let db = test_db();
-        db.store_log("info", "to be cleared");
-        assert!(!db.get_logs(10).is_empty());
-
-        db.clear_logs();
-        assert!(db.get_logs(10).is_empty());
     }
 
     #[test]
