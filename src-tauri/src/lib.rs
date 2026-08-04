@@ -317,7 +317,7 @@ pub fn run() {
             commands::photos::get_photo_by_id,
             commands::photos::get_photo_ocr,
             commands::photos::get_photo_encoded_batch,
-            commands::photos::get_photos_for_map_click,
+            commands::photos::get_photos_by_ids,
             commands::photos::get_heatmap_data,
             // Albums
             commands::albums::create_album,

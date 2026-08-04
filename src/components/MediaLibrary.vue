@@ -215,6 +215,7 @@ import MediaCard from './MediaCard.vue';
 import MediaViewer from './MediaViewer.vue';
 import AddToAlbumSheet from '@/components/albums/AddToAlbumSheet.vue';
 import { useSyncStore } from '@/stores/sync';
+import { getPhotosByIds } from '@/services/tauri';
 import { useI18n } from 'vue-i18n';
 import type { MediaItem } from '@/types/media';
 import type { FacetType } from '@/types/search';
@@ -290,6 +291,8 @@ let unlistenPhotoReceived: UnlistenFn | null = null;
 let reloadTimer: ReturnType<typeof setTimeout> | null = null;
 let discoveredTimer: ReturnType<typeof setTimeout> | null = null;
 let discoveredBuffer: MediaItem[] = [];
+let analysisTimer: ReturnType<typeof setTimeout> | null = null;
+let analysisPendingIds = new Set<string | number>();
 
 const useVirtualScroller = computed(() => {
   return typeof IntersectionObserver !== 'undefined' && virtualItems.value.length > 12;
@@ -394,6 +397,54 @@ function handlePhotoUpdated(updatedPhoto: MediaItem): void {
   }
 }
 
+// Analysis results arrive as one event per photo, which used to trigger one
+// DB round-trip per event (an IPC storm during a batch index). Coalesce them:
+// pending ids are flushed together every ~300ms (or when the buffer fills),
+// mutating items in place instead of rebuilding the whole group array.
+function queueAnalysisResult(id: string | number): void {
+  analysisPendingIds.add(id);
+  if (analysisPendingIds.size >= 50) {
+    void flushAnalysisResults();
+    return;
+  }
+  if (!analysisTimer) {
+    analysisTimer = setTimeout(() => void flushAnalysisResults(), 300);
+  }
+}
+
+async function flushAnalysisResults(): Promise<void> {
+  if (analysisPendingIds.size === 0) {
+    analysisTimer = null;
+    return;
+  }
+  const ids = [...analysisPendingIds];
+  analysisPendingIds = new Set();
+  analysisTimer = null;
+  try {
+    const updatedPhotos = await getPhotosByIds(ids);
+    const fresh: MediaItem[] = [];
+    for (const updated of updatedPhotos) {
+      const existing = imagesMap.value[updated.id];
+      if (existing) {
+        updated._groupKey = existing._groupKey;
+        updated._sortKey = existing._sortKey;
+        imagesMap.value[updated.id] = updated;
+        const idx = images.value.findIndex((p) => p.id === updated.id);
+        if (idx !== -1) images.value[idx] = updated;
+        for (const g of groups.value) {
+          const gi = g.images.findIndex((p) => p.id === updated.id);
+          if (gi !== -1) g.images[gi] = updated;
+        }
+      } else {
+        fresh.push(updated);
+      }
+    }
+    if (fresh.length > 0) updateGroups(fresh);
+  } catch (e) {
+    console.warn('Failed to fetch updated photos after analysis:', e);
+  }
+}
+
 function toggleSelection(id: string | number): void {
   const index = selectedIds.value.indexOf(id);
   if (index === -1) selectedIds.value.push(id);
@@ -417,7 +468,7 @@ function bulkRemove(): void {
 }
 
 function onAddedToAlbum(albumName: string): void {
-  void albumName
+  void albumName;
   clearSelection();
 }
 
@@ -480,6 +531,7 @@ async function loadFiles(): Promise<void> {
       groupsMap.value = {};
       groups.value = [];
       images.value = [];
+      analysisPendingIds.clear();
       updateGroups(newImages);
     } else {
       updateGroups(newImages);
@@ -591,32 +643,10 @@ onMounted(async () => {
 
   unlistenAnalysisResult = await listen<{ id: string | number }>(
     'photo-analysis-result',
-    async (event) => {
+    (event) => {
       const id = event.payload.id;
       if (!id) return;
-      try {
-        const raw = await invoke<string>('get_photo_by_id', { id });
-        if (raw && raw !== 'null') {
-          const updated = JSON.parse(raw) as MediaItem;
-          const existing = imagesMap.value[id];
-          if (existing) {
-            updated._groupKey = existing._groupKey;
-            updated._sortKey = existing._sortKey;
-            imagesMap.value[id] = updated;
-            const idx = images.value.findIndex((p) => p.id === id);
-            if (idx !== -1) images.value[idx] = updated;
-            for (const g of groups.value) {
-              const gi = g.images.findIndex((p) => p.id === id);
-              if (gi !== -1) g.images[gi] = updated;
-            }
-            groups.value = [...groups.value];
-          } else {
-            updateGroups([updated]);
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to fetch updated photo after analysis:', e);
-      }
+      queueAnalysisResult(id);
     },
   );
 
@@ -637,6 +667,7 @@ onUnmounted(() => {
   unlistenPhotoReceived?.();
   if (reloadTimer) clearTimeout(reloadTimer);
   if (discoveredTimer) clearTimeout(discoveredTimer);
+  if (analysisTimer) clearTimeout(analysisTimer);
 });
 </script>
 

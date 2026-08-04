@@ -96,7 +96,7 @@ pub fn do_get_photo_encoded_batch(
 }
 
 /// Pure business logic — testable without Tauri.
-pub fn do_get_photos_for_map_click(db: &Database, ids: &[String]) -> Vec<Photo> {
+pub fn do_get_photos_by_ids(db: &Database, ids: &[String]) -> Vec<Photo> {
     db.get_photos_by_ids(ids)
 }
 
@@ -208,13 +208,13 @@ pub async fn get_photo_encoded_batch(
 }
 
 #[tauri::command]
-pub async fn get_photos_for_map_click(app: tauri::AppHandle, ids: Vec<String>) -> String {
+pub async fn get_photos_by_ids(app: tauri::AppHandle, ids: Vec<String>) -> String {
     let path = get_config_path(&app);
     if path.is_empty() || ids.is_empty() {
         return "[]".to_string();
     }
     let database = database::Database::new(&path);
-    let photos = do_get_photos_for_map_click(&database, &ids);
+    let photos = do_get_photos_by_ids(&database, &ids);
     serde_json::to_string(&photos).unwrap_or("[]".to_string())
 }
 
@@ -340,21 +340,21 @@ mod tests {
     }
 
     #[test]
-    fn get_photos_for_map_click_basic() {
+    fn get_photos_by_ids_basic() {
         let (mut db, _dir) = test_db();
         let mut p = make_photo("m1", "/map.jpg");
         p.latitude = 40.7;
         p.longitude = -74.0;
         db.store_photo_batch(&[p]).unwrap();
-        let result = do_get_photos_for_map_click(&db, &["m1".to_string()]);
+        let result = do_get_photos_by_ids(&db, &["m1".to_string()]);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].latitude, 40.7);
     }
 
     #[test]
-    fn get_photos_for_map_click_empty_ids() {
+    fn get_photos_by_ids_empty_ids() {
         let (db, _dir) = test_db();
-        let result = do_get_photos_for_map_click(&db, &[]);
+        let result = do_get_photos_by_ids(&db, &[]);
         assert!(result.is_empty());
     }
 

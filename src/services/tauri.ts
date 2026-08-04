@@ -87,8 +87,8 @@ export async function getPhotoEncodedBatch(ids: number[]): Promise<Record<number
   return call<Record<number, string>>('get_photo_encoded_batch', { ids });
 }
 
-export async function getPhotosForMapClick(ids: number[]): Promise<MediaItem[]> {
-  const raw = await call<string>('get_photos_for_map_click', { ids });
+export async function getPhotosByIds(ids: Array<string | number>): Promise<MediaItem[]> {
+  const raw = await call<string>('get_photos_by_ids', { ids });
   return parseJsonArray<MediaItem>(raw);
 }
 
