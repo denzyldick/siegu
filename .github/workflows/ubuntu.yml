@@ -16,8 +16,11 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  # ── Unit tests, lint, clippy, security audit, desktop build ────────────
-  tests:
+  # ── Everything on Ubuntu in a single job ───────────────────────────────
+  # Unit tests, lint, clippy, security audit, desktop build, LAN mesh E2E,
+  # face-grouping E2E and full ONNX model inference. One job shares the cargo
+  # target dir so the workspace is compiled once instead of once per stage.
+  ci:
     runs-on: ubuntu-24.04
     env:
       ORT_STRATEGY: download
@@ -83,26 +86,8 @@ jobs:
       - name: Build Tauri App (no bundle)
         run: npm run tauri build -- --no-bundle
 
-  # ── Mesh sync over a real LAN signaling server, no ML models ───────────
-  mesh-e2e:
-    runs-on: ubuntu-24.04
-    env:
-      ORT_STRATEGY: download
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: crates
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev build-essential curl wget file
-
-      - name: Build CLI
+      # ── Mesh sync over a real LAN signaling server, no ML models ─────────
+      - name: Build CLI (release)
         run: cargo build --release -p siegu-cli
 
       - name: Run mesh sync E2E (in-process signaling)
@@ -119,31 +104,7 @@ jobs:
           SIEGU_MODELS_DIR: /tmp/siegu-e2e-models
         run: bash scripts/e2e-face-grouping.sh
 
-  # ── Full ONNX model inference on real photos/videos ────────────────────
-  ai-inference:
-    runs-on: ubuntu-24.04
-    env:
-      ORT_STRATEGY: download
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev libjs-mathjax build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev libavfilter-dev libavdevice-dev libpostproc-dev
-
-      - run: npm install
-
+      # ── Full ONNX model inference on real photos/videos ────────────────
       - name: Cache AI test models
         uses: actions/cache@v4
         with:

@@ -16,8 +16,11 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  # ── Unit tests, lint, clippy, security audit, desktop build ────────────
-  tests:
+  # ── Everything on macOS in a single job ────────────────────────────────
+  # Unit tests, lint, clippy, security audit, desktop build, LAN mesh E2E and
+  # full ONNX model inference. One job shares the cargo target dir so the
+  # workspace is compiled once instead of once per stage.
+  ci:
     runs-on: macos-latest
     env:
       ORT_STRATEGY: download
@@ -39,7 +42,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install ffmpeg
+          brew install pkg-config ffmpeg
           echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
       - run: npm install
@@ -83,54 +86,14 @@ jobs:
       - name: Build Tauri App (no bundle)
         run: npm run tauri build -- --no-bundle
 
-  # ── Mesh sync over a real LAN signaling server, no ML models ───────────
-  mesh-e2e:
-    runs-on: macos-latest
-    env:
-      ORT_STRATEGY: download
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: crates
-
-      - name: Install system dependencies
-        run: brew install pkg-config
-
-      - name: Build CLI
+      # ── Mesh sync over a real LAN signaling server, no ML models ─────────
+      - name: Build CLI (release)
         run: cargo build --release -p siegu-cli
 
       - name: Run mesh sync E2E (in-process signaling)
         run: bash scripts/e2e-sync.sh
 
-  # ── Full ONNX model inference on real photos/videos ────────────────────
-  ai-inference:
-    runs-on: macos-latest
-    env:
-      ORT_STRATEGY: download
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install dependencies
-        run: |
-          brew install ffmpeg
-          echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
-
-      - run: npm install
-
+      # ── Full ONNX model inference on real photos/videos ────────────────
       - name: Cache AI test models
         uses: actions/cache@v4
         with:
