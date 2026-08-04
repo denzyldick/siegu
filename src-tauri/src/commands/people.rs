@@ -19,8 +19,13 @@ pub fn do_assign_name_to_face(db: &Database, face_id: &str, name: &str) -> Strin
 }
 
 /// Pure business logic — testable without Tauri.
-pub fn do_get_person_photos(db: &Database, person_id: &str) -> Vec<crate::database::Photo> {
-    db.get_photos_for_person(person_id)
+pub fn do_get_person_photos(
+    db: &Database,
+    person_id: &str,
+    offset: usize,
+    limit: usize,
+) -> Vec<crate::database::Photo> {
+    db.get_photos_for_person(person_id, offset, limit)
 }
 
 /// Pure business logic — testable without Tauri.
@@ -144,14 +149,19 @@ pub fn assign_name_to_face(
 }
 
 #[tauri::command]
-pub async fn get_person_photos(app: tauri::AppHandle, person_id: String) -> Result<String, String> {
+pub async fn get_person_photos(
+    app: tauri::AppHandle,
+    person_id: String,
+    offset: usize,
+    limit: usize,
+) -> Result<String, String> {
     let path = get_config_path(&app);
     if path.is_empty() {
         return Ok("[]".to_string());
     }
     let database = database::Database::new(&path);
     Ok(
-        serde_json::to_string(&do_get_person_photos(&database, &person_id))
+        serde_json::to_string(&do_get_person_photos(&database, &person_id, offset, limit))
             .unwrap_or("[]".to_string()),
     )
 }
@@ -294,7 +304,7 @@ mod tests {
     #[test]
     fn get_person_photos_empty() {
         let (db, _dir) = test_db();
-        assert!(do_get_person_photos(&db, "nonexistent").is_empty());
+        assert!(do_get_person_photos(&db, "nonexistent", 0, 50).is_empty());
     }
 
     #[test]
@@ -304,9 +314,34 @@ mod tests {
             .unwrap();
         db.store_face(make_face("ph1", "f1", None));
         let person_id = do_assign_name_to_face(&db, "f1", "Dave");
-        let photos = do_get_person_photos(&db, &person_id);
+        let photos = do_get_person_photos(&db, &person_id, 0, 50);
         assert_eq!(photos.len(), 1);
         assert_eq!(photos[0].id, "ph1");
+    }
+
+    #[test]
+    fn get_person_photos_paginated() {
+        let (mut db, _dir) = test_db();
+        let photos: Vec<_> = (0..5)
+            .map(|i| make_photo(&format!("pp{i}"), &format!("/{i}.jpg")))
+            .collect();
+        db.store_photo_batch(&photos).unwrap();
+        for i in 0..5 {
+            db.store_face(make_face(&format!("pp{i}"), &format!("f{i}"), None));
+        }
+        let person_id = do_assign_name_to_face(&db, "f0", "Paged");
+        for i in 1..5 {
+            do_assign_name_to_face(&db, &format!("f{i}"), "Paged");
+        }
+        let first = do_get_person_photos(&db, &person_id, 0, 2);
+        let second = do_get_person_photos(&db, &person_id, 2, 2);
+        let tail = do_get_person_photos(&db, &person_id, 4, 2);
+        assert_eq!(first.len(), 2);
+        assert_eq!(second.len(), 2);
+        assert_eq!(tail.len(), 1);
+        let mut all: Vec<_> = first.into_iter().chain(second).chain(tail).collect();
+        all.sort_by(|a, b| a.id.cmp(&b.id));
+        assert_eq!(all.len(), 5);
     }
 
     #[test]

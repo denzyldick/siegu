@@ -492,8 +492,11 @@ async function loadFiles(): Promise<void> {
   try {
     let response: string;
     if (props.isPersonFilter && props.searchQuery) {
-      response = await invoke<string>('get_person_photos', { personId: props.searchQuery });
-      allLoaded.value = true;
+      response = await invoke<string>('get_person_photos', {
+        personId: props.searchQuery,
+        offset: paging.value.offset,
+        limit: paging.value.limit,
+      });
     } else {
       const byType = (type: string) => props.facets?.find((f) => f.type === type);
       const person = byType('person');
@@ -537,12 +540,10 @@ async function loadFiles(): Promise<void> {
       updateGroups(newImages);
     }
 
-    if (!props.isPersonFilter) {
-      if (newImages.length < paging.value.limit) {
-        allLoaded.value = true;
-      } else {
-        paging.value.offset += paging.value.limit;
-      }
+    if (newImages.length < paging.value.limit) {
+      allLoaded.value = true;
+    } else {
+      paging.value.offset += paging.value.limit;
     }
   } catch (err) {
     console.error('Failed to list files:', err);
@@ -656,7 +657,7 @@ onMounted(async () => {
 
   updateColumns();
   window.addEventListener('resize', updateColumns);
-  if (!props.isPersonFilter) setupInfiniteScroll();
+  setupInfiniteScroll();
 });
 
 onUnmounted(() => {

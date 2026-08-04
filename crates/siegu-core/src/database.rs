@@ -503,6 +503,25 @@ impl Database {
             (),
         );
 
+        // Virtual generated column mirroring video_sql_like(): lets the
+        // videos-only filter use an index instead of a 14-way LIKE scan.
+        // VIRTUAL (not STORED) because ALTER TABLE ADD COLUMN rejects STORED.
+        let is_video_expr = scanner::VIDEO_EXTENSIONS
+            .iter()
+            .map(|ext| format!("location LIKE '%.{ext}'"))
+            .collect::<Vec<_>>()
+            .join(" OR ");
+        let _ = conn.execute(
+            &format!(
+                "ALTER TABLE photo ADD COLUMN is_video INTEGER GENERATED ALWAYS AS ({is_video_expr}) VIRTUAL"
+            ),
+            (),
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_photo_is_video ON photo(is_video);",
+            (),
+        );
+
         let _ = conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_photo_location ON photo(location);",
             (),
@@ -524,6 +543,12 @@ impl Database {
         );
         let _ = conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_photo_aesthetics ON photo(aesthetics_score);",
+            (),
+        );
+        // Matches "best" ordering (aesthetics DESC NULLS LAST) so SQLite scans
+        // the index instead of sorting the whole table for each page.
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_photo_aesthetics_desc ON photo(aesthetics_score DESC);",
             (),
         );
         let _ = conn.execute(
@@ -548,15 +573,34 @@ impl Database {
             (),
         );
         let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_object_class ON object(class);",
+            (),
+        );
+        let _ = conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_properties_photo_id ON properties(photo_id);",
             (),
         );
+        // Backs tag/location/non-camera facet lookups (key + value equality).
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_properties_key_value ON properties(key, value);",
+            (),
+        );
+        // Backs the ocr/text portion of full-text search.
+        let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_ocr_text ON ocr(text);", ());
         let _ = conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_faces_person_id ON faces(person_id);",
             (),
         );
         let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_faces_person_photo ON faces(person_id, photo_id);",
+            (),
+        );
+        let _ = conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_faces_photo_id ON faces(photo_id);",
+            (),
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_people_name ON people(name);",
             (),
         );
         let _ = conn.execute(
@@ -809,6 +853,11 @@ impl Database {
         if photos.is_empty() {
             return;
         }
+        let index: std::collections::HashMap<String, usize> = photos
+            .iter()
+            .enumerate()
+            .map(|(i, p)| (p.id.clone(), i))
+            .collect();
         let placeholders: Vec<String> = photos
             .iter()
             .enumerate()
@@ -834,8 +883,8 @@ impl Database {
                 ))
             }) {
                 for row in iter.flatten() {
-                    if let Some(p) = photos.iter_mut().find(|p| p.id == row.0) {
-                        p.objects.insert(row.1, row.2);
+                    if let Some(&i) = index.get(&row.0) {
+                        photos[i].objects.insert(row.1, row.2);
                     }
                 }
             }
@@ -846,6 +895,11 @@ impl Database {
         if photos.is_empty() {
             return;
         }
+        let index: std::collections::HashMap<String, usize> = photos
+            .iter()
+            .enumerate()
+            .map(|(i, p)| (p.id.clone(), i))
+            .collect();
         let placeholders: Vec<String> = photos
             .iter()
             .enumerate()
@@ -872,8 +926,8 @@ impl Database {
                 ))
             }) {
                 for row in iter.flatten() {
-                    if let Some(p) = photos.iter_mut().find(|p| p.id == row.0) {
-                        p.properties.insert(row.1, row.2);
+                    if let Some(&i) = index.get(&row.0) {
+                        photos[i].properties.insert(row.1, row.2);
                     }
                 }
             }
@@ -917,7 +971,7 @@ impl Database {
             ""
         };
         let video_filter = if videos_only {
-            &format!("AND {}", video_sql_like())
+            "AND p.is_video = 1"
         } else {
             ""
         };
@@ -1842,13 +1896,20 @@ impl Database {
     }
 
     /// Get all photos that contain a given person.
-    pub fn get_photos_for_person(&self, person_id: &str) -> Vec<Photo> {
+    pub fn get_photos_for_person(
+        &self,
+        person_id: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Vec<Photo> {
         let mut photos = Vec::new();
         let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, 
             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres 
-            FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id JOIN faces f ON p.id = f.photo_id WHERE f.person_id = ?1 GROUP BY p.id";
+            FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id JOIN faces f ON p.id = f.photo_id WHERE f.person_id = ?1 GROUP BY p.id ORDER BY p.created DESC LIMIT ?2 OFFSET ?3";
+        let params: [&dyn rusqlite::types::ToSql; 3] =
+            [&person_id, &(limit as i64), &(offset as i64)];
         if let Ok(mut stmt) = self.connection.prepare(sql) {
-            if let Ok(iter) = stmt.query_map([person_id], |row| {
+            if let Ok(iter) = stmt.query_map(params.as_slice(), |row| {
                 Ok(Photo {
                     id: row.get(0)?,
                     location: row.get(1)?,
