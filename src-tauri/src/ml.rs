@@ -203,7 +203,9 @@ mod tests {
     fn test_models_dir() -> Option<std::path::PathBuf> {
         let dir = std::path::Path::new("test_models");
         if REQUIRED_MODELS.iter().all(|f| dir.join(f).exists()) {
-            Some(dir.to_path_buf())
+            // Canonicalize so the symlink target below is absolute: a relative
+            // target would resolve against the temp config dir, not the repo.
+            dir.canonicalize().ok()
         } else {
             None
         }

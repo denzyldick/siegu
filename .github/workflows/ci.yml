@@ -110,14 +110,13 @@ jobs:
         working-directory: src-tauri
 
       - name: Cache AI test models
-        if: matrix.platform == 'ubuntu-24.04'
         uses: actions/cache@v4
         with:
           path: src-tauri/test_models
-          key: ai-test-models-v2
+          key: ai-test-models-v3-${{ runner.os }}
 
       - name: AI Pipeline Integration Test
-        if: matrix.platform == 'ubuntu-24.04'
+        shell: bash
         run: |
           mkdir -p test_models
           download_model() {
