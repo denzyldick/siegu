@@ -358,12 +358,19 @@ pub async fn download_file(
         let total = expected_total.or_else(|| response.content_length());
         let mut file = tokio::fs::OpenOptions::new()
             .create(true)
-            .append(true)
+            .read(true)
+            .write(true)
+            .truncate(start == 0)
             .open(&part_path)
             .await
             .map_err(|e| e.to_string())?;
-        if start == 0 {
-            file.set_len(0).await.map_err(|e| e.to_string())?;
+        if start > 0 {
+            // Append mode plus SetEndOfFile is not allowed on Windows
+            // (FILE_APPEND_DATA), so seek to the resume offset instead.
+            use tokio::io::AsyncSeekExt;
+            file.seek(std::io::SeekFrom::Start(start))
+                .await
+                .map_err(|e| e.to_string())?;
         }
 
         let mut stream = response.bytes_stream();
