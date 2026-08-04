@@ -34,11 +34,7 @@
               </v-list>
             </v-bottom-sheet>
           </template>
-          <v-menu
-            v-else
-            location="bottom start"
-            close-on-content-click
-          >
+          <v-menu v-else location="bottom start" close-on-content-click>
             <template v-slot:activator="{ props: menuProps }">
               <v-btn
                 v-bind="menuProps"
@@ -113,15 +109,20 @@
           </div>
 
           <div class="thumbnail-rail-container">
-            <div class="thumbnail-rail" ref="thumbnailRail">
+            <RecycleScroller
+              ref="scrollerRef"
+              class="thumbnail-rail"
+              :items="photos"
+              :item-size="68"
+              direction="horizontal"
+              v-slot="{ item, index: railIndex }"
+            >
               <MediaThumbnail
-                v-for="(photo, i) in photos"
-                :key="photo.id"
-                :photo="photo"
-                :active="i === index"
-                @click="$emit('update:index', i)"
+                :photo="item"
+                :active="railIndex === index"
+                @click="$emit('update:index', railIndex)"
               />
-            </div>
+            </RecycleScroller>
           </div>
         </v-main>
 
@@ -211,7 +212,9 @@
                 {{ $t('media_viewer.file_details') }}
               </div>
               <div class="d-flex align-start mb-2">
-                <v-icon size="small" color="#71717a" class="mr-2 mt-1">mdi-file-document-outline</v-icon>
+                <v-icon size="small" color="#71717a" class="mr-2 mt-1"
+                  >mdi-file-document-outline</v-icon
+                >
                 <div class="text-body-2 text-zinc-secondary word-break-all">
                   {{ currentPhoto?.location }}
                 </div>
@@ -248,10 +251,7 @@
               </v-btn>
             </div>
 
-            <v-divider
-              class="opacity-5 mb-4"
-              v-if="photoOcr && !ocrLoading && hasExif"
-            ></v-divider>
+            <v-divider class="opacity-5 mb-4" v-if="photoOcr && !ocrLoading && hasExif"></v-divider>
 
             <div class="mb-6" v-if="hasExif">
               <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">
@@ -260,16 +260,22 @@
 
               <div class="d-flex align-center mb-4" v-if="exifData.make || exifData.model">
                 <v-icon size="small" color="#71717a" class="mr-2">mdi-camera</v-icon>
-                <span class="text-body-2 text-zinc-secondary">{{ exifData.make }} {{ exifData.model }}</span>
+                <span class="text-body-2 text-zinc-secondary"
+                  >{{ exifData.make }} {{ exifData.model }}</span
+                >
               </div>
 
               <v-row dense>
                 <v-col cols="6" v-if="exifData.date" class="mb-3">
-                  <div class="text-caption text-zinc-muted">{{ $t('media_viewer.date_taken') }}</div>
+                  <div class="text-caption text-zinc-muted">
+                    {{ $t('media_viewer.date_taken') }}
+                  </div>
                   <div class="text-body-2 text-zinc-secondary">{{ exifData.date }}</div>
                 </v-col>
                 <v-col cols="6" v-if="exifData.dimensions" class="mb-3">
-                  <div class="text-caption text-zinc-muted">{{ $t('media_viewer.resolution') }}</div>
+                  <div class="text-caption text-zinc-muted">
+                    {{ $t('media_viewer.resolution') }}
+                  </div>
                   <div class="text-body-2 text-zinc-secondary">{{ exifData.dimensions }}</div>
                 </v-col>
                 <v-col cols="6" v-if="exifData.iso" class="mb-3">
@@ -285,7 +291,9 @@
                   <div class="text-body-2 text-zinc-secondary">{{ exifData.aperture }}</div>
                 </v-col>
                 <v-col cols="6" v-if="exifData.focalLength" class="mb-3">
-                  <div class="text-caption text-zinc-muted">{{ $t('media_viewer.focal_length') }}</div>
+                  <div class="text-caption text-zinc-muted">
+                    {{ $t('media_viewer.focal_length') }}
+                  </div>
                   <div class="text-body-2 text-zinc-secondary">{{ exifData.focalLength }}</div>
                 </v-col>
                 <v-col cols="6" v-if="exifData.lens" class="mb-3">
@@ -297,11 +305,15 @@
                   <div class="text-body-2 text-zinc-secondary">{{ exifData.flash }}</div>
                 </v-col>
                 <v-col cols="6" v-if="exifData.whiteBalance" class="mb-3">
-                  <div class="text-caption text-zinc-muted">{{ $t('media_viewer.white_balance') }}</div>
+                  <div class="text-caption text-zinc-muted">
+                    {{ $t('media_viewer.white_balance') }}
+                  </div>
                   <div class="text-body-2 text-zinc-secondary">{{ exifData.whiteBalance }}</div>
                 </v-col>
                 <v-col cols="6" v-if="exifData.meteringMode" class="mb-3">
-                  <div class="text-caption text-zinc-muted">{{ $t('media_viewer.metering_mode') }}</div>
+                  <div class="text-caption text-zinc-muted">
+                    {{ $t('media_viewer.metering_mode') }}
+                  </div>
                   <div class="text-body-2 text-zinc-secondary">{{ exifData.meteringMode }}</div>
                 </v-col>
                 <v-col cols="6" v-if="exifData.software" class="mb-3">
@@ -317,7 +329,10 @@
               <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">
                 {{ $t('media_viewer.people_in_photo') }}
               </div>
-              <div v-if="detectedFaces.length === 0" class="text-body-2 text-zinc-muted font-italic">
+              <div
+                v-if="detectedFaces.length === 0"
+                class="text-body-2 text-zinc-muted font-italic"
+              >
                 {{ $t('media_viewer.no_faces') }}
               </div>
               <div class="d-flex flex-wrap ga-3">
@@ -331,7 +346,9 @@
                   <v-avatar size="56" class="border-subtle mb-1">
                     <v-img :src="face.encoded ?? ''" cover></v-img>
                   </v-avatar>
-                  <div class="text-caption text-zinc-primary text-truncate text-center w-100 font-weight-bold">
+                  <div
+                    class="text-caption text-zinc-primary text-truncate text-center w-100 font-weight-bold"
+                  >
                     {{ face.person_name || $t('media_viewer.unnamed') }}
                   </div>
                 </div>
@@ -351,7 +368,9 @@
 
               <div v-for="tag in aiTags" :key="tag.name" class="mb-4">
                 <div class="d-flex align-center justify-space-between w-100">
-                  <span class="text-body-2 text-zinc-secondary text-capitalize">{{ tag.name }}</span>
+                  <span class="text-body-2 text-zinc-secondary text-capitalize">{{
+                    tag.name
+                  }}</span>
                   <span class="text-caption text-zinc-muted">{{ tag.percent }}%</span>
                 </div>
                 <v-progress-linear
@@ -384,127 +403,136 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { invoke, convertFileSrc } from '@tauri-apps/api/core'
-import { revealItemInDir, openPath } from '@tauri-apps/plugin-opener'
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import MediaThumbnail from './MediaThumbnail.vue'
-import AddToAlbumSheet from '@/components/albums/AddToAlbumSheet.vue'
-import { isVideo as checkIsVideo } from '@/composables/useMediaUtils'
-import { useMediaUrl } from '@/composables/useMediaUrl'
-import { useI18n } from 'vue-i18n'
-import type { MediaItem } from '@/types/media'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
+import { revealItemInDir, openPath } from '@tauri-apps/plugin-opener';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import MediaThumbnail from './MediaThumbnail.vue';
+import { RecycleScroller } from 'vue-virtual-scroller';
+import AddToAlbumSheet from '@/components/albums/AddToAlbumSheet.vue';
+import { isVideo as checkIsVideo } from '@/composables/useMediaUtils';
+import { useMediaUrl } from '@/composables/useMediaUrl';
+import { useI18n } from 'vue-i18n';
+import type { MediaItem } from '@/types/media';
 
-const { t } = useI18n()
-const { ensurePort, videoUrl: buildVideoUrl } = useMediaUrl()
+const { t } = useI18n();
+const { ensurePort, videoUrl: buildVideoUrl } = useMediaUrl();
 
 interface DetectedFace {
-  photo_id: string
-  face_id: string
-  crop_path: string
-  encoded: string | null
-  person_id: string | null
-  person_name: string | null
+  photo_id: string;
+  face_id: string;
+  crop_path: string;
+  encoded: string | null;
+  person_id: string | null;
+  person_name: string | null;
 }
 
 const props = defineProps<{
-  modelValue: boolean
-  photos: MediaItem[]
-  index: number
-}>()
+  modelValue: boolean;
+  photos: MediaItem[];
+  index: number;
+}>();
 
 const emit = defineEmits<{
-  'update:modelValue': [value: boolean]
-  'update:index': [index: number]
-  'update:photo': [photo: MediaItem]
-  'navigate-to-person': [person: { id: string; name: string }]
-}>()
+  'update:modelValue': [value: boolean];
+  'update:index': [index: number];
+  'update:photo': [photo: MediaItem];
+  'navigate-to-person': [person: { id: string; name: string }];
+}>();
 
-const showInfo = ref(false)
-const os = ref('')
-const moreMenuOpen = ref(false)
-const addToAlbumOpen = ref(false)
-const detectedFaces = ref<DetectedFace[]>([])
-const photoOcr = ref('')
-const ocrLoading = ref(false)
-const isAnalyzing = ref(false)
-const isAnalyzingModel = ref<string | null>(null)
-const runStartTime = ref(0)
-const runTimerTick = ref(0)
-let runTimer: ReturnType<typeof setInterval> | null = null
-const globalEta = ref(0)
-let unlistenEta: UnlistenFn | null = null
-let unlistenResult: UnlistenFn | null = null
-const snackbar = ref({ show: false, text: '', error: false })
-const downloadedModels = ref<string[]>([])
-const videoPlayer = ref<HTMLVideoElement | null>(null)
-const thumbnailRail = ref<HTMLElement | null>(null)
+const showInfo = ref(false);
+const os = ref('');
+const moreMenuOpen = ref(false);
+const addToAlbumOpen = ref(false);
+const detectedFaces = ref<DetectedFace[]>([]);
+const photoOcr = ref('');
+const ocrLoading = ref(false);
+const isAnalyzing = ref(false);
+const isAnalyzingModel = ref<string | null>(null);
+const runStartTime = ref(0);
+const runTimerTick = ref(0);
+let runTimer: ReturnType<typeof setInterval> | null = null;
+const globalEta = ref(0);
+let unlistenEta: UnlistenFn | null = null;
+let unlistenResult: UnlistenFn | null = null;
+const snackbar = ref({ show: false, text: '', error: false });
+const downloadedModels = ref<string[]>([]);
+const videoPlayer = ref<HTMLVideoElement | null>(null);
+const scrollerRef = ref<{
+  scrollToItem: (index: number, options?: ScrollToOptions) => void;
+} | null>(null);
 
 const modelInfo = [
-  { id: 'clip' }, { id: 'face' }, { id: 'ocr' }, { id: 'nsfw' },
-  { id: 'aesthetics' }, { id: 'yolo' }, { id: 'blip' },
-  { id: 'midas' }, { id: 'whisper' },
-]
+  { id: 'clip' },
+  { id: 'face' },
+  { id: 'ocr' },
+  { id: 'nsfw' },
+  { id: 'aesthetics' },
+  { id: 'yolo' },
+  { id: 'blip' },
+  { id: 'midas' },
+  { id: 'whisper' },
+];
 
-const isMobile = computed(() => os.value === 'android' || os.value === 'ios')
+const isMobile = computed(() => os.value === 'android' || os.value === 'ios');
 
 const visible = computed({
   get: () => props.modelValue,
   set: (val: boolean) => emit('update:modelValue', val),
-})
+});
 
 const currentPhoto = computed(() => {
-  if (!props.photos || props.photos.length === 0) return null
-  return props.photos[props.index]
-})
+  if (!props.photos || props.photos.length === 0) return null;
+  return props.photos[props.index];
+});
 
 const isVideo = computed(() => {
-  if (!currentPhoto.value?.location) return false
-  return checkIsVideo(currentPhoto.value.location)
-})
+  if (!currentPhoto.value?.location) return false;
+  return checkIsVideo(currentPhoto.value.location);
+});
 
 const computedVideoUrl = computed(() => {
-  if (!currentPhoto.value || !isVideo.value) return ''
-  return buildVideoUrl(currentPhoto.value.location) ?? ''
-})
+  if (!currentPhoto.value || !isVideo.value) return '';
+  return buildVideoUrl(currentPhoto.value.location) ?? '';
+});
 
 const currentPhotoSrc = computed(() => {
-  if (!currentPhoto.value || isVideo.value) return ''
-  const ext = currentPhoto.value.location.split('.').pop()?.toLowerCase()
+  if (!currentPhoto.value || isVideo.value) return '';
+  const ext = currentPhoto.value.location.split('.').pop()?.toLowerCase();
   if (['heic', 'heif'].includes(ext ?? '')) {
-    return currentPhoto.value.encoded || convertFileSrc(currentPhoto.value.location)
+    return currentPhoto.value.encoded || convertFileSrc(currentPhoto.value.location);
   }
-  return convertFileSrc(currentPhoto.value.location)
-})
+  return convertFileSrc(currentPhoto.value.location);
+});
 
 interface ExifData {
-  make?: string
-  model?: string
-  date?: string
-  dimensions?: string
-  iso?: string
-  shutter?: string
-  aperture?: string
-  lens?: string
-  lensMake?: string
-  focalLength?: string
-  focalLength35?: string
-  flash?: string
-  whiteBalance?: string
-  exposureProgram?: string
-  meteringMode?: string
-  sceneType?: string
-  software?: string
+  make?: string;
+  model?: string;
+  date?: string;
+  dimensions?: string;
+  iso?: string;
+  shutter?: string;
+  aperture?: string;
+  lens?: string;
+  lensMake?: string;
+  focalLength?: string;
+  focalLength35?: string;
+  flash?: string;
+  whiteBalance?: string;
+  exposureProgram?: string;
+  meteringMode?: string;
+  sceneType?: string;
+  software?: string;
 }
 
 const exifData = computed((): ExifData => {
-  if (!currentPhoto.value?.properties) return {} as ExifData
-  const props = currentPhoto.value.properties
-  let dimensions: string | null = null
+  if (!currentPhoto.value?.properties) return {} as ExifData;
+  const props = currentPhoto.value.properties;
+  let dimensions: string | null = null;
   if (props['PixelXDimension'] && props['PixelYDimension']) {
-    dimensions = `${props['PixelXDimension']} x ${props['PixelYDimension']}`
+    dimensions = `${props['PixelXDimension']} x ${props['PixelYDimension']}`;
   } else if (props['ImageWidth'] && props['ImageLength']) {
-    dimensions = `${props['ImageWidth']} x ${props['ImageLength']}`
+    dimensions = `${props['ImageWidth']} x ${props['ImageLength']}`;
   }
   return {
     make: props['Make'] as string | undefined,
@@ -524,250 +552,274 @@ const exifData = computed((): ExifData => {
     meteringMode: props['MeteringMode'] as string | undefined,
     sceneType: props['SceneCaptureType'] as string | undefined,
     software: props['Software'] as string | undefined,
-  }
-})
+  };
+});
 
-const hasExif = computed(() => Object.values(exifData.value).some((val) => val !== undefined && val !== null))
+const hasExif = computed(() =>
+  Object.values(exifData.value).some((val) => val !== undefined && val !== null),
+);
 
 const aiTags = computed(() => {
-  if (!currentPhoto.value?.objects) return []
+  if (!currentPhoto.value?.objects) return [];
   return Object.entries(currentPhoto.value.objects)
     .map(([name, score]) => ({ name, percent: Math.round(score * 100) }))
-    .sort((a, b) => b.percent - a.percent)
-})
+    .sort((a, b) => b.percent - a.percent);
+});
 
 const uniquePeople = computed(() => {
-  if (!detectedFaces.value) return []
-  const seen = new Set()
+  if (!detectedFaces.value) return [];
+  const seen = new Set();
   return detectedFaces.value.filter((face: DetectedFace) => {
-    if (!face.person_id) return true
-    if (seen.has(face.person_id as string)) return false
-    seen.add(face.person_id as string)
-    return true
-  })
-})
+    if (!face.person_id) return true;
+    if (seen.has(face.person_id as string)) return false;
+    seen.add(face.person_id as string);
+    return true;
+  });
+});
 
 const modelChips = computed(() => {
-  if (!currentPhoto.value) return []
-  const status = (currentPhoto.value.ai_status ?? {}) as Record<string, number>
+  if (!currentPhoto.value) return [];
+  const status = (currentPhoto.value.ai_status ?? {}) as Record<string, number>;
   return modelInfo
     .filter((m) => downloadedModels.value.includes(m.id))
     .map((m) => ({
       id: m.id,
       done: status[m.id] === 1,
-    }))
-})
+    }));
+});
 
 function clearAnalysisListener(): void {
   if (unlistenResult) {
-    unlistenResult()
-    unlistenResult = null
+    unlistenResult();
+    unlistenResult = null;
   }
 }
 
 function onVideoError(): void {
-  snackbar.value = { show: true, text: 'Failed to load video', error: true }
+  snackbar.value = { show: true, text: 'Failed to load video', error: true };
 }
 
 function stopVideo(): void {
-  const video = videoPlayer.value
+  const video = videoPlayer.value;
   if (video) {
-    video.pause()
-    video.removeAttribute('src')
-    video.load()
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
   }
 }
 
 async function fetchFaces(): Promise<void> {
-  if (!currentPhoto.value) return
+  if (!currentPhoto.value) return;
   try {
-    const facesStr = await invoke<string>('get_faces_for_photo', { photoId: currentPhoto.value.id })
-    detectedFaces.value = JSON.parse(facesStr)
+    const facesStr = await invoke<string>('get_faces_for_photo', {
+      photoId: currentPhoto.value.id,
+    });
+    detectedFaces.value = JSON.parse(facesStr);
   } catch (e) {
-    console.error('Failed to fetch faces', e)
+    console.error('Failed to fetch faces', e);
   }
 }
 
 async function loadOcr(): Promise<void> {
   if (!currentPhoto.value || isVideo.value) {
-    photoOcr.value = ''
-    return
+    photoOcr.value = '';
+    return;
   }
-  ocrLoading.value = true
+  ocrLoading.value = true;
   try {
-    photoOcr.value = await invoke<string>('get_photo_ocr', { id: currentPhoto.value.id })
+    photoOcr.value = await invoke<string>('get_photo_ocr', { id: currentPhoto.value.id });
   } catch (e) {
-    console.error('Failed to fetch OCR text', e)
-    photoOcr.value = ''
+    console.error('Failed to fetch OCR text', e);
+    photoOcr.value = '';
   } finally {
-    ocrLoading.value = false
+    ocrLoading.value = false;
   }
 }
 
 async function copyOcrText(): Promise<void> {
-  if (!photoOcr.value) return
+  if (!photoOcr.value) return;
   try {
-    await navigator.clipboard.writeText(photoOcr.value)
-    snackbar.value = { show: true, text: t('media_viewer.copied'), error: false }
+    await navigator.clipboard.writeText(photoOcr.value);
+    snackbar.value = { show: true, text: t('media_viewer.copied'), error: false };
   } catch {
-    snackbar.value = { show: true, text: t('media_viewer.copy_failed'), error: true }
+    snackbar.value = { show: true, text: t('media_viewer.copy_failed'), error: true };
   }
 }
 
 function goToPerson(face: DetectedFace): void {
-  if (!face.person_id) return
+  if (!face.person_id) return;
   emit('navigate-to-person', {
     id: face.person_id as string,
     name: face.person_name || 'Unnamed',
-  })
-  close()
+  });
+  close();
 }
 
 async function analyzePhoto(): Promise<void> {
-  if (!currentPhoto.value || isAnalyzing.value || isAnalyzingModel.value) return
-  isAnalyzing.value = true
-  const photoId = currentPhoto.value.id
-  const startTime = Date.now()
+  if (!currentPhoto.value || isAnalyzing.value || isAnalyzingModel.value) return;
+  isAnalyzing.value = true;
+  const photoId = currentPhoto.value.id;
+  const startTime = Date.now();
   try {
-    clearAnalysisListener()
-    const unlisten = await listen<{ id: string | number; object_count?: number; face_count?: number; has_caption?: boolean }>('photo-analysis-result', (event) => {
+    clearAnalysisListener();
+    const unlisten = await listen<{
+      id: string | number;
+      object_count?: number;
+      face_count?: number;
+      has_caption?: boolean;
+    }>('photo-analysis-result', (event) => {
       if (String(event.payload.id) === String(photoId)) {
-        isAnalyzing.value = false
-        fetchFaces()
-        unlisten()
-        if (unlistenResult === unlisten) unlistenResult = null
+        isAnalyzing.value = false;
+        fetchFaces();
+        unlisten();
+        if (unlistenResult === unlisten) unlistenResult = null;
 
-        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-        const r = event.payload
-        const parts: string[] = []
-        if (r.object_count && r.object_count > 0) parts.push(`${r.object_count} objects`)
-        if (r.face_count && r.face_count > 0) parts.push(`${r.face_count} faces`)
-        if (r.has_caption) parts.push('caption')
-        if (parts.length === 0) parts.push('nothing detected')
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        const r = event.payload;
+        const parts: string[] = [];
+        if (r.object_count && r.object_count > 0) parts.push(`${r.object_count} objects`);
+        if (r.face_count && r.face_count > 0) parts.push(`${r.face_count} faces`);
+        if (r.has_caption) parts.push('caption');
+        if (parts.length === 0) parts.push('nothing detected');
 
-        snackbar.value.text = `Analysis complete: ${parts.join(', ')} (${elapsed}s)`
-        snackbar.value.show = true
-        refreshPhoto(photoId)
-        showInfo.value = true
+        snackbar.value.text = `Analysis complete: ${parts.join(', ')} (${elapsed}s)`;
+        snackbar.value.show = true;
+        refreshPhoto(photoId);
+        showInfo.value = true;
       }
-    })
-    unlistenResult = unlisten
-    await invoke('analyze_photo', { id: photoId })
+    });
+    unlistenResult = unlisten;
+    await invoke('analyze_photo', { id: photoId });
   } catch (e) {
-    console.error('Analysis failed', e)
-    isAnalyzing.value = false
-    clearAnalysisListener()
+    console.error('Analysis failed', e);
+    isAnalyzing.value = false;
+    clearAnalysisListener();
   }
 }
 
 async function runSingleModel(modelId: string): Promise<void> {
-  if (!currentPhoto.value || isAnalyzing.value || isAnalyzingModel.value) return
-  isAnalyzingModel.value = modelId
-  runStartTime.value = Date.now()
-  runTimerTick.value = 0
-  runTimer = window.setInterval(() => { runTimerTick.value += 1 }, 1000)
-  const photoId = currentPhoto.value.id
+  if (!currentPhoto.value || isAnalyzing.value || isAnalyzingModel.value) return;
+  isAnalyzingModel.value = modelId;
+  runStartTime.value = Date.now();
+  runTimerTick.value = 0;
+  runTimer = window.setInterval(() => {
+    runTimerTick.value += 1;
+  }, 1000);
+  const photoId = currentPhoto.value.id;
   try {
-    clearAnalysisListener()
-    const unlisten = await listen<{ id: string | number; model_timings?: Record<string, number> }>('photo-analysis-result', (event) => {
-      if (String(event.payload.id) === String(photoId)) {
-        isAnalyzingModel.value = null
-        if (runTimer) { clearInterval(runTimer); runTimer = null }
-        fetchFaces()
-        unlisten()
-        if (unlistenResult === unlisten) unlistenResult = null
-        refreshPhoto(photoId)
-        showInfo.value = true
-        const modelTimings = event.payload.model_timings ?? {}
-        const modelTime = modelTimings[modelId]
-        const elapsed = (modelTime ?? (Date.now() - runStartTime.value) / 1000).toFixed(1)
-        snackbar.value.text = `${modelId} complete (${elapsed}s)`
-        snackbar.value.error = false
-        snackbar.value.show = true
-      }
-    })
-    unlistenResult = unlisten
-    await invoke('analyze_photo_model', { id: photoId, modelId })
+    clearAnalysisListener();
+    const unlisten = await listen<{ id: string | number; model_timings?: Record<string, number> }>(
+      'photo-analysis-result',
+      (event) => {
+        if (String(event.payload.id) === String(photoId)) {
+          isAnalyzingModel.value = null;
+          if (runTimer) {
+            clearInterval(runTimer);
+            runTimer = null;
+          }
+          fetchFaces();
+          unlisten();
+          if (unlistenResult === unlisten) unlistenResult = null;
+          refreshPhoto(photoId);
+          showInfo.value = true;
+          const modelTimings = event.payload.model_timings ?? {};
+          const modelTime = modelTimings[modelId];
+          const elapsed = (modelTime ?? (Date.now() - runStartTime.value) / 1000).toFixed(1);
+          snackbar.value.text = `${modelId} complete (${elapsed}s)`;
+          snackbar.value.error = false;
+          snackbar.value.show = true;
+        }
+      },
+    );
+    unlistenResult = unlisten;
+    await invoke('analyze_photo_model', { id: photoId, modelId });
   } catch (e) {
-    console.error('Model analysis failed', e)
-    isAnalyzingModel.value = null
-    if (runTimer) { clearInterval(runTimer); runTimer = null }
-    snackbar.value.text = `${modelId} failed`
-    snackbar.value.error = true
-    snackbar.value.show = true
-    clearAnalysisListener()
+    console.error('Model analysis failed', e);
+    isAnalyzingModel.value = null;
+    if (runTimer) {
+      clearInterval(runTimer);
+      runTimer = null;
+    }
+    snackbar.value.text = `${modelId} failed`;
+    snackbar.value.error = true;
+    snackbar.value.show = true;
+    clearAnalysisListener();
   }
 }
 
 async function refreshPhoto(photoId: string | number): Promise<void> {
   try {
-    const photoJson = await invoke<string>('get_photo_by_id', { id: photoId })
-    if (!photoJson || photoJson === 'null') return
-    const updated = JSON.parse(photoJson) as MediaItem
-    const idx = props.photos.findIndex((p) => p.id === photoId)
-    if (idx !== -1) emit('update:photo', updated)
+    const photoJson = await invoke<string>('get_photo_by_id', { id: photoId });
+    if (!photoJson || photoJson === 'null') return;
+    const updated = JSON.parse(photoJson) as MediaItem;
+    const idx = props.photos.findIndex((p) => p.id === photoId);
+    if (idx !== -1) emit('update:photo', updated);
   } catch (e) {
-    console.error('Failed to refresh photo', e)
+    console.error('Failed to refresh photo', e);
   }
 }
 
 function formatEta(ms: number): string {
-  if (!ms || ms < 0) return ''
-  const totalSeconds = Math.floor(ms / 1000)
-  const hours = Math.floor(totalSeconds / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  if (hours > 0) return `${hours}h ${minutes}m`
-  if (minutes > 0) return `${minutes}m`
-  return `${totalSeconds % 60}s`
+  if (!ms || ms < 0) return '';
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m`;
+  return `${totalSeconds % 60}s`;
 }
 
 async function listenForEta(): Promise<void> {
   unlistenEta = await listen<number>('indexing-eta', (event) => {
-    globalEta.value = event.payload as number
-  })
+    globalEta.value = event.payload as number;
+  });
 }
 
 function close(): void {
-  stopVideo()
-  visible.value = false
+  stopVideo();
+  visible.value = false;
 }
 
 async function handleSetWallpaper(): Promise<void> {
-  if (!currentPhoto.value) return
+  if (!currentPhoto.value) return;
   try {
-    await invoke('set_wallpaper', { path: currentPhoto.value.location })
-    snackbar.value = { show: true, text: 'Wallpaper set', error: false }
+    await invoke('set_wallpaper', { path: currentPhoto.value.location });
+    snackbar.value = { show: true, text: 'Wallpaper set', error: false };
   } catch {
-    snackbar.value = { show: true, text: 'Failed to set wallpaper', error: true }
+    snackbar.value = { show: true, text: 'Failed to set wallpaper', error: true };
   }
 }
 
 async function handleShowInExplorer(): Promise<void> {
-  if (!currentPhoto.value) return
+  if (!currentPhoto.value) return;
   try {
-    await revealItemInDir(currentPhoto.value.location)
-    snackbar.value = { show: true, text: 'Opened in explorer', error: false }
+    await revealItemInDir(currentPhoto.value.location);
+    snackbar.value = { show: true, text: 'Opened in explorer', error: false };
   } catch {
-    snackbar.value = { show: true, text: 'Failed to open explorer', error: true }
+    snackbar.value = { show: true, text: 'Failed to open explorer', error: true };
   }
 }
 
 async function handleOpenWith(): Promise<void> {
-  if (!currentPhoto.value) return
+  if (!currentPhoto.value) return;
   try {
-    await openPath(currentPhoto.value.location)
+    await openPath(currentPhoto.value.location);
   } catch (e) {
-    console.error('Failed to open with default app', e)
+    console.error('Failed to open with default app', e);
   }
 }
 
 const addToAlbumPhotoIds = computed(() => {
-  if (!currentPhoto.value) return []
-  return [String(currentPhoto.value.id)]
-})
+  if (!currentPhoto.value) return [];
+  return [String(currentPhoto.value.id)];
+});
 
 function onAddedToAlbum(albumName: string): void {
-  snackbar.value = { show: true, error: false, text: t('albums.added_to_album', { album: albumName }) }
+  snackbar.value = {
+    show: true,
+    error: false,
+    text: t('albums.added_to_album', { album: albumName }),
+  };
 }
 
 const moreItems = computed(() => {
@@ -791,111 +843,119 @@ const moreItems = computed(() => {
       key: 'add_to_album',
       icon: 'mdi-image-plus',
       action: () => {
-        moreMenuOpen.value = false
-        addToAlbumOpen.value = true
+        moreMenuOpen.value = false;
+        addToAlbumOpen.value = true;
       },
     },
-  ]
+  ];
   return items.filter((item) => {
-    if (item.key === 'set_wallpaper' && os.value === 'ios') return false
-    if (item.key === 'show_in_explorer' && isMobile.value) return false
-    return true
-  })
-})
+    if (item.key === 'set_wallpaper' && os.value === 'ios') return false;
+    if (item.key === 'show_in_explorer' && isMobile.value) return false;
+    return true;
+  });
+});
 
 function closeMoreMenu(action: () => void): void {
-  moreMenuOpen.value = false
-  action()
+  moreMenuOpen.value = false;
+  action();
 }
 
 function formatElapsed(start: number, tick: number): string {
-  if (!start) return '0s'
-  void tick
-  const sec = Math.floor((Date.now() - start) / 1000)
-  if (sec < 60) return `${sec}s`
-  const m = Math.floor(sec / 60)
-  return `${m}m ${sec % 60}s`
+  if (!start) return '0s';
+  void tick;
+  const sec = Math.floor((Date.now() - start) / 1000);
+  if (sec < 60) return `${sec}s`;
+  const m = Math.floor(sec / 60);
+  return `${m}m ${sec % 60}s`;
 }
 
 function next(): void {
-  if (props.photos.length === 0) return
-  emit('update:index', (props.index + 1) % props.photos.length)
+  if (props.photos.length === 0) return;
+  emit('update:index', (props.index + 1) % props.photos.length);
 }
 
 function prev(): void {
-  if (props.photos.length === 0) return
-  emit('update:index', (props.index - 1 + props.photos.length) % props.photos.length)
+  if (props.photos.length === 0) return;
+  emit('update:index', (props.index - 1 + props.photos.length) % props.photos.length);
 }
 
 function handleKeydown(e: KeyboardEvent): void {
-  if (!visible.value) return
-  if (e.key === 'ArrowRight') next()
-  if (e.key === 'ArrowLeft') prev()
-  if (e.key === 'Escape') close()
-  if (e.key === 'i') showInfo.value = !showInfo.value
+  if (!visible.value) return;
+  if (e.key === 'ArrowRight') next();
+  if (e.key === 'ArrowLeft') prev();
+  if (e.key === 'Escape') close();
+  if (e.key === 'i') showInfo.value = !showInfo.value;
 }
 
 function scrollToActiveThumb(): void {
   nextTick(() => {
-    const rail = thumbnailRail.value
-    if (!rail) return
-    const activeItem = rail.querySelector('.rail-item.active') as HTMLElement | null
-    if (activeItem) {
-      activeItem.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
-    }
-  })
+    scrollerRef.value?.scrollToItem(props.index, { behavior: 'smooth' });
+  });
 }
 
-watch(() => props.index, () => {
-  stopVideo()
-  isAnalyzing.value = false
-  isAnalyzingModel.value = null
-  if (runTimer) { clearInterval(runTimer); runTimer = null }
-  fetchFaces()
-  loadOcr()
-  scrollToActiveThumb()
-  if (isVideo.value) {
-    showInfo.value = false
-    void ensurePort()
-  }
-})
+watch(
+  () => props.index,
+  () => {
+    stopVideo();
+    isAnalyzing.value = false;
+    isAnalyzingModel.value = null;
+    if (runTimer) {
+      clearInterval(runTimer);
+      runTimer = null;
+    }
+    fetchFaces();
+    loadOcr();
+    scrollToActiveThumb();
+    if (isVideo.value) {
+      showInfo.value = false;
+      void ensurePort();
+    }
+  },
+);
 
-watch(() => props.photos, (newPhotos) => {
-  if (!Array.isArray(newPhotos) || newPhotos.length === 0) {
-    if (visible.value) visible.value = false
-    detectedFaces.value = []
-    return
-  }
-  if (props.index >= newPhotos.length) emit('update:index', newPhotos.length - 1)
-  if (props.index < 0) emit('update:index', 0)
-})
+watch(
+  () => props.photos,
+  (newPhotos) => {
+    if (!Array.isArray(newPhotos) || newPhotos.length === 0) {
+      if (visible.value) visible.value = false;
+      detectedFaces.value = [];
+      return;
+    }
+    if (props.index >= newPhotos.length) emit('update:index', newPhotos.length - 1);
+    if (props.index < 0) emit('update:index', 0);
+  },
+);
 
 watch(visible, (val) => {
   if (val) {
-    fetchFaces()
-    scrollToActiveThumb()
+    fetchFaces();
+    scrollToActiveThumb();
   } else {
-    detectedFaces.value = []
+    detectedFaces.value = [];
   }
-})
+});
 
 onMounted(async () => {
-  window.addEventListener('keydown', handleKeydown)
+  window.addEventListener('keydown', handleKeydown);
   try {
-    os.value = await invoke<string>('get_os')
-  } catch { /* ignore */ }
-  listenForEta()
+    os.value = await invoke<string>('get_os');
+  } catch {
+    /* ignore */
+  }
+  listenForEta();
   try {
-    downloadedModels.value = await invoke<string[]>('check_models')
-  } catch { /* ignore */ }
-})
+    downloadedModels.value = await invoke<string[]>('check_models');
+  } catch {
+    /* ignore */
+  }
+});
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
-  if (unlistenEta) unlistenEta()
-  clearAnalysisListener()
-  if (runTimer) clearInterval(runTimer)
-})
+  window.removeEventListener('keydown', handleKeydown);
+  if (unlistenEta) unlistenEta();
+  clearAnalysisListener();
+  if (runTimer) clearInterval(runTimer);
+});
 </script>
 
 <style scoped>
@@ -991,13 +1051,18 @@ onUnmounted(() => {
 }
 
 .thumbnail-rail {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding: 10px 0;
+  flex: 1;
   width: 100%;
+  height: 100%;
+  overflow-y: hidden;
   scrollbar-width: none;
 }
+
+.thumbnail-rail :deep(.vue-recycle-scroller__item-view) {
+  display: flex;
+  align-items: center;
+}
+
 .thumbnail-rail::-webkit-scrollbar {
   display: none;
 }
@@ -1017,10 +1082,20 @@ onUnmounted(() => {
 }
 
 @keyframes dots {
-  0% { content: ''; }
-  25% { content: '.'; }
-  50% { content: '..'; }
-  75% { content: '...'; }
-  100% { content: ''; }
+  0% {
+    content: '';
+  }
+  25% {
+    content: '.';
+  }
+  50% {
+    content: '..';
+  }
+  75% {
+    content: '...';
+  }
+  100% {
+    content: '';
+  }
 }
 </style>

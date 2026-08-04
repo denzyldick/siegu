@@ -1,7 +1,7 @@
 <template>
   <div class="media-library-container px-4 py-6">
     <v-fade-transition>
-      <div v-if="selectedIds.length > 0" class="bulk-toolbar-container">
+      <div v-if="selectedIds.size > 0" class="bulk-toolbar-container">
         <v-sheet
           class="bulk-toolbar d-flex align-center px-6 py-3 rounded-pill shadow-xl"
           color="#18181b"
@@ -15,7 +15,7 @@
           ></v-btn>
           <div class="ml-4">
             <div class="text-subtitle-2 font-weight-bold text-white">
-              {{ $t('media.items_selected', { count: selectedIds.length }) }}
+              {{ $t('media.items_selected', { count: selectedIds.size }) }}
             </div>
           </div>
           <v-spacer></v-spacer>
@@ -76,8 +76,8 @@
             v-for="photo in item.photos"
             :key="photo.id"
             :path="photo"
-            :selected="selectedIds.includes(photo.id)"
-            :selection-mode="selectedIds.length > 0"
+            :selected="selectedIds.has(photo.id)"
+            :selection-mode="selectedIds.size > 0"
             @click="openViewerByPhoto(photo)"
             @select="toggleSelection"
             @toggle-favorite="handleToggleFavorite"
@@ -107,8 +107,8 @@
             v-for="photo in item.photos"
             :key="photo.id"
             :path="photo"
-            :selected="selectedIds.includes(photo.id)"
-            :selection-mode="selectedIds.length > 0"
+            :selected="selectedIds.has(photo.id)"
+            :selection-mode="selectedIds.size > 0"
             @click="openViewerByPhoto(photo)"
             @select="toggleSelection"
             @toggle-favorite="handleToggleFavorite"
@@ -199,7 +199,7 @@
     />
     <AddToAlbumSheet
       v-model="addToAlbumOpen"
-      :photo-ids="selectedIds.map(String)"
+      :photo-ids="[...selectedIds].map(String)"
       @added="onAddedToAlbum"
     />
   </div>
@@ -274,7 +274,7 @@ const images = ref<MediaItem[]>([]);
 const imagesMap = ref<Record<string, MediaItem>>({});
 const groups = ref<{ name: string; sortKey: string; images: MediaItem[] }[]>([]);
 const groupsMap = ref<Record<string, { name: string; sortKey: string; images: MediaItem[] }>>({});
-const selectedIds = ref<(string | number)[]>([]);
+const selectedIds = ref(new Set<string | number>());
 const viewerOpen = ref(false);
 const currentPhotoIndex = ref(0);
 const columns = ref(5);
@@ -446,13 +446,13 @@ async function flushAnalysisResults(): Promise<void> {
 }
 
 function toggleSelection(id: string | number): void {
-  const index = selectedIds.value.indexOf(id);
-  if (index === -1) selectedIds.value.push(id);
-  else selectedIds.value.splice(index, 1);
+  const set = selectedIds.value;
+  if (set.has(id)) set.delete(id);
+  else set.add(id);
 }
 
 function clearSelection(): void {
-  selectedIds.value = [];
+  selectedIds.value.clear();
 }
 
 async function bulkFavorite(): Promise<void> {
@@ -581,7 +581,7 @@ async function handleToggleFavorite(id: string | number): Promise<void> {
             }
           }
         }
-        selectedIds.value = selectedIds.value.filter((selectedId) => selectedId !== id);
+        selectedIds.value.delete(id);
       }
     }
   } catch (err) {

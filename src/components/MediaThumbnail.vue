@@ -74,7 +74,7 @@ onUnmounted(() => {
 
 <style scoped>
 .rail-item {
-  min-width: 60px;
+  width: 60px;
   height: 60px;
   border-radius: 8px;
   overflow: hidden;
