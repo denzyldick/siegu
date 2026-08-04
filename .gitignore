@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# AI model binaries (downloaded by CI/the app, never committed)
+src-tauri/test_models/
+
+# AI session logs
+session-*.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

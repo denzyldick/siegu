@@ -8,9 +8,9 @@ set -euo pipefail
 # grouped into a SINGLE person (the >0.5 similarity threshold from the A1
 # face-grouping fix). Also asserts NSFW + aesthetics scores were produced.
 #
-# Used by .github/workflows/e2e.yml. Models are downloaded to a temp dir
-# (or a persistent cache dir via SIEGU_MODELS_DIR); nothing touches a real
-# library.
+# Used by the `mesh-e2e` job in .github/workflows/ubuntu.yml. Models are
+# downloaded to a temp dir (or a persistent cache dir via SIEGU_MODELS_DIR);
+# nothing touches a real library.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PHOTOS="$REPO_ROOT/tests/fixtures/faces"

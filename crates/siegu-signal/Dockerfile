@@ -5,7 +5,7 @@
 # binary only requires glibc/libstdc++ symbols available in Debian 12; the
 # floating `rust:1-slim` base has moved to Debian 13, which produces binaries
 # that fail to load on the bookworm runtime below (GLIBC_2.38 / GLIBCXX_3.4.31).
-FROM rust:1-bookworm-slim AS builder
+FROM rust:1-slim-bookworm AS builder
 
 WORKDIR /app
 

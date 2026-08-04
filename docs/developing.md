@@ -30,8 +30,9 @@ GitHub Actions workflows in `.github/workflows/` (details in `docs/ci.md`):
 
 | Workflow | Jobs |
 |----------|------|
-| `ci.yml` | `test` (macOS/Ubuntu/Windows: fmt, check, test, clippy, tauri build), `test-android`, `test-ios`, ML inference E2E, release builds |
-| `e2e.yml` | `face-grouping` (ML), `sync-cli` (3-OS mesh sync) |
+| `ubuntu.yml` / `macos.yml` / `windows.yml` | per platform: `tests` (fmt, check, test, clippy, tauri build), `mesh-e2e`, `ai-inference` |
+| `android.yml` / `ios.yml` | `test` (cross-compile check + core tests on emulator/simulator) |
+| `release.yml` | desktop installers, Android APK, Arch AppImage, iOS |
 | `signal-docker.yml` / `landing-page-docker.yml` | Docker publish + build-only PR validation; `signal-docker.yml` also runs the mesh-sync E2E against the just-pushed commit image |
 
 ### Formatting

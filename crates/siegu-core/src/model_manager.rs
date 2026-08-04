@@ -550,12 +550,20 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        target_os = "ios",
+        ignore = "sysinfo reports 0 available memory in the iOS simulator"
+    )]
     fn test_available_memory_nonzero() {
         let mem = available_memory_bytes();
         assert!(mem > 0);
     }
 
     #[test]
+    #[cfg_attr(
+        target_os = "ios",
+        ignore = "models_fit_in_memory needs real available-memory data"
+    )]
     fn test_models_fit_in_memory_small() {
         let sizes = vec![("clip".to_string(), 1024 * 1024)];
         assert!(models_fit_in_memory(&sizes));

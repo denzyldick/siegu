@@ -109,15 +109,19 @@ npm run tauri ios dev
 
 ## CI Pipelines
 
-The project uses GitHub Actions (`.github/workflows/ci.yml`) with three test jobs:
+The project uses GitHub Actions (`.github/workflows/`) with one workflow per
+platform (details in `docs/ci.md`):
 
-| Job | Platform | Key steps |
-|-----|----------|-----------|
-| `test` | macOS, Ubuntu, Windows | `cargo fmt --check`, `cargo check`, `cargo test`, `cargo clippy`, `tauri build` |
-| `test-android` | Ubuntu | `cargo fmt --check`, `cargo ndk check` (aarch64 + x86_64) |
-| `test-ios` | macOS | `cargo fmt --check`, `cargo check --target aarch64-apple-ios` |
+| Workflow | Platform | Key jobs |
+|----------|----------|-----------|
+| `ubuntu.yml` | Ubuntu | `tests`, `mesh-e2e`, `ai-inference` |
+| `macos.yml` | macOS | `tests`, `mesh-e2e`, `ai-inference` |
+| `windows.yml` | Windows | `tests`, `mesh-e2e`, `ai-inference` |
+| `android.yml` | Ubuntu (Android target) | cross-compile check + core tests on an arm64 emulator |
+| `ios.yml` | macOS (iOS target) | cross-compile check + core tests on a simulator |
 
-Release jobs (`release`, `release-android`, `release-arch`, `release-ios`) publish binaries on GitHub Releases.
+Release jobs (`release.yml`: desktop installers, Android APK, Arch AppImage,
+iOS) publish binaries on GitHub Releases.
 
 ### CI environment variables
 

@@ -18,7 +18,8 @@ set -euo pipefail
 #   SIEGU_SIGNAL_URL   ws(s):// URL of an EXTERNAL signaling server to use
 #                      instead of the host's in-process one (Docker job).
 #
-# Used by .github/workflows/e2e.yml (sync-cli and sync-docker jobs).
+# Used by the `mesh-e2e` jobs in .github/workflows/ubuntu.yml, macos.yml and
+# windows.yml, and by the post-publish job in signal-docker.yml.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN="${SIEGU_BIN:-$REPO_ROOT/target/release/siegu}"

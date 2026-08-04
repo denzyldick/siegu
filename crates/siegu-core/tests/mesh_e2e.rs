@@ -434,9 +434,22 @@ async fn mdns_discovers_lan_host() {
     siegu_core::mdns::register_service(&daemon, "siegu-e2e-host", server.port)
         .expect("register mDNS service");
 
-    // Give the daemon a moment to announce, then browse the network.
-    tokio::time::sleep(Duration::from_millis(300)).await;
-    let hosts = siegu_core::mdns::discover_hosts(&daemon, 5).expect("browse for hosts");
+    // Give the daemon a moment to announce, then browse the network. mDNS
+    // traffic is lossy multicast (especially alongside macOS mDNSResponder),
+    // so retry the browse a few times before giving up.
+    tokio::time::sleep(Duration::from_millis(1000)).await;
+    let mut hosts = Vec::new();
+    for attempt in 0..3 {
+        hosts = siegu_core::mdns::discover_hosts(&daemon, 3).expect("browse for hosts");
+        if hosts.iter().any(|h| h.port == server.port) {
+            break;
+        }
+        eprintln!(
+            "mDNS browse attempt {attempt} found {:?}, retrying...",
+            hosts.iter().map(|h| h.port).collect::<Vec<_>>()
+        );
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
 
     siegu_core::mdns::unregister_service(&daemon, "siegu-e2e-host");
     daemon.shutdown();

@@ -1,0 +1,185 @@
+name: Ubuntu
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Unit tests, lint, clippy, security audit, desktop build ────────────
+  tests:
+    runs-on: ubuntu-24.04
+    env:
+      ORT_STRATEGY: download
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev libjs-mathjax build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev libavfilter-dev libavdevice-dev libpostproc-dev
+
+      - run: npm install
+
+      - run: npm run check:translations
+
+      - run: npm run typecheck
+
+      - run: npm run lint
+
+      - run: npm test
+
+      - run: cargo fmt --check
+        working-directory: src-tauri
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Security audit
+        run: cargo audit
+
+      - run: cargo test
+        working-directory: src-tauri
+
+      - run: cargo test -p siegu-core
+        working-directory: src-tauri
+
+      # clippy --all-targets subsumes `cargo check` (it type-checks every target
+      # including tests), so a separate check step is dropped to avoid compiling
+      # the workspace twice.
+      - run: cargo clippy --all-targets -- -D warnings
+        working-directory: src-tauri
+
+      # Guard: no unwrap()/expect() in production code (lib + bins). Test code
+      # is excluded by default cargo clippy target scope, so tests may still use
+      # them. Errors must be handled or logged, never panicked or swallowed.
+      - name: Clippy (no panics in production code)
+        run: cargo clippy -- -D clippy::unwrap_used -D clippy::expect_used
+        working-directory: src-tauri
+
+      - name: Build Tauri App (no bundle)
+        run: npm run tauri build -- --no-bundle
+
+  # ── Mesh sync over a real LAN signaling server, no ML models ───────────
+  mesh-e2e:
+    runs-on: ubuntu-24.04
+    env:
+      ORT_STRATEGY: download
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev build-essential curl wget file
+
+      - name: Build CLI
+        run: cargo build --release -p siegu-cli
+
+      - name: Run mesh sync E2E (in-process signaling)
+        run: bash scripts/e2e-sync.sh
+
+      - name: Cache E2E models
+        uses: actions/cache@v4
+        with:
+          path: /tmp/siegu-e2e-models
+          key: siegu-e2e-models-v2
+
+      - name: Run face-grouping E2E
+        env:
+          SIEGU_MODELS_DIR: /tmp/siegu-e2e-models
+        run: bash scripts/e2e-face-grouping.sh
+
+  # ── Full ONNX model inference on real photos/videos ────────────────────
+  ai-inference:
+    runs-on: ubuntu-24.04
+    env:
+      ORT_STRATEGY: download
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev libjs-mathjax build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev libavfilter-dev libavdevice-dev libpostproc-dev
+
+      - run: npm install
+
+      - name: Cache AI test models
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/test_models
+          key: ai-test-models-v3-${{ runner.os }}
+
+      - name: AI Pipeline Integration Test
+        shell: bash
+        run: |
+          mkdir -p test_models
+          download_model() {
+            local url="$1"
+            local output="$2"
+            if [ -s "$output" ]; then
+              echo "Using cached $output"
+              return
+            fi
+            curl --fail --location --retry 3 --retry-delay 5 "$url" --output "$output"
+          }
+
+          download_model "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model.onnx" "test_models/clip-vit-base-patch32-visual.onnx"
+          download_model "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/text_model.onnx" "test_models/clip-vit-base-patch32-text.onnx"
+          download_model "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/tokenizer.json" "test_models/tokenizer.json"
+          download_model "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx" "test_models/face_detection_yunet_2023mar.onnx"
+          download_model "https://huggingface.co/SWHL/RapidOCR/resolve/main/PP-OCRv4/en_PP-OCRv3_det_infer.onnx" "test_models/ocr_det.onnx"
+          download_model "https://huggingface.co/SWHL/RapidOCR/resolve/main/PP-OCRv3/en_PP-OCRv3_rec_infer.onnx" "test_models/ocr_rec.onnx"
+          download_model "https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/release/2.6/ppocr/utils/en_dict.txt" "test_models/en_dict.txt"
+          download_model "https://huggingface.co/onnx-community/nsfw_image_detection-ONNX/resolve/main/onnx/model.onnx" "test_models/nsfw.onnx"
+          download_model "https://huggingface.co/fsw/aesthetic-predictor-v2-5_onnx/resolve/main/aesthetic_predictor_v2_5.onnx" "test_models/aesthetics.onnx"
+          download_model "https://huggingface.co/webml/yolov8n/resolve/main/onnx/yolov8n.onnx" "test_models/yolov8.onnx"
+          download_model "https://huggingface.co/onnx-community/Salesforce_blip-image-captioning-base/resolve/main/split_0.onnx" "test_models/blip.onnx"
+          download_model "https://huggingface.co/onnx-community/Salesforce_blip-image-captioning-base/resolve/main/split_1.onnx" "test_models/blip_decoder.onnx"
+          download_model "https://huggingface.co/Salesforce/blip-image-captioning-base/resolve/main/tokenizer.json" "test_models/blip_tokenizer.json"
+          download_model "https://huggingface.co/crj/dl-ws/resolve/main/arcface_w600k_r50.onnx" "test_models/arcface.onnx"
+          download_model "https://huggingface.co/Xenova/dpt-hybrid-midas/resolve/main/onnx/model.onnx" "test_models/midas.onnx"
+          download_model "https://huggingface.co/onnx-community/whisper-tiny-ONNX/resolve/main/onnx/encoder_model.onnx" "test_models/whisper.onnx"
+          download_model "https://huggingface.co/onnx-community/whisper-tiny-ONNX/resolve/main/onnx/decoder_model_merged.onnx" "test_models/whisper-decoder.onnx"
+          download_model "https://huggingface.co/onnx-community/whisper-tiny-ONNX/resolve/main/tokenizer.json" "test_models/whisper-tokenizer.json"
+
+          cargo test -- --ignored test_full_inference_on_sample
+          cargo test -- --ignored test_whisper_smoke
+        working-directory: src-tauri

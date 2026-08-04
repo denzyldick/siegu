@@ -1,0 +1,250 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Desktop installers (macOS, Ubuntu, Windows) ────────────────────────
+  desktop:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    env:
+      ORT_STRATEGY: download
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.platform }}
+          workspaces: src-tauri
+
+      - name: Install dependencies (Ubuntu only)
+        if: matrix.platform == 'ubuntu-24.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev libjs-mathjax build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev libavfilter-dev libavdevice-dev libpostproc-dev
+
+      - name: Install dependencies (macOS only)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          brew install ffmpeg
+          echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+
+      - name: Cache FFmpeg (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\installed\x64-windows
+          key: ffmpeg-windows-${{ runner.os }}-v1
+
+      - name: Install dependencies (Windows only)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          if (Test-Path "C:\vcpkg\installed\x64-windows\include\libavcodec\avcodec.h") {
+            Write-Host "FFmpeg already cached, skipping install"
+          } else {
+            $retries = 3
+            for ($i = 1; $i -le $retries; $i++) {
+              try {
+                vcpkg install ffmpeg:x64-windows
+                break
+              } catch {
+                Write-Host "Attempt $i failed, retrying..."
+                Start-Sleep -Seconds (10 * $i)
+              }
+            }
+          }
+          $ffmpegDir = "C:\vcpkg\installed\x64-windows"
+          "FFMPEG_DIR=$ffmpegDir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FFMPEG_INCLUDE_DIR=$ffmpegDir\include" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FFMPEG_LIB_DIR=$ffmpegDir\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$ffmpegDir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - run: npm install
+
+      - name: Write signing key
+        shell: bash
+        run: |
+          mkdir -p ~/.tauri
+          printf '%s' "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" > ~/.tauri/siegu.key
+          echo "TAURI_SIGNING_PRIVATE_KEY=$HOME/.tauri/siegu.key" >> $GITHUB_ENV
+
+      - name: Build Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Siegu v__VERSION__'
+          releaseBody: 'See the attached assets for the latest release versions.'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.platform == 'ubuntu-24.04' && '--bundles appimage deb' || '' }}
+
+  # ── Android APK ─────────────────────────────────────────────────────────
+  android:
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    env:
+      ORT_STRATEGY: download
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-34 build-tools;34.0.0 ndk;27.0.12077973"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+          components: rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-android
+          workspaces: src-tauri
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y nasm
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Ensure rust targets are installed
+        run: rustup target add aarch64-linux-android || true
+
+      - name: Patch ffmpeg-sys-next for Android cross-compilation
+        run: |
+          cargo fetch --manifest-path src-tauri/Cargo.toml
+          BUILD_RS=$(find ~/.cargo/registry/src -path "*/ffmpeg-sys-next-*/build.rs" -print -quit 2>/dev/null || true)
+          if [ -z "$BUILD_RS" ]; then
+            echo "ffmpeg-sys-next build.rs not found, skipping patch"
+            exit 0
+          fi
+          echo "Patching $BUILD_RS"
+          python3 scripts/patch-ffmpeg-android.py "$BUILD_RS"
+
+      - run: npm install
+
+      - name: Build frontend
+        run: yarn build
+
+      - name: Build Rust lib for aarch64
+        run: |
+          cargo ndk -t aarch64-linux-android -P 24 \
+            --manifest-path src-tauri/Cargo.toml \
+            build --features "tauri/custom-protocol tauri/custom-protocol" --lib --release
+
+      - name: Copy .so to jniLibs
+        run: |
+          mkdir -p src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a
+          cp target/aarch64-linux-android/release/libsiegu_lib.so \
+             src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a/
+
+      - name: Generate tauri.build.gradle.kts
+        working-directory: src-tauri/gen/android
+        run: |
+          if [ ! -f app/tauri.build.gradle.kts ]; then
+            timeout 15 npx tauri android android-studio-script 2>&1 || true
+          fi
+
+      - name: Build APK
+        working-directory: src-tauri/gen/android
+        run: ./gradlew assembleUniversalRelease
+
+      - name: Upload APK to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
+
+  # ── Arch Linux AppImage ─────────────────────────────────────────────────
+  arch:
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    env:
+      ORT_STRATEGY: download
+    container:
+      image: archlinux:base-devel
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm git nodejs npm rustup webkit2gtk-4.1 libayatana-appindicator librsvg xdotool openssl sudo yarn xdg-utils fuse2 ffmpeg pkgconf
+
+          useradd -m -G wheel builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+      - uses: actions/checkout@v4
+
+      - name: Build Arch AppImage
+        run: |
+          chown -R builder:builder .
+          su builder -c "
+            rustup default stable
+            npm install
+            APPIMAGE_EXTRACT_AND_RUN=1 npm run tauri build -- --bundles appimage
+          "
+
+      - name: Upload Arch AppImage
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: src-tauri/target/release/bundle/appimage/*.AppImage
+
+  # ── iOS ─────────────────────────────────────────────────────────────────
+  ios:
+    permissions:
+      contents: write
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios, x86_64-apple-ios, aarch64-apple-ios-sim
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-ios
+          workspaces: src-tauri
+
+      - run: npm install
+
+      - run: npm run tauri ios build || echo "iOS build skipped/failed. Please configure code signing."

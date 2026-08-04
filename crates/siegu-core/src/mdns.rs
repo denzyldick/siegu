@@ -84,6 +84,9 @@ pub fn create_daemon() -> Result<DaemonHandle, Box<dyn std::error::Error>> {
 
         let mut services: Vec<Service> = Vec::new();
         let mut responders: Vec<mpsc::Sender<Vec<DiscoveredHost>>> = Vec::new();
+        // mDNS packets are UDP multicast and can be dropped, so a single PTR
+        // query is not enough (RFC 6762 §5.2). Re-send while anyone browses.
+        let mut last_query = Instant::now();
 
         let mut buf = [0u8; 1500];
 
@@ -112,9 +115,20 @@ pub fn create_daemon() -> Result<DaemonHandle, Box<dyn std::error::Error>> {
                         socket
                             .send_to(&query, SocketAddr::new(MULTICAST_ADDR.into(), MDNS_PORT))
                             .ok();
+                        last_query = Instant::now();
                         responders.push(sender);
                     }
                     ControlMsg::Shutdown => return,
+                }
+            }
+
+            if !responders.is_empty() && last_query.elapsed() >= Duration::from_secs(1) {
+                let query = build_ptr_query(SERVICE_TYPE);
+                if socket
+                    .send_to(&query, SocketAddr::new(MULTICAST_ADDR.into(), MDNS_PORT))
+                    .is_ok()
+                {
+                    last_query = Instant::now();
                 }
             }
 
@@ -150,7 +164,9 @@ fn bind_multicast_socket() -> Result<UdpSocket, Box<dyn std::error::Error>> {
     )?;
     sock.set_reuse_address(true)?;
     // macOS/BSD require SO_REUSEPORT to bind UDP 5353 alongside
-    // mDNSResponder, which already owns the port. Harmless elsewhere.
+    // mDNSResponder, which already owns the port. Unix-only: socket2 does not
+    // expose set_reuse_port on Windows (SO_EXCLUSIVEADDRUSE semantics differ).
+    #[cfg(unix)]
     sock.set_reuse_port(true)?;
     if let Err(e) = sock.set_read_timeout(Some(Duration::from_millis(200))) {
         eprintln!("set_read_timeout: {e}");

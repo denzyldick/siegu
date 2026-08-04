@@ -6,17 +6,28 @@ locally.
 
 ## Workflows
 
+CI is organized **per platform**: each supported OS has its own workflow whose
+jobs cover every check that platform can run (unit tests + lint, the mesh-sync
+E2E, and the real-ML inference test on desktop). Open the workflow for a
+platform in the Actions tab to see its full check list, then switch to another
+platform's list.
+
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `ci.yml` | push to `main`, PRs, tags, releases | Rust tests/lint + Tauri build on macOS/Ubuntu/Windows, Android, iOS, and the real ML inference E2E (Ubuntu) |
-| `e2e.yml` | push to `main`, PRs | Cross-platform mesh sync E2E + ML face-grouping E2E |
+| `ubuntu.yml` | push to `main`, PRs | Ubuntu: `tests`, `mesh-e2e`, `ai-inference` jobs |
+| `macos.yml` | push to `main`, PRs | macOS: `tests`, `mesh-e2e`, `ai-inference` jobs |
+| `windows.yml` | push to `main`, PRs | Windows: `tests`, `mesh-e2e`, `ai-inference` jobs |
+| `android.yml` | push to `main`, PRs | Android: cross-compile check + core tests on an arm64 emulator |
+| `ios.yml` | push to `main`, PRs | iOS: cross-compile check + core tests on a simulator |
+| `release.yml` | tags, releases | Build/publish desktop installers, Android APK, Arch AppImage, iOS |
 | `signal-docker.yml` | push to `main`, PRs, tags | Build/push the signaling-server Docker image; PRs only validate the build |
 | `landing-page-docker.yml` | push to `main`, PRs, tags | Build/push the landing-page Docker image; PRs only validate the build |
 
-### `ci.yml`
+### Desktop workflows (`ubuntu.yml`, `macos.yml`, `windows.yml`)
 
-- **`test`** (matrix: `ubuntu-24.04`, `macos-latest`, `windows-latest`):
-  `cargo fmt --check`, `cargo test`, `cargo clippy --all-targets -- -D warnings`
+Each runs three jobs on its platform:
+
+- **`tests`**: `cargo fmt --check`, `cargo test`, `cargo clippy --all-targets -- -D warnings`
   (which subsumes `cargo check`), a second clippy run gating
   `-D clippy::unwrap_used -D clippy::expect_used` on production code (lib + bins;
   tests are excluded so they may keep unwraps), and
@@ -24,29 +35,26 @@ locally.
   pre-commit hook, so no new panics-on-error can be added to shipped code.
   macOS builds ONNX Runtime with the CoreML feature; other platforms use plain
   or DirectML (see `crates/siegu-core/Cargo.toml` `[target.*.dependencies]`).
-- **`test-android`**: `cargo ndk check` for `aarch64` + `x86_64`.
-- **`test-ios`**: `cargo check` for `aarch64-apple-ios`.
-- **`test-android-emulator`**: builds the `siegu-core` unit + `sync_e2e` test
-  harnesses for `aarch64-linux-android` and runs them on an arm64 Android
-  emulator (ort only ships arm64 Android binaries).
-- **`test-ios-simulator`**: builds the same harnesses for
-  `aarch64-apple-ios-sim` and runs them on an iOS simulator (Apple Silicon host).
-- **ML inference E2E** (all three desktop OSes): downloads the model suite to
-  `src-tauri/test_models/` (cache key `ai-test-models-v3-${{ runner.os }}`) and
-  runs the two `#[ignore]`d integration tests in `src-tauri/src/ml.rs`:
-  `test_full_inference_on_sample` and `test_whisper_smoke`.
-- **Release jobs**: publish installers/artifacts to GitHub Releases.
+- **`mesh-e2e`**: builds `siegu-cli` and runs `scripts/e2e-sync.sh`. Two CLI
+  processes connect over WebRTC through an in-process signaling server, exchange
+  protocol messages, and transfer a photo byte-for-byte (SHA-256 compared). No ML
+  models required. On Ubuntu the same CLI build also runs
+  `scripts/e2e-face-grouping.sh` (one release build instead of two), which
+  downloads face-detection models to `/tmp/siegu-e2e-models` (cache key
+  `siegu-e2e-models-v2`) and asserts that same-person photos are grouped into one
+  album by the AI pipeline.
+- **`ai-inference`**: downloads the model suite to `src-tauri/test_models/`
+  (cache key `ai-test-models-v3-${{ runner.os }}`) and runs the two `#[ignore]`d
+  integration tests in `src-tauri/src/ml.rs`: `test_full_inference_on_sample`
+  and `test_whisper_smoke`.
 
-### `e2e.yml`
+### Mobile workflows
 
-- **`sync-cli`** (matrix: Ubuntu, macOS, Windows): builds `siegu-cli` and runs
-  `scripts/e2e-sync.sh`. Two CLI processes connect over WebRTC through an
-  in-process signaling server, exchange protocol messages, and transfer a photo
-  byte-for-byte (SHA-256 compared). No ML models required. On Ubuntu the same
-  CLI build also runs `scripts/e2e-face-grouping.sh` (one release build instead
-  of two), which downloads face-detection models to `/tmp/siegu-e2e-models`
-  (cache key `siegu-e2e-models-v2`) and asserts that same-person photos are
-  grouped into one album by the AI pipeline.
+- **`android.yml`** — `cargo ndk check` for `aarch64-linux-android`, builds the
+  `siegu-core` unit + `sync_e2e` test harnesses for the same target, and runs
+  them on an arm64 Android emulator (ort only ships arm64 Android binaries).
+- **`ios.yml`** — `cargo check` for `aarch64-apple-ios`, builds the same
+  harnesses for `aarch64-apple-ios-sim`, and runs them on an iOS simulator.
 
 ### Docker publish workflows
 
@@ -78,7 +86,7 @@ What is actually verified per platform, and on which devices the app can run.
 | Container mesh E2E | — | ✅ | — | — | — |
 | Cross-compile check | — | — | — | ✅ | ✅ |
 | On-device unit tests + mesh sync (`sync_e2e`) | — | — | — | ✅ emulator | ✅ simulator |
-| Release artifacts | ✅ | ✅ | ✅ | — | — |
+| Release artifacts | ✅ | ✅ | ✅ | ✅ APK | — |
 
 **Policy**: real AI *inference* is verified on desktop only; mobile guarantees
 compile-time support. The shared runtime (DB, WebRTC mesh) is exercised
@@ -149,7 +157,7 @@ cargo test -- --ignored test_whisper_smoke
 runs face detection/recognition, captioning (BLIP), OCR, aesthetics/NSFW
 scoring and MiDaS depth, then asserts a coherent caption and ≥1 detected face.
 
-## Model suite (ci.yml AI step)
+## Model suite (AI inference job)
 
 All files land in `src-tauri/test_models/`:
 
@@ -166,7 +174,7 @@ All files land in `src-tauri/test_models/`:
 | `midas.onnx` | Xenova dpt-hybrid-midas |
 | `whisper.onnx` (encoder), `whisper-decoder.onnx`, `whisper-tokenizer.json` | onnx-community whisper-tiny |
 
-Cache key is `ai-test-models-v2` — bump it whenever a model URL or file
+Cache key is `ai-test-models-v3` — bump it whenever a model URL or file
 changes so CI re-downloads instead of reusing stale files.
 
 ## Known issues
@@ -181,9 +189,10 @@ changes so CI re-downloads instead of reusing stale files.
   the `ml` feature. See the "default-features is ignored for siegu-core"
   warning from `cargo build`.
 
-- The signaling Docker image pins the builder to `rust:1-bookworm-slim` and
+- The signaling Docker image pins the builder to `rust:1-slim-bookworm` and
   the runtime to `debian:bookworm-slim`. Both must stay on the same major
   Debian release: the floating `rust:1-slim` base has moved to Debian 13,
   which produced binaries that fail to load on the bookworm runtime
   (`GLIBC_2.38` / `GLIBCXX_3.4.31` missing). When either base is eventually
-  bumped, bump both stages together.
+  bumped, bump both stages together. (The tag is `-slim-bookworm`, not
+  `-bookworm-slim`.)
