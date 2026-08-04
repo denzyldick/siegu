@@ -68,7 +68,7 @@
           :is-cleaning="isCleaning"
           :logs="logs"
           @cleanup-db="cleanupDb"
-          @save-performance="savePerformanceConfig"
+          @update-scan-threads="onScanThreadsChange"
           @set-indexing-mode="setIndexingMode"
           @clear-logs="clearLogs"
           @copy-logs="copyLogs"
@@ -272,7 +272,7 @@ import SignallingSection from './settings/SignallingSection.vue'
 import UpdateSection from './settings/UpdateSection.vue'
 import AboutSection from './settings/AboutSection.vue'
 
-const props = defineProps<{
+defineProps<{
   embedded?: boolean
   hideAiSection?: boolean
   hideFolderSection?: boolean
@@ -355,6 +355,11 @@ const isStoreManaged = computed(
 )
 
 const { t } = useI18n()
+
+function onScanThreadsChange(value: number): void {
+  performance.scanThreads = value
+  void savePerformanceConfig()
+}
 
 async function copyLogs(): Promise<void> {
   try {

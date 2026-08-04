@@ -2,7 +2,7 @@
 import type { Person, UnnamedFace } from '@/types/person'
 import { getFaceImageSrc } from '@/composables/useMediaUtils'
 
-const props = defineProps<{
+defineProps<{
   modelValue: boolean
   cluster: Person | null
   faces: UnnamedFace[]

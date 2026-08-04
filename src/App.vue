@@ -14,11 +14,11 @@ import AppToolbar from '@/components/layout/AppToolbar.vue';
 import SyncStatusBanner from '@/components/layout/SyncStatusBanner.vue';
 import OnboardingFlow from '@/components/onboarding/OnboardingFlow.vue';
 import MediaLibrary from '@/components/MediaLibrary.vue';
-import Albums from '@/components/Albums.vue';
-import People from '@/components/People.vue';
-import Map from '@/components/Map.vue';
+import AlbumsView from '@/components/AlbumsView.vue';
+import PeopleView from '@/components/PeopleView.vue';
+import MapView from '@/components/MapView.vue';
 import DeviceList from '@/components/DeviceList.vue';
-import Setting from '@/components/Setting.vue';
+import SettingsView from '@/components/SettingsView.vue';
 import GuidedTour from '@/components/GuidedTour.vue';
 import ErrorBoundary from '@/components/shared/ErrorBoundary.vue';
 
@@ -182,11 +182,11 @@ function removeFilterChip(index: number): void {
               @search-person="handleSearchPerson"
             />
           </div>
-          <People v-if="currentPage === 'people'" @search-person="handleSearchPerson" />
-          <Albums v-if="currentPage === 'albums'" />
-          <Map v-if="currentPage === 'location'" />
+          <PeopleView v-if="currentPage === 'people'" @search-person="handleSearchPerson" />
+          <AlbumsView v-if="currentPage === 'albums'" />
+          <MapView v-if="currentPage === 'location'" />
           <DeviceList v-if="currentPage === 'devices'" />
-          <Setting v-if="currentPage === 'settings'" @done="uiStore.setPage('home')" />
+          <SettingsView v-if="currentPage === 'settings'" @done="uiStore.setPage('home')" />
         </ErrorBoundary>
       </v-main>
 

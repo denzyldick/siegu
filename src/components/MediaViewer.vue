@@ -737,7 +737,7 @@ async function handleSetWallpaper(): Promise<void> {
   try {
     await invoke('set_wallpaper', { path: currentPhoto.value.location })
     snackbar.value = { show: true, text: 'Wallpaper set', error: false }
-  } catch (e) {
+  } catch {
     snackbar.value = { show: true, text: 'Failed to set wallpaper', error: true }
   }
 }
@@ -747,7 +747,7 @@ async function handleShowInExplorer(): Promise<void> {
   try {
     await revealItemInDir(currentPhoto.value.location)
     snackbar.value = { show: true, text: 'Opened in explorer', error: false }
-  } catch (e) {
+  } catch {
     snackbar.value = { show: true, text: 'Failed to open explorer', error: true }
   }
 }
@@ -883,11 +883,11 @@ onMounted(async () => {
   window.addEventListener('keydown', handleKeydown)
   try {
     os.value = await invoke<string>('get_os')
-  } catch (e) { /* ignore */ }
+  } catch { /* ignore */ }
   listenForEta()
   try {
     downloadedModels.value = await invoke<string[]>('check_models')
-  } catch (e) { /* ignore */ }
+  } catch { /* ignore */ }
 })
 
 onUnmounted(() => {

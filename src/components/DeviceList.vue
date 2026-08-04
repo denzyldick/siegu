@@ -8,7 +8,7 @@
         </div>
         <div class="text-subtitle-1 text-zinc-secondary">{{ $t('devices.desc') }}</div>
       </div>
-      <Connect />
+      <ConnectView />
     </div>
 
     <!-- Empty State -->
@@ -349,7 +349,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import Connect from './Connect.vue';
+import ConnectView from './ConnectView.vue';
 import { useSyncStore } from '@/stores/sync';
 import {
   listDevices,

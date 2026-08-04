@@ -63,14 +63,14 @@
             >
           </div>
           <v-slider
-            v-model="performance.scanThreads"
+            :model-value="performance.scanThreads"
             :min="1"
             :max="maxThreads"
             :step="1"
             hide-details
             color="primary"
             track-color="#f4f4f5"
-            @update:model-value="$emit('save-performance')"
+            @update:model-value="onScanThreadsChange"
           ></v-slider>
 
           <v-list-item class="px-0 mt-4">
@@ -172,15 +172,19 @@ defineProps<{
   logs: LogEntry[]
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   'cleanup-db': []
-  'save-performance': []
+  'update-scan-threads': [value: number]
   'set-indexing-mode': [mode: string]
   'clear-logs': []
   'copy-logs': []
 }>()
 
 const indexingModes = [{ value: 'immediate' }, { value: 'idle' }, { value: 'manual' }]
+
+function onScanThreadsChange(value: number | [number, number]): void {
+  emit('update-scan-threads', typeof value === 'number' ? value : value[0])
+}
 
 function getModeLabel(val: string): string {
   return val

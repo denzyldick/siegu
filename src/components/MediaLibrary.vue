@@ -261,7 +261,7 @@ const props = withDefaults(
   },
 );
 
-const emit = defineEmits<{
+defineEmits<{
   'clear-search': [];
   'search-person': [person: { id: string; name: string }];
 }>();

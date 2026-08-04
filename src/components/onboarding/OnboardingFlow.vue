@@ -5,10 +5,9 @@ import { useAppStore } from '@/stores/app';
 import { useModelsStore } from '@/stores/models';
 import { useUiStore } from '@/stores/ui';
 import { markOnboardingComplete, addDirectory } from '@/services/tauri';
-import Setting from '@/components/Setting.vue';
-import FolderPicker from '@/components/FolderPicker.vue';
-import Connect from '@/components/Connect.vue';
-import Greet from '@/components/Greet.vue';
+import SettingsView from '@/components/SettingsView.vue';
+import ConnectView from '@/components/ConnectView.vue';
+import GreetView from '@/components/GreetView.vue';
 
 const { t } = useI18n();
 const appStore = useAppStore();
@@ -75,7 +74,7 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
 </script>
 
 <template>
-  <Greet v-if="step === 'greet'" @setup-local="handleGreetLocal" @setup-sync="handleGreetSync" />
+  <GreetView v-if="step === 'greet'" @setup-local="handleGreetLocal" @setup-sync="handleGreetSync" />
 
   <v-container v-else-if="step === 'folders'" class="fill-height" fluid>
     <v-row justify="center">
@@ -90,7 +89,7 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
             </h2>
             <p class="text-zinc-secondary">{{ t('onboarding.add_media_desc') }}</p>
           </div>
-          <Setting :embedded="true" hide-ai-section />
+          <SettingsView :embedded="true" hide-ai-section />
           <v-btn block color="black" height="56" class="siegu-btn mt-8" @click="goToStep('models')">
             {{ t('onboarding.continue_ai') }}
           </v-btn>
@@ -112,7 +111,7 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
             </h2>
             <p class="text-zinc-secondary">{{ t('onboarding.ai_desc') }}</p>
           </div>
-          <Setting :embedded="true" hide-folder-section />
+          <SettingsView :embedded="true" hide-folder-section />
           <v-btn
             block
             color="black"
@@ -178,7 +177,7 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
           <FolderPicker v-model="showSyncPicker" @select="handleSetSyncPath" />
 
           <div class="d-flex justify-center mb-8">
-            <Connect
+<ConnectView
               :embedded="true"
               :initial-mode="connectionMode"
               :hide-mode-toggle="true"
