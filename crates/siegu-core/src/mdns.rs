@@ -116,6 +116,25 @@ pub fn create_daemon() -> Result<DaemonHandle, Box<dyn std::error::Error>> {
                             .send_to(&query, SocketAddr::new(MULTICAST_ADDR.into(), MDNS_PORT))
                             .ok();
                         last_query = Instant::now();
+                        // A daemon can discover services it itself advertises
+                        // without waiting for multicast loopback: on macOS the
+                        // looped-back packet may be delivered to mDNSResponder's
+                        // SO_REUSEPORT socket instead of ours, making
+                        // self-discovery racy. Answer in-process (RFC 6762
+                        // expects a host to see its own instances). No-op for
+                        // production browse-only daemons, which have no services.
+                        if !services.is_empty() {
+                            let local: Vec<DiscoveredHost> = services
+                                .iter()
+                                .map(|s| DiscoveredHost {
+                                    name: s.instance.clone(),
+                                    ip: s.ip.to_string(),
+                                    port: s.port,
+                                    room_id: String::new(),
+                                })
+                                .collect();
+                            let _ = sender.send(local);
+                        }
                         responders.push(sender);
                     }
                     ControlMsg::Shutdown => return,

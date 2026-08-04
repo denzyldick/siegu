@@ -201,14 +201,22 @@ mod tests {
     ];
 
     fn test_models_dir() -> Option<std::path::PathBuf> {
-        let dir = std::path::Path::new("test_models");
-        if REQUIRED_MODELS.iter().all(|f| dir.join(f).exists()) {
-            // Canonicalize so the symlink target below is absolute: a relative
-            // target would resolve against the temp config dir, not the repo.
-            dir.canonicalize().ok()
-        } else {
-            None
+        // Prefer the repo-local `test_models/` (used by CI, which downloads a
+        // fresh ~5GB suite). Locally, fall back to the app's real models dir
+        // (`~/.config/io.denzyl.siegu/models`) so tests reuse already-downloaded
+        // models instead of fetching a second copy.
+        let mut candidates = vec![std::path::Path::new("test_models").to_path_buf()];
+        if let Some(base) = crate::config_dir_fallback() {
+            candidates.push(base.join("io.denzyl.siegu").join("models"));
         }
+        for dir in candidates {
+            if dir.exists() && REQUIRED_MODELS.iter().all(|f| dir.join(f).exists()) {
+                // Canonicalize so the symlink target below is absolute: a relative
+                // target would resolve against the temp config dir, not the repo.
+                return dir.canonicalize().ok();
+            }
+        }
+        None
     }
 
     #[cfg(unix)]
@@ -241,7 +249,9 @@ mod tests {
         let models_dir = match test_models_dir() {
             Some(d) => d,
             None => {
-                println!("Skipping: required models not present in test_models/");
+                println!(
+                    "Skipping: required models not present in test_models/ or the app models dir"
+                );
                 return;
             }
         };
@@ -354,7 +364,9 @@ mod tests {
         let models_dir = match test_models_dir() {
             Some(d) => d,
             None => {
-                println!("Skipping: required models not present in test_models/");
+                println!(
+                    "Skipping: required models not present in test_models/ or the app models dir"
+                );
                 return;
             }
         };

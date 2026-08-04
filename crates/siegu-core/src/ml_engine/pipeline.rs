@@ -487,7 +487,7 @@ pub fn generate_blip_caption(img: &image::RgbImage, models: &mut LoadedModels) -
     let data = input.into_raw_vec_and_offset().0;
     let tensor = ort::value::Value::from_array((shape, data)).ok()?;
 
-    let (enc_hidden, enc_attn_mask) = {
+    let pooled = {
         let mut lock = vision_encoder.lock().ok()?;
         let encoder_outputs = match lock.run(ort::inputs!["pixel_values" => tensor]) {
             Ok(outputs) => outputs,
@@ -496,51 +496,49 @@ pub fn generate_blip_caption(img: &image::RgbImage, models: &mut LoadedModels) -
                 return None;
             }
         };
-        if encoder_outputs.len() == 0 {
-            tracing::warn!("blip vision encoder produced no outputs");
+        // The onnx-community split export emits `encoder_hidden_states` (f32)
+        // and a degenerate single-element `encoder_attention_mask`; the decoder
+        // split consumes a mean-pooled single embedding, so we only need the
+        // hidden states here.
+        let mut enc_hidden: Option<Vec<f32>> = None;
+        for (name, output) in encoder_outputs {
+            if name == "encoder_hidden_states" {
+                match output.try_extract_tensor::<f32>() {
+                    Ok((_, data)) => enc_hidden = Some(data.to_vec()),
+                    Err(e) => tracing::warn!("blip encoder_hidden_states is not f32: {e}"),
+                }
+            }
+        }
+        let enc_hidden = enc_hidden?;
+        let seq_len = enc_hidden.len() / 768;
+        if seq_len == 0 {
+            tracing::warn!("blip encoder_hidden_states has zero sequence length");
             return None;
         }
-        let (_, hidden_data) = match encoder_outputs[0].try_extract_tensor::<f32>() {
-            Ok((shape, data)) => (shape, data),
-            Err(e) => {
-                tracing::warn!("blip vision encoder output[0] is not f32: {e}");
-                return None;
-            }
-        };
-        let enc_hidden: Vec<f32> = hidden_data.to_vec();
-        // onnx-community exports (1, 577, 768) hidden states + attention mask.
-        // The mask dtype varies between exports (i64 vs f32); the input has no
-        // padding, so fall back to an all-ones mask from the hidden length.
-        let seq_len = enc_hidden.len() / 768;
-        let enc_attn_mask: Vec<i64> = if encoder_outputs.len() >= 2 {
-            match encoder_outputs[1].try_extract_tensor::<i64>() {
-                Ok((_, mask)) => mask.to_vec(),
-                Err(_) => match encoder_outputs[1].try_extract_tensor::<f32>() {
-                    Ok((_, mask)) => mask.iter().map(|&v| (v != 0.0) as i64).collect(),
-                    Err(_) => {
-                        tracing::warn!("blip vision encoder output[1] is neither i64 nor f32");
-                        vec![1i64; seq_len]
-                    }
-                },
-            }
-        } else {
-            vec![1i64; seq_len]
-        };
-        (enc_hidden, enc_attn_mask)
+        // Mean-pool over the visual tokens, matching the reference
+        // `image_embeds.mean(dim=1)` behavior of the captioning model.
+        let mut pooled = Vec::with_capacity(768);
+        for i in 0..768 {
+            pooled.push(enc_hidden[i..].iter().step_by(768).sum::<f32>() / seq_len as f32);
+        }
+        pooled
     };
 
     let bos: i64 = 30522;
     let eos: i64 = 2;
     let max_len: usize = 20;
 
-    let mut tokens: Vec<u32> = vec![bos as u32];
+    let mut tokens: Vec<i64> = vec![bos];
 
     for _ in 0..max_len {
         let seq_len = tokens.len();
         let ids_arr = ndarray::Array2::from_shape_vec((1, seq_len), tokens.clone()).ok()?;
         let mask_arr = ndarray::Array2::from_shape_vec((1, seq_len), vec![1i64; seq_len]).ok()?;
-        let enc_arr = ndarray::Array3::from_shape_vec((1, 577, 768), enc_hidden.clone()).ok()?;
-        let enc_mask_arr = ndarray::Array2::from_shape_vec((1, 577), enc_attn_mask.clone()).ok()?;
+        // The onnx-community decoder split accepts a single pooled image
+        // embedding (its cross-attention is collapsed to one token), so the
+        // mean-pooled encoder output is fed as [1, 1, 768] with a scalar mask.
+        let enc_arr = ndarray::Array3::from_shape_vec((1, 1, 768), pooled.clone()).ok()?;
+        let enc_mask_arr = ndarray::Array1::from_vec(vec![1i64]);
 
         let ids_tensor = ort::value::Value::from_array((
             ids_arr.shape().to_vec(),
@@ -599,15 +597,20 @@ pub fn generate_blip_caption(img: &image::RgbImage, models: &mut LoadedModels) -
         if next_token == eos {
             break;
         }
-        tokens.push(next_token as u32);
+        // Stop before the decoder collapses into repetition, which the
+        // single-token export does quickly under greedy decoding.
+        tokens.push(next_token);
+        if tokens.len() >= 3 {
+            let last3 = &tokens[tokens.len() - 3..];
+            if tokens[..tokens.len() - 3].windows(3).any(|w| w == last3) {
+                break;
+            }
+        }
     }
 
     // Decode tokens (skip BOS prefix)
-    let decoded = tokenizer
-        .decode(&tokens[1..], false)
-        .ok()?
-        .trim()
-        .to_string();
+    let decoded: Vec<u32> = tokens[1..].iter().map(|&t| t as u32).collect();
+    let decoded = tokenizer.decode(&decoded, false).ok()?.trim().to_string();
     if decoded.is_empty() || decoded == "[UNK]" {
         None
     } else {

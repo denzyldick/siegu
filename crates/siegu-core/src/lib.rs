@@ -8,7 +8,9 @@ pub mod lan_server;
 pub mod mdns;
 pub mod mesh;
 pub mod mesh_transport;
+#[cfg(feature = "ml")]
 pub mod ml_engine;
+#[cfg(feature = "ml")]
 pub mod ml_worker;
 pub mod model_manager;
 pub mod scanner;
@@ -26,6 +28,7 @@ pub use database::{
 pub use error::{Result, SieguError};
 pub use event_bus::{ArcEventBus, CallbackEventBus, EventBus, Level, LogCollector, NullEventBus};
 pub use mesh::{MeshManager, SyncEvent, SyncMessage, SyncProgress};
+#[cfg(feature = "ml")]
 pub use ml_worker::MlContext;
 pub use scanner::{extract_photo_metadata, is_media_file, ScanGuard};
 pub use server::{generate_pairing_codes, hash_pairing_code, PairingCodes};

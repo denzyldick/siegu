@@ -11,7 +11,7 @@ name = "siegu"
 path = "src/main.rs"
 
 [dependencies]
-siegu-core = { workspace = true }
+siegu-core = { workspace = true, default-features = true }
 tokio = { workspace = true }
 uuid = { workspace = true }
 tracing = { workspace = true }
