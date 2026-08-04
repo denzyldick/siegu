@@ -1,6 +1,11 @@
 # Build the standalone Siegu signalling server as a small distroless-ish image.
 # Build context is the repository root (the crate is a workspace member).
-FROM rust:1-slim AS builder
+#
+# The builder is pinned to the bookworm (Debian 12) variant so the produced
+# binary only requires glibc/libstdc++ symbols available in Debian 12; the
+# floating `rust:1-slim` base has moved to Debian 13, which produces binaries
+# that fail to load on the bookworm runtime below (GLIBC_2.38 / GLIBCXX_3.4.31).
+FROM rust:1-bookworm-slim AS builder
 
 WORKDIR /app
 

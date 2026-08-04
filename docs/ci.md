@@ -127,8 +127,16 @@ changes so CI re-downloads instead of reusing stale files.
 - `crates/siegu-signal/Cargo.toml` declares `siegu-core` with
   `default-features = false`, but because the workspace dependency
   (`Cargo.toml`) does not pin `default-features`, Cargo **ignores** that and
-  the signaling container compiles the full ML stack anyway. The image still
-  builds; fixing this would mean setting `default-features = false` on the
-  workspace dep and re-enabling the `ml` feature where needed (`siegu-cli`,
-  `src-tauri`). See the "default-features is ignored for siegu-core" warning
-  from `cargo build`.
+  the signaling container compiles the full ML stack anyway (slow builds, C++
+  runtime deps). Fixing it properly requires `#[cfg(feature = "ml")]` gating
+  across `siegu-core`'s lib code first — the crate currently references
+  `ort`/`tokenizers` unconditionally, so the signal binary won't build without
+  the `ml` feature. See the "default-features is ignored for siegu-core"
+  warning from `cargo build`.
+
+- The signaling Docker image pins the builder to `rust:1-bookworm-slim` and
+  the runtime to `debian:bookworm-slim`. Both must stay on the same major
+  Debian release: the floating `rust:1-slim` base has moved to Debian 13,
+  which produced binaries that fail to load on the bookworm runtime
+  (`GLIBC_2.38` / `GLIBCXX_3.4.31` missing). When either base is eventually
+  bumped, bump both stages together.

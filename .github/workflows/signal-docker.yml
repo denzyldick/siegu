@@ -48,6 +48,24 @@ jobs:
           context: "."
           file: "crates/siegu-signal/Dockerfile"
           push: false
+          load: true
+          tags: "siegu-signal:ci-smoke"
+
+      - name: "Smoke-test image (run + healthcheck)"
+        run: |
+          docker run -d --name siegu-signal-smoke -p 18080:8080 siegu-signal:ci-smoke
+          for _ in $(seq 1 30); do
+            if curl -sf --max-time 4 -o /dev/null http://127.0.0.1:18080/healthz; then
+              echo "signaling server healthy"
+              docker rm -f siegu-signal-smoke
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "signaling server did not become healthy" >&2
+          docker logs siegu-signal-smoke
+          docker rm -f siegu-signal-smoke
+          exit 1
 
   build-and-push-image:
     if: github.event_name != 'pull_request'
@@ -84,7 +102,34 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=${{ github.sha }}
 
-      - name: "Build and push Docker image"
+      - name: "Build Docker image (load for smoke test)"
+        uses: "docker/build-push-action@v5"
+        with:
+          context: "."
+          file: "crates/siegu-signal/Dockerfile"
+          push: false
+          load: true
+          tags: "siegu-signal:smoke-test"
+          cache-from: "type=gha"
+          cache-to: "type=gha,mode=max"
+
+      - name: "Smoke-test image before publishing"
+        run: |
+          docker run -d --name siegu-signal-smoke -p 18080:8080 siegu-signal:smoke-test
+          for _ in $(seq 1 30); do
+            if curl -sf --max-time 4 -o /dev/null http://127.0.0.1:18080/healthz; then
+              echo "signaling server healthy"
+              docker rm -f siegu-signal-smoke
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "signaling server did not become healthy" >&2
+          docker logs siegu-signal-smoke
+          docker rm -f siegu-signal-smoke
+          exit 1
+
+      - name: "Push Docker image"
         uses: "docker/build-push-action@v5"
         with:
           context: "."
@@ -92,3 +137,4 @@ jobs:
           push: true
           tags: "${{ steps.meta.outputs.tags }}"
           labels: "${{ steps.meta.outputs.labels }}"
+          cache-from: "type=gha"
