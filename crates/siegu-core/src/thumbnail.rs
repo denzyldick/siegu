@@ -70,35 +70,44 @@ pub fn is_video_ext(path: &str) -> bool {
 }
 
 pub fn generate_thumbnail(path: &str) -> Option<String> {
+    generate_thumbnail_bytes(path).map(|bytes| {
+        format!(
+            "data:image/jpeg;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(bytes)
+        )
+    })
+}
+
+/// Raw JPEG thumbnail bytes for an image or a video poster frame. Used by the
+/// on-demand media-server thumbnail endpoint; the base64 `generate_thumbnail`
+/// wrapper above is kept for the scan/sync code paths.
+pub fn generate_thumbnail_bytes(path: &str) -> Option<Vec<u8>> {
     if is_video_ext(path) {
         #[cfg(feature = "video-thumbs")]
         {
-            generate_video_thumbnail(path)
+            generate_video_thumbnail_bytes(path)
         }
         #[cfg(not(feature = "video-thumbs"))]
         {
             None
         }
     } else {
-        generate_image_thumbnail(path)
+        generate_image_thumbnail_bytes(path)
     }
 }
 
-fn generate_image_thumbnail(path: &str) -> Option<String> {
+fn generate_image_thumbnail_bytes(path: &str) -> Option<Vec<u8>> {
     let img = open_image(path)?;
     let orientation = read_exif_orientation(path);
     let img = apply_orientation(img, orientation);
     let thumb = img.thumbnail(THUMB_SIZE, THUMB_SIZE);
     let mut buf = std::io::Cursor::new(Vec::new());
     thumb.write_to(&mut buf, ImageFormat::Jpeg).ok()?;
-    Some(format!(
-        "data:image/jpeg;base64,{}",
-        base64::engine::general_purpose::STANDARD.encode(buf.get_ref())
-    ))
+    Some(buf.into_inner())
 }
 
 #[cfg(feature = "video-thumbs")]
-fn generate_video_thumbnail(path: &str) -> Option<String> {
+fn generate_video_thumbnail_bytes(path: &str) -> Option<Vec<u8>> {
     let mut ctx = ffmpeg_next::format::input(path).ok()?;
     let (stream_index, time_base, params) = {
         let streams = ctx.streams();
@@ -123,7 +132,7 @@ fn generate_video_thumbnail(path: &str) -> Option<String> {
             let mut frame = ffmpeg_next::frame::Video::empty();
             match decoder.receive_frame(&mut frame) {
                 Ok(()) => {
-                    if let Some(result) = process_video_frame(&frame) {
+                    if let Some(result) = process_video_frame_bytes(&frame) {
                         return Some(result);
                     }
                 }
@@ -138,7 +147,7 @@ fn generate_video_thumbnail(path: &str) -> Option<String> {
         let mut frame = ffmpeg_next::frame::Video::empty();
         match decoder.receive_frame(&mut frame) {
             Ok(()) => {
-                if let Some(result) = process_video_frame(&frame) {
+                if let Some(result) = process_video_frame_bytes(&frame) {
                     return Some(result);
                 }
             }
@@ -150,7 +159,7 @@ fn generate_video_thumbnail(path: &str) -> Option<String> {
 }
 
 #[cfg(feature = "video-thumbs")]
-fn process_video_frame(frame: &ffmpeg_next::frame::Video) -> Option<String> {
+fn process_video_frame_bytes(frame: &ffmpeg_next::frame::Video) -> Option<Vec<u8>> {
     let mut rgb = ffmpeg_next::frame::Video::empty();
     let mut scaler = match ffmpeg_next::software::scaling::context::Context::get(
         frame.format(),
@@ -171,10 +180,7 @@ fn process_video_frame(frame: &ffmpeg_next::frame::Video) -> Option<String> {
     image::DynamicImage::ImageRgb8(img)
         .write_to(&mut buf, ImageFormat::Jpeg)
         .ok()?;
-    Some(format!(
-        "data:image/jpeg;base64,{}",
-        base64::engine::general_purpose::STANDARD.encode(buf.get_ref())
-    ))
+    Some(buf.into_inner())
 }
 
 #[cfg(test)]
@@ -216,10 +222,11 @@ mod tests {
         let path = dir.path().join("test.jpg");
         let path_str = path.to_str().unwrap();
         create_test_image(path_str);
-        let result = generate_image_thumbnail(path_str);
+        let result = generate_thumbnail_bytes(path_str);
         assert!(result.is_some());
-        let data_url = result.unwrap();
-        assert!(data_url.starts_with("data:image/jpeg;base64,"));
+        let bytes = result.unwrap();
+        assert!(!bytes.is_empty());
+        assert!(bytes.len() < 100_000);
     }
 
     #[test]
@@ -228,13 +235,13 @@ mod tests {
         let path = dir.path().join("corrupt.jpg");
         let path_str = path.to_str().unwrap();
         create_corrupt_file(path_str);
-        let result = generate_image_thumbnail(path_str);
+        let result = generate_thumbnail_bytes(path_str);
         assert!(result.is_none());
     }
 
     #[test]
     fn test_generate_image_thumbnail_nonexistent() {
-        let result = generate_image_thumbnail("/nonexistent/path.jpg");
+        let result = generate_thumbnail_bytes("/nonexistent/path.jpg");
         assert!(result.is_none());
     }
 

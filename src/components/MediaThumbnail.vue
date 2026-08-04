@@ -1,14 +1,14 @@
 <template>
   <div class="rail-item" ref="container" :class="{ active: active }" @click="$emit('click')">
     <template v-if="isVisible">
+      <img v-if="thumbSrc" :src="thumbSrc" :alt="$t('media_thumbnail.alt_thumb')" />
       <video
-        v-if="isVideo && !photo.encoded"
+        v-else-if="isVideo && !photo.encoded"
         :src="videoUrl + '#t=0.5'"
         :alt="$t('media_thumbnail.alt_thumb')"
         muted
         preload="metadata"
       />
-      <img v-else :src="imageSrc" :alt="$t('media_thumbnail.alt_thumb')" />
       <div v-if="isVideo" class="rail-video-icon">
         <v-icon size="12" color="white">mdi-play</v-icon>
       </div>
@@ -18,58 +18,58 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useMediaUrl } from '@/composables/useMediaUrl'
-import type { MediaItem } from '@/types/media'
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useMediaUrl } from '@/composables/useMediaUrl';
+import type { MediaItem } from '@/types/media';
 
 const props = defineProps<{
-  photo: MediaItem
-  active: boolean
-}>()
+  photo: MediaItem;
+  active: boolean;
+}>();
 
 defineEmits<{
-  click: []
-}>()
+  click: [];
+}>();
 
-const { isVideo: checkIsVideo, videoUrl: buildVideoUrl } = useMediaUrl()
+const { isVideo: checkIsVideo, videoUrl: buildVideoUrl, thumbUrl: buildThumbUrl } = useMediaUrl();
 
-const isVisible = ref(false)
-const container = ref<HTMLElement | null>(null)
-let observer: IntersectionObserver | null = null
+const isVisible = ref(false);
+const container = ref<HTMLElement | null>(null);
+let observer: IntersectionObserver | null = null;
 
 const isVideo = computed(() => {
-  if (!props.photo?.location) return false
-  return checkIsVideo(props.photo.location)
-})
+  if (!props.photo?.location) return false;
+  return checkIsVideo(props.photo.location);
+});
 
 const videoUrl = computed(() => {
-  if (!props.photo?.location || !isVideo.value) return ''
-  return buildVideoUrl(props.photo.location)
-})
+  if (!props.photo?.location || !isVideo.value) return '';
+  return buildVideoUrl(props.photo.location);
+});
 
-const imageSrc = computed(() => {
-  if (!props.photo?.location) return ''
-  if (props.photo.encoded) return props.photo.encoded
-  return ''
-})
+const thumbSrc = computed(() => {
+  if (!props.photo?.location) return '';
+  if (props.photo.encoded) return props.photo.encoded;
+  return buildThumbUrl(props.photo.location) ?? '';
+});
 
 onMounted(() => {
   if (typeof IntersectionObserver === 'undefined') {
-    isVisible.value = true
-    return
+    isVisible.value = true;
+    return;
   }
   observer = new IntersectionObserver(
     (entries) => {
-      isVisible.value = entries[0].isIntersecting
+      isVisible.value = entries[0].isIntersecting;
     },
     { rootMargin: '100px', threshold: 0.01 },
-  )
-  if (container.value) observer.observe(container.value)
-})
+  );
+  if (container.value) observer.observe(container.value);
+});
 
 onUnmounted(() => {
-  observer?.disconnect()
-})
+  observer?.disconnect();
+});
 </script>
 
 <style scoped>

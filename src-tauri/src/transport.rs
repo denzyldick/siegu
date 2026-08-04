@@ -2,6 +2,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::database;
+use hex::ToHex;
+use sha2::{Digest, Sha256};
 use siegu_core::mesh_transport::MeshTransport;
 use warp::Filter;
 
@@ -57,6 +59,69 @@ fn path_within_roots(roots: &[PathBuf], candidate: &Path) -> bool {
     })
 }
 
+/// Content-addressable key for the on-disk thumbnail cache (hash of the media
+/// path). Immutable and stable across restarts, so browsers can cache forever.
+fn thumb_cache_key(path: &Path) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(path.as_os_str().to_string_lossy().as_bytes());
+    hasher.finalize().encode_hex()
+}
+
+fn thumb_response(
+    bytes: Vec<u8>,
+    etag: String,
+    is_head: bool,
+) -> Result<warp::http::Response<Vec<u8>>, warp::Rejection> {
+    warp::http::Response::builder()
+        .header("Content-Type", "image/jpeg")
+        .header("Cache-Control", "public, max-age=31536000, immutable")
+        .header("ETag", format!("\"{etag}\""))
+        .header("Content-Length", bytes.len().to_string())
+        .body(if is_head { Vec::new() } else { bytes })
+        .map_err(|_| warp::reject::not_found())
+}
+
+/// Serve a cached or freshly generated 320px thumbnail for a validated media
+/// file. Generates on first request (image decode runs on the blocking pool,
+/// bounded by a semaphore), then persists to `config_path/thumbs/<key>.jpg` so
+/// every later request is a cache hit.
+async fn serve_thumbnail(
+    path: &Path,
+    cache_dir: PathBuf,
+    semaphore: Arc<tokio::sync::Semaphore>,
+    is_head: bool,
+) -> Result<warp::http::Response<Vec<u8>>, warp::Rejection> {
+    let key = thumb_cache_key(path);
+    let cached = cache_dir.join(format!("{key}.jpg"));
+    if let Ok(bytes) = tokio::fs::read(&cached).await {
+        return thumb_response(bytes, key, is_head);
+    }
+
+    let _permit = semaphore
+        .acquire_owned()
+        .await
+        .map_err(|_| warp::reject::not_found())?;
+    let path_owned = path.to_path_buf();
+    let generated = tokio::task::spawn_blocking(move || {
+        path_owned
+            .to_str()
+            .and_then(siegu_core::thumbnail::generate_thumbnail_bytes)
+    })
+    .await
+    .unwrap_or(None);
+
+    match generated {
+        Some(bytes) => {
+            let _ = tokio::fs::create_dir_all(&cache_dir).await;
+            let tmp = cache_dir.join(format!("{key}.tmp"));
+            let _ = tokio::fs::write(&tmp, &bytes).await;
+            let _ = tokio::fs::rename(&tmp, &cached).await;
+            thumb_response(bytes, key, is_head)
+        }
+        None => Err(warp::reject::not_found()),
+    }
+}
+
 fn parse_single_range(range: &str, len: u64) -> Option<(u64, u64)> {
     let spec = range.strip_prefix("bytes=")?;
     let (a, b) = spec.split_once('-')?;
@@ -92,9 +157,18 @@ async fn serve_media_file(
     };
     let len = meta.len();
     let mime = mime_guess::from_path(path).first_or_octet_stream();
+    let modified = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let etag = format!("\"{modified:x}-{len:x}\"");
     let mut builder = warp::http::Response::builder()
         .header("Content-Type", mime.as_ref())
-        .header("Accept-Ranges", "bytes");
+        .header("Accept-Ranges", "bytes")
+        .header("Cache-Control", "public, max-age=3600")
+        .header("ETag", &etag);
 
     let bytes = if let Some(range) = range {
         match parse_single_range(&range, len) {
@@ -157,7 +231,14 @@ pub fn start_media_server(config_path: String) -> u16 {
                 std::time::Instant::now(),
                 Vec::new(),
             )));
+            // Bound concurrent thumbnail generation so a page of missing thumbs
+            // cannot saturate the blocking pool.
+            let thumb_semaphore: Arc<tokio::sync::Semaphore> =
+                Arc::new(tokio::sync::Semaphore::new(4));
+            let thumb_cache_dir = Path::new(&config_path).join("thumbs");
 
+            let media_config = config_path.clone();
+            let media_cache = Arc::clone(&cache);
             let media = warp::get()
                 .or(warp::head())
                 .unify()
@@ -167,8 +248,8 @@ pub fn start_media_server(config_path: String) -> u16 {
                 .and(warp::method())
                 .and_then(
                     move |tail: warp::path::Tail, range: Option<String>, method| {
-                        let cache = Arc::clone(&cache);
-                        let config = config_path.clone();
+                        let cache = Arc::clone(&media_cache);
+                        let config = media_config.clone();
                         async move {
                             // The frontend encodes the absolute file path as
                             // `/media/<percent-encoded path>`; anything outside the
@@ -185,7 +266,36 @@ pub fn start_media_server(config_path: String) -> u16 {
                             serve_media_file(&path, range, is_head).await
                         }
                     },
-                );
+                )
+                .boxed();
+
+            let thumb_config = config_path.clone();
+            let thumb_cache = Arc::clone(&cache);
+            let thumb = warp::get()
+                .or(warp::head())
+                .unify()
+                .and(warp::path("thumb"))
+                .and(warp::path::tail())
+                .and(warp::method())
+                .and_then(move |tail: warp::path::Tail, method| {
+                    let cache = Arc::clone(&thumb_cache);
+                    let config = thumb_config.clone();
+                    let cache_dir = thumb_cache_dir.clone();
+                    let semaphore = Arc::clone(&thumb_semaphore);
+                    async move {
+                        let decoded = percent_encoding::percent_decode_str(tail.as_str())
+                            .decode_utf8_lossy()
+                            .into_owned();
+                        let roots = load_allowed_roots(&config, &cache);
+                        let path = PathBuf::from(decoded);
+                        if !path_within_roots(&roots, &path) {
+                            return Err(warp::reject::not_found());
+                        }
+                        let is_head = method == warp::http::Method::HEAD;
+                        serve_thumbnail(&path, cache_dir, semaphore, is_head).await
+                    }
+                })
+                .boxed();
 
             let addr: std::net::SocketAddr = ([127, 0, 0, 1], 0).into();
             let listener = match tokio::net::TcpListener::bind(addr).await {
@@ -204,7 +314,7 @@ pub fn start_media_server(config_path: String) -> u16 {
             };
             let port = addr.port();
             let _ = tx.send(port);
-            warp::serve(media).incoming(listener).run().await;
+            warp::serve(media.or(thumb)).incoming(listener).run().await;
         });
     });
 
@@ -418,6 +528,134 @@ mod tests {
 
             let outside = format!("http://127.0.0.1:{port}/media/etc%2Fpasswd");
             let resp = reqwest::get(&outside).await.unwrap();
+            assert_eq!(resp.status(), reqwest::StatusCode::NOT_FOUND);
+        });
+    }
+
+    #[test]
+    fn serve_thumbnail_generates_then_serves_from_disk_cache() {
+        let root = tempfile::tempdir().unwrap();
+        let photo_dir = root.path().join("photos");
+        fs::create_dir(&photo_dir).unwrap();
+        let file = photo_dir.join("a.jpg");
+        {
+            let mut out = fs::File::create(&file).unwrap();
+            let img = image::RgbImage::from_pixel(16, 16, image::Rgb([200, 100, 50]));
+            image::codecs::jpeg::JpegEncoder::new(&mut out)
+                .encode_image(&img)
+                .unwrap();
+        }
+
+        let cache_dir = root.path().join("config").join("thumbs");
+        let cache_dir_check = cache_dir.clone();
+        let cache: DirCache = Arc::new(std::sync::Mutex::new((
+            std::time::Instant::now(),
+            vec![photo_dir.display().to_string()],
+        )));
+        let semaphore: Arc<tokio::sync::Semaphore> = Arc::new(tokio::sync::Semaphore::new(4));
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let port = rt.block_on(async {
+            let thumb = warp::get()
+                .or(warp::head())
+                .unify()
+                .and(warp::path("thumb"))
+                .and(warp::path::tail())
+                .and(warp::method())
+                .and_then(move |tail: warp::path::Tail, method| {
+                    let cache = Arc::clone(&cache);
+                    let cache_dir = cache_dir.clone();
+                    let semaphore = Arc::clone(&semaphore);
+                    async move {
+                        let decoded = percent_encoding::percent_decode_str(tail.as_str())
+                            .decode_utf8_lossy()
+                            .into_owned();
+                        let roots: Vec<PathBuf> =
+                            cache.lock().unwrap().1.iter().map(PathBuf::from).collect();
+                        let path = PathBuf::from(decoded);
+                        if !path_within_roots(&roots, &path) {
+                            return Err(warp::reject::not_found());
+                        }
+                        let is_head = method == warp::http::Method::HEAD;
+                        serve_thumbnail(&path, cache_dir, semaphore, is_head).await
+                    }
+                });
+
+            let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+                .await
+                .unwrap();
+            let addr = listener.local_addr().unwrap();
+            tokio::spawn(async move { warp::serve(thumb.boxed()).incoming(listener).run().await });
+            addr.port()
+        });
+
+        rt.block_on(async {
+            use percent_encoding::utf8_percent_encode;
+            use percent_encoding::NON_ALPHANUMERIC;
+
+            let encoded = utf8_percent_encode(file.to_str().unwrap(), NON_ALPHANUMERIC).to_string();
+            let url = format!("http://127.0.0.1:{port}/thumb/{encoded}");
+            let client = reqwest::Client::new();
+
+            let resp = client.get(&url).send().await.unwrap();
+            assert_eq!(resp.status(), reqwest::StatusCode::OK);
+            assert_eq!(
+                resp.headers()
+                    .get("content-type")
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
+                "image/jpeg"
+            );
+            let cache_control = resp
+                .headers()
+                .get("cache-control")
+                .unwrap()
+                .to_str()
+                .unwrap();
+            assert!(cache_control.contains("immutable"));
+            let etag = resp
+                .headers()
+                .get("etag")
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string();
+            assert!(!resp.bytes().await.unwrap().is_empty());
+
+            // The generated thumbnail was persisted to the on-disk cache.
+            let key = thumb_cache_key(&file);
+            assert!(cache_dir_check.join(format!("{key}.jpg")).exists());
+
+            // A second request is served from the disk cache with a stable ETag.
+            let resp2 = client.get(&url).send().await.unwrap();
+            assert_eq!(
+                resp2
+                    .headers()
+                    .get("etag")
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+                etag
+            );
+
+            // HEAD returns headers but no body.
+            let head = client.head(&url).send().await.unwrap();
+            assert_eq!(head.status(), reqwest::StatusCode::OK);
+            assert_eq!(
+                head.headers()
+                    .get("etag")
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+                etag
+            );
+            assert_eq!(head.bytes().await.unwrap().len(), 0);
+
+            let outside = format!("http://127.0.0.1:{port}/thumb/etc%2Fpasswd");
+            let resp = client.get(&outside).send().await.unwrap();
             assert_eq!(resp.status(), reqwest::StatusCode::NOT_FOUND);
         });
     }

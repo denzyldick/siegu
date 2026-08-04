@@ -71,6 +71,7 @@ heic = "0.1.6"
 [dev-dependencies]
 tempfile = "3.19.0"
 tungstenite = "0.28.0"
+image = { workspace = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 ffmpeg-next = "8.1.0"

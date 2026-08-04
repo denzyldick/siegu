@@ -7,22 +7,31 @@
   >
     <div class="media-card-wrapper shadow-sm">
       <template v-if="isVisible">
-        <video
-          v-if="isVideo && !path.encoded && computedVideoUrl"
-          :src="computedVideoUrl + '#t=0.5'"
-          class="media-card-img"
-          muted
-          preload="metadata"
-          @error="onVideoError"
-        ></video>
         <img
-          v-else
+          v-if="imageSrc"
           :src="imageSrc"
           loading="lazy"
           :alt="$t('media_card.alt_photo')"
           class="media-card-img"
           @error="onImageError"
         />
+        <img
+          v-else-if="posterSrc"
+          :src="posterSrc"
+          loading="lazy"
+          :alt="$t('media_card.alt_photo')"
+          class="media-card-img"
+          @error="onPosterError"
+        />
+        <video
+          v-else-if="isVideo && !path.encoded && computedVideoUrl"
+          :src="computedVideoUrl + '#t=0.5'"
+          class="media-card-img"
+          muted
+          preload="metadata"
+          @error="onVideoError"
+        ></video>
+        <div v-else class="media-card-img img-placeholder"></div>
 
         <div class="scrim-overlay"></div>
 
@@ -102,7 +111,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { convertFileSrc } from '@tauri-apps/api/core';
 import { useMediaUrl } from '@/composables/useMediaUrl';
 import { isVideo as checkIsVideo, formatScore } from '@/composables/useMediaUtils';
 import type { MediaItem } from '@/types/media';
@@ -120,7 +128,7 @@ const emit = defineEmits<{
   select: [id: string | number];
 }>();
 
-const { videoUrl: buildVideoUrl } = useMediaUrl();
+const { videoUrl: buildVideoUrl, thumbUrl: buildThumbUrl } = useMediaUrl();
 
 const containerRef = ref<HTMLElement | null>(null);
 const isVisible = ref(false);
@@ -136,15 +144,24 @@ const computedVideoUrl = computed(() => {
   return buildVideoUrl(props.path.location);
 });
 
+const posterFailed = ref(false);
+
 const imageSrc = computed(() => {
   if (!props.path?.location) return undefined;
   if (props.path.encoded) return props.path.encoded;
   if (!isVideo.value) {
     const ext = props.path.location.split('.').pop()?.toLowerCase();
     if (['heic', 'heif'].includes(ext ?? '')) return undefined;
-    return convertFileSrc(props.path.location);
+    return buildThumbUrl(props.path.location);
   }
   return undefined;
+});
+
+// Prefer a generated poster (320px thumb from ffmpeg) over mounting a video
+// element per card, which forces the browser to download media bytes.
+const posterSrc = computed(() => {
+  if (posterFailed.value || !isVideo.value || !props.path?.location) return undefined;
+  return buildThumbUrl(props.path.location);
 });
 
 const tags = computed((): string[] => {
@@ -204,6 +221,10 @@ function onVideoError(): void {
   console.error('[MediaCard] Failed to load video:', props.path?.location);
 }
 
+function onPosterError(): void {
+  posterFailed.value = true;
+}
+
 onMounted(() => {
   if (typeof IntersectionObserver === 'undefined') {
     isVisible.value = true;
@@ -243,6 +264,10 @@ onUnmounted(() => {
 }
 
 .viewport-placeholder {
+  background-color: #f4f4f5;
+}
+
+.img-placeholder {
   background-color: #f4f4f5;
 }
 

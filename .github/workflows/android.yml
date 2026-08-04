@@ -73,8 +73,12 @@ jobs:
 
       - name: Build core tests for Android (x86_64)
         run: |
-          cargo ndk -t x86_64-linux-android --platform 24 test -p siegu-core --lib --no-run
-          cargo ndk -t x86_64-linux-android --platform 24 test -p siegu-core --test sync_e2e --no-run
+          # ort-sys ships no prebuilt ONNX Runtime for x86_64-linux-android, so
+          # the emulator test binaries are built with siegu-core's default
+          # features (ml) disabled. Core lib + sync_e2e tests don't need ML, and
+          # the aarch64 check above still validates the ML/ort cross-compile.
+          cargo ndk -t x86_64-linux-android --platform 24 test -p siegu-core --lib --no-run --no-default-features
+          cargo ndk -t x86_64-linux-android --platform 24 test -p siegu-core --test sync_e2e --no-run --no-default-features
 
       - name: Locate test binaries
         run: |
