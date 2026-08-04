@@ -168,9 +168,12 @@ jobs:
       - name: Build Tauri App (no bundle)
         run: npm run tauri build -- --no-bundle
 
+  # ── Android: cross-check the Tauri app and run core tests on an emulator ──
   test-android:
     if: github.event_name != 'release'
     runs-on: ubuntu-24.04
+    env:
+      ORT_STRATEGY: download
     steps:
       - uses: actions/checkout@v4
 
@@ -195,16 +198,17 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: android
-          workspaces: src-tauri
+          workspaces: crates,src-tauri
 
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y nasm
 
-      - name: Install cargo-ndk
-        run: cargo install cargo-ndk
-
-      - name: Ensure rust targets are installed
-        run: rustup target add aarch64-linux-android || true
+      - name: Install cargo-ndk (prebuilt binary)
+        run: |
+          curl -sSLo /tmp/cargo-ndk.tgz https://github.com/bbqsrc/cargo-ndk/releases/download/v4.1.2/cargo-ndk-x86_64-unknown-linux-gnu-v4.1.2.tgz
+          mkdir -p /tmp/cargo-ndk
+          tar -xzf /tmp/cargo-ndk.tgz -C /tmp/cargo-ndk --strip-components=1
+          install -m 755 /tmp/cargo-ndk/cargo-ndk "$HOME/.cargo/bin/cargo-ndk"
 
       - name: Patch ffmpeg-sys-next for Android cross-compilation
         run: |
@@ -224,77 +228,10 @@ jobs:
         working-directory: src-tauri
         run: cargo ndk -t aarch64-linux-android -P 24 check
 
-  test-ios:
-    if: github.event_name != 'release'
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-ios, x86_64-apple-ios, aarch64-apple-ios-sim
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ios
-          workspaces: src-tauri
-
-      - run: npm install
-
-      - run: cargo fmt --check
-        working-directory: src-tauri
-
-      - run: cargo check --target aarch64-apple-ios
-        working-directory: src-tauri
-
-  # ── Mobile runtime verification: core unit tests + in-process mesh sync ──
-  # Builds the siegu-core test harnesses for arm64 and runs them on a real
-  # Android emulator / iOS simulator so the shared runtime (DB, WebRTC mesh)
-  # is exercised on-device at least once. Disable these if they get too slow.
-  test-android-emulator:
-    if: github.event_name != 'release'
-    runs-on: ubuntu-24.04
-    env:
-      ORT_STRATEGY: download
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: "platforms;android-34 build-tools;34.0.0 ndk;27.0.12077973"
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: android-emu
-          workspaces: crates
-
-      - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y nasm
-
-      - name: Install cargo-ndk
-        run: cargo install cargo-ndk
-
       - name: Build core tests for Android (aarch64)
         run: |
-          cargo ndk -t aarch64-linux-android -p 24 test -p siegu-core --lib --no-run
-          cargo ndk -t aarch64-linux-android -p 24 test -p siegu-core --test sync_e2e --no-run
+          cargo ndk -t aarch64-linux-android --platform 24 test -p siegu-core --lib --no-run
+          cargo ndk -t aarch64-linux-android --platform 24 test -p siegu-core --test sync_e2e --no-run
 
       - name: Locate test binaries
         run: |
@@ -323,7 +260,8 @@ jobs:
             adb shell 'export TMPDIR=/data/local/tmp; /data/local/tmp/siegu_core_tests --test-threads 4'
             adb shell 'export TMPDIR=/data/local/tmp; /data/local/tmp/sync_e2e_tests --test-threads 2'
 
-  test-ios-simulator:
+  # ── iOS: cross-check the Tauri app and run core tests on a simulator ──
+  test-ios:
     if: github.event_name != 'release'
     runs-on: macos-latest
     env:
@@ -337,12 +275,20 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios-sim
+          targets: aarch64-apple-ios, x86_64-apple-ios, aarch64-apple-ios-sim
 
       - uses: Swatinem/rust-cache@v2
         with:
-          key: ios-sim
-          workspaces: crates
+          key: ios
+          workspaces: crates,src-tauri
+
+      - run: npm install
+
+      - run: cargo fmt --check
+        working-directory: src-tauri
+
+      - run: cargo check --target aarch64-apple-ios
+        working-directory: src-tauri
 
       - name: Build core tests for iOS simulator (aarch64)
         run: |
