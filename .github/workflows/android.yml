@@ -36,13 +36,12 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android
+          targets: aarch64-linux-android,x86_64-linux-android
           components: rustfmt
 
       - uses: Swatinem/rust-cache@v2
         with:
           key: android
-          workspaces: crates,src-tauri
 
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y nasm
@@ -72,25 +71,25 @@ jobs:
         working-directory: src-tauri
         run: cargo ndk -t aarch64-linux-android -P 24 check
 
-      - name: Build core tests for Android (aarch64)
+      - name: Build core tests for Android (x86_64)
         run: |
-          cargo ndk -t aarch64-linux-android --platform 24 test -p siegu-core --lib --no-run
-          cargo ndk -t aarch64-linux-android --platform 24 test -p siegu-core --test sync_e2e --no-run
+          cargo ndk -t x86_64-linux-android --platform 24 test -p siegu-core --lib --no-run
+          cargo ndk -t x86_64-linux-android --platform 24 test -p siegu-core --test sync_e2e --no-run
 
       - name: Locate test binaries
         run: |
-          echo "LIB_TEST=$(find target/aarch64-linux-android/debug/deps -maxdepth 1 -type f -perm -u+x -name 'siegu_core-*' | head -1)" >> $GITHUB_ENV
-          echo "SYNC_TEST=$(find target/aarch64-linux-android/debug/deps -maxdepth 1 -type f -perm -u+x -name 'sync_e2e-*' | head -1)" >> $GITHUB_ENV
+          echo "LIB_TEST=$(find target/x86_64-linux-android/debug/deps -maxdepth 1 -type f -perm -u+x -name 'siegu_core-*' | head -1)" >> $GITHUB_ENV
+          echo "SYNC_TEST=$(find target/x86_64-linux-android/debug/deps -maxdepth 1 -type f -perm -u+x -name 'sync_e2e-*' | head -1)" >> $GITHUB_ENV
 
       - name: Run tests on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          # arm64-v8a guest on an x86_64 host cannot use KVM, so it boots via
-          # software emulation. aosp_atd (Automated Test Device) images are
-          # stripped-down and boot fastest under emulation, and API 30 is the
-          # highest level that ships an arm64-v8a image.
+          # x86_64 guests on an x86_64 host use KVM, so they boot fast and
+          # reliably. arm64-v8a images cannot use KVM here and routinely time
+          # out booting under software emulation, so the ARM build is only
+          # cross-checked above while tests actually run on x86_64.
           api-level: 30
-          arch: arm64-v8a
+          arch: x86_64
           target: aosp_atd
           force-avd-creation: true
           emulator-boot-timeout: 1800

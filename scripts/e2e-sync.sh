@@ -55,7 +55,18 @@ JOIN_PID=""
 cleanup() {
   [ -n "$HOST_PID" ] && kill "$HOST_PID" 2>/dev/null || true
   [ -n "$JOIN_PID" ] && kill "$JOIN_PID" 2>/dev/null || true
-  rm -rf "$WORK"
+  # The peers can still be holding their SQLite/WAL files open for a moment
+  # after kill (especially on Windows/MSYS), which makes `rm -rf` fail with
+  # "Device or resource busy" and, under `set -e`, flips the CI exit code.
+  # Give them a moment to exit, then clean up best-effort.
+  for _ in $(seq 1 50); do
+    ALIVE=""
+    [ -n "$HOST_PID" ] && kill -0 "$HOST_PID" 2>/dev/null && ALIVE=1
+    [ -n "$JOIN_PID" ] && kill -0 "$JOIN_PID" 2>/dev/null && ALIVE=1
+    [ -z "$ALIVE" ] && break
+    sleep 0.1
+  done
+  rm -rf "$WORK" 2>/dev/null || true
 }
 trap cleanup EXIT
 
