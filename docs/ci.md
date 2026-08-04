@@ -73,8 +73,18 @@ SIEGU_SIGNAL_URL=ws://127.0.0.1:8080 bash scripts/e2e-sync.sh
 # Or: a bare `siegu serve` on one terminal, then the script with SIEGU_SIGNAL_URL
 ```
 
-The Rust-level equivalents live in `crates/siegu-core/tests/sync_e2e.rs` and
-run with `cargo test -p siegu-core --test sync_e2e` (no models needed).
+The Rust-level equivalents live in `crates/siegu-core/tests/` and run with
+`cargo test -p siegu-core` (no models needed):
+
+- `sync_e2e.rs` — two peers exchange protocol messages over a LAN signaling
+  server (also honors `SIEGU_SIGNAL_URL` for external servers).
+- `mesh_e2e.rs` — three scenarios:
+  - `two_joiners_connect_with_initiator_flag`: the `mesh join --initiator`
+    path, where two joiner peers (neither is the LAN host) connect.
+  - `mesh_delta_sync_transfers_only_new_photos`: reconnect after a peer adds
+    a photo and assert only the new file transfers (delta sync).
+  - `mdns_discovers_lan_host`: registers the `_siegu._tcp` service and
+    verifies LAN discovery finds it (skips only if mDNS is unavailable).
 
 ### Running the ML E2E locally
 

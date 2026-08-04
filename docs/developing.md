@@ -87,6 +87,7 @@ cargo test -- --ignored test_whisper_smoke
 
 # Run the mesh sync E2E (Rust-level, no models needed)
 cargo test -p siegu-core --test sync_e2e
+cargo test -p siegu-core --test mesh_e2e    # join --initiator, delta sync, mDNS
 
 # Run the CLI-level sync E2E (builds + exercises two real processes)
 bash scripts/e2e-sync.sh
