@@ -52,6 +52,9 @@ locally.
   built from `landing-page/Dockerfile` (`node:20-alpine`, `npm ci --omit=dev`).
 - Both add a build-only `build-image` job on PRs so image breakage is caught
   before merge without publishing.
+- Tagging: pushes to `main` get `main` + `<commit-sha>`; version tags get
+  `semver` tags + `<commit-sha>` and set `latest` (so `latest` always points at
+  the newest release, never at unreleased `main`).
 
 ## E2E scripts
 
