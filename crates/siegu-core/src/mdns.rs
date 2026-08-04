@@ -149,6 +149,9 @@ fn bind_multicast_socket() -> Result<UdpSocket, Box<dyn std::error::Error>> {
         Some(socket2::Protocol::UDP),
     )?;
     sock.set_reuse_address(true)?;
+    // macOS/BSD require SO_REUSEPORT to bind UDP 5353 alongside
+    // mDNSResponder, which already owns the port. Harmless elsewhere.
+    sock.set_reuse_port(true)?;
     if let Err(e) = sock.set_read_timeout(Some(Duration::from_millis(200))) {
         eprintln!("set_read_timeout: {e}");
     }

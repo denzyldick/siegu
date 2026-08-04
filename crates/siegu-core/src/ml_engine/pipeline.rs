@@ -489,14 +489,44 @@ pub fn generate_blip_caption(img: &image::RgbImage, models: &mut LoadedModels) -
 
     let (enc_hidden, enc_attn_mask) = {
         let mut lock = vision_encoder.lock().ok()?;
-        let encoder_outputs = lock.run(ort::inputs!["pixel_values" => tensor]).ok()?;
-        if encoder_outputs.len() >= 2 {
-            let (_, hidden_data) = encoder_outputs[0].try_extract_tensor::<f32>().ok()?;
-            let (_, mask_data) = encoder_outputs[1].try_extract_tensor::<i64>().ok()?;
-            (hidden_data.to_vec(), mask_data.to_vec())
-        } else {
+        let encoder_outputs = match lock.run(ort::inputs!["pixel_values" => tensor]) {
+            Ok(outputs) => outputs,
+            Err(e) => {
+                tracing::warn!("blip vision encoder run failed: {e}");
+                return None;
+            }
+        };
+        if encoder_outputs.len() == 0 {
+            tracing::warn!("blip vision encoder produced no outputs");
             return None;
         }
+        let (_, hidden_data) = match encoder_outputs[0].try_extract_tensor::<f32>() {
+            Ok((shape, data)) => (shape, data),
+            Err(e) => {
+                tracing::warn!("blip vision encoder output[0] is not f32: {e}");
+                return None;
+            }
+        };
+        let enc_hidden: Vec<f32> = hidden_data.to_vec();
+        // onnx-community exports (1, 577, 768) hidden states + attention mask.
+        // The mask dtype varies between exports (i64 vs f32); the input has no
+        // padding, so fall back to an all-ones mask from the hidden length.
+        let seq_len = enc_hidden.len() / 768;
+        let enc_attn_mask: Vec<i64> = if encoder_outputs.len() >= 2 {
+            match encoder_outputs[1].try_extract_tensor::<i64>() {
+                Ok((_, mask)) => mask.to_vec(),
+                Err(_) => match encoder_outputs[1].try_extract_tensor::<f32>() {
+                    Ok((_, mask)) => mask.iter().map(|&v| (v != 0.0) as i64).collect(),
+                    Err(_) => {
+                        tracing::warn!("blip vision encoder output[1] is neither i64 nor f32");
+                        vec![1i64; seq_len]
+                    }
+                },
+            }
+        } else {
+            vec![1i64; seq_len]
+        };
+        (enc_hidden, enc_attn_mask)
     };
 
     let bos: i64 = 30522;
@@ -541,8 +571,20 @@ pub fn generate_blip_caption(img: &image::RgbImage, models: &mut LoadedModels) -
 
         let next_token = {
             let mut lock = decoder.lock().ok()?;
-            let outputs = lock.run(inputs).ok()?;
-            let (logits_shape, logits_data) = outputs[0].try_extract_tensor::<f32>().ok()?;
+            let outputs = match lock.run(inputs) {
+                Ok(outputs) => outputs,
+                Err(e) => {
+                    tracing::warn!("blip decoder run failed: {e}");
+                    return None;
+                }
+            };
+            let (logits_shape, logits_data) = match outputs[0].try_extract_tensor::<f32>() {
+                Ok((shape, data)) => (shape, data),
+                Err(e) => {
+                    tracing::warn!("blip decoder output[0] is not f32: {e}");
+                    return None;
+                }
+            };
             let vocab_size = *logits_shape.last().unwrap_or(&30524) as usize;
             let last_offset = logits_data.len().saturating_sub(vocab_size);
             let last_logits = &logits_data[last_offset..last_offset + vocab_size];

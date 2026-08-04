@@ -83,8 +83,11 @@ pub fn yunet_preprocess(img: &image::RgbImage) -> Array4<f32> {
 }
 
 pub fn midas_preprocess(img: &image::RgbImage) -> Array4<f32> {
-    let resized = image::imageops::resize(img, 256, 256, image::imageops::FilterType::Triangle);
-    let mut input = Array4::<f32>::zeros((1, 3, 256, 256));
+    // Xenova/dpt-hybrid-midas is exported with position embeddings sized for a
+    // 384x384 input (24x24 + 1 = 577 patches). Feeding 256x256 produced
+    // 257-patch embeddings and failed to broadcast against the 577-embedding.
+    let resized = image::imageops::resize(img, 384, 384, image::imageops::FilterType::Triangle);
+    let mut input = Array4::<f32>::zeros((1, 3, 384, 384));
     for (x, y, pixel) in resized.enumerate_pixels() {
         input[[0, 0, y as usize, x as usize]] = pixel[0] as f32 / 255.0;
         input[[0, 1, y as usize, x as usize]] = pixel[1] as f32 / 255.0;
