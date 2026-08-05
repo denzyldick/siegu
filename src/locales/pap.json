@@ -116,7 +116,10 @@
     "sort_newest": "Mas resien",
     "sort_best": "Mihó kalidat",
     "sort_random": "Alatorio",
-    "best_shot": "Mihó potret di e dia"
+    "best_shot": "Mihó potret di e dia",
+    "save_as_album": "Wardá kom album",
+    "save_as_album_hint": "Wardá e buskeda aktual kom album di ménke ku ta keda aktualisá outomátiko.",
+    "save_as_album_placeholder": "Nòmber di album..."
   },
   "sync": {
     "status_label": "STATUS DI BIBLIOTEKA",
@@ -608,6 +611,16 @@
     "selected": "{count} selekshoná",
     "reorder_hint": "Hala foto pa reordená",
     "load_more": "Subi mas",
-    "cover_photo": "Portada di album"
+    "cover_photo": "Portada di album",
+    "section_people": "Hende",
+    "section_places": "Lugá",
+    "section_trips": "Biahenan",
+    "section_smart": "Albnan di ménke",
+    "section_albums": "Albnan",
+    "kind_person": "Persona",
+    "kind_location": "Lugá",
+    "kind_trip": "Biahe",
+    "kind_smart": "Album di ménke",
+    "kind_album": "Album"
   }
 }

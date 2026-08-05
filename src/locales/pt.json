@@ -116,7 +116,10 @@
     "sort_newest": "Mais recentes",
     "sort_best": "Melhor qualidade",
     "sort_random": "Aleatório",
-    "best_shot": "Melhor foto do dia"
+    "best_shot": "Melhor foto do dia",
+    "save_as_album": "Salvar como álbum",
+    "save_as_album_hint": "Salve a pesquisa atual como álbum inteligente que fica atualizado automaticamente.",
+    "save_as_album_placeholder": "Nome do álbum..."
   },
   "sync": {
     "status_label": "STATUS DA BIBLIOTECA",
@@ -608,6 +611,16 @@
     "selected": "{count} selecionados",
     "reorder_hint": "Arraste fotos para reordenar",
     "load_more": "Carregar mais",
-    "cover_photo": "Capa do álbum"
+    "cover_photo": "Capa do álbum",
+    "section_people": "Pessoas",
+    "section_places": "Lugares",
+    "section_trips": "Viagens",
+    "section_smart": "Álbuns inteligentes",
+    "section_albums": "Álbuns",
+    "kind_person": "Pessoa",
+    "kind_location": "Local",
+    "kind_trip": "Viagem",
+    "kind_smart": "Álbum inteligente",
+    "kind_album": "Álbum"
   }
 }

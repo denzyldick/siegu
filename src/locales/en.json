@@ -101,7 +101,10 @@
     "sort_newest": "Newest",
     "sort_best": "Best quality",
     "sort_random": "Random",
-    "best_shot": "Best shot of the day"
+    "best_shot": "Best shot of the day",
+    "save_as_album": "Save as album",
+    "save_as_album_hint": "Save the current search as a smart album that stays up to date automatically.",
+    "save_as_album_placeholder": "Album name..."
   },
   "filters": {
     "favorites_only": "Favorites only",
@@ -356,7 +359,17 @@
     "selected": "{count} selected",
     "reorder_hint": "Drag photos to reorder",
     "load_more": "Load more",
-    "cover_photo": "Album cover"
+    "cover_photo": "Album cover",
+    "section_people": "People",
+    "section_places": "Places",
+    "section_trips": "Trips",
+    "section_smart": "Smart Albums",
+    "section_albums": "Albums",
+    "kind_person": "Person",
+    "kind_location": "Place",
+    "kind_trip": "Trip",
+    "kind_smart": "Smart album",
+    "kind_album": "Album"
   },
   "settings": {
     "title": "Settings",

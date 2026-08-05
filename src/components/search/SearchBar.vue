@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useSearchStore } from '@/stores/search';
+import { useAlbumsStore } from '@/stores/albums';
 import { getFaceImageSrc, getMediaThumbnailSrc } from '@/composables/useMediaUtils';
 import { listFiles } from '@/services/tauri';
 import DateRangePicker from '@/components/search/DateRangePicker.vue';
@@ -13,6 +14,7 @@ import type { MediaItem } from '@/types/media';
 
 const { t } = useI18n();
 const searchStore = useSearchStore();
+const albumsStore = useAlbumsStore();
 
 const vEdgeScroll = {
   mounted(el: HTMLElement) {
@@ -67,9 +69,7 @@ const locations = computed(() =>
 );
 
 const tags = computed(() =>
-  (facets.value?.tags ?? [])
-    .filter((l) => !q.value || matches(l.name))
-    .slice(0, 8),
+  (facets.value?.tags ?? []).filter((l) => !q.value || matches(l.name)).slice(0, 8),
 );
 
 const papers = computed(() =>
@@ -243,6 +243,64 @@ function clearAll(): void {
   searchStore.clearQuery();
   searchStore.clearFilters();
   closeDropdown();
+}
+
+const saveAlbumDialog = ref(false);
+const saveAlbumName = ref('');
+const savingAlbum = ref(false);
+
+function canSaveAlbum(): boolean {
+  if (searchStore.query.trim()) return false;
+  return searchStore.hasFilters;
+}
+
+function buildRule(): Record<string, unknown> {
+  const byType = (type: string) => searchStore.activeFilters.find((f) => f.type === type);
+  const people = searchStore.activeFilters.filter((f) => f.type === 'person');
+  const location = byType('location');
+  const tag = byType('tag');
+  const month = byType('month');
+  const date = byType('date');
+  const dateRange = date ? (date.value.split('|') as [string, string]) : null;
+  return {
+    person_ids: people.map((f) => f.value),
+    person_match: searchStore.personMatch,
+    person_alone: searchStore.personAlone,
+    location: location ? location.value : null,
+    tag: tag ? tag.value : null,
+    date_from: month ? `${month.value}-01` : dateRange ? dateRange[0] : null,
+    date_to: month ? `${month.value}-31` : dateRange ? dateRange[1] : null,
+    favorite: searchStore.mediaFilters.favoritesOnly,
+    has_faces: searchStore.mediaFilters.facesOnly,
+    papers: searchStore.mediaFilters.papersOnly,
+    nsfw_only: searchStore.mediaFilters.nsfwOnly,
+    camera: searchStore.camera,
+    aesthetics_min: searchStore.aestheticsMin,
+    random: false,
+    order_by: searchStore.sortOrder,
+    album_id: null,
+  };
+}
+
+function openSaveAlbumDialog(): void {
+  if (!canSaveAlbum()) return;
+  saveAlbumName.value = '';
+  saveAlbumDialog.value = true;
+}
+
+async function saveAsAlbum(): Promise<void> {
+  const name = saveAlbumName.value.trim();
+  if (!name || savingAlbum.value) return;
+  savingAlbum.value = true;
+  try {
+    const album = await albumsStore.createSmartAlbum(name, buildRule(), 'smart');
+    if (album) {
+      saveAlbumDialog.value = false;
+      closeDropdown();
+    }
+  } finally {
+    savingAlbum.value = false;
+  }
 }
 
 function isActive(type: string, value: string): boolean {
@@ -794,6 +852,10 @@ function iconForFilter(type: string): string {
 
           <v-divider class="border-subtle" />
           <div v-if="searchStore.hasFilters" class="footer-row pa-2">
+            <button class="save-album-btn" :disabled="!canSaveAlbum()" @click="openSaveAlbumDialog">
+              <v-icon size="14" class="mr-1">mdi-content-save-outline</v-icon>
+              {{ t('search.save_as_album') }}
+            </button>
             <button class="clear-btn" @click="clearAll">
               {{ t('search.clear_all') }}
             </button>
@@ -801,6 +863,35 @@ function iconForFilter(type: string): string {
         </template>
       </div>
     </Teleport>
+
+    <v-dialog v-model="saveAlbumDialog" max-width="420">
+      <v-card class="rounded-xl pa-6" color="surface">
+        <h3 class="text-h6 font-weight-bold text-zinc-primary mb-1">
+          {{ t('search.save_as_album') }}
+        </h3>
+        <p class="text-caption text-zinc-muted mb-4">{{ t('search.save_as_album_hint') }}</p>
+        <v-text-field
+          v-model="saveAlbumName"
+          :label="t('search.save_as_album_placeholder')"
+          variant="outlined"
+          hide-details
+          @keyup.enter="saveAsAlbum"
+        ></v-text-field>
+        <div class="d-flex justify-end mt-4 ga-2">
+          <v-btn variant="text" @click="saveAlbumDialog = false">{{ t('common.cancel') }}</v-btn>
+          <v-btn
+            variant="flat"
+            color="primary"
+            class="siegu-btn-modern px-6"
+            :disabled="!saveAlbumName.trim()"
+            :loading="savingAlbum"
+            @click="saveAsAlbum"
+          >
+            {{ t('common.save') }}
+          </v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -1303,6 +1394,27 @@ function iconForFilter(type: string): string {
 .clear-btn:hover {
   background: var(--color-bg-hover);
   color: var(--color-text-primary);
+}
+
+.save-album-btn {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgb(var(--v-theme-primary));
+  padding: 8px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.save-album-btn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+}
+
+.save-album-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .ellipsis {

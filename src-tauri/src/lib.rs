@@ -322,6 +322,9 @@ pub fn run() {
             commands::photos::get_heatmap_data,
             // Albums
             commands::albums::create_album,
+            commands::albums::create_smart_album,
+            commands::albums::update_smart_album_rule,
+            commands::albums::get_album_sections,
             commands::albums::rename_album,
             commands::albums::delete_album,
             commands::albums::list_albums,

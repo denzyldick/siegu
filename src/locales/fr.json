@@ -116,7 +116,10 @@
     "sort_newest": "Plus récentes",
     "sort_best": "Meilleure qualité",
     "sort_random": "Aléatoire",
-    "best_shot": "Meilleure photo du jour"
+    "best_shot": "Meilleure photo du jour",
+    "save_as_album": "Enregistrer comme album",
+    "save_as_album_hint": "Enregistrez la recherche actuelle comme album intelligent qui reste à jour automatiquement.",
+    "save_as_album_placeholder": "Nom de l'album..."
   },
   "sync": {
     "status_label": "ÉTAT DE LA BIBLIOTHÈQUE",
@@ -608,6 +611,16 @@
     "selected": "{count} sélectionnées",
     "reorder_hint": "Faites glisser les photos pour les réorganiser",
     "load_more": "Charger plus",
-    "cover_photo": "Couverture de l'album"
+    "cover_photo": "Couverture de l'album",
+    "section_people": "Personnes",
+    "section_places": "Lieux",
+    "section_trips": "Voyages",
+    "section_smart": "Albums intelligents",
+    "section_albums": "Albums",
+    "kind_person": "Personne",
+    "kind_location": "Lieu",
+    "kind_trip": "Voyage",
+    "kind_smart": "Album intelligent",
+    "kind_album": "Album"
   }
 }

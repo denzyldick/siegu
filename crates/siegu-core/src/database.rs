@@ -139,6 +139,36 @@ pub struct PhotoFilter {
     pub album_id: Option<String>,
 }
 
+/// How a non-manual album computes its membership.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AlbumKind {
+    /// A plain user-managed album with explicit album_item rows.
+    Manual,
+    /// A rule-based album whose contents are computed from a stored `PhotoFilter`.
+    Smart,
+    /// An automatically detected trip (date-bounded collection of photos).
+    Trip,
+}
+
+impl AlbumKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Manual => "manual",
+            Self::Smart => "smart",
+            Self::Trip => "trip",
+        }
+    }
+
+    pub fn parse(value: &str) -> Self {
+        match value {
+            "smart" => Self::Smart,
+            "trip" => Self::Trip,
+            _ => Self::Manual,
+        }
+    }
+}
+
 /// A user-created collection of photos. Albums are local and free for
 /// everyone; sharing them is a separate (paid) feature.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -150,6 +180,40 @@ pub struct Album {
     pub sort_order: i64,
     /// Number of photos currently in the album.
     pub item_count: i64,
+    /// Membership model: manual, smart, or trip.
+    pub kind: AlbumKind,
+    /// JSON-serialized `PhotoFilter` for smart albums (null otherwise).
+    pub rule: Option<String>,
+    /// Last modification timestamp (used to order trip albums).
+    pub updated_at: Option<String>,
+}
+
+/// One tile inside an Albums-view section: a person, a place, or a persisted
+/// album (manual / smart / trip).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AlbumSectionItem {
+    /// Stable id the frontend uses to open the item (album id, or
+    /// `person:<id>` / `place:<name>` for virtual sections).
+    pub id: String,
+    pub name: String,
+    /// Number of photos in this item.
+    pub count: i64,
+    /// Data-URL thumbnail for the tile (null when no preview is available).
+    pub cover_encoded: Option<String>,
+    /// Face crop path (people section only).
+    pub cover_crop: Option<String>,
+    /// Section-level type: "person", "location", "trip", "smart", "manual".
+    pub kind: String,
+    /// The persisted album when this item is backed by an album row.
+    pub album: Option<Album>,
+}
+
+/// A titled group of tiles in the Albums view (People, Places, Trips, Smart,
+/// and manual albums).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AlbumSection {
+    pub id: String,
+    pub items: Vec<AlbumSectionItem>,
 }
 
 /// Persisted sync session for auto-reconnect on app restart.
@@ -290,6 +354,53 @@ fn month_name_to_like(query: &str) -> Option<String> {
     }
     None
 }
+
+/// Days since 1970-01-01 for a date string in either `YYYY-MM-DD` or
+/// `YYYY:MM:DD` form (EXIF uses colons). Returns None for unparseable input.
+fn date_day_index(value: &str) -> Option<i64> {
+    let mut normalized = value.chars().take(10).collect::<String>();
+    if normalized.len() < 10 {
+        return None;
+    }
+    if normalized.contains(':') {
+        normalized = normalized.replace(':', "-");
+    }
+    let mut parts = normalized.split('-');
+    let year: i32 = parts.next()?.parse().ok()?;
+    let month: i32 = parts.next()?.parse().ok()?;
+    let day: i32 = parts.next()?.parse().ok()?;
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return None;
+    }
+    Some(days_from_civil(year, month, day))
+}
+
+/// Inverse of [`date_day_index`] (Howard Hinnant's civil-from-days).
+fn day_index_to_date(days: i64) -> Option<String> {
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    Some(format!("{y:04}-{m:02}-{d:02}"))
+}
+
+/// Howard Hinnant's days-from-civil algorithm (proleptic Gregorian).
+fn days_from_civil(year: i32, month: i32, day: i32) -> i64 {
+    let y = if month <= 2 { year - 1 } else { year };
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = (y - era * 400) as i64;
+    let mp = ((month + 9) % 12) as i64;
+    let doy = (153 * mp + 2) / 5 + day as i64 - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era as i64 * 146_097 + doe - 719_468
+}
+
 /// Photo data for syncing between devices.
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct PhotoSyncInfo {
@@ -693,6 +804,26 @@ impl Database {
             "CREATE INDEX IF NOT EXISTS idx_album_item_photo ON album_item(photo_id);",
             (),
         );
+        let _ = conn.execute(
+            "ALTER TABLE album ADD COLUMN kind TEXT NOT NULL DEFAULT 'manual';",
+            (),
+        );
+        let _ = conn.execute("ALTER TABLE album ADD COLUMN rule TEXT;", ());
+        let _ = conn.execute(
+            "ALTER TABLE album ADD COLUMN updated_at TEXT DEFAULT (datetime('now'));",
+            (),
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_album_kind ON album(kind);",
+            (),
+        );
+
+        // Dismissed-trip signatures persist so a deleted trip does not
+        // reappear on the next sync.
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS dismissed_trip(id TEXT PRIMARY KEY);",
+            (),
+        );
 
         Self { connection: conn }
     }
@@ -976,18 +1107,19 @@ impl Database {
         )
     }
 
-    /// List photos with search, pagination, favorite/video filters, and facet
-    /// filters (person, location, tag, date range) combined with AND.
-    pub fn list_photos_filtered(
+    /// Build the "WHERE 1=1 ..." clause and bound parameters for a filtered
+    /// photo query. Params begin with ?1 = offset, ?2 = limit so the same
+    /// parameter vector works for both paged listings and COUNT(*) queries
+    /// (callers pass offset 0 / limit -1 for an unbounded count).
+    fn photo_where_clause(
         &self,
         query: &str,
-        offset: usize,
-        limit: usize,
         favorites_only: bool,
         videos_only: bool,
         filter: &PhotoFilter,
-    ) -> Vec<Photo> {
-        let mut photos = Vec::new();
+        offset: usize,
+        limit: usize,
+    ) -> (String, Vec<Box<dyn rusqlite::ToSql>>) {
         let fav_filter = if favorites_only {
             "AND EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite')"
         } else {
@@ -1126,6 +1258,60 @@ impl Database {
             extra_params.push(Box::new(album_id.clone()));
         }
 
+        let where_clause =
+            format!("WHERE 1=1 {fav_filter} {video_filter} {q_filter} {facet_filters}");
+        let q_param = if is_uuid {
+            query.to_string()
+        } else {
+            format!("%{query}%")
+        };
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> =
+            vec![Box::new(offset as i64), Box::new(limit as i64)];
+        if !query.is_empty() {
+            params.push(Box::new(q_param));
+            if let Some(ref mp) = month_param {
+                params.push(Box::new(mp.clone()));
+            }
+        }
+        params.extend(extra_params);
+        (where_clause, params)
+    }
+
+    /// Count photos matching a search + facet filter without loading any rows.
+    /// Used for smart-album membership and section totals.
+    pub fn count_photos_filtered(
+        &self,
+        query: &str,
+        favorites_only: bool,
+        videos_only: bool,
+        filter: &PhotoFilter,
+    ) -> i64 {
+        let (where_clause, params) =
+            self.photo_where_clause(query, favorites_only, videos_only, filter, 0, usize::MAX);
+        let sql = format!("SELECT COUNT(*) FROM photo p {where_clause}");
+        let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        self.connection
+            .prepare(&sql)
+            .ok()
+            .and_then(|mut stmt| stmt.query_row(param_refs.as_slice(), |row| row.get(0)).ok())
+            .unwrap_or(0)
+    }
+
+    /// List photos with search, pagination, favorite/video filters, and facet
+    /// filters (person, location, tag, date range) combined with AND.
+    pub fn list_photos_filtered(
+        &self,
+        query: &str,
+        offset: usize,
+        limit: usize,
+        favorites_only: bool,
+        videos_only: bool,
+        filter: &PhotoFilter,
+    ) -> Vec<Photo> {
+        let mut photos = Vec::new();
+        let (where_clause, params) =
+            self.photo_where_clause(query, favorites_only, videos_only, filter, offset, limit);
+
         let order_by = if let Some(order) = filter.order_by.as_deref() {
             match order {
                 "oldest" => "ORDER BY p.created ASC",
@@ -1141,22 +1327,8 @@ impl Database {
 
         let sql = format!("SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, 
             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received 
-            FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE 1=1 {fav_filter} {video_filter} {q_filter} {facet_filters} {order_by} LIMIT ?1, ?2");
+            FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id {where_clause} {order_by} LIMIT ?1, ?2");
         if let Ok(mut stmt) = self.connection.prepare(&sql) {
-            let q_param = if is_uuid {
-                query.to_string()
-            } else {
-                format!("%{query}%")
-            };
-            let mut params: Vec<Box<dyn rusqlite::ToSql>> =
-                vec![Box::new(offset as i64), Box::new(limit as i64)];
-            if !query.is_empty() {
-                params.push(Box::new(q_param));
-                if let Some(ref mp) = month_param {
-                    params.push(Box::new(mp.clone()));
-                }
-            }
-            params.extend(extra_params);
             let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
             if let Ok(iter) = stmt.query_map(param_refs.as_slice(), |row| {
                 Ok(Photo {
@@ -2770,8 +2942,21 @@ impl Database {
         Ok(())
     }
 
-    /// Delete an album and all of its items.
+    /// Delete an album and all of its items. Deleting an auto-detected trip
+    /// dismisses it so it does not reappear on the next trip sync.
     pub fn delete_album(&self, album_id: &str) -> Result<(), String> {
+        if let Ok(kind) = self.connection.query_row(
+            "SELECT kind FROM album WHERE id = ?1",
+            rusqlite::params![album_id],
+            |r| r.get::<_, String>(0),
+        ) {
+            if AlbumKind::parse(&kind) == AlbumKind::Trip {
+                let _ = self.connection.execute(
+                    "INSERT OR IGNORE INTO dismissed_trip(id) VALUES (?1)",
+                    rusqlite::params![album_id],
+                );
+            }
+        }
         self.connection
             .execute(
                 "DELETE FROM album_item WHERE album_id = ?1",
@@ -2795,13 +2980,47 @@ impl Database {
             cover_photo_id: row.get(3)?,
             sort_order: row.get(4)?,
             item_count: row.get(5)?,
+            kind: AlbumKind::parse(&row.get::<_, String>(6).unwrap_or_default()),
+            rule: row.get(7)?,
+            updated_at: row.get(8)?,
         })
+    }
+
+    /// Parse a stored smart-album rule into a filter, or None if it is unset
+    /// or malformed.
+    fn album_rule_filter(album: &Album) -> Option<PhotoFilter> {
+        if album.kind == AlbumKind::Manual {
+            return None;
+        }
+        let rule = album.rule.as_deref()?;
+        serde_json::from_str(rule).ok()
+    }
+
+    /// Fill in live counts and covers for smart/trip albums (which are computed
+    /// from their rule rather than stored album_item rows).
+    fn resolve_album_metrics(&self, albums: &mut [Album]) {
+        for album in albums {
+            if album.kind == AlbumKind::Manual {
+                continue;
+            }
+            if let Some(filter) = Self::album_rule_filter(album) {
+                album.item_count = self.count_photos_filtered("", false, false, &filter);
+                if album.cover_photo_id.is_none() {
+                    let first = self.list_photos_filtered("", 0, 1, false, false, &filter);
+                    if let Some(photo) = first.first() {
+                        album.cover_photo_id = Some(photo.id.clone());
+                    }
+                }
+            }
+        }
     }
 
     /// List all albums ordered by sort_order, with live item counts.
     pub fn list_albums(&self) -> Vec<Album> {
         let sql = "SELECT a.id, a.name, a.created_at, a.cover_photo_id, a.sort_order, \
-            (SELECT COUNT(*) FROM album_item WHERE album_id = a.id) AS item_count \
+            CASE WHEN a.kind IN ('smart','trip') THEN 0 \
+            ELSE (SELECT COUNT(*) FROM album_item WHERE album_id = a.id) END AS item_count, \
+            a.kind, a.rule, a.updated_at \
             FROM album a ORDER BY a.sort_order ASC, a.created_at ASC";
         let mut albums = Vec::new();
         if let Ok(mut stmt) = self.connection.prepare(sql) {
@@ -2811,17 +3030,367 @@ impl Database {
                 }
             }
         }
+        self.resolve_album_metrics(&mut albums);
         albums
     }
 
     /// Fetch a single album by id, or None if it does not exist.
     pub fn get_album(&self, album_id: &str) -> Option<Album> {
         let sql = "SELECT a.id, a.name, a.created_at, a.cover_photo_id, a.sort_order, \
-            (SELECT COUNT(*) FROM album_item WHERE album_id = a.id) AS item_count \
+            CASE WHEN a.kind IN ('smart','trip') THEN 0 \
+            ELSE (SELECT COUNT(*) FROM album_item WHERE album_id = a.id) END AS item_count, \
+            a.kind, a.rule, a.updated_at \
             FROM album a WHERE a.id = ?1";
-        self.connection
+        let mut album = self
+            .connection
             .query_row(sql, rusqlite::params![album_id], Self::album_from_row)
+            .ok();
+        if let Some(ref mut album) = album {
+            let slice = std::slice::from_mut(album);
+            self.resolve_album_metrics(slice);
+        }
+        album
+    }
+
+    /// Create a rule-based album. `kind` must be Smart or Trip (Manual albums
+    /// go through [`Self::create_album`]). The rule is stored as JSON and its
+    /// membership is computed on demand.
+    pub fn create_smart_album(
+        &self,
+        name: &str,
+        rule: &PhotoFilter,
+        kind: AlbumKind,
+    ) -> Result<Album, String> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err("Album name cannot be empty".to_string());
+        }
+        if kind == AlbumKind::Manual {
+            return self.create_album(name);
+        }
+        let rule_json = serde_json::to_string(rule).map_err(|e| e.to_string())?;
+        let id = uuid::Uuid::new_v4().to_string();
+        let sort_order: i64 = self
+            .connection
+            .query_row(
+                "SELECT COALESCE(MAX(sort_order), 0) + 1 FROM album",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(1);
+        self.connection
+            .execute(
+                "INSERT INTO album(id, name, sort_order, kind, rule, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, datetime('now'))",
+                rusqlite::params![id, name, sort_order, kind.as_str(), rule_json],
+            )
+            .map_err(|e| e.to_string())?;
+        self.get_album(&id)
+            .ok_or_else(|| "Failed to create album".to_string())
+    }
+
+    /// Replace a smart/trip album's rule, bumping its updated_at.
+    pub fn update_smart_album_rule(
+        &self,
+        album_id: &str,
+        rule: &PhotoFilter,
+    ) -> Result<(), String> {
+        let rule_json = serde_json::to_string(rule).map_err(|e| e.to_string())?;
+        self.connection
+            .execute(
+                "UPDATE album SET rule = ?1, updated_at = datetime('now') WHERE id = ?2",
+                rusqlite::params![rule_json, album_id],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn list_albums_by_kind(&self, kind: AlbumKind) -> Vec<Album> {
+        let sql = "SELECT a.id, a.name, a.created_at, a.cover_photo_id, a.sort_order, \
+            CASE WHEN a.kind IN ('smart','trip') THEN 0 \
+            ELSE (SELECT COUNT(*) FROM album_item WHERE album_id = a.id) END AS item_count, \
+            a.kind, a.rule, a.updated_at \
+            FROM album a WHERE a.kind = ?1 \
+            ORDER BY a.sort_order ASC, a.created_at ASC";
+        let mut albums = Vec::new();
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) = stmt.query_map(rusqlite::params![kind.as_str()], Self::album_from_row)
+            {
+                for album in iter.flatten() {
+                    albums.push(album);
+                }
+            }
+        }
+        self.resolve_album_metrics(&mut albums);
+        albums
+    }
+
+    /// Data-URL thumbnail for an album's cover photo, if any.
+    fn album_cover_encoded(&self, album: &Album) -> Option<String> {
+        let cover = album.cover_photo_id.as_deref()?;
+        self.connection
+            .query_row(
+                "SELECT encoded FROM photo WHERE id = ?1",
+                rusqlite::params![cover],
+                |r| r.get::<_, String>(0),
+            )
             .ok()
+    }
+
+    /// Turn one contiguous cluster of photos into a trip: a display name (the
+    /// dominant resolved location, else "Trip"), a `from|to` date range, and
+    /// the photo ids. Returns None for clusters that are too small or span a
+    /// single day.
+    fn finalize_trip(&self, photos: &[(String, String)]) -> Option<(String, String, Vec<String>)> {
+        if photos.len() < 3 {
+            return None;
+        }
+        let mut days: Vec<i64> = Vec::new();
+        for (_, created) in photos {
+            if let Some(d) = date_day_index(created) {
+                days.push(d);
+            }
+        }
+        let first_day = *days.iter().min()?;
+        let last_day = *days.iter().max()?;
+        if last_day - first_day < 1 {
+            return None;
+        }
+        let date_from = day_index_to_date(first_day)?;
+        let date_to = day_index_to_date(last_day)?;
+        let photo_ids: Vec<String> = photos.iter().map(|(id, _)| id.clone()).collect();
+
+        let mut location: Option<String> = None;
+        let sql = "SELECT pr.value, COUNT(*) AS c FROM properties pr \
+            JOIN photo p ON p.id = pr.photo_id \
+            WHERE pr.key = 'location_name' AND substr(p.created, 1, 10) BETWEEN ?1 AND ?2 \
+            GROUP BY pr.value ORDER BY c DESC LIMIT 1";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) = stmt.query_map(rusqlite::params![&date_from, &date_to], |r| {
+                r.get::<_, String>(0)
+            }) {
+                location = iter.flatten().next();
+            }
+        }
+        let year = &date_from[..4];
+        let name = match location {
+            Some(loc) => format!("{loc} · {year}"),
+            None => format!("Trip · {year}"),
+        };
+        Some((name, format!("{date_from}|{date_to}"), photo_ids))
+    }
+
+    /// Recompute trip clusters from photo timestamps and upsert them as `trip`
+    /// albums under stable signatures (so re-scanning never duplicates a trip
+    /// and manual edits to a trip's name survive). Returns the number of trips
+    /// synced. Gaps of more than `TRIP_GAP_DAYS` between consecutive photos
+    /// split trips; clusters need at least `TRIP_MIN_PHOTOS` and a span of at
+    /// least one day.
+    pub fn sync_trips(&self) -> i64 {
+        let gap_days = 3_i64;
+        let mut rows: Vec<(String, String)> = Vec::new();
+        if let Ok(mut stmt) = self
+            .connection
+            .prepare("SELECT id, created FROM photo WHERE created IS NOT NULL AND created != ''")
+        {
+            if let Ok(iter) =
+                stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+            {
+                for row in iter.flatten() {
+                    rows.push(row);
+                }
+            }
+        }
+        rows.sort_by(|a, b| a.1.cmp(&b.1));
+
+        // Cluster photos into trips by timestamp gaps.
+        let mut clusters: Vec<(String, String, Vec<String>)> = Vec::new();
+        let mut current: Vec<(String, String)> = Vec::new();
+        let mut prev_day: Option<i64> = None;
+        for (id, created) in rows {
+            let day = match date_day_index(&created) {
+                Some(d) => d,
+                None => continue,
+            };
+            if let Some(prev) = prev_day {
+                if day - prev > gap_days {
+                    if let Some(cluster) = self.finalize_trip(&current) {
+                        clusters.push(cluster);
+                    }
+                    current.clear();
+                }
+            }
+            current.push((id, created));
+            prev_day = Some(day);
+        }
+        if let Some(cluster) = self.finalize_trip(&current) {
+            clusters.push(cluster);
+        }
+
+        let mut trip_ids: Vec<String> = Vec::new();
+        for (name, range, _photo_ids) in clusters {
+            let (date_from, date_to) = match range.split_once('|') {
+                Some((f, t)) if f != t => (f.to_string(), t.to_string()),
+                _ => continue,
+            };
+            let id = format!("trip:{date_from}:{date_to}");
+            // Skip trips the user dismissed.
+            let dismissed: bool = self
+                .connection
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM dismissed_trip WHERE id = ?1)",
+                    rusqlite::params![id],
+                    |r| r.get(0),
+                )
+                .unwrap_or(false);
+            if dismissed {
+                continue;
+            }
+            trip_ids.push(id.clone());
+            let rule = PhotoFilter {
+                date_from: Some(date_from),
+                // Inclusive end: `p.created <= ?` compares the full timestamp,
+                // so append a late time to cover the whole final day.
+                date_to: Some(format!("{date_to} 23:59:59")),
+                order_by: Some("oldest".to_string()),
+                ..PhotoFilter::default()
+            };
+            let rule_json = serde_json::to_string(&rule).unwrap_or_default();
+            let _ = self.connection.execute(
+                // `name` is only set on insert so a user rename survives resyncs.
+                "INSERT INTO album(id, name, sort_order, kind, rule, created_at, updated_at) \
+                 VALUES (?1, ?2, 1000000, 'trip', ?3, datetime('now'), datetime('now')) \
+                 ON CONFLICT(id) DO UPDATE SET \
+                 rule = excluded.rule, updated_at = datetime('now')",
+                rusqlite::params![id, name, rule_json],
+            );
+        }
+
+        // Drop trip rows whose signature no longer matches a current cluster.
+        if trip_ids.is_empty() {
+            let _ = self
+                .connection
+                .execute("DELETE FROM album WHERE kind = 'trip'", ());
+        } else {
+            let placeholders: Vec<String> = (1..=trip_ids.len()).map(|i| format!("?{i}")).collect();
+            let sql = format!(
+                "DELETE FROM album WHERE kind = 'trip' AND id NOT IN ({})",
+                placeholders.join(",")
+            );
+            let _ = self
+                .connection
+                .execute(&sql, rusqlite::params_from_iter(trip_ids.iter()));
+        }
+        trip_ids.len() as i64
+    }
+
+    /// Full data for the Albums view: People, Places, Trips, Smart albums, and
+    /// manual albums, in that order.
+    pub fn get_album_sections(&self) -> Vec<AlbumSection> {
+        let mut sections = Vec::new();
+
+        let people: Vec<AlbumSectionItem> = self
+            .get_search_people(100)
+            .into_iter()
+            .map(|p| AlbumSectionItem {
+                id: format!("person:{}", p.id),
+                name: p.name,
+                count: p.photo_count,
+                cover_encoded: p.encoded,
+                cover_crop: p.representative_crop,
+                kind: "person".to_string(),
+                album: None,
+            })
+            .collect();
+        if !people.is_empty() {
+            sections.push(AlbumSection {
+                id: "people".to_string(),
+                items: people,
+            });
+        }
+
+        let places: Vec<AlbumSectionItem> = self
+            .get_location_groups(100)
+            .into_iter()
+            .map(|g| AlbumSectionItem {
+                id: format!("place:{}", g.name),
+                name: g.name,
+                count: g.count,
+                cover_encoded: g.encoded,
+                cover_crop: None,
+                kind: "location".to_string(),
+                album: None,
+            })
+            .collect();
+        if !places.is_empty() {
+            sections.push(AlbumSection {
+                id: "places".to_string(),
+                items: places,
+            });
+        }
+
+        self.sync_trips();
+        let trips: Vec<AlbumSectionItem> = self
+            .list_albums_by_kind(AlbumKind::Trip)
+            .into_iter()
+            .map(|album| AlbumSectionItem {
+                id: album.id.clone(),
+                name: album.name.clone(),
+                count: album.item_count,
+                cover_encoded: self.album_cover_encoded(&album),
+                cover_crop: None,
+                kind: "trip".to_string(),
+                album: Some(album),
+            })
+            .collect();
+        if !trips.is_empty() {
+            sections.push(AlbumSection {
+                id: "trips".to_string(),
+                items: trips,
+            });
+        }
+
+        let smart: Vec<AlbumSectionItem> = self
+            .list_albums_by_kind(AlbumKind::Smart)
+            .into_iter()
+            .map(|album| AlbumSectionItem {
+                id: album.id.clone(),
+                name: album.name.clone(),
+                count: album.item_count,
+                cover_encoded: self.album_cover_encoded(&album),
+                cover_crop: None,
+                kind: "smart".to_string(),
+                album: Some(album),
+            })
+            .collect();
+        if !smart.is_empty() {
+            sections.push(AlbumSection {
+                id: "smart".to_string(),
+                items: smart,
+            });
+        }
+
+        let manual: Vec<AlbumSectionItem> = self
+            .list_albums_by_kind(AlbumKind::Manual)
+            .into_iter()
+            .map(|album| AlbumSectionItem {
+                id: album.id.clone(),
+                name: album.name.clone(),
+                count: album.item_count,
+                cover_encoded: self.album_cover_encoded(&album),
+                cover_crop: None,
+                kind: "manual".to_string(),
+                album: Some(album),
+            })
+            .collect();
+        if !manual.is_empty() {
+            sections.push(AlbumSection {
+                id: "albums".to_string(),
+                items: manual,
+            });
+        }
+
+        sections
     }
 
     /// Add photos to an album, appending them in position order. Duplicates are
@@ -2838,6 +3407,15 @@ impl Database {
             .unwrap_or(false);
         if !album_exists {
             return Err(format!("Album '{album_id}' does not exist"));
+        }
+        if let Ok(kind) = self.connection.query_row(
+            "SELECT kind FROM album WHERE id = ?1",
+            rusqlite::params![album_id],
+            |r| r.get::<_, String>(0),
+        ) {
+            if AlbumKind::parse(&kind) != AlbumKind::Manual {
+                return Err("Smart and trip albums are managed automatically".to_string());
+            }
         }
         let mut max_position: i64 = self
             .connection
@@ -2925,9 +3503,18 @@ impl Database {
         Ok(())
     }
 
-    /// Paginated album contents ordered by album position (manual order), with
-    /// the newest-added photo first on ties.
+    /// Paginated album contents. Manual albums use their stored item order;
+    /// smart/trip albums compute membership from their rule on the fly.
     pub fn get_album_contents(&self, album_id: &str, offset: usize, limit: usize) -> Vec<Photo> {
+        let Some(album) = self.get_album(album_id) else {
+            return Vec::new();
+        };
+        if album.kind != AlbumKind::Manual {
+            if let Some(filter) = Self::album_rule_filter(&album) {
+                return self.list_photos_filtered("", offset, limit, false, false, &filter);
+            }
+            return Vec::new();
+        }
         let mut photos = Vec::new();
         let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, \
             EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, \

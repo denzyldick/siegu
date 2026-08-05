@@ -116,7 +116,10 @@
     "sort_newest": "Più recenti",
     "sort_best": "Migliore qualità",
     "sort_random": "Casuale",
-    "best_shot": "Miglior scatto del giorno"
+    "best_shot": "Miglior scatto del giorno",
+    "save_as_album": "Salva come album",
+    "save_as_album_hint": "Salva la ricerca attuale come album intelligente che si aggiorna automaticamente.",
+    "save_as_album_placeholder": "Nome dell'album..."
   },
   "sync": {
     "status_label": "STATO LIBRERIA",
@@ -608,6 +611,16 @@
     "selected": "{count} selezionati",
     "reorder_hint": "Trascina le foto per riordinarle",
     "load_more": "Carica altro",
-    "cover_photo": "Copertina dell'album"
+    "cover_photo": "Copertina dell'album",
+    "section_people": "Persone",
+    "section_places": "Luoghi",
+    "section_trips": "Viaggi",
+    "section_smart": "Album intelligenti",
+    "section_albums": "Album",
+    "kind_person": "Persona",
+    "kind_location": "Luogo",
+    "kind_trip": "Viaggio",
+    "kind_smart": "Album intelligente",
+    "kind_album": "Album"
   }
 }

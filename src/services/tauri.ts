@@ -4,7 +4,7 @@ import type { MediaItem, ListFilesOptions } from '@/types/media';
 import type { Person, UnnamedFace } from '@/types/person';
 import type { PairingCodes, DiscoveredHost } from '@/types/sync';
 import type { SearchFacetsData, DayCount } from '@/types/search';
-import type { Album } from '@/types/albums';
+import type { Album, AlbumSection } from '@/types/albums';
 
 export class TauriError extends Error {
   constructor(
@@ -357,6 +357,31 @@ export async function getAlbum(albumId: string): Promise<Album | null> {
   const raw = await call<string>('get_album', { albumId });
   if (raw === 'null') return null;
   return parseJsonObject<Album>(raw);
+}
+
+export async function getAlbumSections(): Promise<AlbumSection[]> {
+  const raw = await call<string>('get_album_sections');
+  return parseJsonArray<AlbumSection>(raw);
+}
+
+export async function createSmartAlbum(
+  name: string,
+  rule: unknown,
+  kind: 'smart' | 'trip',
+): Promise<Album> {
+  const raw = await call<string>('create_smart_album', {
+    name,
+    rule: JSON.stringify(rule),
+    kind,
+  });
+  return parseJsonObject<Album>(raw);
+}
+
+export async function updateSmartAlbumRule(albumId: string, rule: unknown): Promise<void> {
+  await call<unknown>('update_smart_album_rule', {
+    albumId,
+    rule: JSON.stringify(rule),
+  });
 }
 
 export async function addAlbumItems(albumId: string, photoIds: string[]): Promise<void> {

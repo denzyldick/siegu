@@ -116,7 +116,10 @@
     "sort_newest": "Nieuwste",
     "sort_best": "Beste kwaliteit",
     "sort_random": "Willekeurig",
-    "best_shot": "Beste foto van de dag"
+    "best_shot": "Beste foto van de dag",
+    "save_as_album": "Opslaan als album",
+    "save_as_album_hint": "Sla de huidige zoekopdracht op als slim album dat automatisch actueel blijft.",
+    "save_as_album_placeholder": "Albumnaam..."
   },
   "sync": {
     "status_label": "BIBLIOTHEEKSTATUS",
@@ -608,6 +611,16 @@
     "selected": "{count} geselecteerd",
     "reorder_hint": "Sleep foto's om te herschikken",
     "load_more": "Meer laden",
-    "cover_photo": "Albumcover"
+    "cover_photo": "Albumcover",
+    "section_people": "Personen",
+    "section_places": "Plaatsen",
+    "section_trips": "Reizen",
+    "section_smart": "Slimme albums",
+    "section_albums": "Albums",
+    "kind_person": "Persoon",
+    "kind_location": "Plaats",
+    "kind_trip": "Reis",
+    "kind_smart": "Slim album",
+    "kind_album": "Album"
   }
 }
