@@ -43,6 +43,15 @@
         </div>
         <v-spacer></v-spacer>
         <v-btn
+          variant="text"
+          class="mr-1"
+          :title="$t('albums.restore_trips')"
+          :aria-label="$t('albums.restore_trips')"
+          @click="restoreTrips"
+        >
+          <v-icon size="18">mdi-undo</v-icon>
+        </v-btn>
+        <v-btn
           variant="flat"
           color="primary"
           class="siegu-btn-modern px-6"
@@ -56,9 +65,17 @@
       <template v-if="hasAnyItems">
         <div v-for="section in sections" :key="section.id" class="mb-8">
           <div v-if="section.items.length > 0" class="animate-fade-in">
-            <h2 class="section-title text-subtitle-1 font-weight-bold text-zinc-primary px-2 mb-3">
-              {{ sectionTitle(section.id) }}
-            </h2>
+            <div class="d-flex align-center px-2 mb-3">
+              <h2
+                class="section-title text-subtitle-1 font-weight-bold text-zinc-primary flex-grow-1"
+              >
+                {{ sectionTitle(section.id) }}
+              </h2>
+              <button v-if="section.id === 'people'" class="manage-people-btn" @click="goToPeople">
+                <v-icon size="13" class="mr-1">mdi-account-edit-outline</v-icon>
+                {{ $t('albums.manage_people') }}
+              </button>
+            </div>
             <div class="album-grid" :style="{ gridTemplateColumns: `repeat(${columns}, 1fr)` }">
               <div
                 v-for="item in section.items"
@@ -135,6 +152,13 @@
             </v-btn>
           </template>
           <v-list density="compact" class="siegu-list">
+            <v-list-item
+              v-if="currentSectionItem?.album?.kind === 'smart'"
+              @click="editSmartAlbumRules"
+              prepend-icon="mdi-tune-variant"
+            >
+              <v-list-item-title>{{ $t('albums.edit_rules') }}</v-list-item-title>
+            </v-list-item>
             <v-list-item @click="openRenameDialog" prepend-icon="mdi-pencil-outline">
               <v-list-item-title>{{ $t('albums.rename_album') }}</v-list-item-title>
             </v-list-item>
@@ -331,6 +355,8 @@ import { useI18n } from 'vue-i18n';
 import MediaCard from '@/components/MediaCard.vue';
 import MediaViewer from '@/components/MediaViewer.vue';
 import { useAlbumsStore } from '@/stores/albums';
+import { useSearchStore } from '@/stores/search';
+import { useUiStore } from '@/stores/ui';
 import { toggleFavorite, listFiles } from '@/services/tauri';
 import { getFaceImageSrc } from '@/composables/useMediaUtils';
 import type { Album, AlbumSectionItem } from '@/types/albums';
@@ -339,6 +365,8 @@ import type { ListFilesOptions } from '@/types/media';
 
 const { t } = useI18n();
 const albumsStore = useAlbumsStore();
+const searchStore = useSearchStore();
+const uiStore = useUiStore();
 
 const sections = computed(() => albumsStore.sections);
 const hasAnyItems = computed(() => sections.value.some((s) => s.items.length > 0));
@@ -456,6 +484,30 @@ function closeAlbum(): void {
   openedItem.value = null;
   albumsStore.currentAlbumId = null;
   resetContents();
+}
+
+function editSmartAlbumRules(): void {
+  const album = openedItem.value?.album;
+  if (!album || album.kind !== 'smart' || !album.rule) return;
+  try {
+    const rule = JSON.parse(album.rule) as Record<string, unknown>;
+    void searchStore.applyRule(rule);
+  } catch (error) {
+    console.error('[Albums] Failed to parse smart album rule:', error);
+    return;
+  }
+  albumsStore.startEditingSmartAlbum(album);
+  uiStore.setPage('home');
+  closeAlbum();
+}
+
+async function restoreTrips(): Promise<void> {
+  await albumsStore.clearDismissedTrips();
+  showMessage(t('albums.trips_restored'));
+}
+
+function goToPeople(): void {
+  uiStore.setPage('people');
 }
 
 function baseFilterOptions(): Omit<ListFilesOptions, 'offset' | 'limit'> {
@@ -693,6 +745,22 @@ onUnmounted(() => {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-size: 12px;
+}
+
+.manage-people-btn {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgb(var(--v-theme-primary));
+  padding: 4px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.manage-people-btn:hover {
+  background: var(--color-bg-hover);
 }
 
 .album-card {

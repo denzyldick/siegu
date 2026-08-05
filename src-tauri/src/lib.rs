@@ -327,6 +327,7 @@ pub fn run() {
             commands::albums::get_album_sections,
             commands::albums::rename_album,
             commands::albums::delete_album,
+            commands::albums::clear_dismissed_trips,
             commands::albums::list_albums,
             commands::albums::get_album,
             commands::albums::add_album_items,

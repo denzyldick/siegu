@@ -119,6 +119,10 @@ pub struct PhotoFilter {
     pub tag: Option<String>,
     pub date_from: Option<String>,
     pub date_to: Option<String>,
+    /// Free-text search applied to captions, objects, OCR, people, etc.
+    pub query: Option<String>,
+    /// Only photos that are videos.
+    pub videos: Option<bool>,
     /// Only photos marked as favorites.
     pub favorite: bool,
     /// Only photos containing at least one detected face.
@@ -2972,6 +2976,15 @@ impl Database {
         Ok(())
     }
 
+    /// Forget every dismissed trip so previously deleted trips are re-detected
+    /// on the next sync. Returns the number of dismissals removed.
+    pub fn clear_dismissed_trips(&self) -> i64 {
+        self.connection
+            .execute("DELETE FROM dismissed_trip", ())
+            .map(|n| n as i64)
+            .unwrap_or(0)
+    }
+
     fn album_from_row(row: &rusqlite::Row) -> rusqlite::Result<Album> {
         Ok(Album {
             id: row.get(0)?,
@@ -3004,9 +3017,11 @@ impl Database {
                 continue;
             }
             if let Some(filter) = Self::album_rule_filter(album) {
-                album.item_count = self.count_photos_filtered("", false, false, &filter);
+                let query = filter.query.as_deref().unwrap_or("");
+                let videos = filter.videos.unwrap_or(false);
+                album.item_count = self.count_photos_filtered(query, false, videos, &filter);
                 if album.cover_photo_id.is_none() {
-                    let first = self.list_photos_filtered("", 0, 1, false, false, &filter);
+                    let first = self.list_photos_filtered(query, 0, 1, false, videos, &filter);
                     if let Some(photo) = first.first() {
                         album.cover_photo_id = Some(photo.id.clone());
                     }
@@ -3139,8 +3154,8 @@ impl Database {
 
     /// Turn one contiguous cluster of photos into a trip: a display name (the
     /// dominant resolved location, else "Trip"), a `from|to` date range, and
-    /// the photo ids. Returns None for clusters that are too small or span a
-    /// single day.
+    /// the photo ids. Returns None for clusters that are too small (fewer than
+    /// `TRIP_MIN_PHOTOS`).
     fn finalize_trip(&self, photos: &[(String, String)]) -> Option<(String, String, Vec<String>)> {
         if photos.len() < 3 {
             return None;
@@ -3153,9 +3168,6 @@ impl Database {
         }
         let first_day = *days.iter().min()?;
         let last_day = *days.iter().max()?;
-        if last_day - first_day < 1 {
-            return None;
-        }
         let date_from = day_index_to_date(first_day)?;
         let date_to = day_index_to_date(last_day)?;
         let photo_ids: Vec<String> = photos.iter().map(|(id, _)| id.clone()).collect();
@@ -3184,8 +3196,8 @@ impl Database {
     /// albums under stable signatures (so re-scanning never duplicates a trip
     /// and manual edits to a trip's name survive). Returns the number of trips
     /// synced. Gaps of more than `TRIP_GAP_DAYS` between consecutive photos
-    /// split trips; clusters need at least `TRIP_MIN_PHOTOS` and a span of at
-    /// least one day.
+    /// split trips; clusters need at least `TRIP_MIN_PHOTOS` photos (even on a
+    /// single day, e.g. a day trip).
     pub fn sync_trips(&self) -> i64 {
         let gap_days = 3_i64;
         let mut rows: Vec<(String, String)> = Vec::new();
@@ -3230,7 +3242,7 @@ impl Database {
         let mut trip_ids: Vec<String> = Vec::new();
         for (name, range, _photo_ids) in clusters {
             let (date_from, date_to) = match range.split_once('|') {
-                Some((f, t)) if f != t => (f.to_string(), t.to_string()),
+                Some((f, t)) => (f.to_string(), t.to_string()),
                 _ => continue,
             };
             let id = format!("trip:{date_from}:{date_to}");
@@ -3511,7 +3523,9 @@ impl Database {
         };
         if album.kind != AlbumKind::Manual {
             if let Some(filter) = Self::album_rule_filter(&album) {
-                return self.list_photos_filtered("", offset, limit, false, false, &filter);
+                let query = filter.query.as_deref().unwrap_or("");
+                let videos = filter.videos.unwrap_or(false);
+                return self.list_photos_filtered(query, offset, limit, false, videos, &filter);
             }
             return Vec::new();
         }

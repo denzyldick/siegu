@@ -119,7 +119,9 @@
     "best_shot": "Beste foto van de dag",
     "save_as_album": "Opslaan als album",
     "save_as_album_hint": "Sla de huidige zoekopdracht op als slim album dat automatisch actueel blijft.",
-    "save_as_album_placeholder": "Albumnaam..."
+    "save_as_album_placeholder": "Albumnaam...",
+    "update_album": "Album bijwerken",
+    "update_album_hint": "Sla de huidige zoekopdracht opnieuw op als regels van dit album."
   },
   "sync": {
     "status_label": "BIBLIOTHEEKSTATUS",
@@ -621,6 +623,10 @@
     "kind_location": "Plaats",
     "kind_trip": "Reis",
     "kind_smart": "Slim album",
-    "kind_album": "Album"
+    "kind_album": "Album",
+    "edit_rules": "Regels bewerken",
+    "restore_trips": "Verwijderde reizen herstellen",
+    "trips_restored": "Verwijderde reizen hersteld",
+    "manage_people": "Beheren"
   }
 }

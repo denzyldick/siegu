@@ -73,6 +73,8 @@ pub fn do_list_files_filtered(
         tag,
         date_from,
         date_to,
+        query: None,
+        videos: None,
         favorite: favorites_only,
         has_faces,
         aesthetics_min,

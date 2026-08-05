@@ -119,7 +119,9 @@
     "best_shot": "Mihó potret di e dia",
     "save_as_album": "Wardá kom album",
     "save_as_album_hint": "Wardá e buskeda aktual kom album di ménke ku ta keda aktualisá outomátiko.",
-    "save_as_album_placeholder": "Nòmber di album..."
+    "save_as_album_placeholder": "Nòmber di album...",
+    "update_album": "Aktualisá album",
+    "update_album_hint": "Wardá e buskeda aktual di nobo kom reglan di e album aki."
   },
   "sync": {
     "status_label": "STATUS DI BIBLIOTEKA",
@@ -621,6 +623,10 @@
     "kind_location": "Lugá",
     "kind_trip": "Biahe",
     "kind_smart": "Album di ménke",
-    "kind_album": "Album"
+    "kind_album": "Album",
+    "edit_rules": "Editá reglan",
+    "restore_trips": "Restaurná biahenan despidí",
+    "trips_restored": "Biahenan despidí restourá",
+    "manage_people": "Manehá"
   }
 }

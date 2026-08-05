@@ -104,7 +104,9 @@
     "best_shot": "Best shot of the day",
     "save_as_album": "Save as album",
     "save_as_album_hint": "Save the current search as a smart album that stays up to date automatically.",
-    "save_as_album_placeholder": "Album name..."
+    "save_as_album_placeholder": "Album name...",
+    "update_album": "Update album",
+    "update_album_hint": "Re-save the current search as this album's rules."
   },
   "filters": {
     "favorites_only": "Favorites only",
@@ -369,7 +371,11 @@
     "kind_location": "Place",
     "kind_trip": "Trip",
     "kind_smart": "Smart album",
-    "kind_album": "Album"
+    "kind_album": "Album",
+    "edit_rules": "Edit rules",
+    "restore_trips": "Restore dismissed trips",
+    "trips_restored": "Dismissed trips restored",
+    "manage_people": "Manage"
   },
   "settings": {
     "title": "Settings",

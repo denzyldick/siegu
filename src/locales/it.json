@@ -119,7 +119,9 @@
     "best_shot": "Miglior scatto del giorno",
     "save_as_album": "Salva come album",
     "save_as_album_hint": "Salva la ricerca attuale come album intelligente che si aggiorna automaticamente.",
-    "save_as_album_placeholder": "Nome dell'album..."
+    "save_as_album_placeholder": "Nome dell'album...",
+    "update_album": "Aggiorna album",
+    "update_album_hint": "Risalva la ricerca attuale come regole di questo album."
   },
   "sync": {
     "status_label": "STATO LIBRERIA",
@@ -621,6 +623,10 @@
     "kind_location": "Luogo",
     "kind_trip": "Viaggio",
     "kind_smart": "Album intelligente",
-    "kind_album": "Album"
+    "kind_album": "Album",
+    "edit_rules": "Modifica regole",
+    "restore_trips": "Ripristina viaggi ignorati",
+    "trips_restored": "Viaggi ignorati ripristinati",
+    "manage_people": "Gestisci"
   }
 }

@@ -250,9 +250,10 @@ const saveAlbumName = ref('');
 const savingAlbum = ref(false);
 
 function canSaveAlbum(): boolean {
-  if (searchStore.query.trim()) return false;
-  return searchStore.hasFilters;
+  return searchStore.hasFilters || searchStore.hasQuery;
 }
+
+const isEditingAlbum = computed(() => albumsStore.editingSmartAlbum !== null);
 
 function buildRule(): Record<string, unknown> {
   const byType = (type: string) => searchStore.activeFilters.find((f) => f.type === type);
@@ -270,6 +271,8 @@ function buildRule(): Record<string, unknown> {
     tag: tag ? tag.value : null,
     date_from: month ? `${month.value}-01` : dateRange ? dateRange[0] : null,
     date_to: month ? `${month.value}-31` : dateRange ? dateRange[1] : null,
+    query: searchStore.query.trim() || null,
+    videos: searchStore.mediaFilters.videosOnly || null,
     favorite: searchStore.mediaFilters.favoritesOnly,
     has_faces: searchStore.mediaFilters.facesOnly,
     papers: searchStore.mediaFilters.papersOnly,
@@ -284,7 +287,7 @@ function buildRule(): Record<string, unknown> {
 
 function openSaveAlbumDialog(): void {
   if (!canSaveAlbum()) return;
-  saveAlbumName.value = '';
+  saveAlbumName.value = albumsStore.editingSmartAlbum?.name ?? '';
   saveAlbumDialog.value = true;
 }
 
@@ -293,11 +296,15 @@ async function saveAsAlbum(): Promise<void> {
   if (!name || savingAlbum.value) return;
   savingAlbum.value = true;
   try {
-    const album = await albumsStore.createSmartAlbum(name, buildRule(), 'smart');
-    if (album) {
-      saveAlbumDialog.value = false;
-      closeDropdown();
+    const editing = albumsStore.editingSmartAlbum;
+    if (editing) {
+      await albumsStore.updateSmartAlbumRule(editing.id, buildRule());
+    } else {
+      await albumsStore.createSmartAlbum(name, buildRule(), 'smart');
     }
+    albumsStore.stopEditingSmartAlbum();
+    saveAlbumDialog.value = false;
+    closeDropdown();
   } finally {
     savingAlbum.value = false;
   }
@@ -851,10 +858,10 @@ function iconForFilter(type: string): string {
           </div>
 
           <v-divider class="border-subtle" />
-          <div v-if="searchStore.hasFilters" class="footer-row pa-2">
+          <div v-if="searchStore.hasFilters || searchStore.hasQuery" class="footer-row pa-2">
             <button class="save-album-btn" :disabled="!canSaveAlbum()" @click="openSaveAlbumDialog">
               <v-icon size="14" class="mr-1">mdi-content-save-outline</v-icon>
-              {{ t('search.save_as_album') }}
+              {{ isEditingAlbum ? t('search.update_album') : t('search.save_as_album') }}
             </button>
             <button class="clear-btn" @click="clearAll">
               {{ t('search.clear_all') }}
@@ -867,10 +874,13 @@ function iconForFilter(type: string): string {
     <v-dialog v-model="saveAlbumDialog" max-width="420">
       <v-card class="rounded-xl pa-6" color="surface">
         <h3 class="text-h6 font-weight-bold text-zinc-primary mb-1">
-          {{ t('search.save_as_album') }}
+          {{ isEditingAlbum ? t('search.update_album') : t('search.save_as_album') }}
         </h3>
-        <p class="text-caption text-zinc-muted mb-4">{{ t('search.save_as_album_hint') }}</p>
+        <p class="text-caption text-zinc-muted mb-4">
+          {{ isEditingAlbum ? t('search.update_album_hint') : t('search.save_as_album_hint') }}
+        </p>
         <v-text-field
+          v-if="!isEditingAlbum"
           v-model="saveAlbumName"
           :label="t('search.save_as_album_placeholder')"
           variant="outlined"
@@ -883,11 +893,11 @@ function iconForFilter(type: string): string {
             variant="flat"
             color="primary"
             class="siegu-btn-modern px-6"
-            :disabled="!saveAlbumName.trim()"
+            :disabled="!isEditingAlbum && !saveAlbumName.trim()"
             :loading="savingAlbum"
             @click="saveAsAlbum"
           >
-            {{ t('common.save') }}
+            {{ isEditingAlbum ? t('common.update') : t('common.save') }}
           </v-btn>
         </div>
       </v-card>

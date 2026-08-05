@@ -119,7 +119,9 @@
     "best_shot": "Bestes Foto des Tages",
     "save_as_album": "Als Album speichern",
     "save_as_album_hint": "Speichere die aktuelle Suche als Smart-Album, das automatisch aktuell bleibt.",
-    "save_as_album_placeholder": "Albumname..."
+    "save_as_album_placeholder": "Albumname...",
+    "update_album": "Album aktualisieren",
+    "update_album_hint": "Speichere die aktuelle Suche als Regeln dieses Albums neu."
   },
   "sync": {
     "status_label": "BIBLIOTHEKSSTATUS",
@@ -621,6 +623,10 @@
     "kind_location": "Ort",
     "kind_trip": "Reise",
     "kind_smart": "Smart-Album",
-    "kind_album": "Album"
+    "kind_album": "Album",
+    "edit_rules": "Regeln bearbeiten",
+    "restore_trips": "Verworfene Reisen wiederherstellen",
+    "trips_restored": "Verworfene Reisen wiederhergestellt",
+    "manage_people": "Verwalten"
   }
 }

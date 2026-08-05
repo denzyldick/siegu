@@ -353,6 +353,10 @@ export async function deleteAlbum(albumId: string): Promise<void> {
   await call<unknown>('delete_album', { albumId });
 }
 
+export async function clearDismissedTrips(): Promise<number> {
+  return call<number>('clear_dismissed_trips');
+}
+
 export async function getAlbum(albumId: string): Promise<Album | null> {
   const raw = await call<string>('get_album', { albumId });
   if (raw === 'null') return null;

@@ -119,7 +119,9 @@
     "best_shot": "Meilleure photo du jour",
     "save_as_album": "Enregistrer comme album",
     "save_as_album_hint": "Enregistrez la recherche actuelle comme album intelligent qui reste à jour automatiquement.",
-    "save_as_album_placeholder": "Nom de l'album..."
+    "save_as_album_placeholder": "Nom de l'album...",
+    "update_album": "Mettre à jour l'album",
+    "update_album_hint": "Réenregistrez la recherche actuelle comme règles de cet album."
   },
   "sync": {
     "status_label": "ÉTAT DE LA BIBLIOTHÈQUE",
@@ -621,6 +623,10 @@
     "kind_location": "Lieu",
     "kind_trip": "Voyage",
     "kind_smart": "Album intelligent",
-    "kind_album": "Album"
+    "kind_album": "Album",
+    "edit_rules": "Modifier les règles",
+    "restore_trips": "Restaurer les voyages ignorés",
+    "trips_restored": "Voyages ignorés restaurés",
+    "manage_people": "Gérer"
   }
 }

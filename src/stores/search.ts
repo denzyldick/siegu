@@ -1,32 +1,32 @@
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { searchFacets, resolvePhotoLocations } from '@/services/tauri'
-import type { SearchFacetsData, ActiveFilter, FacetType } from '@/types/search'
+import { defineStore } from 'pinia';
+import { ref, computed } from 'vue';
+import { searchFacets, resolvePhotoLocations } from '@/services/tauri';
+import type { SearchFacetsData, ActiveFilter, FacetType } from '@/types/search';
 
 export const useSearchStore = defineStore('search', () => {
-  const query = ref('')
-  const recentSearches = ref<string[]>([])
-  const loading = ref(false)
-  const facets = ref<SearchFacetsData | null>(null)
-  const facetsLoading = ref(false)
-  const activeFilters = ref<ActiveFilter[]>([])
+  const query = ref('');
+  const recentSearches = ref<string[]>([]);
+  const loading = ref(false);
+  const facets = ref<SearchFacetsData | null>(null);
+  const facetsLoading = ref(false);
+  const activeFilters = ref<ActiveFilter[]>([]);
   const mediaFilters = ref({
     favoritesOnly: false,
     videosOnly: false,
     facesOnly: false,
     papersOnly: false,
     nsfwOnly: false,
-  })
-  const camera = ref<string | null>(null)
-  const aestheticsMin = ref<number | null>(null)
-  const surprise = ref(false)
-  const sortOrder = ref<'newest' | 'oldest' | 'best' | 'random'>('newest')
-  const dateRange = ref<[string, string] | null>(null)
-  const personMatch = ref<'and' | 'or'>('and')
-  const personAlone = ref(false)
-  let locationsResolved = false
+  });
+  const camera = ref<string | null>(null);
+  const aestheticsMin = ref<number | null>(null);
+  const surprise = ref(false);
+  const sortOrder = ref<'newest' | 'oldest' | 'best' | 'random'>('newest');
+  const dateRange = ref<[string, string] | null>(null);
+  const personMatch = ref<'and' | 'or'>('and');
+  const personAlone = ref(false);
+  let locationsResolved = false;
 
-  const hasQuery = computed(() => query.value.trim().length > 0)
+  const hasQuery = computed(() => query.value.trim().length > 0);
   const hasFilters = computed(
     () =>
       activeFilters.value.length > 0 ||
@@ -37,188 +37,221 @@ export const useSearchStore = defineStore('search', () => {
       camera.value !== null ||
       aestheticsMin.value !== null ||
       dateRange.value !== null,
-  )
-  const activeFacets = computed(() => activeFilters.value)
-  const personCount = computed(
-    () => activeFilters.value.filter((f) => f.type === 'person').length,
-  )
+  );
+  const activeFacets = computed(() => activeFilters.value);
+  const personCount = computed(() => activeFilters.value.filter((f) => f.type === 'person').length);
 
   async function loadFacets(): Promise<void> {
-    if (facetsLoading.value) return
+    if (facetsLoading.value) return;
     if (!locationsResolved) {
-      locationsResolved = true
+      locationsResolved = true;
       resolvePhotoLocations()
         .catch((error) => {
-          console.error('[SearchStore] Failed to resolve photo locations:', error)
+          console.error('[SearchStore] Failed to resolve photo locations:', error);
         })
         .finally(() => {
-          if (facets.value) void loadFacets()
-        })
+          if (facets.value) void loadFacets();
+        });
     }
-    facetsLoading.value = true
+    facetsLoading.value = true;
     try {
-      facets.value = await searchFacets()
+      facets.value = await searchFacets();
     } catch (error) {
-      console.error('[SearchStore] Failed to load search facets:', error)
+      console.error('[SearchStore] Failed to load search facets:', error);
     } finally {
-      facetsLoading.value = false
+      facetsLoading.value = false;
     }
   }
 
   function setQuery(value: string): void {
-    query.value = value
+    query.value = value;
   }
 
   function clearQuery(): void {
-    query.value = ''
+    query.value = '';
   }
 
   function addFilter(filter: ActiveFilter): void {
     if (filter.type === 'person') {
       const exists = activeFilters.value.some(
         (f) => f.type === 'person' && f.value === filter.value,
-      )
-      if (exists) return
-      activeFilters.value = [...activeFilters.value, filter]
-      return
+      );
+      if (exists) return;
+      activeFilters.value = [...activeFilters.value, filter];
+      return;
     }
-    activeFilters.value = [
-      ...activeFilters.value.filter((f) => f.type !== filter.type),
-      filter,
-    ]
+    activeFilters.value = [...activeFilters.value.filter((f) => f.type !== filter.type), filter];
   }
 
   function removeFilter(type: FacetType): void {
-    activeFilters.value = activeFilters.value.filter((f) => f.type !== type)
+    activeFilters.value = activeFilters.value.filter((f) => f.type !== type);
     if (type === 'person' && !activeFilters.value.some((f) => f.type === 'person')) {
-      personMatch.value = 'and'
-      personAlone.value = false
+      personMatch.value = 'and';
+      personAlone.value = false;
     }
   }
 
   function removeFilterValue(type: FacetType, value: string): void {
     activeFilters.value = activeFilters.value.filter(
       (f) => !(f.type === type && f.value === value),
-    )
+    );
     if (type === 'person' && !activeFilters.value.some((f) => f.type === 'person')) {
-      personMatch.value = 'and'
-      personAlone.value = false
+      personMatch.value = 'and';
+      personAlone.value = false;
     }
   }
 
   function togglePerson(person: { id: string; name: string }): void {
-    const exists = activeFilters.value.find(
-      (f) => f.type === 'person' && f.value === person.id,
-    )
-    if (exists) removeFilterValue('person', person.id)
-    else addFilter({ type: 'person', value: person.id, label: person.name })
+    const exists = activeFilters.value.find((f) => f.type === 'person' && f.value === person.id);
+    if (exists) removeFilterValue('person', person.id);
+    else addFilter({ type: 'person', value: person.id, label: person.name });
   }
 
   function setPersonMatch(match: 'and' | 'or'): void {
-    personMatch.value = match
+    personMatch.value = match;
   }
 
   function togglePersonAlone(): void {
-    personAlone.value = !personAlone.value
+    personAlone.value = !personAlone.value;
   }
 
   function setCamera(value: string | null): void {
-    camera.value = value
+    camera.value = value;
   }
 
   function setAestheticsMin(value: number | null): void {
-    aestheticsMin.value = value
+    aestheticsMin.value = value;
   }
 
   function setDateRange(value: [string, string] | null): void {
-    dateRange.value = value
+    dateRange.value = value;
   }
 
   function toggleSurprise(): void {
-    surprise.value = true
+    surprise.value = true;
   }
 
   function clearSurprise(): void {
-    surprise.value = false
+    surprise.value = false;
   }
 
   function setSortOrder(order: 'newest' | 'oldest' | 'best' | 'random'): void {
-    sortOrder.value = order
+    sortOrder.value = order;
     if (order === 'random') {
-      surprise.value = true
+      surprise.value = true;
     } else if (surprise.value) {
-      surprise.value = false
+      surprise.value = false;
     }
   }
 
   function clearFilters(): void {
-    activeFilters.value = []
+    activeFilters.value = [];
     mediaFilters.value = {
       favoritesOnly: false,
       videosOnly: false,
       facesOnly: false,
       papersOnly: false,
       nsfwOnly: false,
-    }
-    camera.value = null
-    aestheticsMin.value = null
-    surprise.value = false
-    sortOrder.value = 'newest'
-    dateRange.value = null
-    personMatch.value = 'and'
-    personAlone.value = false
+    };
+    camera.value = null;
+    aestheticsMin.value = null;
+    surprise.value = false;
+    sortOrder.value = 'newest';
+    dateRange.value = null;
+    personMatch.value = 'and';
+    personAlone.value = false;
   }
 
   function toggleFavoriteOnly(): void {
-    mediaFilters.value.favoritesOnly = !mediaFilters.value.favoritesOnly
+    mediaFilters.value.favoritesOnly = !mediaFilters.value.favoritesOnly;
   }
 
   function toggleVideoOnly(): void {
-    mediaFilters.value.videosOnly = !mediaFilters.value.videosOnly
+    mediaFilters.value.videosOnly = !mediaFilters.value.videosOnly;
   }
 
   function toggleFacesOnly(): void {
-    mediaFilters.value.facesOnly = !mediaFilters.value.facesOnly
+    mediaFilters.value.facesOnly = !mediaFilters.value.facesOnly;
   }
 
   function togglePapersOnly(): void {
-    mediaFilters.value.papersOnly = !mediaFilters.value.papersOnly
+    mediaFilters.value.papersOnly = !mediaFilters.value.papersOnly;
   }
 
   function toggleNsfwOnly(): void {
-    mediaFilters.value.nsfwOnly = !mediaFilters.value.nsfwOnly
+    mediaFilters.value.nsfwOnly = !mediaFilters.value.nsfwOnly;
   }
 
   function addRecentSearch(term: string): void {
-    if (!term.trim()) return
-    recentSearches.value = [
-      term,
-      ...recentSearches.value.filter((s) => s !== term),
-    ].slice(0, 10)
-    saveRecentSearches()
+    if (!term.trim()) return;
+    recentSearches.value = [term, ...recentSearches.value.filter((s) => s !== term)].slice(0, 10);
+    saveRecentSearches();
+  }
+
+  async function applyRule(rule: Record<string, unknown>): Promise<void> {
+    clearFilters();
+    setQuery(String(rule.query ?? ''));
+    const rawPeople = rule.person_ids;
+    if (Array.isArray(rawPeople) && rawPeople.length > 0) {
+      if (!facets.value) await loadFacets();
+      const people = (facets.value?.people ?? []) as { id: string; name: string | null }[];
+      const nameFor = new Map(people.map((p) => [p.id, p.name ?? p.id]));
+      for (const id of rawPeople as string[]) {
+        addFilter({ type: 'person', value: id, label: nameFor.get(id) ?? id });
+      }
+    }
+    if (rule.person_match === 'or') personMatch.value = 'or';
+    if (rule.person_alone) personAlone.value = true;
+    if (rule.location) {
+      const value = String(rule.location);
+      addFilter({ type: 'location', value, label: value });
+    }
+    if (rule.tag) {
+      const value = String(rule.tag);
+      addFilter({ type: 'tag', value, label: value });
+    }
+    if (rule.date_from && rule.date_to) {
+      const fromDate = String(rule.date_from).slice(0, 10);
+      const toDate = String(rule.date_to).slice(0, 10);
+      addFilter({
+        type: 'date',
+        value: `${fromDate}|${toDate}`,
+        label: fromDate === toDate ? fromDate : `${fromDate} → ${toDate}`,
+      });
+    }
+    if (rule.favorite) mediaFilters.value.favoritesOnly = true;
+    if (rule.videos) mediaFilters.value.videosOnly = true;
+    if (rule.has_faces) mediaFilters.value.facesOnly = true;
+    if (rule.papers) mediaFilters.value.papersOnly = true;
+    if (rule.nsfw_only) mediaFilters.value.nsfwOnly = true;
+    if (rule.camera) camera.value = String(rule.camera);
+    if (rule.aesthetics_min != null) aestheticsMin.value = Number(rule.aesthetics_min);
+    if (rule.order_by && rule.order_by !== 'newest') {
+      setSortOrder(rule.order_by as 'newest' | 'oldest' | 'best' | 'random');
+    }
   }
 
   function clearRecentSearches(): void {
-    recentSearches.value = []
-    saveRecentSearches()
+    recentSearches.value = [];
+    saveRecentSearches();
   }
 
   function saveRecentSearches(): void {
-    localStorage.setItem('siegu_recent_searches', JSON.stringify(recentSearches.value))
+    localStorage.setItem('siegu_recent_searches', JSON.stringify(recentSearches.value));
   }
 
   function loadRecentSearches(): void {
     try {
-      const stored = localStorage.getItem('siegu_recent_searches')
+      const stored = localStorage.getItem('siegu_recent_searches');
       if (stored) {
-        recentSearches.value = JSON.parse(stored) as string[]
+        recentSearches.value = JSON.parse(stored) as string[];
       }
     } catch {
-      recentSearches.value = []
+      recentSearches.value = [];
     }
   }
 
-  loadRecentSearches()
+  loadRecentSearches();
 
   return {
     query,
@@ -261,6 +294,7 @@ export const useSearchStore = defineStore('search', () => {
     togglePapersOnly,
     toggleNsfwOnly,
     addRecentSearch,
+    applyRule,
     clearRecentSearches,
-  }
-})
+  };
+});

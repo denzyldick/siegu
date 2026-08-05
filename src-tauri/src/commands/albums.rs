@@ -42,6 +42,11 @@ pub fn do_delete_album(db: &Database, album_id: &str) -> Result<(), String> {
 }
 
 /// Pure business logic — testable without Tauri.
+pub fn do_clear_dismissed_trips(db: &Database) -> i64 {
+    db.clear_dismissed_trips()
+}
+
+/// Pure business logic — testable without Tauri.
 pub fn do_list_albums(db: &Database) -> Vec<Album> {
     db.list_albums()
 }
@@ -163,6 +168,16 @@ pub async fn delete_album(app: tauri::AppHandle, album_id: String) -> Result<(),
     }
     let db = database::Database::new(&path);
     do_delete_album(&db, &album_id)
+}
+
+#[tauri::command]
+pub async fn clear_dismissed_trips(app: tauri::AppHandle) -> i64 {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return 0;
+    }
+    let db = database::Database::new(&path);
+    do_clear_dismissed_trips(&db)
 }
 
 #[tauri::command]
@@ -546,5 +561,85 @@ mod tests {
         assert_eq!(sections[2].items[0].kind, "trip");
         assert_eq!(sections[3].items[0].kind, "smart");
         assert_eq!(sections[4].items[0].kind, "manual");
+    }
+
+    #[test]
+    fn smart_album_rule_supports_query_and_videos() {
+        let (db, _dir) = test_db();
+        db.connection
+            .execute(
+                "INSERT INTO photo (id, location, caption, created, encoded) VALUES \
+                 ('q1', '/q1.jpg', 'beach sunset', '2026-01-01', 'enc'), \
+                 ('q2', '/q2.mp4', 'beach sunset', '2026-01-02', 'enc'), \
+                 ('q3', '/q3.jpg', 'city night', '2026-01-03', 'enc')",
+                (),
+            )
+            .unwrap();
+
+        let rule = database::PhotoFilter {
+            query: Some("beach".to_string()),
+            ..Default::default()
+        };
+        let album = do_create_smart_album(&db, "Beach", &rule, "smart").unwrap();
+        assert_eq!(album.item_count, 2);
+
+        let videos = database::PhotoFilter {
+            query: Some("beach".to_string()),
+            videos: Some(true),
+            ..Default::default()
+        };
+        let album = do_create_smart_album(&db, "Beach Videos", &videos, "smart").unwrap();
+        assert_eq!(album.item_count, 1);
+        let contents = do_get_album_contents(&db, &album.id, 0, 50);
+        assert_eq!(contents.len(), 1);
+        assert_eq!(contents[0].id, "q2");
+    }
+
+    #[test]
+    fn single_day_trip_is_detected() {
+        let (db, _dir) = test_db();
+        for (id, created) in [
+            ("d1", "2026-07-04 09:00:00"),
+            ("d2", "2026-07-04 12:00:00"),
+            ("d3", "2026-07-04 18:00:00"),
+        ] {
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded) VALUES (?1, ?2, ?3, '')",
+                    (id, format!("/{id}.jpg"), created),
+                )
+                .unwrap();
+        }
+        assert_eq!(db.sync_trips(), 1);
+        let trips = db.list_albums_by_kind(AlbumKind::Trip);
+        assert_eq!(trips.len(), 1);
+        assert_eq!(trips[0].id, "trip:2026-07-04:2026-07-04");
+        assert_eq!(trips[0].item_count, 3);
+    }
+
+    #[test]
+    fn clear_dismissed_trips_restores_deleted_trip() {
+        let (db, _dir) = test_db();
+        for (id, created) in [
+            ("t1", "2026-05-01"),
+            ("t2", "2026-05-02"),
+            ("t3", "2026-05-03"),
+        ] {
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded) VALUES (?1, ?2, ?3, '')",
+                    (id, format!("/{id}.jpg"), created),
+                )
+                .unwrap();
+        }
+        assert_eq!(db.sync_trips(), 1);
+        let trips = db.list_albums_by_kind(AlbumKind::Trip);
+        do_delete_album(&db, &trips[0].id).unwrap();
+        assert_eq!(db.sync_trips(), 0);
+        assert_eq!(db.list_albums_by_kind(AlbumKind::Trip).len(), 0);
+
+        assert_eq!(do_clear_dismissed_trips(&db), 1);
+        assert_eq!(db.sync_trips(), 1);
+        assert_eq!(db.list_albums_by_kind(AlbumKind::Trip).len(), 1);
     }
 }

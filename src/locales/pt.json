@@ -119,7 +119,9 @@
     "best_shot": "Melhor foto do dia",
     "save_as_album": "Salvar como álbum",
     "save_as_album_hint": "Salve a pesquisa atual como álbum inteligente que fica atualizado automaticamente.",
-    "save_as_album_placeholder": "Nome do álbum..."
+    "save_as_album_placeholder": "Nome do álbum...",
+    "update_album": "Atualizar álbum",
+    "update_album_hint": "Salve novamente a pesquisa atual como regras deste álbum."
   },
   "sync": {
     "status_label": "STATUS DA BIBLIOTECA",
@@ -621,6 +623,10 @@
     "kind_location": "Local",
     "kind_trip": "Viagem",
     "kind_smart": "Álbum inteligente",
-    "kind_album": "Álbum"
+    "kind_album": "Álbum",
+    "edit_rules": "Editar regras",
+    "restore_trips": "Restaurar viagens descartadas",
+    "trips_restored": "Viagens descartadas restauradas",
+    "manage_people": "Gerenciar"
   }
 }
