@@ -116,6 +116,7 @@ jobs:
         run: |
           bash ../scripts/download-models.sh
           cargo test -- --ignored test_full_inference_on_sample
+          cargo test -- --ignored test_full_inference_on_video_sample
           cargo test -- --ignored test_whisper_smoke
           cargo test -p siegu-core -- --ignored session_pool_allows_concurrent_locks
         working-directory: src-tauri

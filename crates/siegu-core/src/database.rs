@@ -588,22 +588,6 @@ impl Database {
         // Backs the ocr/text portion of full-text search.
         let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_ocr_text ON ocr(text);", ());
         let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_faces_person_id ON faces(person_id);",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_faces_person_photo ON faces(person_id, photo_id);",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_faces_photo_id ON faces(photo_id);",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_people_name ON people(name);",
-            (),
-        );
-        let _ = conn.execute(
             "CREATE TABLE IF NOT EXISTS peer_device(\
              device_id TEXT PRIMARY KEY, name TEXT, ip TEXT, port INTEGER DEFAULT 0, \
              device_type TEXT DEFAULT '', os TEXT DEFAULT '', \
@@ -630,6 +614,26 @@ impl Database {
         );
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS faces (photo_id STRING, face_id STRING PRIMARY KEY, crop_path STRING, encoded STRING, embedding BLOB, person_id STRING);", ());
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS people (id STRING PRIMARY KEY, name STRING, embedding BLOB);", ());
+        // Must run after the faces/people tables exist: created here (not above)
+        // so fresh databases get these indexes too — previously the CREATE
+        // INDEX statements ran before the tables and silently failed, leaving
+        // fresh installs without index coverage for person/face queries.
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_faces_person_id ON faces(person_id);",
+            (),
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_faces_person_photo ON faces(person_id, photo_id);",
+            (),
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_faces_photo_id ON faces(photo_id);",
+            (),
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_people_name ON people(name);",
+            (),
+        );
         let _ = conn.execute(
             "CREATE TABLE IF NOT EXISTS config(key TEXT, value TEXT);",
             (),
@@ -4089,5 +4093,106 @@ mod tests {
 
         let _ = db.store_photo_batch(&[make_photo("p_any", "/tmp/any.jpg")]);
         assert!(db.has_any_photos());
+    }
+
+    #[test]
+    fn test_hot_queries_use_indexes() {
+        let db = test_db();
+
+        // The faces/people indexes were previously created before their tables
+        // and silently failed on fresh databases. Guard the schema directly so
+        // that ordering bug cannot regress.
+        let mut stmt = db
+            .connection
+            .prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
+            .unwrap();
+        let mut rows = stmt.query([]).unwrap();
+        let mut indexes = Vec::new();
+        while let Ok(Some(row)) = rows.next() {
+            indexes.push(row.get::<_, String>(0).unwrap());
+        }
+        for expected in [
+            "idx_photo_indexed",
+            "idx_photo_created",
+            "idx_faces_person_id",
+            "idx_faces_person_photo",
+            "idx_faces_photo_id",
+            "idx_people_name",
+            "idx_object_photo_id",
+            "idx_properties_photo_id",
+        ] {
+            assert!(
+                indexes.iter().any(|i| i == expected),
+                "missing schema index {expected}; have: {indexes:?}"
+            );
+        }
+
+        // And the hot paths must actually reach them, so accidental SQL changes
+        // that fall back to full scans fail loudly on CI.
+        let cases: [(&str, &str, &str); 8] = [
+            (
+                "scan batch (WHERE indexed<2)",
+                "SELECT p.id FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE p.indexed < 2 LIMIT ?1 OFFSET ?2",
+                "idx_photo_indexed",
+            ),
+            (
+                "photo by id",
+                "SELECT id, location FROM photo WHERE id = ?1",
+                "sqlite_autoindex_photo_1",
+            ),
+            (
+                "photo grid (ORDER BY created)",
+                "SELECT p.id FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE 1=1 ORDER BY p.created DESC LIMIT ?1, ?2",
+                "idx_photo_created",
+            ),
+            (
+                "person filter (EXISTS faces)",
+                "SELECT p.id FROM photo p WHERE EXISTS(SELECT 1 FROM faces WHERE photo_id=p.id AND person_id = ?1)",
+                "idx_faces_person_photo",
+            ),
+            (
+                "person photo count",
+                "SELECT COUNT(DISTINCT photo_id) FROM faces WHERE person_id = ?1",
+                "idx_faces_person_photo",
+            ),
+            (
+                "person embeddings",
+                "SELECT embedding FROM faces WHERE person_id = ?1",
+                "idx_faces_person_photo",
+            ),
+            (
+                "objects by photo",
+                "SELECT class, probability FROM object WHERE photo_id = ?1",
+                "idx_object_photo_id",
+            ),
+            (
+                "properties by photo",
+                "SELECT * FROM properties WHERE photo_id = ?1",
+                "idx_properties_photo_id",
+            ),
+        ];
+        for (name, sql, index) in cases {
+            let plan = db_explain(&db.connection, sql);
+            assert!(
+                plan.contains(index),
+                "{name} should reach index {index} but plan was:\n{plan}"
+            );
+        }
+    }
+
+    fn db_explain(connection: &rusqlite::Connection, sql: &str) -> String {
+        let mut stmt = connection
+            .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
+            .unwrap();
+        let param_count = sql.matches('?').count();
+        let params: Vec<i64> = (0..param_count).map(|_| 0).collect();
+        let mut rows = stmt.query(rusqlite::params_from_iter(params)).unwrap();
+        let mut out = String::new();
+        while let Ok(Some(row)) = rows.next() {
+            let detail: String = row.get(3).unwrap();
+            out.push_str(&detail);
+            out.push('\n');
+        }
+        out
     }
 }

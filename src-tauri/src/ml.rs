@@ -192,7 +192,7 @@ mod tests {
     use std::path::Path;
 
     use siegu_core::database::AiStatus;
-    use siegu_core::ml_engine::pipeline::{analyze_photo, is_video_file};
+    use siegu_core::ml_engine::pipeline::{analyze_photo, analyze_video, is_video_file};
     use siegu_core::ml_engine::whisper::whisper_transcribe;
 
     const REQUIRED_MODELS: &[&str] = &[
@@ -389,6 +389,140 @@ mod tests {
             .expect("BLIP should produce a caption");
         assert!(!caption.trim().is_empty(), "BLIP caption must be non-empty");
         println!("caption: {caption:?}");
+
+        let _ = std::fs::remove_dir_all(&config_dir);
+    }
+
+    #[test]
+    #[ignore] // CI only: requires the ~5GB model suite in test_models/
+    fn test_full_inference_on_video_sample() {
+        let models_dir = match test_models_dir() {
+            Some(d) => d,
+            None => {
+                println!(
+                    "Skipping: required models not present in test_models/ or the app models dir"
+                );
+                return;
+            }
+        };
+        let sample = Path::new("../tests/fixtures/videos/einstein_2s.mp4");
+        if !sample.exists() {
+            println!("Skipping: sample video not found at {sample:?}");
+            return;
+        }
+        assert!(
+            is_video_file(sample.to_str().unwrap()),
+            "expected a video fixture, got: {}",
+            sample.display()
+        );
+
+        let config_dir = prepare_config(&models_dir);
+        let config_path = config_dir.display().to_string();
+        let faces_dir = config_dir.join("faces").display().to_string();
+
+        let config: HashMap<String, String> = HashMap::new();
+        let mut loaded =
+            siegu_core::ml_engine::models::load_models(&config_path, &config, Vec::new(), &|msg| {
+                println!("[models] {msg}")
+            });
+        assert!(loaded.clip_visual.is_some(), "CLIP visual should load");
+        assert!(
+            loaded.face_detector.is_some(),
+            "YuNet face detector should load"
+        );
+        assert!(loaded.arcface.is_some(), "ArcFace should load");
+        assert!(loaded.nsfw.is_some(), "NSFW model should load");
+        assert!(loaded.aesthetics.is_some(), "aesthetics model should load");
+        assert!(loaded.yolo.is_some(), "YOLO model should load");
+        assert!(loaded.blip.is_some(), "BLIP vision encoder should load");
+        assert!(
+            loaded.blip_decoder.is_some(),
+            "BLIP text decoder should load"
+        );
+        assert!(
+            loaded.whisper_encoder.is_some(),
+            "Whisper encoder should load"
+        );
+        assert!(
+            loaded.whisper_decoder.is_some(),
+            "Whisper decoder should load"
+        );
+        assert!(
+            loaded.whisper_tokenizer.is_some(),
+            "Whisper tokenizer should load"
+        );
+
+        // A 2s silent clip of the einstein portrait: exercises the whole video
+        // path — ffmpeg frame extraction, per-frame visual analysis, and the
+        // whisper audio extraction/transcription branch on silence.
+        let start = std::time::Instant::now();
+        let result = analyze_video(
+            "e2e-inference-video",
+            sample.to_str().unwrap(),
+            &AiStatus::default(),
+            &mut loaded,
+            &config,
+            None,
+            &faces_dir,
+        );
+        let elapsed = start.elapsed();
+
+        println!(
+            "video inference completed in {:.1}s: models={:?}",
+            elapsed.as_secs_f64(),
+            result.completed_models
+        );
+
+        assert!(
+            result.completed_models.contains(&"clip"),
+            "CLIP visual should embed the extracted frame: {:?}",
+            result.completed_models
+        );
+        assert!(
+            result.completed_models.contains(&"aesthetics"),
+            "aesthetics should score the frame"
+        );
+        assert!(
+            result.completed_models.contains(&"nsfw"),
+            "NSFW should classify the frame"
+        );
+        assert!(
+            result.completed_models.contains(&"yolo"),
+            "YOLO should run on the frame: {:?}",
+            result.completed_models
+        );
+        assert!(
+            result.completed_models.contains(&"arcface"),
+            "ArcFace should embed the detected face: {:?}",
+            result.completed_models
+        );
+        assert!(
+            result.face_count >= 1,
+            "einstein video fixture is a portrait, expected >=1 face, got {}",
+            result.face_count
+        );
+        assert!(result.aesthetics.is_some(), "expected an aesthetics score");
+        let aesthetics = result.aesthetics.unwrap();
+        assert!(
+            aesthetics.is_finite(),
+            "aesthetics score must be finite, got {aesthetics}"
+        );
+        assert!(result.nsfw.is_some(), "expected an NSFW label");
+        let nsfw_score: f64 = result.nsfw.as_deref().unwrap().parse().expect("nsfw score");
+        assert!(
+            (0.0..=1.0).contains(&nsfw_score),
+            "nsfw sigmoid must be in [0,1], got {nsfw_score}"
+        );
+        assert!(
+            result.completed_models.contains(&"blip"),
+            "BLIP captioning should run on the frame"
+        );
+        let caption = result
+            .caption
+            .as_deref()
+            .expect("BLIP should produce a caption");
+        assert!(!caption.trim().is_empty(), "BLIP caption must be non-empty");
+        println!("video caption: {caption:?}");
 
         let _ = std::fs::remove_dir_all(&config_dir);
     }
