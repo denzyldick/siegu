@@ -68,13 +68,20 @@
             variant="outlined"
             border
             class="border-subtle rounded-lg fill-height d-flex flex-column ai-model-card"
-            :class="{ 'ai-model-card-active': isModelActive(model.id) }"
+            :class="{
+              'ai-model-card-active': isModelActive(model.id),
+              'ai-model-card-blocked': isModelBlocked(model.id),
+            }"
           >
             <v-card-item class="pb-2">
               <template v-slot:prepend>
                 <v-tooltip
                   v-if="!downloadedModels.includes(model.id)"
-                  :text="$t('settings.select_for_download')"
+                  :text="
+                    isModelDownloadBlocked(model.id)
+                      ? getModelBlockReason(model.id)
+                      : $t('settings.select_for_download')
+                  "
                   location="top"
                 >
                   <template v-slot:activator="{ props }">
@@ -82,6 +89,7 @@
                       v-bind="props"
                       :model-value="selectedModels.includes(model.id)"
                       @update:model-value="toggleModelSelection(model.id)"
+                      :disabled="isModelDownloadBlocked(model.id)"
                       hide-details
                       density="compact"
                       color="primary"
@@ -110,17 +118,20 @@
                   v-if="downloadedModels.includes(model.id)"
                   :model-value="modelEnabled[model.id]"
                   @update:model-value="toggleModel(model.id)"
+                  :disabled="isModelBlocked(model.id)"
                   hide-details
                   color="primary"
                   density="compact"
                   :true-value="true"
                   :false-value="false"
                   :title="
-                    (modelEnabled[model.id]
-                      ? $t('settings.disable_model')
-                      : $t('settings.enable_model')) +
-                    ' ' +
-                    $t('models.' + model.id + '.title')
+                    isModelBlocked(model.id)
+                      ? getModelBlockReason(model.id)
+                      : (modelEnabled[model.id]
+                          ? $t('settings.disable_model')
+                          : $t('settings.enable_model')) +
+                        ' ' +
+                        $t('models.' + model.id + '.title')
                   "
                 ></v-switch>
               </template>
@@ -142,10 +153,19 @@
                 </span>
                 <div class="d-flex align-center">
                   <v-icon
+                    v-if="isModelBlocked(model.id)"
+                    size="18"
+                    color="warning"
+                    class="mr-1"
+                    :title="getModelBlockReason(model.id)"
+                    >mdi-alert-circle-outline</v-icon
+                  >
+                  <v-icon
                     v-if="
                       downloadedModels.includes(model.id) &&
                       !isModelActive(model.id) &&
-                      !isModelDownloading(model.id)
+                      !isModelDownloading(model.id) &&
+                      !isModelBlocked(model.id)
                     "
                     size="18"
                     color="success"
@@ -182,7 +202,17 @@
               </div>
 
               <div v-if="isModelDownloading(model.id)" class="mt-4">
+                <div
+                  v-if="getDownloadStats(model.id).bytesText"
+                  class="d-flex justify-space-between text-caption mb-1"
+                >
+                  <span class="font-weight-bold text-zinc-primary">{{
+                    getDownloadStats(model.id).bytesText
+                  }}</span>
+                  <span class="text-zinc-muted">{{ getDownloadStats(model.id).rightText }}</span>
+                </div>
                 <v-progress-linear
+                  :indeterminate="!hasDownloadProgressTotal(model.id)"
                   :model-value="getProgress(model.id)"
                   color="black"
                   bg-color="#f4f4f5"
@@ -196,7 +226,11 @@
               <v-spacer></v-spacer>
               <v-tooltip
                 v-if="!downloadedModels.includes(model.id)"
-                :text="$t('settings.download')"
+                :text="
+                  isModelDownloadBlocked(model.id)
+                    ? getModelBlockReason(model.id)
+                    : $t('settings.download')
+                "
                 location="top"
               >
                 <template v-slot:activator="{ props }">
@@ -207,7 +241,7 @@
                     color="primary"
                     icon="mdi-download"
                     :loading="isModelDownloading(model.id)"
-                    :disabled="isAnyModelProcessing"
+                    :disabled="isAnyModelProcessing || isModelDownloadBlocked(model.id)"
                     @click="$emit('download-models', false, [model.id])"
                   />
                 </template>
@@ -229,9 +263,11 @@
                 </v-tooltip>
                 <v-tooltip
                   :text="
-                    isModelProcessing(model.id)
-                      ? getModelStatusLabel(model.id)
-                      : $t('settings.run_now')
+                    isModelBlocked(model.id)
+                      ? getModelBlockReason(model.id)
+                      : isModelProcessing(model.id)
+                        ? getModelStatusLabel(model.id)
+                        : $t('settings.run_now')
                   "
                   location="top"
                 >
@@ -243,7 +279,10 @@
                       color="primary"
                       icon="mdi-play"
                       :loading="isModelProcessing(model.id)"
-                      :disabled="isAnyModelProcessing && !isModelProcessing(model.id)"
+                      :disabled="
+                        (isAnyModelProcessing && !isModelProcessing(model.id)) ||
+                        isModelBlocked(model.id)
+                      "
                       @click="$emit('run-model', model.id)"
                     />
                   </template>
@@ -310,6 +349,8 @@
 </template>
 
 <script setup lang="ts">
+import type { DownloadStats } from '@/types/settings';
+
 interface ModelEntry {
   id: string;
   size: string;
@@ -336,7 +377,10 @@ const props = defineProps<{
   getModelStatusLabel: (modelId: string) => string;
   getModelStatusText: (modelId: string) => string;
   getModelActivityIcon: (modelId: string) => string;
+  getDownloadStats: (modelId: string) => DownloadStats;
   getProgress: (modelId: string) => number;
+  isModelBlocked: (modelId: string) => boolean;
+  getModelBlockReason: (modelId: string) => string;
   formatIndexingCount: (value: number) => string;
   formatEta: (ms: number) => string;
   toggleModel: (modelId: string) => void;
@@ -355,6 +399,14 @@ const emit = defineEmits<{
 
 function hasModelProgressTotal(modelId: string): boolean {
   return props.getModelProgressPercent(modelId) > 0;
+}
+
+function hasDownloadProgressTotal(modelId: string): boolean {
+  return props.getDownloadStats(modelId).hasTotal;
+}
+
+function isModelDownloadBlocked(modelId: string): boolean {
+  return props.isModelBlocked(modelId) && !props.downloadedModels.includes(modelId);
 }
 
 function toggleModelSelection(modelId: string): void {
@@ -386,6 +438,10 @@ function toggleModelSelection(modelId: string): void {
   border-color: var(--color-text-primary) !important;
   background-color: var(--color-bg-primary) !important;
   box-shadow: inset 3px 0 0 var(--color-text-primary);
+}
+.ai-model-card-blocked {
+  opacity: 0.75;
+  border-color: rgba(245, 158, 11, 0.4) !important;
 }
 .model-status-line {
   gap: 12px;

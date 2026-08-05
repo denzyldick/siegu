@@ -162,6 +162,26 @@ pub struct LoadedModels {
     pub selected_ep: String,
 }
 
+impl LoadedModels {
+    /// Whether the given model's engines are actually in memory. Used to
+    /// distinguish "disabled / dropped / not downloaded" (intentionally absent)
+    /// from "failed to build a session" (broken on this device).
+    pub fn engine_loaded(&self, name: &str) -> bool {
+        match name {
+            "clip" => self.clip_visual.is_some() && self.clip_text.is_some(),
+            "face" => self.face_detector.is_some() && self.arcface.is_some(),
+            "ocr" => self.ocr_det.is_some() && self.ocr_rec.is_some(),
+            "nsfw" => self.nsfw.is_some(),
+            "aesthetics" => self.aesthetics.is_some(),
+            "yolo" => self.yolo.is_some(),
+            "blip" => self.blip.is_some() && self.blip_decoder.is_some(),
+            "midas" => self.midas.is_some(),
+            "whisper" => self.whisper_encoder.is_some() && self.whisper_decoder.is_some(),
+            _ => false,
+        }
+    }
+}
+
 /// Checks whether a model is enabled in the user's config.
 /// Config keys follow the pattern `model_enabled_<name>` (e.g., `model_enabled_clip`).
 ///
@@ -194,17 +214,17 @@ fn should_load(config: &HashMap<String, String>, dropped: &[&str], name: &str) -
     model_enabled(config, name) && !dropped.contains(&name)
 }
 
-/// Applies the `ml_memory_budget_mb` cap: returns the names of enabled models
-/// dropped (heaviest first) so the total estimated size fits the budget.
-/// Returns an empty list when the budget is unset.
-fn dropped_over_budget(config: &HashMap<String, String>, log: &dyn Fn(&str)) -> Vec<&'static str> {
-    let Some(budget_mb) = config
-        .get("ml_memory_budget_mb")
-        .and_then(|s| s.parse::<u64>().ok())
-    else {
+/// Applies a byte-based RAM cap: returns the names of enabled models dropped
+/// (heaviest first) so the total estimated size fits the cap. Returns an empty
+/// list when the cap is `None` (no limit).
+fn dropped_over_cap_bytes(
+    config: &HashMap<String, String>,
+    cap: Option<u64>,
+    log: &dyn Fn(&str),
+) -> Vec<&'static str> {
+    let Some(budget) = cap else {
         return Vec::new();
     };
-    let budget = budget_mb.saturating_mul(1024 * 1024);
 
     let mut enabled: Vec<(u64, &'static str)> = MODEL_SIZES
         .iter()
@@ -224,12 +244,170 @@ fn dropped_over_budget(config: &HashMap<String, String>, log: &dyn Fn(&str)) -> 
     }
 
     if !dropped.is_empty() {
-        log(&format!(
-            "Memory budget {budget_mb} MB: skipped {}",
-            dropped.join(", ")
-        ));
+        log(&format!("Memory budget: skipped {}", dropped.join(", ")));
     }
     dropped
+}
+
+/// Applies the `ml_memory_budget_mb` cap: returns the names of enabled models
+/// dropped (heaviest first) so the total estimated size fits the budget.
+/// Returns an empty list when the budget is unset.
+fn dropped_over_budget(config: &HashMap<String, String>, log: &dyn Fn(&str)) -> Vec<&'static str> {
+    let budget_mb = config
+        .get("ml_memory_budget_mb")
+        .and_then(|s| s.parse::<u64>().ok());
+    dropped_over_cap_bytes(
+        config,
+        budget_mb.map(|mb| mb.saturating_mul(1024 * 1024)),
+        log,
+    )
+}
+
+/// Machine-readable reasons a model can't run on this device. These codes are
+/// emitted as-is so the frontend can map them to localized strings.
+pub const REASON_MEMORY_BUDGET: &str = "memory_budget";
+pub const REASON_LOW_RAM: &str = "low_ram";
+pub const REASON_NOT_DOWNLOADED: &str = "not_downloaded";
+pub const REASON_LOAD_FAILED: &str = "load_failed";
+
+/// Feasibility verdict for one user-facing model.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ModelFeasibility {
+    pub model: String,
+    /// Whether the model can actually run on this device right now.
+    pub runnable: bool,
+    /// `None` when runnable; otherwise one of the `REASON_*` codes.
+    pub reason: Option<String>,
+}
+
+/// Fraction of physical RAM the model weights may occupy. The rest is reserved
+/// for the OS and app. Tuned so a 4 GB phone keeps ~2 GB for models, which is
+/// realistic on low-end Android devices.
+const RAM_USABLE_FRACTION: f64 = 0.5;
+
+/// User-facing models checked for feasibility. Mirrors the app's model toggles
+/// (the `face` toggle also gates the separate `arcface` model).
+pub const FEASIBILITY_MODELS: &[&str] = &[
+    "clip",
+    "face",
+    "ocr",
+    "nsfw",
+    "aesthetics",
+    "yolo",
+    "blip",
+    "midas",
+    "whisper",
+];
+
+/// Required files per model, used to decide whether a model is downloaded.
+/// Matches the files each pipeline reads; an empty/absent file counts as
+/// missing (e.g. an interrupted download).
+fn model_files_ok(models_dir: &Path, name: &str) -> bool {
+    let required: &[&str] = match name {
+        "clip" => &[
+            "clip-vit-base-patch32-visual.onnx",
+            "clip-vit-base-patch32-text.onnx",
+            "tokenizer.json",
+        ],
+        "face" => &["face_detection_yunet_2023mar.onnx", "arcface.onnx"],
+        "ocr" => &["ocr_det.onnx", "ocr_rec.onnx", "en_dict.txt"],
+        "nsfw" => &["nsfw.onnx"],
+        "aesthetics" => &["aesthetics.onnx"],
+        "yolo" => &["yolov8.onnx"],
+        "blip" => &["blip.onnx", "blip_decoder.onnx", "blip_tokenizer.json"],
+        "midas" => &["midas.onnx"],
+        "whisper" => &[
+            "whisper.onnx",
+            "whisper-decoder.onnx",
+            "whisper-tokenizer.json",
+        ],
+        _ => return false,
+    };
+    required.iter().all(|f| {
+        let p = models_dir.join(f);
+        p.exists() && p.metadata().map(|m| m.len()).unwrap_or(0) > 0
+    })
+}
+
+/// Feasibility with an explicit device-RAM value (injectable for tests).
+///
+/// A model is reported as runnable only when it could actually load AND run
+/// here: enabled, downloaded, not dropped by the user's memory budget, and not
+/// over the device's physical RAM (heaviest enabled models are dropped first,
+/// exactly like [`dropped_over_budget`]).
+pub fn model_feasibility_with_ram(
+    models_dir: &Path,
+    config: &HashMap<String, String>,
+    device_ram: Option<u64>,
+    log: &dyn Fn(&str),
+) -> Vec<ModelFeasibility> {
+    let user_budget = config
+        .get("ml_memory_budget_mb")
+        .and_then(|s| s.parse::<u64>().ok())
+        .map(|mb| mb.saturating_mul(1024 * 1024));
+    let ram_cap = device_ram.map(|ram| (ram as f64 * RAM_USABLE_FRACTION) as u64);
+
+    let mut out = Vec::new();
+    for &name in FEASIBILITY_MODELS {
+        if !model_enabled(config, name) {
+            continue;
+        }
+        if !model_files_ok(models_dir, name) {
+            out.push(ModelFeasibility {
+                model: name.to_string(),
+                runnable: false,
+                reason: Some(REASON_NOT_DOWNLOADED.to_string()),
+            });
+            continue;
+        }
+        let cap = match (user_budget, ram_cap) {
+            (Some(b), Some(r)) => Some(b.min(r)),
+            (Some(b), None) => Some(b),
+            (None, Some(r)) => Some(r),
+            (None, None) => None,
+        };
+        let dropped = dropped_over_cap_bytes(config, cap, log);
+        // `face` also depends on the separately-sized `arcface` engine.
+        let is_dropped =
+            dropped.contains(&name) || (name == "face" && dropped.contains(&"arcface"));
+        if !is_dropped {
+            out.push(ModelFeasibility {
+                model: name.to_string(),
+                runnable: true,
+                reason: None,
+            });
+            continue;
+        }
+        // The binding cap is the smaller one: that's what actually caused the
+        // drop, and it decides whether the fix is "raise the memory limit" or
+        // "this device can't run it".
+        let reason = match (user_budget, ram_cap) {
+            (Some(b), Some(r)) if b > r => REASON_LOW_RAM,
+            (Some(_), _) => REASON_MEMORY_BUDGET,
+            (None, Some(_)) => REASON_LOW_RAM,
+            (None, None) => unreachable!("cap is None, nothing can be dropped"),
+        };
+        out.push(ModelFeasibility {
+            model: name.to_string(),
+            runnable: false,
+            reason: Some(reason.to_string()),
+        });
+    }
+    out
+}
+
+/// Feasibility verdicts for every enabled model on this device.
+pub fn model_feasibility(
+    models_dir: &Path,
+    config: &HashMap<String, String>,
+    log: &dyn Fn(&str),
+) -> Vec<ModelFeasibility> {
+    model_feasibility_with_ram(
+        models_dir,
+        config,
+        crate::model_manager::physical_memory_bytes(),
+        log,
+    )
 }
 
 /// Loads all enabled ONNX models from the models directory.
@@ -685,6 +863,122 @@ mod tests {
         let config = config_with("32768", &["clip"]);
         assert!(should_load(&config, &[], "clip"));
         assert!(!should_load(&config, &[], "midas"));
+    }
+
+    /// A models dir with every file `model_files_ok` requires (empty files are
+    /// fine — feasibility only checks presence/size > 0).
+    fn models_dir_with_files() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        for f in [
+            "clip-vit-base-patch32-visual.onnx",
+            "clip-vit-base-patch32-text.onnx",
+            "tokenizer.json",
+            "face_detection_yunet_2023mar.onnx",
+            "arcface.onnx",
+            "ocr_det.onnx",
+            "ocr_rec.onnx",
+            "en_dict.txt",
+            "nsfw.onnx",
+            "aesthetics.onnx",
+            "yolov8.onnx",
+            "blip.onnx",
+            "blip_decoder.onnx",
+            "blip_tokenizer.json",
+            "midas.onnx",
+            "whisper.onnx",
+            "whisper-decoder.onnx",
+            "whisper-tokenizer.json",
+        ] {
+            std::fs::write(dir.path().join(f), b"x").unwrap();
+        }
+        dir
+    }
+
+    fn feasibility_for(
+        models: &std::path::Path,
+        config: &HashMap<String, String>,
+        device_ram: Option<u64>,
+    ) -> Vec<ModelFeasibility> {
+        model_feasibility_with_ram(models, config, device_ram, &noop_log)
+    }
+
+    #[test]
+    fn feasibility_all_runnable_when_ram_plentiful() {
+        let models = models_dir_with_files();
+        let config = HashMap::new(); // all enabled, no budget
+        let out = feasibility_for(models.path(), &config, Some(64 * 1024 * 1024 * 1024));
+        assert_eq!(out.len(), FEASIBILITY_MODELS.len());
+        for v in &out {
+            assert!(v.runnable, "{} should run: {:?}", v.model, v.reason);
+        }
+    }
+
+    #[test]
+    fn feasibility_drops_heaviest_models_on_4gb_device() {
+        let models = models_dir_with_files();
+        let config = HashMap::new(); // all enabled
+                                     // 4 GB device -> 2 GB model cap. Enabled models total ~4.5 GB, so the
+                                     // heaviest (aesthetics, then blip) are dropped first, like the loader.
+        let out = feasibility_for(models.path(), &config, Some(4 * 1024 * 1024 * 1024));
+        let aesthetics = out.iter().find(|v| v.model == "aesthetics").unwrap();
+        assert!(!aesthetics.runnable);
+        assert_eq!(aesthetics.reason.as_deref(), Some(REASON_LOW_RAM));
+        let blip = out.iter().find(|v| v.model == "blip").unwrap();
+        assert!(!blip.runnable);
+        assert_eq!(blip.reason.as_deref(), Some(REASON_LOW_RAM));
+        let yolo = out.iter().find(|v| v.model == "yolo").unwrap();
+        assert!(yolo.runnable, "light models should still run");
+    }
+
+    #[test]
+    fn feasibility_reports_memory_budget_when_user_cap_binds() {
+        let models = models_dir_with_files();
+        let config = config_with("2048", &["aesthetics", "blip", "yolo"]);
+        // Device RAM is huge, so only the user's 2 GB budget can cause a drop.
+        let out = feasibility_for(models.path(), &config, Some(64 * 1024 * 1024 * 1024));
+        let aesthetics = out.iter().find(|v| v.model == "aesthetics").unwrap();
+        assert!(!aesthetics.runnable);
+        assert_eq!(aesthetics.reason.as_deref(), Some(REASON_MEMORY_BUDGET));
+        let yolo = out.iter().find(|v| v.model == "yolo").unwrap();
+        assert!(yolo.runnable);
+    }
+
+    #[test]
+    fn feasibility_low_ram_binds_when_device_cap_smaller_than_user_budget() {
+        let models = models_dir_with_files();
+        let config = config_with("16384", &["aesthetics", "yolo"]); // 16 GB user budget
+                                                                    // A 2 GB device caps models at 1 GB — tighter than the user's 16 GB.
+        let out = feasibility_for(models.path(), &config, Some(2 * 1024 * 1024 * 1024));
+        let aesthetics = out.iter().find(|v| v.model == "aesthetics").unwrap();
+        assert_eq!(aesthetics.reason.as_deref(), Some(REASON_LOW_RAM));
+        let yolo = out.iter().find(|v| v.model == "yolo").unwrap();
+        assert!(yolo.runnable);
+    }
+
+    #[test]
+    fn feasibility_reports_not_downloaded_for_missing_files() {
+        let models = tempfile::tempdir().unwrap();
+        let config = HashMap::new();
+        let out = feasibility_for(models.path(), &config, Some(64 * 1024 * 1024 * 1024));
+        assert_eq!(out.len(), FEASIBILITY_MODELS.len());
+        for v in &out {
+            assert!(!v.runnable);
+            assert_eq!(v.reason.as_deref(), Some(REASON_NOT_DOWNLOADED));
+        }
+    }
+
+    #[test]
+    fn feasibility_skips_disabled_models() {
+        let models = models_dir_with_files();
+        let mut config = HashMap::new();
+        config.insert("model_enabled_aesthetics".to_string(), "false".to_string());
+        config.insert("model_enabled_blip".to_string(), "false".to_string());
+        let out = feasibility_for(models.path(), &config, Some(2 * 1024 * 1024 * 1024));
+        assert!(
+            out.iter()
+                .all(|v| v.model != "aesthetics" && v.model != "blip"),
+            "disabled models must not be reported"
+        );
     }
 
     /// Locate a directory containing at least the tiny YuNet face-detector

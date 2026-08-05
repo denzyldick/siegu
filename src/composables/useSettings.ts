@@ -6,10 +6,13 @@ import { platform } from '@tauri-apps/plugin-os';
 import { listen } from '@tauri-apps/api/event';
 import { check } from '@tauri-apps/plugin-updater';
 import { AI_MODEL_IDS } from '@/types/models';
+import type { ModelCapability } from '@/types/models';
+import { MODEL_BLOCK_REASONS } from '@/types/models';
 import type {
   DirectoryEntry,
   LogEntry,
   DownloadProgressState,
+  DownloadStats,
   ModelProgressState,
   PerformanceConfig,
   DownloadDialogState,
@@ -20,6 +23,11 @@ import type {
   PerformancePreset,
   UpdateStatus,
 } from '@/types/settings';
+import {
+  formatBytes as formatDownloadBytes,
+  formatDuration,
+  updateDownloadProgress,
+} from '@/utils/format';
 import type { Update } from '@tauri-apps/plugin-updater';
 import { DEFAULT_SIGNALING_URL, appendToken, pingSignalling } from '@/services/signalling';
 import type { PingResult } from '@/services/signalling';
@@ -66,6 +74,7 @@ export function useSettings() {
   const activeModelId = ref<string | null>(null);
   const activeModelHoldUntil = ref(0);
   const modelProgress = ref<Record<string, ModelProgressState>>({});
+  const modelCapabilities = ref<Record<string, ModelCapability>>({});
 
   const modelEnabled = ref<Record<string, boolean>>({});
 
@@ -155,11 +164,15 @@ export function useSettings() {
     );
 
     cleanupFns.push(
-      await listen<{ model: string; downloaded: number; total: number }>(
+      await listen<{ model: string; downloaded: number; total: number | null }>(
         'download-progress',
         (event) => {
           const { model, downloaded, total } = event.payload;
-          downloadProgress.value = { ...downloadProgress.value, [model]: { downloaded, total } };
+          const previous = downloadProgress.value[model];
+          downloadProgress.value = {
+            ...downloadProgress.value,
+            [model]: updateDownloadProgress(previous, downloaded, total, Date.now()),
+          };
         },
       ),
     );
@@ -170,6 +183,7 @@ export function useSettings() {
         downloadingModels.value = {};
         downloadProgress.value = {};
         checkExistingModels();
+        loadModelCapabilities();
       }),
     );
 
@@ -233,6 +247,7 @@ export function useSettings() {
     isAndroid.value = detectedPlatform === 'android';
     currentPlatform.value = detectedPlatform;
     await checkExistingModels();
+    await loadModelCapabilities();
     await loadPerformanceConfig();
     await loadModelEnabledStates();
     await loadModelsLoaded();
@@ -480,6 +495,48 @@ export function useSettings() {
     }
   }
 
+  async function loadModelCapabilities(): Promise<void> {
+    try {
+      const caps = await invoke<ModelCapability[]>('get_model_capabilities');
+      const map: Record<string, ModelCapability> = {};
+      for (const cap of caps) {
+        map[cap.model] = cap;
+      }
+      modelCapabilities.value = map;
+    } catch {
+      modelCapabilities.value = {};
+    }
+  }
+
+  function modelBlockReason(reason: string | null | undefined): string {
+    switch (reason) {
+      case 'low_ram':
+        return t('settings.model_reason_low_ram');
+      case 'memory_budget':
+        return t('settings.model_reason_memory_budget');
+      case 'load_failed':
+        return t('settings.model_reason_load_failed');
+      default:
+        return t('settings.model_status_not_available');
+    }
+  }
+
+  function isModelBlocked(modelId: string): boolean {
+    const reason = modelCapabilities.value[modelId]?.reason;
+    return (MODEL_BLOCK_REASONS as readonly string[]).includes(reason ?? '');
+  }
+
+  /** Why a model can't run on this device, or '' when it can. */
+  function getModelBlockReason(modelId: string): string {
+    const cap = modelCapabilities.value[modelId];
+    if (cap && !cap.runnable) return modelBlockReason(cap.reason);
+    const progress = modelProgress.value[modelId];
+    if (progress && (MODEL_BLOCK_REASONS as readonly string[]).includes(progress.message)) {
+      return modelBlockReason(progress.message);
+    }
+    return '';
+  }
+
   async function freeMemory(): Promise<void> {
     if (isMemoryFreeing.value) return;
     isMemoryFreeing.value = true;
@@ -558,6 +615,9 @@ export function useSettings() {
     if (!forceUpdate && !specificModels) {
       modelsToDownload = AI_MODEL_IDS.filter((m) => !downloadedModels.value.includes(m));
     }
+    if (modelsToDownload.some((m) => isModelBlocked(m))) {
+      modelsToDownload = modelsToDownload.filter((m) => !isModelBlocked(m));
+    }
     if (!modelsToDownload || modelsToDownload.length === 0) return;
 
     isDownloading.value = true;
@@ -566,7 +626,13 @@ export function useSettings() {
       ...Object.fromEntries(modelsToDownload.map((m) => [m, true])),
     };
     modelsToDownload.forEach((m) => {
-      downloadProgress.value[m] = { downloaded: 0, total: 1 };
+      downloadProgress.value[m] = {
+        downloaded: 0,
+        total: 1,
+        speedBytesPerSec: 0,
+        etaMs: null,
+        updatedAt: 0,
+      };
     });
 
     try {
@@ -586,6 +652,27 @@ export function useSettings() {
     const progress = downloadProgress.value[model];
     if (!progress || !progress.total) return downloadedModels.value.includes(model) ? 100 : 0;
     return (progress.downloaded / progress.total) * 100;
+  }
+
+  function getDownloadStats(modelId: string): DownloadStats {
+    const progress = downloadProgress.value[modelId];
+    if (!progress || !downloadingModels.value[modelId]) {
+      return { bytesText: '', rightText: '', hasTotal: false };
+    }
+    const downloaded = formatDownloadBytes(progress.downloaded);
+    const total = progress.total != null ? formatDownloadBytes(progress.total) : '';
+    const rightParts: string[] = [];
+    if (progress.speedBytesPerSec > 0) {
+      rightParts.push(`${formatDownloadBytes(progress.speedBytesPerSec)}/s`);
+    }
+    if (progress.etaMs != null) {
+      rightParts.push(t('settings.eta_label', { time: formatDuration(progress.etaMs) }));
+    }
+    return {
+      bytesText: total ? `${downloaded} / ${total}` : downloaded,
+      rightText: rightParts.join(' · '),
+      hasTotal: progress.total != null,
+    };
   }
 
   function isModelProcessing(modelId: string): boolean {
@@ -630,7 +717,13 @@ export function useSettings() {
   function getModelStatusText(modelId: string): string {
     const progress = modelProgress.value[modelId];
     if (isModelProcessing(modelId)) return getModelProgressText(modelId);
-    if (progress?.message) return progress.message;
+    const blockReason = getModelBlockReason(modelId);
+    if (blockReason) return blockReason;
+    if (progress?.message) {
+      return (MODEL_BLOCK_REASONS as readonly string[]).includes(progress.message)
+        ? modelBlockReason(progress.message)
+        : progress.message;
+    }
     if (progress?.status === 'completed') return 'Finished';
     if (progress?.status === 'up_to_date') return 'Up to date';
     if (progress?.status === 'unavailable') return 'Not available';
@@ -747,7 +840,9 @@ export function useSettings() {
   });
 
   const missingSelectedCount = computed(() => {
-    return selectedModels.value.filter((id) => !downloadedModels.value.includes(id)).length;
+    return selectedModels.value.filter(
+      (id) => !downloadedModels.value.includes(id) && !isModelBlocked(id),
+    ).length;
   });
 
   function formatBytes(bytes: number): string {
@@ -897,6 +992,7 @@ export function useSettings() {
     setIndexingMode,
     applyPreset,
     loadModelsLoaded,
+    loadModelCapabilities,
     freeMemory,
     loadSignallingConfig,
     saveSignallingConfig,
@@ -904,6 +1000,7 @@ export function useSettings() {
     effectiveSignalingUrl,
     downloadModels,
     getProgress,
+    getDownloadStats,
     isModelProcessing,
     isModelActive,
     getModelProgressPercent,
@@ -912,6 +1009,9 @@ export function useSettings() {
     getModelStatusText,
     getModelActivityIcon,
     isModelDownloading,
+    isModelBlocked,
+    getModelBlockReason,
+    modelCapabilities,
     runModel,
     startConfirmedCleanup,
     checkUpdate,

@@ -18,7 +18,16 @@ export interface LogEntry {
 
 export interface DownloadProgressState {
   downloaded: number;
-  total: number;
+  total: number | null;
+  speedBytesPerSec: number;
+  etaMs: number | null;
+  updatedAt: number;
+}
+
+export interface DownloadStats {
+  bytesText: string;
+  rightText: string;
+  hasTotal: boolean;
 }
 
 export interface ModelProgressState {

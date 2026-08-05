@@ -37,6 +37,19 @@ pub trait AnalysisCallbacks: Send + Sync {
     fn on_scan_complete(&self);
     fn on_progress(&self, completed: usize, total: usize, avg_ms: f64);
     fn on_model_status(&self, model: &str, status: &str, pending: usize, total: usize);
+    /// Status report that can also carry a machine-readable reason code (e.g.
+    /// "low_ram", "load_failed") explaining why a model won't run. Defaults to
+    /// the plain [`Self::on_model_status`].
+    fn on_model_status_with_reason(
+        &self,
+        model: &str,
+        status: &str,
+        pending: usize,
+        total: usize,
+        _reason: Option<&str>,
+    ) {
+        self.on_model_status(model, status, pending, total)
+    }
     fn on_ep_selected(&self, ep: &str);
     fn on_log(&self, msg: &str);
     fn should_abort(&self) -> bool;
@@ -68,6 +81,58 @@ impl AnalysisCallbacks for NoopCallbacks {
     fn on_log(&self, _msg: &str) {}
     fn should_abort(&self) -> bool {
         false
+    }
+}
+
+/// Reports enabled-but-unrunnable models via `on_model_status_with_reason` so
+/// the UI can explain why a model won't run on this device (low RAM, a memory
+/// budget that drops it, or an ONNX session that failed to build).
+///
+/// "Not downloaded" models are skipped here — that's a normal pre-download
+/// state the UI already surfaces.
+fn report_unavailable_models<C: AnalysisCallbacks>(
+    db_path: &str,
+    config: &HashMap<String, String>,
+    loaded: &LoadedModels,
+    callbacks: &C,
+) {
+    let models_dir = std::path::Path::new(db_path).join("models");
+    let caps = super::models::model_feasibility(&models_dir, config, &|msg| callbacks.on_log(msg));
+    let caps: HashMap<&str, &super::models::ModelFeasibility> =
+        caps.iter().map(|c| (c.model.as_str(), c)).collect();
+
+    for &name in super::models::FEASIBILITY_MODELS {
+        let enabled = config
+            .get(&format!("model_enabled_{name}"))
+            .is_none_or(|v| v == "true");
+        if !enabled {
+            continue;
+        }
+        match caps.get(name) {
+            Some(cap) if !cap.runnable => {
+                let reason = cap.reason.as_deref().unwrap_or("");
+                if reason == super::models::REASON_NOT_DOWNLOADED {
+                    continue;
+                }
+                callbacks.on_model_status_with_reason(name, "unavailable", 0, 0, Some(reason));
+            }
+            Some(_) => {
+                // Feasibility can't see a session build failing on a corrupt or
+                // unsupported model, so check the loaded engines directly.
+                if !loaded.engine_loaded(name) {
+                    callbacks.on_model_status_with_reason(
+                        name,
+                        "unavailable",
+                        0,
+                        0,
+                        Some(super::models::REASON_LOAD_FAILED),
+                    );
+                }
+            }
+            None => {
+                callbacks.on_log(&format!("Model {name}: no feasibility verdict"));
+            }
+        }
     }
 }
 
@@ -156,6 +221,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                             callbacks.on_log(msg)
                         });
                     callbacks.on_ep_selected(&loaded.selected_ep);
+                    report_unavailable_models(&db_path, &config, &loaded, &*callbacks);
                     *m = Some(loaded);
                     callbacks.on_log("Models ready.");
                 }

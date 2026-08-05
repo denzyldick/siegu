@@ -39,6 +39,10 @@ export interface DownloadProgressEvent {
   payload: DownloadProgress;
 }
 
+export interface DownloadCompleteEvent {
+  payload: null;
+}
+
 export interface MediaAnalysisResultEvent {
   payload: {
     photo_id: number;
@@ -90,6 +94,7 @@ export type TauriEventMap = {
   'sync-progress': SyncProgressEvent;
   'sync-error': SyncErrorEvent;
   'download-progress': DownloadProgressEvent;
+  'download-complete': DownloadCompleteEvent;
   'model-progress': ModelProgressEvent;
   'webrtc-state': WebRtcStateEvent;
   'peer-connected': PeerConnectedEvent;

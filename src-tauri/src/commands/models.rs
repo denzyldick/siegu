@@ -16,6 +16,33 @@ pub struct DownloadProgress {
     total: Option<u64>,
 }
 
+#[derive(serde::Serialize, Clone)]
+pub struct ModelCapability {
+    model: String,
+    runnable: bool,
+    reason: Option<String>,
+}
+
+/// Per-model verdicts for whether a model can run on this device. The UI uses
+/// this to disable the enable toggle / download button and to explain why.
+#[tauri::command]
+pub async fn get_model_capabilities(app: tauri::AppHandle) -> Vec<ModelCapability> {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return Vec::new();
+    }
+    let models_dir = std::path::Path::new(&path).join("models");
+    let config = siegu_core::database::Database::new(&path).get_state();
+    siegu_core::ml_engine::models::model_feasibility(&models_dir, &config, &|_| {})
+        .into_iter()
+        .map(|v| ModelCapability {
+            model: v.model,
+            runnable: v.runnable,
+            reason: v.reason,
+        })
+        .collect()
+}
+
 #[tauri::command]
 pub async fn check_models(app: tauri::AppHandle) -> Vec<String> {
     let path = get_config_path(&app);
@@ -29,7 +56,7 @@ pub async fn check_models(app: tauri::AppHandle) -> Vec<String> {
 #[tauri::command]
 pub async fn download_models(
     app: tauri::AppHandle,
-    models: Vec<String>,
+    mut models: Vec<String>,
     state: tauri::State<'_, ml::MlContext>,
 ) -> Result<(), String> {
     use crate::common::emit_log;
@@ -41,6 +68,39 @@ pub async fn download_models(
     }
     let models_dir = std::path::PathBuf::from(&path).join("models");
     std::fs::create_dir_all(&models_dir).map_err(|e| e.to_string())?;
+
+    // Never download models that can't run on this device (low RAM, memory
+    // budget) — tell the user why instead of wasting bandwidth.
+    let config = siegu_core::database::Database::new(&path).get_state();
+    let blocked: Vec<(String, String)> =
+        siegu_core::ml_engine::models::model_feasibility(&models_dir, &config, &|_| {})
+            .into_iter()
+            .filter(|v| {
+                !v.runnable
+                    && v.reason
+                        .as_deref()
+                        .is_some_and(|r| r != siegu_core::ml_engine::models::REASON_NOT_DOWNLOADED)
+            })
+            .map(|v| (v.model.clone(), v.reason.unwrap_or_default()))
+            .collect();
+    let blocked_names: Vec<&str> = blocked.iter().map(|(name, _)| name.as_str()).collect();
+    if !blocked_names.is_empty() {
+        emit_log(
+            &app,
+            format!(
+                "Skipping models that can't run on this device: {}",
+                blocked_names.join(", ")
+            ),
+        );
+        let allowed: Vec<String> = models
+            .into_iter()
+            .filter(|m| !blocked_names.contains(&m.as_str()))
+            .collect();
+        if allowed.is_empty() {
+            return Err("None of the selected models can run on this device".to_string());
+        }
+        models = allowed;
+    }
 
     let needed = siegu_core::model_manager::needed_download_bytes(&models_dir, &models);
     if needed > 0 {

@@ -43,6 +43,9 @@
           :get-model-status-text="getModelStatusText"
           :get-model-activity-icon="getModelActivityIcon"
           :get-progress="getProgress"
+          :get-download-stats="getDownloadStats"
+          :is-model-blocked="isModelBlocked"
+          :get-model-block-reason="getModelBlockReason"
           :format-indexing-count="formatIndexingCount"
           :format-eta="formatEta"
           :toggle-model="toggleModel"
@@ -335,6 +338,9 @@ const {
   getModelStatusText,
   getModelActivityIcon,
   getProgress,
+  getDownloadStats,
+  isModelBlocked,
+  getModelBlockReason,
   formatIndexingCount,
   formatEta,
   modelRam,

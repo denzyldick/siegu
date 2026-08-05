@@ -485,6 +485,33 @@ pub fn available_memory_bytes() -> u64 {
     sys.available_memory()
 }
 
+/// Total physical RAM in bytes, if it can be determined.
+///
+/// Reads `/proc/meminfo` on Linux/Android (fast, works without a sysinfo
+/// refresh) and falls back to `sysinfo` elsewhere. Returns `None` when the
+/// value can't be read (e.g. a container without /proc).
+pub fn physical_memory_bytes() -> Option<u64> {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        if let Ok(contents) = std::fs::read_to_string("/proc/meminfo") {
+            for line in contents.lines() {
+                if let Some(rest) = line.strip_prefix("MemTotal:") {
+                    let kb: u64 = rest.split_whitespace().next()?.parse().ok()?;
+                    return Some(kb.saturating_mul(1024));
+                }
+            }
+        }
+    }
+    let mut sys = System::new();
+    sys.refresh_memory();
+    let total = sys.total_memory();
+    if total > 0 {
+        Some(total)
+    } else {
+        None
+    }
+}
+
 pub fn models_fit_in_memory(model_sizes: &[(String, u64)]) -> bool {
     let available = available_memory_bytes();
     let total_needed: u64 = model_sizes.iter().map(|(_, size)| size).sum();

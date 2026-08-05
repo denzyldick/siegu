@@ -122,3 +122,59 @@ describe('useSettings performance + memory', () => {
     expect(settings.totalModelRamEstimate.value).toBe('1.6 GB');
   });
 });
+
+describe('useSettings model capabilities', () => {
+  beforeEach(() => {
+    invoke.mockReset();
+    invoke.mockResolvedValue(undefined);
+  });
+
+  it('loads capabilities and blocks unrunnable models', async () => {
+    invoke.mockResolvedValueOnce([
+      { model: 'aesthetics', runnable: false, reason: 'low_ram' },
+      { model: 'yolo', runnable: true, reason: null },
+    ]);
+    const settings = useSettings();
+    await settings.loadModelCapabilities();
+    expect(settings.isModelBlocked('aesthetics')).toBe(true);
+    expect(settings.isModelBlocked('yolo')).toBe(false);
+    expect(settings.isModelBlocked('clip')).toBe(false);
+  });
+
+  it('reports a localized reason for blocked models', async () => {
+    invoke.mockResolvedValueOnce([{ model: 'aesthetics', runnable: false, reason: 'low_ram' }]);
+    const settings = useSettings();
+    await settings.loadModelCapabilities();
+    // t() returns the i18n key itself in tests
+    expect(settings.getModelBlockReason('aesthetics')).toBe('settings.model_reason_low_ram');
+    expect(settings.getModelBlockReason('yolo')).toBe('');
+  });
+
+  it('maps a reason code carried in model-progress messages', async () => {
+    const settings = useSettings();
+    settings.modelProgress.value = {
+      clip: {
+        pending: 0,
+        total: 0,
+        status: 'unavailable',
+        message: 'memory_budget',
+        updatedAt: 0,
+      },
+    };
+    expect(settings.getModelBlockReason('clip')).toBe('settings.model_reason_memory_budget');
+    expect(settings.getModelStatusText('clip')).toBe('settings.model_reason_memory_budget');
+  });
+
+  it('drops blocked models from downloads', async () => {
+    invoke.mockResolvedValueOnce([
+      { model: 'aesthetics', runnable: false, reason: 'memory_budget' },
+    ]);
+    const settings = useSettings();
+    await settings.loadModelCapabilities();
+    settings.downloadedModels.value = [];
+    await settings.downloadModels(false, ['aesthetics', 'yolo']);
+    const downloadCalls = invoke.mock.calls.filter(([name]) => name === 'download_models');
+    expect(downloadCalls).toHaveLength(1);
+    expect(downloadCalls[0][1].models).toEqual(['yolo']);
+  });
+});

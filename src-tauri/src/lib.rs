@@ -311,6 +311,7 @@ pub fn run() {
             // Models
             commands::models::check_models,
             commands::models::download_models,
+            commands::models::get_model_capabilities,
             // Photos
             commands::photos::list_files,
             commands::photos::toggle_favorite,

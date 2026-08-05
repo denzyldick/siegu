@@ -146,15 +146,27 @@ impl AnalysisCallbacks for TauriCallbacks {
     }
 
     fn on_model_status(&self, model: &str, status: &str, pending: usize, total: usize) {
-        let _ = self.app.emit(
-            "model-progress",
-            serde_json::json!({
-                "model": model,
-                "pending": pending,
-                "total": total,
-                "status": status,
-            }),
-        );
+        self.on_model_status_with_reason(model, status, pending, total, None)
+    }
+
+    fn on_model_status_with_reason(
+        &self,
+        model: &str,
+        status: &str,
+        pending: usize,
+        total: usize,
+        reason: Option<&str>,
+    ) {
+        let mut payload = serde_json::json!({
+            "model": model,
+            "pending": pending,
+            "total": total,
+            "status": status,
+        });
+        if let Some(reason) = reason {
+            payload["message"] = serde_json::Value::String(reason.to_string());
+        }
+        let _ = self.app.emit("model-progress", payload);
     }
 
     fn on_ep_selected(&self, ep: &str) {

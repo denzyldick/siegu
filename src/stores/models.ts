@@ -68,7 +68,12 @@ export const useModelsStore = defineStore('models', () => {
   }
 
   void listenEvent('download-progress', (payload) => {
-    downloadProgress.value[payload.model] = payload.progress
+    if (payload.total) {
+      downloadProgress.value[payload.model] = Math.min(
+        100,
+        Math.round((payload.downloaded / payload.total) * 100),
+      )
+    }
   })
 
   void listenEvent('model-progress', (payload) => {

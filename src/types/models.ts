@@ -23,15 +23,32 @@ export interface AiModelInfo {
 
 export interface ModelProgress {
   model: string
-  progress: number
-  eta: number
+  pending: number | null
+  total: number | null
+  status: string
+  message: string
 }
 
 export interface DownloadProgress {
   model: string
-  progress: number
-  speed: number
+  downloaded: number
+  total: number | null
 }
+
+export interface ModelCapability {
+  model: string
+  runnable: boolean
+  reason: string | null
+}
+
+export type ModelBlockReason = 'low_ram' | 'memory_budget' | 'load_failed'
+
+/** Reason codes that mean a model cannot run on this device at all. */
+export const MODEL_BLOCK_REASONS: readonly ModelBlockReason[] = [
+  'low_ram',
+  'memory_budget',
+  'load_failed',
+]
 
 export interface AiJob {
   photo_id: number
