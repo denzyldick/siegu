@@ -1,48 +1,48 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useUiStore } from '@/stores/ui'
-import { useScanStore } from '@/stores/scan'
-import { normalizeIndexingCount, formatEta } from '@/composables/useMediaUtils'
-import logo from '@/assets/logo.png'
+import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useUiStore } from '@/stores/ui';
+import { useScanStore } from '@/stores/scan';
+import { normalizeIndexingCount, formatEta } from '@/composables/useMediaUtils';
+import logo from '@/assets/logo.png';
 
-const { t } = useI18n()
-const uiStore = useUiStore()
-const scanStore = useScanStore()
+const { t } = useI18n();
+const uiStore = useUiStore();
+const scanStore = useScanStore();
 
 const navItems = [
   { page: 'home' as const, icon: null, tour: 'dock-home', useLogo: true },
   { page: 'albums' as const, icon: 'mdi-image-album', tour: 'dock-albums', useLogo: false },
-  { page: 'people' as const, icon: 'mdi-account-group-outline', tour: 'dock-people', useLogo: false },
   { page: 'location' as const, icon: 'mdi-map-outline', tour: 'dock-map', useLogo: false },
   { page: 'devices' as const, icon: 'mdi-laptop', tour: 'dock-devices', useLogo: false },
   { page: 'settings' as const, icon: 'mdi-cog-outline', tour: 'dock-settings', useLogo: false },
-]
+];
 
-const isIndexing = computed(() => scanStore.isActive)
-const jobsLeft = computed(() => normalizeIndexingCount(scanStore.indexingCount))
+const isIndexing = computed(() => scanStore.isActive);
+const jobsLeft = computed(() => normalizeIndexingCount(scanStore.indexingCount));
 const statusLabel = computed(() => {
-  if (!scanStore.isActive) return ''
-  if (scanStore.status === 'scanning') return t('sync.scanning')
+  if (!scanStore.isActive) return '';
+  if (scanStore.status === 'scanning') return t('sync.scanning');
   if (scanStore.indexingCount > 0) {
-    return t('sync.indexing')
+    return t('sync.indexing');
   }
-  return t('sync.indexing')
-})
+  return t('sync.indexing');
+});
 
 const tooltipText = computed(() => {
-  if (!scanStore.isActive) return ''
-  const eta = scanStore.indexingEta && scanStore.indexingEta > 0 ? formatEta(scanStore.indexingEta) : null
+  if (!scanStore.isActive) return '';
+  const eta =
+    scanStore.indexingEta && scanStore.indexingEta > 0 ? formatEta(scanStore.indexingEta) : null;
   if (scanStore.indexingCount > 0) {
     return eta
       ? `${statusLabel.value}: ${t('sync.jobs_left', { count: jobsLeft.value.toLocaleString() })} · ~${eta}`
-      : `${statusLabel.value}: ${t('sync.jobs_left', { count: jobsLeft.value.toLocaleString() })}`
+      : `${statusLabel.value}: ${t('sync.jobs_left', { count: jobsLeft.value.toLocaleString() })}`;
   }
-  return statusLabel.value
-})
+  return statusLabel.value;
+});
 
-function navigate(page: 'home' | 'albums' | 'people' | 'location' | 'devices' | 'settings'): void {
-  uiStore.setPage(page)
+function navigate(page: 'home' | 'albums' | 'location' | 'devices' | 'settings'): void {
+  uiStore.setPage(page);
 }
 </script>
 
@@ -73,18 +73,20 @@ function navigate(page: 'home' | 'albums' | 'people' | 'location' | 'devices' | 
               :data-tour="item.tour"
               @click="navigate(item.page)"
             >
-            <div class="siegu-logo-wrap">
-              <v-img
-                :src="logo"
-                width="24"
-                height="24"
-                :class="uiStore.currentPage === item.page ? 'siegu-logo--active' : 'opacity-40'"
-              />
-              <template v-if="isIndexing">
-                <span class="indexing-dot" aria-label="indexing"></span>
-                <span v-if="jobsLeft > 0" class="indexing-pill">{{ jobsLeft.toLocaleString() }}</span>
-              </template>
-            </div>
+              <div class="siegu-logo-wrap">
+                <v-img
+                  :src="logo"
+                  width="24"
+                  height="24"
+                  :class="uiStore.currentPage === item.page ? 'siegu-logo--active' : 'opacity-40'"
+                />
+                <template v-if="isIndexing">
+                  <span class="indexing-dot" aria-label="indexing"></span>
+                  <span v-if="jobsLeft > 0" class="indexing-pill">{{
+                    jobsLeft.toLocaleString()
+                  }}</span>
+                </template>
+              </div>
             </v-btn>
           </template>
         </v-tooltip>

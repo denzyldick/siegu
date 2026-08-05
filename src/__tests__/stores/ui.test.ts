@@ -1,49 +1,49 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
-import { useUiStore } from '@/stores/ui'
+import { describe, it, expect, beforeEach } from 'vitest';
+import { setActivePinia, createPinia } from 'pinia';
+import { useUiStore } from '@/stores/ui';
 
 describe('ui store', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
-    localStorage.clear()
-  })
+    setActivePinia(createPinia());
+    localStorage.clear();
+  });
 
   it('defaults to home page', () => {
-    const store = useUiStore()
-    expect(store.currentPage).toBe('home')
-  })
+    const store = useUiStore();
+    expect(store.currentPage).toBe('home');
+  });
 
   it('sets current page and persists', () => {
-    const store = useUiStore()
-    store.setPage('people')
-    expect(store.currentPage).toBe('people')
-    expect(localStorage.getItem('siegu_page')).toBe('people')
-  })
+    const store = useUiStore();
+    store.setPage('location');
+    expect(store.currentPage).toBe('location');
+    expect(localStorage.getItem('siegu_page')).toBe('location');
+  });
 
   it('sets theme and persists', () => {
-    const store = useUiStore()
-    store.setTheme('dark')
-    expect(store.theme).toBe('dark')
-    expect(localStorage.getItem('siegu_theme')).toBe('dark')
-  })
+    const store = useUiStore();
+    store.setTheme('dark');
+    expect(store.theme).toBe('dark');
+    expect(localStorage.getItem('siegu_theme')).toBe('dark');
+  });
 
   it('sets language and persists', () => {
-    const store = useUiStore()
-    store.setLanguage('nl')
-    expect(store.language).toBe('nl')
-    expect(localStorage.getItem('siegu_language')).toBe('nl')
-  })
+    const store = useUiStore();
+    store.setLanguage('nl');
+    expect(store.language).toBe('nl');
+    expect(localStorage.getItem('siegu_language')).toBe('nl');
+  });
 
   it('opens and closes viewer', () => {
-    const store = useUiStore()
-    expect(store.viewerOpen).toBe(false)
+    const store = useUiStore();
+    expect(store.viewerOpen).toBe(false);
 
-    store.openViewer(42)
-    expect(store.viewerOpen).toBe(true)
-    expect(store.viewerMediaId).toBe(42)
+    store.openViewer(42);
+    expect(store.viewerOpen).toBe(true);
+    expect(store.viewerMediaId).toBe(42);
 
-    store.closeViewer()
-    expect(store.viewerOpen).toBe(false)
-    expect(store.viewerMediaId).toBe(null)
-  })
-})
+    store.closeViewer();
+    expect(store.viewerOpen).toBe(false);
+    expect(store.viewerMediaId).toBe(null);
+  });
+});

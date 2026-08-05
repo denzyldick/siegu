@@ -15,7 +15,6 @@ import SyncStatusBanner from '@/components/layout/SyncStatusBanner.vue';
 import OnboardingFlow from '@/components/onboarding/OnboardingFlow.vue';
 import MediaLibrary from '@/components/MediaLibrary.vue';
 import AlbumsView from '@/components/AlbumsView.vue';
-import PeopleView from '@/components/PeopleView.vue';
 import MapView from '@/components/MapView.vue';
 import DeviceList from '@/components/DeviceList.vue';
 import SettingsView from '@/components/SettingsView.vue';
@@ -186,7 +185,6 @@ function removeFilterChip(index: number): void {
               @search-person="handleSearchPerson"
             />
           </div>
-          <PeopleView v-if="currentPage === 'people'" @search-person="handleSearchPerson" />
           <AlbumsView v-if="currentPage === 'albums'" />
           <MapView v-if="currentPage === 'location'" />
           <DeviceList v-if="currentPage === 'devices'" />
@@ -202,7 +200,9 @@ function removeFilterChip(index: number): void {
       <div class="d-flex align-center ga-2">
         <v-icon color="primary" size="20">mdi-file-image-outline</v-icon>
         <span>
-          {{ t('open_with.opened_in_siegu', { file: openedFile ? openedFileName(openedFile) : '' }) }}
+          {{
+            t('open_with.opened_in_siegu', { file: openedFile ? openedFileName(openedFile) : '' })
+          }}
         </span>
       </div>
     </v-snackbar>

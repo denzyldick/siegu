@@ -4,7 +4,9 @@
     <div class="tour-card" :class="cardPosition" @click.stop>
       <div class="tour-card-inner">
         <v-icon size="32" color="primary" class="mb-3">{{ currentStep.icon }}</v-icon>
-        <h3 class="text-h6 font-weight-bold text-zinc-primary mb-1">{{ $t(currentStep.titleKey) }}</h3>
+        <h3 class="text-h6 font-weight-bold text-zinc-primary mb-1">
+          {{ $t(currentStep.titleKey) }}
+        </h3>
         <p class="text-body-2 text-zinc-secondary mb-6">{{ $t(currentStep.descKey) }}</p>
         <div class="d-flex align-center justify-space-between">
           <v-btn
@@ -49,32 +51,35 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue';
 
 interface Step {
-  icon: string
-  titleKey: string
-  descKey: string
-  target: string | null
-  position: string
+  icon: string;
+  titleKey: string;
+  descKey: string;
+  target: string | null;
+  position: string;
 }
 
-const props = withDefaults(defineProps<{
-  active: boolean
-  target?: string
-}>(), {
-  target: '',
-})
+const props = withDefaults(
+  defineProps<{
+    active: boolean;
+    target?: string;
+  }>(),
+  {
+    target: '',
+  },
+);
 
 const emit = defineEmits<{
-  (e: 'finish'): void
-  (e: 'skip'): void
-  (e: 'update:target', value: string): void
-}>()
+  (e: 'finish'): void;
+  (e: 'skip'): void;
+  (e: 'update:target', value: string): void;
+}>();
 
-const step = ref(0)
-const targetRects = ref<Record<string, DOMRect>>({})
-const observer = ref<ResizeObserver | null>(null)
+const step = ref(0);
+const targetRects = ref<Record<string, DOMRect>>({});
+const observer = ref<ResizeObserver | null>(null);
 
 const steps: Step[] = [
   {
@@ -113,13 +118,6 @@ const steps: Step[] = [
     position: 'bottom',
   },
   {
-    icon: 'mdi-account-group-outline',
-    titleKey: 'guided_tour.people_title',
-    descKey: 'guided_tour.people_desc',
-    target: "[data-tour='dock-people']",
-    position: 'top',
-  },
-  {
     icon: 'mdi-map-outline',
     titleKey: 'guided_tour.map_title',
     descKey: 'guided_tour.map_desc',
@@ -147,100 +145,100 @@ const steps: Step[] = [
     target: null,
     position: 'bottom',
   },
-]
+];
 
-const currentStep = computed(() => steps[step.value])
+const currentStep = computed(() => steps[step.value]);
 
 const targetRect = computed(() => {
-  const t = currentStep.value.target
-  return t ? targetRects.value[t] ?? null : null
-})
+  const t = currentStep.value.target;
+  return t ? (targetRects.value[t] ?? null) : null;
+});
 
-const pad = 8
+const pad = 8;
 
 const spotlightStyle = computed(() => {
-  if (!targetRect.value) return { display: 'none' }
-  const r = targetRect.value
+  if (!targetRect.value) return { display: 'none' };
+  const r = targetRect.value;
   return {
     left: r.left - pad + 'px',
     top: r.top - pad + 'px',
     width: r.width + pad * 2 + 'px',
     height: r.height + pad * 2 + 'px',
-  }
-})
+  };
+});
 
 const cardPosition = computed(() => {
-  return currentStep.value.position === 'top' ? 'tour-card--top' : 'tour-card--bottom'
-})
+  return currentStep.value.position === 'top' ? 'tour-card--top' : 'tour-card--bottom';
+});
 
 function measureTarget() {
-  const t = currentStep.value.target
-  if (!t) return
-  const el = document.querySelector(t)
+  const t = currentStep.value.target;
+  if (!t) return;
+  const el = document.querySelector(t);
   if (el) {
-    targetRects.value[t] = el.getBoundingClientRect()
+    targetRects.value[t] = el.getBoundingClientRect();
   }
 }
 
 function stopObserver() {
   if (observer.value) {
-    observer.value.disconnect()
-    observer.value = null
+    observer.value.disconnect();
+    observer.value = null;
   }
 }
 
 function startObserver() {
-  stopObserver()
-  if (typeof ResizeObserver === 'undefined') return
-  observer.value = new ResizeObserver(() => measureTarget())
-  const t = currentStep.value.target
+  stopObserver();
+  if (typeof ResizeObserver === 'undefined') return;
+  observer.value = new ResizeObserver(() => measureTarget());
+  const t = currentStep.value.target;
   if (t) {
-    const el = document.querySelector(t)
-    if (el) observer.value.observe(el)
+    const el = document.querySelector(t);
+    if (el) observer.value.observe(el);
   }
 }
 
 function next() {
   if (step.value < steps.length - 1) {
-    step.value++
+    step.value++;
   }
 }
 
 function finish() {
-  stopObserver()
-  emit('finish')
+  stopObserver();
+  emit('finish');
 }
 
 function skip() {
-  stopObserver()
-  emit('skip')
+  stopObserver();
+  emit('skip');
 }
 
 watch(step, () => {
   nextTick(() => {
-    measureTarget()
-    startObserver()
-  })
-})
+    measureTarget();
+    startObserver();
+  });
+});
 
 watch(
   () => props.active,
   (val) => {
     if (val) {
-      step.value = 0
+      step.value = 0;
       nextTick(() => {
-        measureTarget()
-        startObserver()
-      })
+        measureTarget();
+        startObserver();
+      });
     } else {
-      stopObserver()
+      stopObserver();
     }
   },
-)
+);
 
 onUnmounted(() => {
-  stopObserver()
-})
+  stopObserver();
+});
 </script>
 
 <style scoped>

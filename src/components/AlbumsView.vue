@@ -71,7 +71,11 @@
               >
                 {{ sectionTitle(section.id) }}
               </h2>
-              <button v-if="section.id === 'people'" class="manage-people-btn" @click="goToPeople">
+              <button
+                v-if="section.id === 'people'"
+                class="manage-people-btn"
+                @click="togglePeopleManage"
+              >
                 <v-icon size="13" class="mr-1">mdi-account-edit-outline</v-icon>
                 {{ $t('albums.manage_people') }}
               </button>
@@ -104,7 +108,25 @@
                 </div>
               </div>
             </div>
+            <div v-if="section.id === 'people' && peopleManageOpen" class="mt-6">
+              <PeopleManagePanel
+                :faces="unnamedFaces"
+                :indexing-count="indexingCount"
+                @start-indexing="startPeopleIndexing"
+                @view-cluster="handleViewCluster"
+                @prompt-name="promptName"
+              />
+            </div>
           </div>
+        </div>
+        <div v-if="showPeopleManageFallback" class="mb-8">
+          <PeopleManagePanel
+            :faces="unnamedFaces"
+            :indexing-count="indexingCount"
+            @start-indexing="startPeopleIndexing"
+            @view-cluster="handleViewCluster"
+            @prompt-name="promptName"
+          />
         </div>
       </template>
 
@@ -145,7 +167,7 @@
           </p>
         </div>
         <v-spacer></v-spacer>
-        <v-menu v-if="currentSectionItem?.album">
+        <v-menu v-if="currentSectionItem?.album || currentSectionItem?.kind === 'person'">
           <template v-slot:activator="{ props: menuProps }">
             <v-btn v-bind="menuProps" icon variant="text" size="small">
               <v-icon size="20">mdi-dots-vertical</v-icon>
@@ -153,20 +175,29 @@
           </template>
           <v-list density="compact" class="siegu-list">
             <v-list-item
-              v-if="currentSectionItem?.album?.kind === 'smart'"
-              @click="editSmartAlbumRules"
-              prepend-icon="mdi-tune-variant"
+              v-if="currentSectionItem?.kind === 'person'"
+              @click="openManagePerson"
+              prepend-icon="mdi-account-cog-outline"
             >
-              <v-list-item-title>{{ $t('albums.edit_rules') }}</v-list-item-title>
+              <v-list-item-title>{{ $t('people.profile_actions') }}</v-list-item-title>
             </v-list-item>
-            <v-list-item @click="openRenameDialog" prepend-icon="mdi-pencil-outline">
-              <v-list-item-title>{{ $t('albums.rename_album') }}</v-list-item-title>
-            </v-list-item>
-            <v-list-item @click="confirmDelete = true" prepend-icon="mdi-delete-outline">
-              <v-list-item-title class="text-error">{{
-                $t('albums.delete_album')
-              }}</v-list-item-title>
-            </v-list-item>
+            <template v-if="currentSectionItem?.album">
+              <v-list-item
+                v-if="currentSectionItem?.album?.kind === 'smart'"
+                @click="editSmartAlbumRules"
+                prepend-icon="mdi-tune-variant"
+              >
+                <v-list-item-title>{{ $t('albums.edit_rules') }}</v-list-item-title>
+              </v-list-item>
+              <v-list-item @click="openRenameDialog" prepend-icon="mdi-pencil-outline">
+                <v-list-item-title>{{ $t('albums.rename_album') }}</v-list-item-title>
+              </v-list-item>
+              <v-list-item @click="confirmDelete = true" prepend-icon="mdi-delete-outline">
+                <v-list-item-title class="text-error">{{
+                  $t('albums.delete_album')
+                }}</v-list-item-title>
+              </v-list-item>
+            </template>
           </v-list>
         </v-menu>
       </div>
@@ -343,6 +374,29 @@
       </v-card>
     </v-dialog>
 
+    <NameDialog
+      v-model="nameDialog"
+      :active-face="activeFace"
+      :people="people"
+      @save="handleSaveName"
+    />
+
+    <ManageDialog
+      v-model="manageDialog"
+      :active-person="activePerson"
+      :people="people"
+      @rename="handleRenamePerson"
+      @merge="handleMergePerson"
+    />
+
+    <ClusterDialog
+      v-model="clusterDialog"
+      :cluster="activeCluster"
+      :faces="clusterFaces"
+      @remove-face="handleRemoveFace"
+      @prompt-name="promptNameFromCluster"
+    />
+
     <v-snackbar v-model="snackbar" timeout="2500" color="surface" location="bottom">
       <span class="text-body-2 text-zinc-primary">{{ snackbarText }}</span>
     </v-snackbar>
@@ -354,19 +408,37 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import MediaCard from '@/components/MediaCard.vue';
 import MediaViewer from '@/components/MediaViewer.vue';
+import PeopleManagePanel from '@/components/people/PeopleManagePanel.vue';
+import NameDialog from '@/components/people/NameDialog.vue';
+import ManageDialog from '@/components/people/ManageDialog.vue';
+import ClusterDialog from '@/components/people/ClusterDialog.vue';
 import { useAlbumsStore } from '@/stores/albums';
 import { useSearchStore } from '@/stores/search';
 import { useUiStore } from '@/stores/ui';
+import { usePeople } from '@/composables/usePeople';
 import { toggleFavorite, listFiles } from '@/services/tauri';
 import { getFaceImageSrc } from '@/composables/useMediaUtils';
 import type { Album, AlbumSectionItem } from '@/types/albums';
 import type { MediaItem } from '@/types/media';
 import type { ListFilesOptions } from '@/types/media';
+import type { Person, UnnamedFace } from '@/types/person';
 
 const { t } = useI18n();
 const albumsStore = useAlbumsStore();
 const searchStore = useSearchStore();
 const uiStore = useUiStore();
+const {
+  people,
+  unnamedFaces,
+  indexingCount,
+  fetchData: fetchPeopleData,
+  startIndexing: startPeopleIndexing,
+  saveName: savePeopleName,
+  renamePersonById,
+  mergePersonById,
+  fetchClusterFaces,
+  removeFace,
+} = usePeople();
 
 const sections = computed(() => albumsStore.sections);
 const hasAnyItems = computed(() => sections.value.some((s) => s.items.length > 0));
@@ -396,6 +468,19 @@ const renameName = ref('');
 const confirmDelete = ref(false);
 const snackbar = ref(false);
 const snackbarText = ref('');
+
+const peopleManageOpen = ref(false);
+const nameDialog = ref(false);
+const manageDialog = ref(false);
+const clusterDialog = ref(false);
+const activeFace = ref<Person | null>(null);
+const activePerson = ref<Person | null>(null);
+const activeCluster = ref<Person | null>(null);
+const clusterFaces = ref<UnnamedFace[]>([]);
+const hasPeopleSection = computed(() => sections.value.some((s) => s.id === 'people'));
+const showPeopleManageFallback = computed(
+  () => !hasPeopleSection.value && (unnamedFaces.value.length > 0 || indexingCount.value > 0),
+);
 
 const searching = computed(() => query.value.trim().length > 0);
 const selectionActive = computed(() => selectedIds.value.length > 0);
@@ -506,8 +591,67 @@ async function restoreTrips(): Promise<void> {
   showMessage(t('albums.trips_restored'));
 }
 
-function goToPeople(): void {
-  uiStore.setPage('people');
+function togglePeopleManage(): void {
+  peopleManageOpen.value = !peopleManageOpen.value;
+  if (peopleManageOpen.value) void fetchPeopleData();
+}
+
+function isPersonItem(item: AlbumSectionItem): boolean {
+  return item.kind === 'person' && item.id.startsWith('person:');
+}
+
+function openManagePerson(): void {
+  const item = openedItem.value;
+  if (!item || !isPersonItem(item)) return;
+  const personId = Number(item.id.slice('person:'.length));
+  activePerson.value = people.value.find((p) => p.id === personId) ?? null;
+  manageDialog.value = true;
+}
+
+function promptName(group: Person): void {
+  activeFace.value = group;
+  nameDialog.value = true;
+}
+
+function promptNameFromCluster(): void {
+  if (activeCluster.value) promptName(activeCluster.value);
+}
+
+async function handleViewCluster(group: Person): Promise<void> {
+  activeCluster.value = group;
+  clusterFaces.value = await fetchClusterFaces(group.id);
+  clusterDialog.value = true;
+}
+
+async function handleSaveName(faceId: number, name: string): Promise<void> {
+  const ok = await savePeopleName(faceId, name);
+  if (ok) {
+    nameDialog.value = false;
+    clusterDialog.value = false;
+    await albumsStore.loadSections();
+  }
+}
+
+async function handleRenamePerson(id: number, newName: string): Promise<void> {
+  await renamePersonById(id, newName);
+  manageDialog.value = false;
+  if (openedItem.value) openedItem.value.name = newName;
+  await albumsStore.loadSections();
+}
+
+async function handleMergePerson(fromId: number, toId: number): Promise<void> {
+  await mergePersonById(fromId, toId);
+  manageDialog.value = false;
+  await albumsStore.loadSections();
+}
+
+async function handleRemoveFace(faceId: number): Promise<void> {
+  const ok = await removeFace(faceId);
+  if (ok) {
+    clusterFaces.value = clusterFaces.value.filter((f) => f.face_id !== faceId);
+    if (clusterFaces.value.length === 0) clusterDialog.value = false;
+    await fetchPeopleData();
+  }
 }
 
 function baseFilterOptions(): Omit<ListFilesOptions, 'offset' | 'limit'> {
