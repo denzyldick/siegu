@@ -19,7 +19,9 @@ pub fn do_list_files(
         limit,
         favorites_only,
         videos_only,
+        vec![],
         None,
+        false,
         None,
         None,
         None,
@@ -44,7 +46,9 @@ pub fn do_list_files_filtered(
     limit: usize,
     favorites_only: bool,
     videos_only: bool,
-    person_id: Option<String>,
+    person_ids: Vec<String>,
+    person_match: Option<String>,
+    person_alone: bool,
     location: Option<String>,
     tag: Option<String>,
     date_from: Option<String>,
@@ -59,7 +63,12 @@ pub fn do_list_files_filtered(
     album_id: Option<String>,
 ) -> Vec<Photo> {
     let filter = crate::database::PhotoFilter {
-        person_id,
+        person_ids,
+        person_match: match person_match.as_deref() {
+            Some("or") => crate::database::PersonMatch::Or,
+            _ => crate::database::PersonMatch::And,
+        },
+        person_alone,
         location,
         tag,
         date_from,
@@ -115,7 +124,9 @@ pub async fn list_files(
     scan: bool,
     favorites_only: bool,
     videos_only: bool,
-    person_id: Option<String>,
+    person_ids: Option<Vec<String>>,
+    person_match: Option<String>,
+    person_alone: bool,
     location: Option<String>,
     tag: Option<String>,
     date_from: Option<String>,
@@ -144,7 +155,9 @@ pub async fn list_files(
         limit,
         favorites_only,
         videos_only,
-        person_id,
+        person_ids.unwrap_or_default(),
+        person_match,
+        person_alone,
         location,
         tag,
         date_from,
@@ -422,7 +435,9 @@ mod tests {
             10,
             false,
             false,
+            vec![],
             None,
+            false,
             None,
             None,
             None,
@@ -456,7 +471,9 @@ mod tests {
             10,
             false,
             false,
+            vec![],
             None,
+            false,
             None,
             None,
             None,
@@ -496,8 +513,27 @@ mod tests {
             )
             .unwrap();
         let result = do_list_files_filtered(
-            &db, "", 0, 10, false, false, None, None, None, None, None, false, None, None, false,
-            true, false, None, None,
+            &db,
+            "",
+            0,
+            10,
+            false,
+            false,
+            vec![],
+            None,
+            false,
+            None,
+            None,
+            None,
+            None,
+            false,
+            None,
+            None,
+            false,
+            true,
+            false,
+            None,
+            None,
         );
         let ids: Vec<_> = result.iter().map(|p| p.id.as_str()).collect();
         assert!(ids.contains(&"risky"));
@@ -529,7 +565,9 @@ mod tests {
             10,
             false,
             false,
+            vec![],
             None,
+            false,
             None,
             None,
             None,
@@ -547,9 +585,200 @@ mod tests {
         assert_eq!(in_album[0].id, "ph2");
 
         let all = do_list_files_filtered(
-            &db, "", 0, 10, false, false, None, None, None, None, None, false, None, None, false,
-            false, false, None, None,
+            &db,
+            "",
+            0,
+            10,
+            false,
+            false,
+            vec![],
+            None,
+            false,
+            None,
+            None,
+            None,
+            None,
+            false,
+            None,
+            None,
+            false,
+            false,
+            false,
+            None,
+            None,
         );
         assert_eq!(all.len(), 2);
+    }
+
+    fn seed_faces(db: &Database) {
+        for (photo, face, person) in [
+            ("both", "f1", "a"),
+            ("both", "f2", "b"),
+            ("alice", "f3", "a"),
+            ("bob", "f4", "b"),
+        ] {
+            db.connection
+                .execute(
+                    "INSERT INTO faces (photo_id, face_id, crop_path, encoded, person_id) \
+                     VALUES (?1, ?2, '', 'enc', ?3)",
+                    (photo, face, person),
+                )
+                .unwrap();
+        }
+    }
+
+    fn person_ids(ids: &[&str]) -> Vec<String> {
+        ids.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn list_files_multi_person_and() {
+        let (mut db, _dir) = test_db();
+        db.store_photo_batch(&[
+            make_photo("both", "/both.jpg"),
+            make_photo("alice", "/alice.jpg"),
+            make_photo("bob", "/bob.jpg"),
+            make_photo("none", "/none.jpg"),
+        ])
+        .unwrap();
+        seed_faces(&db);
+        let result = do_list_files_filtered(
+            &db,
+            "",
+            0,
+            10,
+            false,
+            false,
+            person_ids(&["a", "b"]),
+            None,
+            false,
+            None,
+            None,
+            None,
+            None,
+            false,
+            None,
+            None,
+            false,
+            false,
+            false,
+            None,
+            None,
+        );
+        let ids: Vec<_> = result.iter().map(|p| p.id.as_str()).collect();
+        assert_eq!(ids, vec!["both"]);
+    }
+
+    #[test]
+    fn list_files_multi_person_or() {
+        let (mut db, _dir) = test_db();
+        db.store_photo_batch(&[
+            make_photo("both", "/both.jpg"),
+            make_photo("alice", "/alice.jpg"),
+            make_photo("bob", "/bob.jpg"),
+            make_photo("none", "/none.jpg"),
+        ])
+        .unwrap();
+        seed_faces(&db);
+        let result = do_list_files_filtered(
+            &db,
+            "",
+            0,
+            10,
+            false,
+            false,
+            person_ids(&["a", "b"]),
+            Some("or".to_string()),
+            false,
+            None,
+            None,
+            None,
+            None,
+            false,
+            None,
+            None,
+            false,
+            false,
+            false,
+            None,
+            None,
+        );
+        let mut ids: Vec<_> = result.iter().map(|p| p.id.as_str()).collect();
+        ids.sort_unstable();
+        assert_eq!(ids, vec!["alice", "bob", "both"]);
+    }
+
+    #[test]
+    fn list_files_person_alone_single() {
+        let (mut db, _dir) = test_db();
+        db.store_photo_batch(&[
+            make_photo("both", "/both.jpg"),
+            make_photo("alice", "/alice.jpg"),
+            make_photo("bob", "/bob.jpg"),
+        ])
+        .unwrap();
+        seed_faces(&db);
+        let result = do_list_files_filtered(
+            &db,
+            "",
+            0,
+            10,
+            false,
+            false,
+            person_ids(&["a"]),
+            None,
+            true,
+            None,
+            None,
+            None,
+            None,
+            false,
+            None,
+            None,
+            false,
+            false,
+            false,
+            None,
+            None,
+        );
+        let ids: Vec<_> = result.iter().map(|p| p.id.as_str()).collect();
+        assert_eq!(ids, vec!["alice"]);
+    }
+
+    #[test]
+    fn list_files_person_alone_group() {
+        let (mut db, _dir) = test_db();
+        db.store_photo_batch(&[
+            make_photo("both", "/both.jpg"),
+            make_photo("alice", "/alice.jpg"),
+            make_photo("bob", "/bob.jpg"),
+        ])
+        .unwrap();
+        seed_faces(&db);
+        let result = do_list_files_filtered(
+            &db,
+            "",
+            0,
+            10,
+            false,
+            false,
+            person_ids(&["a", "b"]),
+            None,
+            true,
+            None,
+            None,
+            None,
+            None,
+            false,
+            None,
+            None,
+            false,
+            false,
+            false,
+            None,
+            None,
+        );
+        let ids: Vec<_> = result.iter().map(|p| p.id.as_str()).collect();
+        assert_eq!(ids, vec!["both"]);
     }
 }

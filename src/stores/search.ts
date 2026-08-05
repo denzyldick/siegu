@@ -22,6 +22,8 @@ export const useSearchStore = defineStore('search', () => {
   const surprise = ref(false)
   const sortOrder = ref<'newest' | 'oldest' | 'best' | 'random'>('newest')
   const dateRange = ref<[string, string] | null>(null)
+  const personMatch = ref<'and' | 'or'>('and')
+  const personAlone = ref(false)
   let locationsResolved = false
 
   const hasQuery = computed(() => query.value.trim().length > 0)
@@ -37,6 +39,9 @@ export const useSearchStore = defineStore('search', () => {
       dateRange.value !== null,
   )
   const activeFacets = computed(() => activeFilters.value)
+  const personCount = computed(
+    () => activeFilters.value.filter((f) => f.type === 'person').length,
+  )
 
   async function loadFacets(): Promise<void> {
     if (facetsLoading.value) return
@@ -69,6 +74,14 @@ export const useSearchStore = defineStore('search', () => {
   }
 
   function addFilter(filter: ActiveFilter): void {
+    if (filter.type === 'person') {
+      const exists = activeFilters.value.some(
+        (f) => f.type === 'person' && f.value === filter.value,
+      )
+      if (exists) return
+      activeFilters.value = [...activeFilters.value, filter]
+      return
+    }
     activeFilters.value = [
       ...activeFilters.value.filter((f) => f.type !== filter.type),
       filter,
@@ -77,6 +90,36 @@ export const useSearchStore = defineStore('search', () => {
 
   function removeFilter(type: FacetType): void {
     activeFilters.value = activeFilters.value.filter((f) => f.type !== type)
+    if (type === 'person' && !activeFilters.value.some((f) => f.type === 'person')) {
+      personMatch.value = 'and'
+      personAlone.value = false
+    }
+  }
+
+  function removeFilterValue(type: FacetType, value: string): void {
+    activeFilters.value = activeFilters.value.filter(
+      (f) => !(f.type === type && f.value === value),
+    )
+    if (type === 'person' && !activeFilters.value.some((f) => f.type === 'person')) {
+      personMatch.value = 'and'
+      personAlone.value = false
+    }
+  }
+
+  function togglePerson(person: { id: string; name: string }): void {
+    const exists = activeFilters.value.find(
+      (f) => f.type === 'person' && f.value === person.id,
+    )
+    if (exists) removeFilterValue('person', person.id)
+    else addFilter({ type: 'person', value: person.id, label: person.name })
+  }
+
+  function setPersonMatch(match: 'and' | 'or'): void {
+    personMatch.value = match
+  }
+
+  function togglePersonAlone(): void {
+    personAlone.value = !personAlone.value
   }
 
   function setCamera(value: string | null): void {
@@ -122,6 +165,8 @@ export const useSearchStore = defineStore('search', () => {
     surprise.value = false
     sortOrder.value = 'newest'
     dateRange.value = null
+    personMatch.value = 'and'
+    personAlone.value = false
   }
 
   function toggleFavoriteOnly(): void {
@@ -183,12 +228,15 @@ export const useSearchStore = defineStore('search', () => {
     facetsLoading,
     activeFilters,
     activeFacets,
+    personCount,
     mediaFilters,
     camera,
     aestheticsMin,
     surprise,
     sortOrder,
     dateRange,
+    personMatch,
+    personAlone,
     hasQuery,
     hasFilters,
     loadFacets,
@@ -196,6 +244,10 @@ export const useSearchStore = defineStore('search', () => {
     clearQuery,
     addFilter,
     removeFilter,
+    removeFilterValue,
+    togglePerson,
+    setPersonMatch,
+    togglePersonAlone,
     setCamera,
     setAestheticsMin,
     setDateRange,

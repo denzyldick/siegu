@@ -65,4 +65,69 @@ describe('search store', () => {
     store.addRecentSearch('   ')
     expect(store.recentSearches).toEqual([])
   })
+
+  it('accumulates multiple person filters', () => {
+    const store = useSearchStore()
+    store.addFilter({ type: 'person', value: 'a', label: 'Alice' })
+    store.addFilter({ type: 'person', value: 'b', label: 'Bob' })
+    expect(store.activeFilters).toHaveLength(2)
+    expect(store.personCount).toBe(2)
+  })
+
+  it('does not duplicate the same person filter', () => {
+    const store = useSearchStore()
+    store.addFilter({ type: 'person', value: 'a', label: 'Alice' })
+    store.addFilter({ type: 'person', value: 'a', label: 'Alice' })
+    expect(store.activeFilters).toHaveLength(1)
+  })
+
+  it('replaces a non-person filter of the same type', () => {
+    const store = useSearchStore()
+    store.addFilter({ type: 'location', value: 'Paris', label: 'Paris' })
+    store.addFilter({ type: 'location', value: 'Rome', label: 'Rome' })
+    expect(store.activeFilters).toEqual([
+      { type: 'location', value: 'Rome', label: 'Rome' },
+    ])
+  })
+
+  it('togglePerson adds and removes a person', () => {
+    const store = useSearchStore()
+    store.togglePerson({ id: 'a', name: 'Alice' })
+    expect(store.personCount).toBe(1)
+    store.togglePerson({ id: 'a', name: 'Alice' })
+    expect(store.personCount).toBe(0)
+  })
+
+  it('removeFilterValue removes a single person filter', () => {
+    const store = useSearchStore()
+    store.addFilter({ type: 'person', value: 'a', label: 'Alice' })
+    store.addFilter({ type: 'person', value: 'b', label: 'Bob' })
+    store.removeFilterValue('person', 'a')
+    expect(store.activeFilters).toEqual([
+      { type: 'person', value: 'b', label: 'Bob' },
+    ])
+  })
+
+  it('resets match/alone when the last person filter is removed', () => {
+    const store = useSearchStore()
+    store.addFilter({ type: 'person', value: 'a', label: 'Alice' })
+    store.setPersonMatch('or')
+    store.togglePersonAlone()
+    expect(store.personMatch).toBe('or')
+    expect(store.personAlone).toBe(true)
+    store.removeFilterValue('person', 'a')
+    expect(store.personMatch).toBe('and')
+    expect(store.personAlone).toBe(false)
+  })
+
+  it('clearFilters resets person match and alone state', () => {
+    const store = useSearchStore()
+    store.addFilter({ type: 'person', value: 'a', label: 'Alice' })
+    store.setPersonMatch('or')
+    store.togglePersonAlone()
+    store.clearFilters()
+    expect(store.personMatch).toBe('and')
+    expect(store.personAlone).toBe(false)
+    expect(store.personCount).toBe(0)
+  })
 })

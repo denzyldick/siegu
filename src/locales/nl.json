@@ -68,6 +68,9 @@
     "see_all": "Alles bekijken",
     "results_for": "Resultaten voor \"{query}\"",
     "active": "Actief",
+    "person_match_and": "Allemaal samen",
+    "person_match_or": "Eén van hen",
+    "person_alone": "Alleen",
     "magic": {
       "favorites": "Favorieten",
       "videos": "Video's",

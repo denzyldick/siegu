@@ -6,6 +6,7 @@ import { getFaceImageSrc, getMediaThumbnailSrc } from '@/composables/useMediaUti
 import { listFiles } from '@/services/tauri';
 import DateRangePicker from '@/components/search/DateRangePicker.vue';
 import BrandIcon from '@/components/search/BrandIcon.vue';
+import PersonMatchControls from '@/components/search/PersonMatchControls.vue';
 import { brandMeta } from '@/components/search/brands';
 import type { FacetGroup, LocationGroup, PhotoTile } from '@/types/search';
 import type { MediaItem } from '@/types/media';
@@ -149,12 +150,7 @@ function closeDropdown(): void {
 }
 
 function selectPerson(person: FacetGroup): void {
-  searchStore.addFilter({
-    type: 'person',
-    value: person.id,
-    label: person.name ?? '',
-  });
-  closeDropdown();
+  searchStore.togglePerson({ id: person.id, name: person.name ?? '' });
 }
 
 function selectLocation(name: string): void {
@@ -787,12 +783,13 @@ function iconForFilter(type: string): string {
                 size="x-small"
                 closable
                 variant="tonal"
-                @click:close="searchStore.removeFilter(f.type)"
+                @click:close="searchStore.removeFilterValue(f.type, f.value)"
               >
                 <v-icon start size="13">{{ iconForFilter(f.type) }}</v-icon>
                 {{ f.label }}
               </v-chip>
             </div>
+            <PersonMatchControls v-if="searchStore.personCount > 0" class="mt-1" />
           </div>
 
           <v-divider class="border-subtle" />

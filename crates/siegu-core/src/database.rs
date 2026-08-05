@@ -92,10 +92,29 @@ fn paper_class_in_clause() -> String {
         .join(",")
 }
 
+/// How multiple person filters are combined.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PersonMatch {
+    /// Photos must contain all selected people together.
+    #[default]
+    And,
+    /// Photos must contain at least one of the selected people.
+    Or,
+}
+
 /// Optional facet filters combined with AND against the media list.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PhotoFilter {
-    pub person_id: Option<String>,
+    /// Photos must contain these people, combined per `person_match`.
+    #[serde(default)]
+    pub person_ids: Vec<String>,
+    /// Combine multiple selected people with AND (together) or OR (any).
+    #[serde(default)]
+    pub person_match: PersonMatch,
+    /// Restrict to photos whose only detected faces belong to the selected
+    /// people (e.g. "X alone in the frame").
+    #[serde(default)]
+    pub person_alone: bool,
     pub location: Option<String>,
     pub tag: Option<String>,
     pub date_from: Option<String>,
@@ -1019,12 +1038,30 @@ impl Database {
                 slot += 1; // ?4 month
             }
         }
-        if let Some(ref person_id) = filter.person_id {
-            slot += 1;
-            facet_filters.push_str(&format!(
-                " AND EXISTS(SELECT 1 FROM faces WHERE photo_id=p.id AND person_id = ?{slot})"
-            ));
-            extra_params.push(Box::new(person_id.clone()));
+        if !filter.person_ids.is_empty() {
+            let n = filter.person_ids.len();
+            let placeholders: Vec<String> = (1..=n).map(|i| format!("?{}", slot + i)).collect();
+            let joined = placeholders.join(",");
+            if filter.person_alone {
+                facet_filters.push_str(&format!(
+                    " AND p.id IN (SELECT f.photo_id FROM faces f WHERE f.person_id IN ({joined}) \
+                     GROUP BY f.photo_id HAVING COUNT(DISTINCT f.person_id) = {n}) \
+                     AND (SELECT COUNT(*) FROM faces f WHERE f.photo_id = p.id) = {n}"
+                ));
+            } else if filter.person_match == PersonMatch::Or {
+                facet_filters.push_str(&format!(
+                    " AND EXISTS(SELECT 1 FROM faces f WHERE f.photo_id = p.id AND f.person_id IN ({joined}))"
+                ));
+            } else {
+                facet_filters.push_str(&format!(
+                    " AND p.id IN (SELECT f.photo_id FROM faces f WHERE f.person_id IN ({joined}) \
+                     GROUP BY f.photo_id HAVING COUNT(DISTINCT f.person_id) = {n})"
+                ));
+            }
+            for id in &filter.person_ids {
+                extra_params.push(Box::new(id.clone()));
+            }
+            slot += n;
         }
         if let Some(ref location) = filter.location {
             slot += 1;
@@ -3547,7 +3584,7 @@ mod tests {
         let filter = |f: PhotoFilter| db.list_photos_filtered("", 0, 100, false, false, &f);
 
         let by_person = filter(PhotoFilter {
-            person_id: Some("person-1".into()),
+            person_ids: vec!["person-1".into()],
             ..Default::default()
         });
         assert_eq!(by_person.len(), 1);
@@ -3575,14 +3612,14 @@ mod tests {
         assert_eq!(by_date.len(), 2);
 
         let combined = filter(PhotoFilter {
-            person_id: Some("person-1".into()),
+            person_ids: vec!["person-1".into()],
             location: Some("Paris, France".into()),
             ..Default::default()
         });
         assert_eq!(combined.len(), 1);
 
         let empty = filter(PhotoFilter {
-            person_id: Some("person-1".into()),
+            person_ids: vec!["person-1".into()],
             tag: Some("beach".into()),
             ..Default::default()
         });

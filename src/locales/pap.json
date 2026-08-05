@@ -68,6 +68,9 @@
     "see_all": "Mirá tur",
     "results_for": "Resultadonan pa \"{query}\"",
     "active": "Aktivo",
+    "person_match_and": "Tur nané",
+    "person_match_or": "Kualke di nané",
+    "person_alone": "So dibi",
     "magic": {
       "favorites": "Favoritonan",
       "videos": "Videonan",

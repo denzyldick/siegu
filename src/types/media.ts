@@ -86,7 +86,9 @@ export interface ListFilesOptions {
   favoritesOnly?: boolean;
   videosOnly?: boolean;
   dateRange?: [string, string] | null;
-  personId?: string;
+  personIds?: string[];
+  personMatch?: 'and' | 'or';
+  personAlone?: boolean;
   location?: string;
   tag?: string;
   dateFrom?: string;

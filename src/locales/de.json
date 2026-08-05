@@ -68,6 +68,9 @@
     "see_all": "Alle anzeigen",
     "results_for": "Ergebnisse für \"{query}\"",
     "active": "Aktiv",
+    "person_match_and": "Alle zusammen",
+    "person_match_or": "Einer davon",
+    "person_alone": "Allein",
     "magic": {
       "favorites": "Favoriten",
       "videos": "Videos",

@@ -53,6 +53,9 @@
     "see_all": "See all",
     "results_for": "Results for \"{query}\"",
     "active": "Active",
+    "person_match_and": "All together",
+    "person_match_or": "Any of them",
+    "person_alone": "Alone",
     "magic": {
       "favorites": "Favorites",
       "videos": "Videos",

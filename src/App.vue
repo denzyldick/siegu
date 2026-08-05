@@ -21,6 +21,7 @@ import DeviceList from '@/components/DeviceList.vue';
 import SettingsView from '@/components/SettingsView.vue';
 import GuidedTour from '@/components/GuidedTour.vue';
 import ErrorBoundary from '@/components/shared/ErrorBoundary.vue';
+import PersonMatchControls from '@/components/search/PersonMatchControls.vue';
 
 const { t } = useI18n();
 const appStore = useAppStore();
@@ -115,7 +116,7 @@ function handleSearchPerson(person: { id: string | number; name: string }): void
 function removeFilterChip(index: number): void {
   const filter = searchStore.activeFilters[index];
   if (filter) {
-    searchStore.removeFilter(filter.type);
+    searchStore.removeFilterValue(filter.type, filter.value);
   }
 }
 </script>
@@ -157,6 +158,7 @@ function removeFilterChip(index: number): void {
                 }}</v-icon>
                 {{ filter.label }}
               </v-chip>
+              <PersonMatchControls v-if="searchStore.personCount > 0" />
               <v-btn size="x-small" variant="text" @click="handleClearSearch">
                 {{ t('search.clear_all') }}
               </v-btn>
@@ -175,6 +177,8 @@ function removeFilterChip(index: number): void {
                 aestheticsMin: searchStore.aestheticsMin,
                 surprise: searchStore.surprise,
                 orderBy: searchStore.sortOrder,
+                personMatch: searchStore.personMatch,
+                personAlone: searchStore.personAlone,
                 dateRange: 'all',
                 folder: null,
               }"

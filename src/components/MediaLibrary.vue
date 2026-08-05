@@ -237,6 +237,8 @@ const props = withDefaults(
       aestheticsMin: number | null;
       surprise: boolean;
       orderBy: string;
+      personMatch: 'and' | 'or';
+      personAlone: boolean;
       dateRange: string;
       folder: string | null;
     };
@@ -255,6 +257,8 @@ const props = withDefaults(
       aestheticsMin: null,
       surprise: false,
       orderBy: 'newest',
+      personMatch: 'and',
+      personAlone: false,
       dateRange: 'all',
       folder: null,
     }),
@@ -499,7 +503,8 @@ async function loadFiles(): Promise<void> {
       });
     } else {
       const byType = (type: string) => props.facets?.find((f) => f.type === type);
-      const person = byType('person');
+      const people = props.facets?.filter((f) => f.type === 'person') ?? [];
+      const personIds = people.map((f) => f.value);
       const location = byType('location');
       const tag = byType('tag');
       const month = byType('month');
@@ -512,7 +517,9 @@ async function loadFiles(): Promise<void> {
         scan: false,
         favoritesOnly: props.filters?.favoritesOnly ?? false,
         videosOnly: props.filters?.videosOnly ?? false,
-        personId: person ? person.value : null,
+        personIds: personIds.length ? personIds : null,
+        personMatch: props.filters?.personMatch ?? 'and',
+        personAlone: props.filters?.personAlone ?? false,
         location: location ? location.value : null,
         tag: tag ? tag.value : null,
         dateFrom: month ? `${month.value}-01` : dateRange ? dateRange[0] : null,
