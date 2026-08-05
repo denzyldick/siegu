@@ -142,7 +142,9 @@
     "folder_init_error": "Impossibile inizializzare la cartella di sincronizzazione: {error}",
     "status": "Sincronizzazione",
     "paused": "Sincronizzazione in pausa — dispositivo offline",
-    "reconnect": "Riconnetti"
+    "reconnect": "Riconnetti",
+    "stop": "Ferma",
+    "stopped_resume": "Fermato — riprende da dove era rimasto"
   },
   "filters": {
     "favorites_only": "Solo preferiti",
@@ -324,7 +326,32 @@
     "appearance": "Aspetto",
     "theme_system": "Sistema",
     "theme_light": "Chiaro",
-    "theme_dark": "Scuro"
+    "theme_dark": "Scuro",
+    "download_failed": "Download del modello non riuscito",
+    "performance": "Prestazioni",
+    "performance_desc": "Bilancia velocità e risorse. Scegli una modalità adatta al tuo dispositivo.",
+    "preset_low": "Basso",
+    "preset_low_desc": "Leggera — ideale per telefoni e laptop.",
+    "preset_balanced": "Bilanciata",
+    "preset_balanced_desc": "Buona velocità con un uso sensato delle risorse.",
+    "preset_full": "Completa",
+    "preset_full_desc": "La più veloce — usa tutti i core della CPU.",
+    "preset_custom": "Personalizzata",
+    "preset_custom_desc": "Regolato finemente con i cursori avanzati.",
+    "preset_applied": "Modalità {name} applicata",
+    "show_advanced": "Mostra avanzate",
+    "hide_advanced": "Nascondi avanzate",
+    "ml_threads": "Thread IA",
+    "batch_delay": "Pausa tra le foto",
+    "batch_delay_desc": "Secondi tra i lotti per mantenere il dispositivo fresco.",
+    "memory_budget": "Limite di memoria",
+    "memory_budget_desc": "RAM massima per i modelli IA. 0 = nessun limite.",
+    "memory_budget_none": "Nessun limite",
+    "ram_estimate": "~{size} di RAM",
+    "memory_total": "I modelli caricati usano ~{size} di RAM",
+    "no_models_in_memory": "Nessun modello in memoria",
+    "free_memory": "Libera memoria",
+    "memory_freed": "Modelli rimossi dalla memoria. Verranno ricaricati prima della prossima analisi."
   },
   "open_with": {
     "opened_in_siegu": "Aperto in Siegu: {file}"

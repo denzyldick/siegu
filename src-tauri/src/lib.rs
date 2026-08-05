@@ -377,6 +377,8 @@ pub fn run() {
             commands::indexing::analyze_photo_model,
             commands::indexing::analyze_model,
             commands::indexing::abort_indexing,
+            commands::indexing::unload_models,
+            commands::indexing::get_models_loaded,
             // Geocode
             commands::geocode::list_objects,
             commands::search::search_facets,

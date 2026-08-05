@@ -135,32 +135,6 @@ impl Drop for SessionGuard<'_> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn default_pool_size_keeps_heavy_models_single() {
-        assert_eq!(SessionPool::pool_size_for("aesthetics.onnx"), 1);
-        assert_eq!(SessionPool::pool_size_for("blip.onnx"), 1);
-        assert_eq!(SessionPool::pool_size_for("blip_decoder.onnx"), 1);
-        assert_eq!(SessionPool::pool_size_for("whisper.onnx"), 1);
-        assert_eq!(SessionPool::pool_size_for("whisper-decoder.onnx"), 1);
-        assert_eq!(
-            SessionPool::pool_size_for("clip-vit-base-patch32-visual.onnx"),
-            2
-        );
-        assert_eq!(SessionPool::pool_size_for("yolov8.onnx"), 2);
-    }
-
-    #[test]
-    fn empty_pool_lock_fails() {
-        let pool = SessionPool::new(Vec::new());
-        assert!(pool.is_empty());
-        assert!(pool.lock().is_err());
-    }
-}
-
 /// Container for all loaded ML models and their associated data.
 ///
 /// Each field is `Option<ModelEngine>` — `None` means the model was
@@ -199,6 +173,65 @@ fn model_enabled(config: &HashMap<String, String>, name: &str) -> bool {
         .is_none_or(|v| v == "true")
 }
 
+/// Estimated resident size of each loadable model (sum of its registry
+/// files), used to enforce the `ml_memory_budget_mb` cap.
+const MODEL_SIZES: &[(&str, u64)] = &[
+    ("clip", 351_685_709 + 254_058_553 + 2_224_119),
+    ("face", 232_589),
+    ("arcface", 174_383_860),
+    ("ocr", 2_423_224 + 8_967_018 + 190),
+    ("nsfw", 343_401_688),
+    ("aesthetics", 1_718_811_155),
+    ("yolo", 12_823_574),
+    ("blip", 345_122_738 + 647_427_238 + 711_396),
+    ("midas", 533_061_339),
+    ("whisper", 32_883_618 + 118_505_132),
+];
+
+/// Whether a model should be loaded: enabled in config and not dropped by the
+/// memory budget.
+fn should_load(config: &HashMap<String, String>, dropped: &[&str], name: &str) -> bool {
+    model_enabled(config, name) && !dropped.contains(&name)
+}
+
+/// Applies the `ml_memory_budget_mb` cap: returns the names of enabled models
+/// dropped (heaviest first) so the total estimated size fits the budget.
+/// Returns an empty list when the budget is unset.
+fn dropped_over_budget(config: &HashMap<String, String>, log: &dyn Fn(&str)) -> Vec<&'static str> {
+    let Some(budget_mb) = config
+        .get("ml_memory_budget_mb")
+        .and_then(|s| s.parse::<u64>().ok())
+    else {
+        return Vec::new();
+    };
+    let budget = budget_mb.saturating_mul(1024 * 1024);
+
+    let mut enabled: Vec<(u64, &'static str)> = MODEL_SIZES
+        .iter()
+        .filter(|(name, _)| model_enabled(config, name))
+        .map(|(name, size)| (*size, *name))
+        .collect();
+    enabled.sort_by_key(|(size, _)| std::cmp::Reverse(*size));
+
+    let mut total: u64 = enabled.iter().map(|(size, _)| *size).sum();
+    let mut dropped: Vec<&'static str> = Vec::new();
+    for (size, name) in &enabled {
+        if total <= budget {
+            break;
+        }
+        dropped.push(name);
+        total = total.saturating_sub(*size);
+    }
+
+    if !dropped.is_empty() {
+        log(&format!(
+            "Memory budget {budget_mb} MB: skipped {}",
+            dropped.join(", ")
+        ));
+    }
+    dropped
+}
+
 /// Loads all enabled ONNX models from the models directory.
 ///
 /// Models are loaded conditionally based on config flags. Each model is
@@ -215,88 +248,100 @@ pub fn load_models(
 ) -> LoadedModels {
     let models_dir = Path::new(config_path).join("models");
 
-    let clip_visual = if model_enabled(config, "clip") {
+    let ml_threads: Option<usize> = config
+        .get("ml_threads")
+        .and_then(|s| s.parse::<usize>().ok())
+        .filter(|&n| (1..=32).contains(&n));
+
+    let dropped = dropped_over_budget(config, log);
+
+    let clip_visual = if should_load(config, &dropped, "clip") {
         log("Loading CLIP visual model...");
-        let m = load_model(&models_dir, "clip-vit-base-patch32-visual.onnx");
+        let m = load_model(&models_dir, "clip-vit-base-patch32-visual.onnx", ml_threads);
         log("CLIP visual ready.");
         m
     } else {
         None
     };
-    let face_detector = if model_enabled(config, "face") || model_enabled(config, "ultraface") {
-        log("Loading face detector...");
-        let m =
-            load_model_with_min_size(&models_dir, "face_detection_yunet_2023mar.onnx", 100 * 1024);
-        log("Face detector ready.");
-        m
-    } else {
-        None
-    };
-    let arcface = if model_enabled(config, "arcface") {
+    let face_detector =
+        if should_load(config, &dropped, "face") || model_enabled(config, "ultraface") {
+            log("Loading face detector...");
+            let m = load_model_with_min_size(
+                &models_dir,
+                "face_detection_yunet_2023mar.onnx",
+                100 * 1024,
+                ml_threads,
+            );
+            log("Face detector ready.");
+            m
+        } else {
+            None
+        };
+    let arcface = if should_load(config, &dropped, "arcface") {
         log("Loading ArcFace model...");
-        let m = load_model(&models_dir, "arcface.onnx");
+        let m = load_model(&models_dir, "arcface.onnx", ml_threads);
         log("ArcFace ready.");
         m
     } else {
         None
     };
-    let ocr_det = if model_enabled(config, "ocr") {
+    let ocr_det = if should_load(config, &dropped, "ocr") {
         log("Loading OCR detection model...");
-        let m = load_model(&models_dir, "ocr_det.onnx");
+        let m = load_model(&models_dir, "ocr_det.onnx", ml_threads);
         log("OCR detection ready.");
         m
     } else {
         None
     };
-    let ocr_rec = if model_enabled(config, "ocr") {
+    let ocr_rec = if should_load(config, &dropped, "ocr") {
         log("Loading OCR recognition model...");
-        let m = load_model(&models_dir, "ocr_rec.onnx");
+        let m = load_model(&models_dir, "ocr_rec.onnx", ml_threads);
         log("OCR recognition ready.");
         m
     } else {
         None
     };
-    let nsfw = if model_enabled(config, "nsfw") {
+    let nsfw = if should_load(config, &dropped, "nsfw") {
         log("Loading NSFW model...");
-        let m = load_model(&models_dir, "nsfw.onnx");
+        let m = load_model(&models_dir, "nsfw.onnx", ml_threads);
         log("NSFW ready.");
         m
     } else {
         None
     };
-    let aesthetics = if model_enabled(config, "aesthetics") {
+    let aesthetics = if should_load(config, &dropped, "aesthetics") {
         log("Loading aesthetics model (1.6 GB)...");
-        let m = load_model(&models_dir, "aesthetics.onnx");
+        let m = load_model(&models_dir, "aesthetics.onnx", ml_threads);
         log("Aesthetics ready.");
         m
     } else {
         None
     };
-    let yolo = if model_enabled(config, "yolo") {
+    let yolo = if should_load(config, &dropped, "yolo") {
         log("Loading YOLO model...");
-        let m = load_model(&models_dir, "yolov8.onnx");
+        let m = load_model(&models_dir, "yolov8.onnx", ml_threads);
         log("YOLO ready.");
         m
     } else {
         None
     };
-    let blip = if model_enabled(config, "blip") {
+    let blip = if should_load(config, &dropped, "blip") {
         log("Loading BLIP vision encoder...");
-        let m = load_model(&models_dir, "blip.onnx");
+        let m = load_model(&models_dir, "blip.onnx", ml_threads);
         log("BLIP vision encoder ready.");
         m
     } else {
         None
     };
-    let blip_decoder = if model_enabled(config, "blip") {
+    let blip_decoder = if should_load(config, &dropped, "blip") {
         log("Loading BLIP text decoder...");
-        let m = load_model(&models_dir, "blip_decoder.onnx");
+        let m = load_model(&models_dir, "blip_decoder.onnx", ml_threads);
         log("BLIP text decoder ready.");
         m
     } else {
         None
     };
-    let blip_tokenizer = if model_enabled(config, "blip") {
+    let blip_tokenizer = if should_load(config, &dropped, "blip") {
         let tok_path = models_dir.join("blip_tokenizer.json");
         if tok_path.exists() {
             tokenizers::Tokenizer::from_file(&tok_path).ok()
@@ -312,42 +357,43 @@ pub fn load_models(
     } else {
         None
     };
-    let midas = if model_enabled(config, "midas") {
+    let midas = if should_load(config, &dropped, "midas") {
         log("Loading MiDaS depth model...");
-        let m = load_model(&models_dir, "midas.onnx");
+        let m = load_model(&models_dir, "midas.onnx", ml_threads);
         log("MiDaS ready.");
         m
     } else {
         None
     };
-    let (whisper_encoder, whisper_decoder, whisper_tokenizer) = if model_enabled(config, "whisper")
-    {
-        log("Loading Whisper encoder...");
-        let enc = load_model(&models_dir, "whisper.onnx");
-        log("Whisper encoder ready.");
-        log("Loading Whisper decoder...");
-        let dec = load_model(&models_dir, "whisper-decoder.onnx");
-        log("Whisper decoder ready.");
-        let tok_path = models_dir.join("whisper-tokenizer.json");
-        let tok = if tok_path.exists() {
-            tokenizers::Tokenizer::from_file(&tok_path).ok()
+    let (whisper_encoder, whisper_decoder, whisper_tokenizer) =
+        if should_load(config, &dropped, "whisper") {
+            log("Loading Whisper encoder...");
+            let enc = load_model(&models_dir, "whisper.onnx", ml_threads);
+            log("Whisper encoder ready.");
+            log("Loading Whisper decoder...");
+            let dec = load_model(&models_dir, "whisper-decoder.onnx", ml_threads);
+            log("Whisper decoder ready.");
+            let tok_path = models_dir.join("whisper-tokenizer.json");
+            let tok = if tok_path.exists() {
+                tokenizers::Tokenizer::from_file(&tok_path).ok()
+            } else {
+                None
+            };
+            (enc, dec, tok)
         } else {
-            None
+            (None, None, None)
         };
-        (enc, dec, tok)
-    } else {
-        (None, None, None)
-    };
 
     let clip_text_path = models_dir.join("clip-vit-base-patch32-text.onnx");
     let tokenizer_path = models_dir.join("tokenizer.json");
     let ocr_dict_path = models_dir.join("en_dict.txt");
 
     let mut text_embeddings = Vec::new();
-    let clip_text = if model_enabled(config, "clip") && clip_text_path.exists() {
+    let clip_text = if should_load(config, &dropped, "clip") && clip_text_path.exists() {
         if let Ok(tokenizer) = tokenizers::Tokenizer::from_file(&tokenizer_path) {
             log("Loading CLIP text model & computing embeddings...");
-            if let Some(mut text_model) = load_model(&models_dir, "clip-vit-base-patch32-text.onnx")
+            if let Some(mut text_model) =
+                load_model(&models_dir, "clip-vit-base-patch32-text.onnx", ml_threads)
             {
                 text_embeddings = compute_text_embeddings(&mut text_model, &tokenizer);
                 log(&format!(
@@ -403,8 +449,8 @@ pub fn load_models(
 
 /// Loads a single ONNX model, returning `None` if the file doesn't exist,
 /// is too small (<1MB, likely corrupt), or fails to build an ORT session.
-fn load_model(models_dir: &Path, filename: &str) -> Option<ModelEngine> {
-    load_model_with_min_size(models_dir, filename, 1024 * 1024)
+fn load_model(models_dir: &Path, filename: &str, ml_threads: Option<usize>) -> Option<ModelEngine> {
+    load_model_with_min_size(models_dir, filename, 1024 * 1024, ml_threads)
 }
 
 /// Like [`load_model`] but with an explicit minimum file size, used for
@@ -413,6 +459,7 @@ fn load_model_with_min_size(
     models_dir: &Path,
     filename: &str,
     min_size: u64,
+    ml_threads: Option<usize>,
 ) -> Option<ModelEngine> {
     let path = models_dir.join(filename);
     let is_ok = path.exists() && path.metadata().map(|m| m.len()).unwrap_or(0) > min_size;
@@ -422,7 +469,7 @@ fn load_model_with_min_size(
     let pool_size = SessionPool::pool_size_for(filename);
     let mut sessions = Vec::with_capacity(pool_size);
     for _ in 0..pool_size {
-        if let Ok(session) = super::ep::build_session(&path) {
+        if let Ok(session) = super::ep::build_session(&path, ml_threads) {
             sessions.push(session);
         }
     }
@@ -546,4 +593,183 @@ fn compute_text_embeddings(
         }
     }
     embeddings
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_pool_size_keeps_heavy_models_single() {
+        assert_eq!(SessionPool::pool_size_for("aesthetics.onnx"), 1);
+        assert_eq!(SessionPool::pool_size_for("blip.onnx"), 1);
+        assert_eq!(SessionPool::pool_size_for("blip_decoder.onnx"), 1);
+        assert_eq!(SessionPool::pool_size_for("whisper.onnx"), 1);
+        assert_eq!(SessionPool::pool_size_for("whisper-decoder.onnx"), 1);
+        assert_eq!(
+            SessionPool::pool_size_for("clip-vit-base-patch32-visual.onnx"),
+            2
+        );
+        assert_eq!(SessionPool::pool_size_for("yolov8.onnx"), 2);
+    }
+
+    #[test]
+    fn empty_pool_lock_fails() {
+        let pool = SessionPool::new(Vec::new());
+        assert!(pool.is_empty());
+        assert!(pool.lock().is_err());
+    }
+
+    fn config_with(budget_mb: &str, enabled: &[&str]) -> HashMap<String, String> {
+        let mut config = HashMap::new();
+        config.insert("ml_memory_budget_mb".to_string(), budget_mb.to_string());
+        for m in [
+            "clip",
+            "face",
+            "arcface",
+            "ocr",
+            "nsfw",
+            "aesthetics",
+            "yolo",
+            "blip",
+            "midas",
+            "whisper",
+        ] {
+            if !enabled.contains(&m) {
+                config.insert(format!("model_enabled_{m}"), "false".to_string());
+            }
+        }
+        config
+    }
+
+    fn noop_log(_msg: &str) {}
+
+    #[test]
+    fn budget_unset_returns_nothing() {
+        let config = HashMap::new();
+        assert!(dropped_over_budget(&config, &noop_log).is_empty());
+    }
+
+    #[test]
+    fn budget_large_drops_nothing() {
+        let config = config_with("32768", &["aesthetics", "blip", "clip"]);
+        assert!(dropped_over_budget(&config, &noop_log).is_empty());
+    }
+
+    #[test]
+    fn budget_drops_heaviest_model() {
+        let config = config_with("2048", &["aesthetics", "blip", "yolo"]);
+        let dropped = dropped_over_budget(&config, &noop_log);
+        assert!(dropped.contains(&"aesthetics"));
+        assert!(!dropped.contains(&"yolo"));
+    }
+
+    #[test]
+    fn budget_ignores_disabled_models() {
+        let config = config_with("1024", &["aesthetics"]);
+        let dropped = dropped_over_budget(&config, &noop_log);
+        assert!(dropped.contains(&"aesthetics"));
+        assert!(!dropped.contains(&"blip"));
+    }
+
+    #[test]
+    fn should_load_respects_budget_drop() {
+        let config = config_with("1024", &["aesthetics", "yolo"]);
+        let dropped = dropped_over_budget(&config, &noop_log);
+        assert!(!should_load(&config, &dropped, "aesthetics"));
+        assert!(should_load(&config, &dropped, "yolo"));
+    }
+
+    #[test]
+    fn should_load_false_when_disabled() {
+        let config = config_with("32768", &["clip"]);
+        assert!(should_load(&config, &[], "clip"));
+        assert!(!should_load(&config, &[], "midas"));
+    }
+
+    /// Locate a directory containing at least the tiny YuNet face-detector
+    /// model, used by [`session_pool_allows_concurrent_locks`]. Prefers the
+    /// repo-local `test_models/` (CI), then the app's real models dir.
+    fn test_models_dir() -> Option<std::path::PathBuf> {
+        let candidates = [
+            std::path::Path::new("test_models").to_path_buf(),
+            crate::config::default_config_dir().join("models"),
+        ];
+        candidates
+            .into_iter()
+            .find(|dir| dir.join("face_detection_yunet_2023mar.onnx").exists())
+    }
+
+    /// Proves light models really get concurrent sessions: two threads each
+    /// grab a slot from a 2-session pool simultaneously. A pool with a single
+    /// session would block the second lock, which the channel handshake below
+    /// detects deterministically (no timing-based assertions).
+    #[test]
+    #[ignore] // needs the ~230 KB YuNet model in test_models/ or the app dir
+    fn session_pool_allows_concurrent_locks() {
+        use crate::ml_engine::ep;
+        use std::sync::mpsc;
+
+        let Some(models_dir) = test_models_dir() else {
+            println!("Skipping: face_detection_yunet_2023mar.onnx not present");
+            return;
+        };
+        let model_path = models_dir.join("face_detection_yunet_2023mar.onnx");
+
+        let mut sessions = Vec::new();
+        for _ in 0..2 {
+            match ep::build_session(&model_path, None) {
+                Ok(session) => sessions.push(session),
+                Err(e) => {
+                    println!("Skipping: failed to load YuNet twice: {e}");
+                    return;
+                }
+            }
+        }
+
+        let pool = Arc::new(SessionPool::new(sessions));
+
+        let (a_idx_tx, a_idx_rx) = mpsc::channel();
+        let (go_tx, go_rx) = mpsc::channel();
+        let (b_locked_tx, b_locked_rx) = mpsc::channel();
+        let (b_idx_tx, b_idx_rx) = mpsc::channel();
+
+        let pool_a = Arc::clone(&pool);
+        let pool_b = Arc::clone(&pool);
+
+        std::thread::scope(|scope| {
+            scope.spawn(move || {
+                let guard = pool_a.lock().unwrap();
+                let idx = guard.idx;
+                a_idx_tx.send(idx).ok();
+                go_tx.send(()).ok();
+                // Hold this slot until B proves it acquired its own. If the
+                // pool were single-session, B could never acquire while we
+                // hold, so this receive would time out after 10s.
+                let _ = b_locked_rx.recv_timeout(std::time::Duration::from_secs(10));
+                drop(guard);
+            });
+            scope.spawn(move || {
+                // Start only after A holds a slot.
+                let _ = go_rx.recv_timeout(std::time::Duration::from_secs(10));
+                let guard = pool_b.lock().unwrap();
+                let idx = guard.idx;
+                b_locked_tx.send(()).ok();
+                b_idx_tx.send(idx).ok();
+                drop(guard);
+            });
+        });
+
+        let idx_a = a_idx_rx
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("thread A should have locked a session");
+        let idx_b = b_idx_rx
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("thread B should have locked a second session");
+
+        assert_ne!(
+            idx_a, idx_b,
+            "two concurrent locks must use distinct pooled sessions, got {idx_a} twice"
+        );
+    }
 }

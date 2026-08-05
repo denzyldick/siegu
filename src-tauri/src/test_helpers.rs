@@ -2,7 +2,7 @@ use siegu_core::database::{AiStatus, Database, Photo};
 use siegu_core::ml_worker::{Job, MlContext};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 use tokio::sync::mpsc;
 
@@ -20,6 +20,7 @@ pub fn mock_ml_context() -> (MlContext, mpsc::UnboundedReceiver<Job>) {
         tx,
         pending_count: Arc::new(AtomicUsize::new(0)),
         abort: Arc::new(AtomicBool::new(false)),
+        models: Arc::new(Mutex::new(None)),
     };
     (ctx, rx)
 }

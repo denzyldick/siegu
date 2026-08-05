@@ -142,7 +142,9 @@
     "folder_init_error": "Error al inicializar la carpeta de sincronización: {error}",
     "status": "Sincronizando",
     "paused": "Sincronización pausada: dispositivo sin conexión",
-    "reconnect": "Reconectar"
+    "reconnect": "Reconectar",
+    "stop": "Detener",
+    "stopped_resume": "Detenido — se reanuda donde quedó"
   },
   "filters": {
     "favorites_only": "Solo favoritos",
@@ -324,7 +326,32 @@
     "appearance": "Apariencia",
     "theme_system": "Sistema",
     "theme_light": "Claro",
-    "theme_dark": "Oscuro"
+    "theme_dark": "Oscuro",
+    "download_failed": "Error al descargar el modelo",
+    "performance": "Rendimiento",
+    "performance_desc": "Equilibra velocidad y recursos. Elige un modo que se adapte a tu dispositivo.",
+    "preset_low": "Bajo",
+    "preset_low_desc": "Suave — ideal para teléfonos y portátiles.",
+    "preset_balanced": "Equilibrado",
+    "preset_balanced_desc": "Buena velocidad con un uso sensato de los recursos.",
+    "preset_full": "Completo",
+    "preset_full_desc": "La más rápida — usa todos tus núcleos de CPU.",
+    "preset_custom": "Personalizado",
+    "preset_custom_desc": "Ajustado finamente con los controles avanzados.",
+    "preset_applied": "Modo {name} aplicado",
+    "show_advanced": "Mostrar avanzado",
+    "hide_advanced": "Ocultar avanzado",
+    "ml_threads": "Hilos de IA",
+    "batch_delay": "Pausa entre fotos",
+    "batch_delay_desc": "Segundos entre lotes para mantener el dispositivo fresco.",
+    "memory_budget": "Límite de memoria",
+    "memory_budget_desc": "RAM máxima para los modelos de IA. 0 = sin límite.",
+    "memory_budget_none": "Sin límite",
+    "ram_estimate": "~{size} de RAM",
+    "memory_total": "Los modelos cargados usan ~{size} de RAM",
+    "no_models_in_memory": "No hay modelos en memoria",
+    "free_memory": "Liberar memoria",
+    "memory_freed": "Modelos eliminados de la memoria. Se recargarán antes del próximo análisis."
   },
   "open_with": {
     "opened_in_siegu": "Abierto en Siegu: {file}"

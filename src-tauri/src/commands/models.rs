@@ -42,6 +42,22 @@ pub async fn download_models(
     let models_dir = std::path::PathBuf::from(&path).join("models");
     std::fs::create_dir_all(&models_dir).map_err(|e| e.to_string())?;
 
+    let needed = siegu_core::model_manager::needed_download_bytes(&models_dir, &models);
+    if needed > 0 {
+        let free = siegu_core::model_manager::available_disk_bytes(&models_dir);
+        let free_mb = free / (1024 * 1024);
+        let needed_mb = needed / (1024 * 1024);
+        if free > 0 && free < needed {
+            return Err(format!(
+                "Not enough disk space: {needed_mb} MB needed, only {free_mb} MB free"
+            ));
+        }
+        emit_log(
+            &app,
+            format!("Disk space check: {needed_mb} MB to download, {free_mb} MB free"),
+        );
+    }
+
     let resolved = siegu_core::model_manager::resolve_files_for_models(&models);
     let files_to_download: Vec<(String, String, String, u64, String)> = resolved
         .iter()

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -7,6 +8,16 @@ use crate::ml_worker::{self, decrement_pending_count, increment_pending_count, J
 
 use super::models::LoadedModels;
 use super::pipeline::{self, PhotoResult};
+
+/// Pacing delay (in milliseconds) applied between batches of a bulk analysis
+/// job. Parsed from the `batch_delay_ms` config value; clamped to 0..=2000.
+pub fn batch_delay_ms_from_config(config: &HashMap<String, String>) -> u64 {
+    config
+        .get("batch_delay_ms")
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(0)
+        .min(2000)
+}
 
 pub trait AnalysisCallbacks: Send + Sync {
     fn on_photo_complete(
@@ -72,6 +83,8 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
     let abort_clone = Arc::clone(&abort);
     let db_path = config_path.clone();
     let callbacks = Arc::new(callbacks);
+    let models: Arc<Mutex<Option<LoadedModels>>> = Arc::new(Mutex::new(None));
+    let models_thread = Arc::clone(&models);
 
     std::thread::spawn(move || {
         let faces_dir = format!("{db_path}/faces");
@@ -99,7 +112,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
 
         let avg_photo_time_ms = 1000f64;
         let mut last_auto_job: Option<Instant> = None;
-        let models: Arc<Mutex<Option<LoadedModels>>> = Arc::new(Mutex::new(None));
+        let models = models_thread;
         let total_processed = 0usize;
 
         while let Some(job) = rx.blocking_recv() {
@@ -228,6 +241,8 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                 avg_photo_time_ms,
             );
 
+            let batch_delay_ms = batch_delay_ms_from_config(&config);
+
             let abort_flag = Arc::clone(&abort_clone);
             let db_ref = Arc::clone(&db);
             let pending_count_ref = Arc::clone(&pending_count_clone);
@@ -353,6 +368,10 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                             decrement_pending_count(&pending_count_ref);
                         }
                     }
+
+                    if batch_delay_ms > 0 {
+                        std::thread::sleep(Duration::from_millis(batch_delay_ms));
+                    }
                 }
 
                 callbacks.on_scan_complete();
@@ -364,5 +383,39 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
         tx,
         pending_count,
         abort,
+        models,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn batch_delay_defaults_to_zero_when_missing() {
+        let config = HashMap::new();
+        assert_eq!(batch_delay_ms_from_config(&config), 0);
+    }
+
+    #[test]
+    fn batch_delay_reads_valid_value() {
+        let mut config = HashMap::new();
+        config.insert("batch_delay_ms".to_string(), "500".to_string());
+        assert_eq!(batch_delay_ms_from_config(&config), 500);
+    }
+
+    #[test]
+    fn batch_delay_clamps_to_max() {
+        let mut config = HashMap::new();
+        config.insert("batch_delay_ms".to_string(), "99999".to_string());
+        assert_eq!(batch_delay_ms_from_config(&config), 2000);
+    }
+
+    #[test]
+    fn batch_delay_ignores_garbage() {
+        let mut config = HashMap::new();
+        config.insert("batch_delay_ms".to_string(), "soon".to_string());
+        assert_eq!(batch_delay_ms_from_config(&config), 0);
     }
 }

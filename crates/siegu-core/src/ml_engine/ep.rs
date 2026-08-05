@@ -13,13 +13,16 @@ use ort::session::Session;
 /// Graph optimization is disabled (`Disable`) to avoid issues with certain
 /// model architectures (e.g., Whisper decoder with dynamic KV cache shapes).
 /// Execution providers are tried in priority order; the first successful one wins.
+///
+/// `ml_threads` is the user-configured intra-op thread count from the
+/// `ml_threads` config key. Priority: `SIEGU_ORT_THREADS` env > config > default.
 #[allow(clippy::vec_init_then_push)]
-pub fn build_session(path: &std::path::Path) -> Result<Session, String> {
+pub fn build_session(path: &std::path::Path, ml_threads: Option<usize>) -> Result<Session, String> {
     let mut builder = Session::builder()
         .map_err(|e| format!("Session builder error: {e}"))?
         .with_optimization_level(ort::session::builder::GraphOptimizationLevel::Disable)
         .map_err(|e| format!("Optimization level error: {e}"))?
-        .with_intra_threads(intra_threads())
+        .with_intra_threads(intra_threads(ml_threads))
         .map_err(|e| format!("Intra-op thread count error: {e}"))?;
 
     if let Some(inter) = inter_threads() {
@@ -81,15 +84,17 @@ pub fn selected_ep() -> String {
 ///
 /// Defaults to `min(physical cores, 4)`: a full-library index runs several
 /// photos concurrently (see the session pool in `models`), so a single run
-/// using every core would oversubscribe the machine. Override with
-/// `SIEGU_ORT_THREADS`.
-fn intra_threads() -> usize {
-    env_threads("SIEGU_ORT_THREADS").unwrap_or_else(|| {
-        let cores = std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(4);
-        cores.min(4)
-    })
+/// using every core would oversubscribe the machine. Override with the
+/// `ml_threads` config or `SIEGU_ORT_THREADS` env var (env wins).
+fn intra_threads(config_threads: Option<usize>) -> usize {
+    env_threads("SIEGU_ORT_THREADS")
+        .or(config_threads)
+        .unwrap_or_else(|| {
+            let cores = std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(4);
+            cores.min(4)
+        })
 }
 
 /// Inter-op threads for a run. ORT manages this internally by default; only

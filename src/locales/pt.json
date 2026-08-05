@@ -142,7 +142,9 @@
     "folder_init_error": "Falha ao inicializar a pasta de sincronização: {error}",
     "status": "Sincronizando",
     "paused": "Sincronização pausada — dispositivo offline",
-    "reconnect": "Reconectar"
+    "reconnect": "Reconectar",
+    "stop": "Parar",
+    "stopped_resume": "Parado — retoma de onde parou"
   },
   "filters": {
     "favorites_only": "Apenas favoritos",
@@ -324,7 +326,32 @@
     "appearance": "Aparência",
     "theme_system": "Sistema",
     "theme_light": "Claro",
-    "theme_dark": "Escuro"
+    "theme_dark": "Escuro",
+    "download_failed": "Falha no download do modelo",
+    "performance": "Desempenho",
+    "performance_desc": "Equilibre velocidade e recursos. Escolha um modo que se adapte ao seu dispositivo.",
+    "preset_low": "Baixo",
+    "preset_low_desc": "Suave — ideal para celulares e notebooks.",
+    "preset_balanced": "Equilibrado",
+    "preset_balanced_desc": "Boa velocidade com uso sensato dos recursos.",
+    "preset_full": "Completo",
+    "preset_full_desc": "A mais rápida — usa todos os núcleos da CPU.",
+    "preset_custom": "Personalizado",
+    "preset_custom_desc": "Ajustado finamente com os controles avançados.",
+    "preset_applied": "Modo {name} aplicado",
+    "show_advanced": "Mostrar avançado",
+    "hide_advanced": "Ocultar avançado",
+    "ml_threads": "Threads de IA",
+    "batch_delay": "Pausa entre fotos",
+    "batch_delay_desc": "Segundos entre lotes para manter o dispositivo frio.",
+    "memory_budget": "Limite de memória",
+    "memory_budget_desc": "RAM máxima para os modelos de IA. 0 = sem limite.",
+    "memory_budget_none": "Sem limite",
+    "ram_estimate": "~{size} de RAM",
+    "memory_total": "Os modelos carregados usam ~{size} de RAM",
+    "no_models_in_memory": "Nenhum modelo na memória",
+    "free_memory": "Liberar memória",
+    "memory_freed": "Modelos removidos da memória. Eles recarregarão antes da próxima análise."
   },
   "open_with": {
     "opened_in_siegu": "Aberto no Siegu: {file}"

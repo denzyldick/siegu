@@ -142,7 +142,9 @@
     "folder_init_error": "Kan synchronisatiemap niet initialiseren: {error}",
     "status": "Synchroniseren",
     "paused": "Sync onderbroken — apparaat offline",
-    "reconnect": "Opnieuw verbinden"
+    "reconnect": "Opnieuw verbinden",
+    "stop": "Stoppen",
+    "stopped_resume": "Gestopt — gaat verder waar het was gebleven"
   },
   "filters": {
     "favorites_only": "Alleen favorieten",
@@ -324,7 +326,32 @@
     "appearance": "Weergave",
     "theme_system": "Systeem",
     "theme_light": "Licht",
-    "theme_dark": "Donker"
+    "theme_dark": "Donker",
+    "download_failed": "Model download mislukt",
+    "performance": "Prestaties",
+    "performance_desc": "Balans tussen snelheid en verbruik. Kies een modus die bij uw apparaat past.",
+    "preset_low": "Laag",
+    "preset_low_desc": "Zacht — ideaal voor telefoons en laptops.",
+    "preset_balanced": "Gebalanceerd",
+    "preset_balanced_desc": "Goede snelheid met verstandig gebruik van bronnen.",
+    "preset_full": "Volledig",
+    "preset_full_desc": "Snelste — gebruikt al uw CPU-kernen.",
+    "preset_custom": "Aangepast",
+    "preset_custom_desc": "Fijn afgesteld met de geavanceerde schuifregelaars.",
+    "preset_applied": "{name}-modus toegepast",
+    "show_advanced": "Toon geavanceerd",
+    "hide_advanced": "Verberg geavanceerd",
+    "ml_threads": "AI-threads",
+    "batch_delay": "Pauze tussen foto's",
+    "batch_delay_desc": "Seconden tussen groepen om het apparaat koel te houden.",
+    "memory_budget": "Geheugenlimiet",
+    "memory_budget_desc": "Maximale RAM voor AI-modellen. 0 = geen limiet.",
+    "memory_budget_none": "Geen limiet",
+    "ram_estimate": "~{size} RAM",
+    "memory_total": "Geladen modellen gebruiken ~{size} RAM",
+    "no_models_in_memory": "Geen modellen in geheugen",
+    "free_memory": "Geheugen vrijmaken",
+    "memory_freed": "Modellen uit het geheugen verwijderd. Ze laden opnieuw vóór de volgende analyse."
   },
   "open_with": {
     "opened_in_siegu": "Geopend in Siegu: {file}"

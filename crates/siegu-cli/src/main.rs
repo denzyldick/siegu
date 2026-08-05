@@ -541,6 +541,23 @@ async fn cmd_models_download(config_dir: &Path, names: Option<&[String]>) {
         siegu_core::model_manager::MODEL_REGISTRY.iter().collect()
     };
 
+    let model_names: Vec<String> = to_download
+        .iter()
+        .map(|e| e.model_name.to_string())
+        .collect();
+    let needed = siegu_core::model_manager::needed_download_bytes(&models_dir, &model_names);
+    if needed > 0 {
+        let free = siegu_core::model_manager::available_disk_bytes(&models_dir);
+        if free > 0 && free < needed {
+            eprintln!(
+                "Error: not enough disk space: {} MB needed, only {} MB free",
+                needed / (1024 * 1024),
+                free / (1024 * 1024)
+            );
+            return;
+        }
+    }
+
     let client = reqwest::Client::builder()
         .user_agent("Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
         .timeout(std::time::Duration::from_secs(600))

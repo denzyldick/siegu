@@ -445,6 +445,40 @@ pub fn total_model_disk_usage(models_dir: &Path) -> u64 {
     total
 }
 
+/// Free bytes on the filesystem containing `path`. Returns 0 if the disk
+/// cannot be resolved (callers should treat that as "unknown", not "full").
+pub fn available_disk_bytes(path: &Path) -> u64 {
+    use sysinfo::Disks;
+    let disks = Disks::new_with_refreshed_list();
+    disks
+        .iter()
+        .filter(|d| path.starts_with(d.mount_point()))
+        .max_by_key(|d| d.mount_point().as_os_str().len())
+        .map(|d| d.available_space())
+        .unwrap_or(0)
+}
+
+/// Total bytes that still need to be downloaded for the given model names:
+/// sums the expected size of every registry file that is not already present
+/// on disk at (or above) its expected size.
+pub fn needed_download_bytes(models_dir: &Path, model_names: &[String]) -> u64 {
+    let mut total = 0u64;
+    for entry in MODEL_REGISTRY {
+        if !model_names.iter().any(|n| n == entry.model_name) {
+            continue;
+        }
+        let p = models_dir.join(entry.filename);
+        let present = p
+            .metadata()
+            .map(|m| m.len() >= entry.expected_size)
+            .unwrap_or(false);
+        if !present {
+            total = total.saturating_add(entry.expected_size);
+        }
+    }
+    total
+}
+
 pub fn available_memory_bytes() -> u64 {
     let mut sys = System::new();
     sys.refresh_memory();
@@ -547,6 +581,43 @@ mod tests {
     fn test_total_disk_usage_empty_dir() {
         let dir = tempfile::tempdir().unwrap();
         assert_eq!(total_model_disk_usage(dir.path()), 0);
+    }
+
+    #[test]
+    fn test_needed_download_bytes_missing_models() {
+        let dir = tempfile::tempdir().unwrap();
+        let models = vec!["yolo".to_string()];
+        let needed = needed_download_bytes(dir.path(), &models);
+        assert_eq!(needed, 12_823_574);
+    }
+
+    #[test]
+    fn test_needed_download_bytes_ignores_present_files() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("yolov8.onnx"), vec![0u8; 12_823_574]).unwrap();
+        let models = vec!["yolo".to_string()];
+        assert_eq!(needed_download_bytes(dir.path(), &models), 0);
+    }
+
+    #[test]
+    fn test_needed_download_bytes_partial_file_still_needed() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("yolov8.onnx"), vec![0u8; 1024]).unwrap();
+        let models = vec!["yolo".to_string()];
+        assert_eq!(needed_download_bytes(dir.path(), &models), 12_823_574);
+    }
+
+    #[test]
+    fn test_needed_download_bytes_unknown_model_zero() {
+        let dir = tempfile::tempdir().unwrap();
+        let models = vec!["nope".to_string()];
+        assert_eq!(needed_download_bytes(dir.path(), &models), 0);
+    }
+
+    #[test]
+    fn test_available_disk_bytes_nonzero() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(available_disk_bytes(dir.path()) > 0);
     }
 
     #[test]

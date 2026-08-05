@@ -220,7 +220,9 @@
     "paused": "Sync paused — device offline",
     "error_status": "Error",
     "folder_init_error": "Failed to initialize sync folder: {error}",
-    "reconnect": "Reconnect"
+    "reconnect": "Reconnect",
+    "stop": "Stop",
+    "stopped_resume": "Stopped — resumes where you left off"
   },
   "connect": {
     "joining": "Joining...",
@@ -440,7 +442,32 @@
     "appearance": "Appearance",
     "theme_system": "System",
     "theme_light": "Light",
-    "theme_dark": "Dark"
+    "theme_dark": "Dark",
+    "download_failed": "Model download failed",
+    "performance": "Performance",
+    "performance_desc": "Balance speed and resource use. Pick a mode that fits your device.",
+    "preset_low": "Low",
+    "preset_low_desc": "Gentle — best for phones and laptops.",
+    "preset_balanced": "Balanced",
+    "preset_balanced_desc": "Good speed with sensible resource use.",
+    "preset_full": "Full",
+    "preset_full_desc": "Fastest — uses all your CPU cores.",
+    "preset_custom": "Custom",
+    "preset_custom_desc": "Fine-tuned with the advanced sliders.",
+    "preset_applied": "{name} mode applied",
+    "show_advanced": "Show advanced",
+    "hide_advanced": "Hide advanced",
+    "ml_threads": "AI threads",
+    "batch_delay": "Gap between photos",
+    "batch_delay_desc": "Seconds between batches to keep the device cool.",
+    "memory_budget": "Memory limit",
+    "memory_budget_desc": "Maximum RAM for AI models. 0 = no limit.",
+    "memory_budget_none": "No limit",
+    "ram_estimate": "~{size} RAM",
+    "memory_total": "Loaded models use ~{size} RAM",
+    "no_models_in_memory": "No models in memory",
+    "free_memory": "Free memory",
+    "memory_freed": "Models unloaded from memory. They reload before the next analysis."
   },
   "open_with": {
     "opened_in_siegu": "Opened in Siegu: {file}"

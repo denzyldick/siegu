@@ -1,97 +1,100 @@
-import type { MediaItem } from './media'
-import type { ScanProgress, FileScanProgress, IndexingProgress } from './scan'
-import type { SyncProgress, PeerDevice } from './sync'
-import type { ModelProgress, DownloadProgress, AiJob } from './models'
+import type { MediaItem } from './media';
+import type { ScanProgress, FileScanProgress, IndexingProgress } from './scan';
+import type { SyncProgress, PeerDevice } from './sync';
+import type { ModelProgress, DownloadProgress } from './models';
 
 export interface ScanProgressEvent {
-  payload: ScanProgress
+  payload: ScanProgress;
 }
 
 export interface FileScanProgressEvent {
-  payload: FileScanProgress
+  payload: FileScanProgress;
 }
 
 export interface IndexingProgressEvent {
-  payload: IndexingProgress
+  payload: IndexingProgress;
 }
 
 export interface MediaReceivedEvent {
-  payload: MediaItem
+  payload: MediaItem;
 }
 
 export interface MediaSyncedEvent {
-  payload: { id: number; location: string }
+  payload: { id: number; location: string };
 }
 
 export interface SyncProgressEvent {
-  payload: SyncProgress
+  payload: SyncProgress;
 }
 
 export interface SyncErrorEvent {
-  payload: { message: string; code?: string }
+  payload: { message: string; code?: string };
 }
 
 export interface ModelProgressEvent {
-  payload: ModelProgress
+  payload: ModelProgress;
 }
 
 export interface DownloadProgressEvent {
-  payload: DownloadProgress
+  payload: DownloadProgress;
 }
 
 export interface MediaAnalysisResultEvent {
   payload: {
-    photo_id: number
-    model: string
-    status: string
-    data?: unknown
-  }
+    photo_id: number;
+    model: string;
+    status: string;
+    data?: unknown;
+  };
 }
 
-export interface AiJobEvent {
-  payload: AiJob
+export interface IndexingJobEvent {
+  payload: {
+    status: 'running' | 'idle';
+    completed?: number;
+    total?: number;
+  };
 }
 
 export interface IndexingEtaEvent {
   payload: {
-    model: string
-    eta: number
-  }
+    eta: number;
+  };
 }
 
 export interface PeerConnectedEvent {
-  payload: PeerDevice
+  payload: PeerDevice;
 }
 
 export interface PeerDisconnectedEvent {
-  payload: string
+  payload: string;
 }
 
 export interface WebRtcStateEvent {
-  payload: string
+  payload: string;
 }
 
 export interface RoomCodeEvent {
-  payload: string
+  payload: string;
 }
 
 export type TauriEventMap = {
-  'scan-progress': ScanProgressEvent
-  'file-scan-progress': FileScanProgressEvent
-  'indexing-progress': IndexingProgressEvent
-  'indexing-eta': IndexingEtaEvent
-  'media-received': MediaReceivedEvent
-  'media-synced': MediaSyncedEvent
-  'media-analysis-result': MediaAnalysisResultEvent
-  'current-ai-job': AiJobEvent
-  'sync-progress': SyncProgressEvent
-  'sync-error': SyncErrorEvent
-  'download-progress': DownloadProgressEvent
-  'model-progress': ModelProgressEvent
-  'webrtc-state': WebRtcStateEvent
-  'peer-connected': PeerConnectedEvent
-  'peer-disconnected': PeerDisconnectedEvent
-  'room-code': RoomCodeEvent
-}
+  'scan-progress': ScanProgressEvent;
+  'file-scan-progress': FileScanProgressEvent;
+  'indexing-progress': IndexingProgressEvent;
+  'indexing-eta': IndexingEtaEvent;
+  'indexing-job': IndexingJobEvent;
+  'media-received': MediaReceivedEvent;
+  'media-synced': MediaSyncedEvent;
+  'media-analysis-result': MediaAnalysisResultEvent;
+  'sync-progress': SyncProgressEvent;
+  'sync-error': SyncErrorEvent;
+  'download-progress': DownloadProgressEvent;
+  'model-progress': ModelProgressEvent;
+  'webrtc-state': WebRtcStateEvent;
+  'peer-connected': PeerConnectedEvent;
+  'peer-disconnected': PeerDisconnectedEvent;
+  'room-code': RoomCodeEvent;
+};
 
-export type TauriEventName = keyof TauriEventMap
+export type TauriEventName = keyof TauriEventMap;

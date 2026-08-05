@@ -139,11 +139,52 @@ pub async fn abort_indexing(state: tauri::State<'_, ml::MlContext>) -> Result<()
     do_abort_indexing(&state.abort, &state.pending_count)
 }
 
+/// Pure business logic — clears the loaded-models cache so the worker drops
+/// all ONNX sessions (freeing their RAM). Models reload lazily before the
+/// next analysis job.
+pub fn do_unload_models(models: &siegu_core::ml_worker::LoadedModelsHandle) -> Result<(), String> {
+    // try_lock so we never block: the worker may hold the models mutex for a
+    // whole analysis batch, and unloading mid-inference is never wanted anyway.
+    let mut m = models.try_lock().map_err(|_| {
+        "AI models are in use right now — try again once the current analysis finishes.".to_string()
+    })?;
+    *m = None;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn unload_models(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, ml::MlContext>,
+) -> Result<(), String> {
+    use crate::common::emit_log;
+    do_unload_models(&state.models)?;
+    emit_log(
+        &app,
+        "Unloaded AI models from memory. They will reload before the next analysis.".to_string(),
+    );
+    Ok(())
+}
+
+/// True when the worker currently holds loaded models in memory.
+///
+/// Must never block the UI thread: the worker may hold the models mutex while
+/// loading (30s+) or during inference, so this polls with `try_lock` and
+/// reports "in use" as loaded.
+#[tauri::command]
+pub async fn get_models_loaded(state: tauri::State<'_, ml::MlContext>) -> Result<bool, String> {
+    Ok(match state.models.try_lock() {
+        Ok(m) => m.is_some(),
+        Err(_) => true,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::test_helpers::*;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
+    use std::sync::{Arc, Mutex};
 
     #[test]
     fn get_indexing_status_zero() {
@@ -250,6 +291,49 @@ mod tests {
         do_abort_indexing(&abort, &pending).unwrap();
         assert!(abort.load(std::sync::atomic::Ordering::SeqCst));
         assert_eq!(pending.load(std::sync::atomic::Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn unload_models_clears_cache() {
+        let models: siegu_core::ml_worker::LoadedModelsHandle =
+            Arc::new(Mutex::new(Some(dummy_loaded_models())));
+        assert!(models.lock().unwrap().is_some());
+        do_unload_models(&models).unwrap();
+        assert!(models.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn unload_models_when_already_empty() {
+        let models: siegu_core::ml_worker::LoadedModelsHandle = Arc::new(Mutex::new(None));
+        do_unload_models(&models).unwrap();
+        assert!(models.lock().unwrap().is_none());
+    }
+
+    /// A minimal `LoadedModels` used to prove the cache can be populated and
+    /// then cleared without needing any real ONNX sessions.
+    fn dummy_loaded_models() -> siegu_core::ml_engine::models::LoadedModels {
+        siegu_core::ml_engine::models::LoadedModels {
+            clip_visual: None,
+            clip_text: None,
+            text_embeddings: Vec::new(),
+            face_detector: None,
+            arcface: None,
+            ocr_det: None,
+            ocr_rec: None,
+            ocr_alphabet: Vec::new(),
+            nsfw: None,
+            aesthetics: None,
+            yolo: None,
+            blip: None,
+            blip_decoder: None,
+            blip_tokenizer: None,
+            midas: None,
+            whisper_encoder: None,
+            whisper_decoder: None,
+            whisper_tokenizer: None,
+            known_people: Vec::new(),
+            selected_ep: String::new(),
+        }
     }
 
     #[test]

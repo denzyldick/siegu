@@ -1,10 +1,5 @@
 <template>
-  <v-card
-    variant="flat"
-    color="surface"
-    rounded="xl"
-    class="mb-6 border-subtle overflow-hidden"
-  >
+  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
     <v-card-item class="bg-zinc-100 py-4">
       <template v-slot:prepend>
         <div class="siegu-icon-circle-dark mr-3">
@@ -20,9 +15,7 @@
       <v-list lines="two" class="bg-transparent">
         <v-list-item class="px-0">
           <template v-slot:title>
-            <span class="font-weight-bold text-zinc-primary">{{
-              $t('settings.cleanup_db')
-            }}</span>
+            <span class="font-weight-bold text-zinc-primary">{{ $t('settings.cleanup_db') }}</span>
           </template>
           <template v-slot:subtitle>
             <span class="text-zinc-secondary">{{ $t('settings.cleanup_db_desc') }}</span>
@@ -71,6 +64,29 @@
             color="primary"
             track-color="#f4f4f5"
             @update:model-value="onScanThreadsChange"
+          ></v-slider>
+
+          <div class="d-flex justify-space-between align-center mb-2 mt-4">
+            <div class="text-caption font-weight-bold text-zinc-primary">
+              {{ $t('settings.ml_threads') }}
+            </div>
+            <v-chip
+              size="small"
+              color="#000000"
+              variant="flat"
+              class="font-weight-bold text-white"
+              >{{ performance.mlThreads }}</v-chip
+            >
+          </div>
+          <v-slider
+            :model-value="performance.mlThreads"
+            :min="1"
+            :max="maxThreads"
+            :step="1"
+            hide-details
+            color="primary"
+            track-color="#f4f4f5"
+            @update:model-value="onMlThreadsChange"
           ></v-slider>
 
           <v-list-item class="px-0 mt-4">
@@ -163,31 +179,36 @@
 </template>
 
 <script setup lang="ts">
-import type { PerformanceConfig, LogEntry } from '@/types/settings'
+import type { PerformanceConfig, LogEntry } from '@/types/settings';
 
 defineProps<{
-  performance: PerformanceConfig
-  maxThreads: number
-  isCleaning: boolean
-  logs: LogEntry[]
-}>()
+  performance: PerformanceConfig;
+  maxThreads: number;
+  isCleaning: boolean;
+  logs: LogEntry[];
+}>();
 
 const emit = defineEmits<{
-  'cleanup-db': []
-  'update-scan-threads': [value: number]
-  'set-indexing-mode': [mode: string]
-  'clear-logs': []
-  'copy-logs': []
-}>()
+  'cleanup-db': [];
+  'update-scan-threads': [value: number];
+  'update-ml-threads': [value: number];
+  'set-indexing-mode': [mode: string];
+  'clear-logs': [];
+  'copy-logs': [];
+}>();
 
-const indexingModes = [{ value: 'immediate' }, { value: 'idle' }, { value: 'manual' }]
+const indexingModes = [{ value: 'immediate' }, { value: 'idle' }, { value: 'manual' }];
 
 function onScanThreadsChange(value: number | [number, number]): void {
-  emit('update-scan-threads', typeof value === 'number' ? value : value[0])
+  emit('update-scan-threads', typeof value === 'number' ? value : value[0]);
+}
+
+function onMlThreadsChange(value: number | [number, number]): void {
+  emit('update-ml-threads', typeof value === 'number' ? value : value[0]);
 }
 
 function getModeLabel(val: string): string {
-  return val
+  return val;
 }
 </script>
 

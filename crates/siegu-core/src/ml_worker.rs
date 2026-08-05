@@ -1,12 +1,17 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::UnboundedSender;
+
+/// Handle to the worker's loaded models cache. `None` means no models are
+/// loaded; they reload lazily before the next analysis job.
+pub type LoadedModelsHandle = Arc<Mutex<Option<crate::ml_engine::models::LoadedModels>>>;
 
 pub struct MlContext {
     pub tx: UnboundedSender<Job>,
     pub pending_count: Arc<AtomicUsize>,
     pub abort: Arc<AtomicBool>,
+    pub models: LoadedModelsHandle,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

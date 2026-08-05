@@ -46,8 +46,14 @@ impl AnalysisCallbacks for TauriCallbacks {
                 "model_timings": result.model_timings,
             }),
         );
-        let _ = self.app.emit("indexing-progress", remaining);
-        let _ = self.app.emit("indexing-eta", (remaining as f64) * 1000.0);
+        let _ = self.app.emit(
+            "indexing-progress",
+            serde_json::json!({ "remaining": remaining }),
+        );
+        let _ = self.app.emit(
+            "indexing-eta",
+            serde_json::json!({ "eta": (remaining as f64) * 1000.0 }),
+        );
 
         if let Some(model) = progress_model {
             let _ = self.app.emit(
@@ -61,10 +67,9 @@ impl AnalysisCallbacks for TauriCallbacks {
         }
 
         if remaining == 0 {
-            let _ = self.app.emit(
-                "scan-progress",
-                serde_json::json!({ "status": "complete", "progress": 100 }),
-            );
+            let _ = self
+                .app
+                .emit("indexing-job", serde_json::json!({ "status": "idle" }));
         }
     }
 
@@ -129,7 +134,16 @@ impl AnalysisCallbacks for TauriCallbacks {
         }
     }
 
-    fn on_progress(&self, _completed: usize, _total: usize, _avg_ms: f64) {}
+    fn on_progress(&self, completed: usize, total: usize, _avg_ms: f64) {
+        let _ = self.app.emit(
+            "indexing-job",
+            serde_json::json!({
+                "status": "running",
+                "completed": completed,
+                "total": total,
+            }),
+        );
+    }
 
     fn on_model_status(&self, model: &str, status: &str, pending: usize, total: usize) {
         let _ = self.app.emit(
@@ -336,8 +350,14 @@ mod tests {
             "NSFW should classify the photo"
         );
         assert!(
-            result.completed_models.contains(&"face"),
-            "face detection should run on a portrait fixture"
+            result.completed_models.contains(&"yolo"),
+            "YOLO should run object detection: {:?}",
+            result.completed_models
+        );
+        assert!(
+            result.completed_models.contains(&"arcface"),
+            "ArcFace should embed the detected face: {:?}",
+            result.completed_models
         );
         assert!(
             result.face_count >= 1,
@@ -345,7 +365,17 @@ mod tests {
             result.face_count
         );
         assert!(result.aesthetics.is_some(), "expected an aesthetics score");
+        let aesthetics = result.aesthetics.unwrap();
+        assert!(
+            aesthetics.is_finite(),
+            "aesthetics score must be finite, got {aesthetics}"
+        );
         assert!(result.nsfw.is_some(), "expected an NSFW label");
+        let nsfw_score: f64 = result.nsfw.as_deref().unwrap().parse().expect("nsfw score");
+        assert!(
+            (0.0..=1.0).contains(&nsfw_score),
+            "nsfw sigmoid must be in [0,1], got {nsfw_score}"
+        );
 
         // BLIP caption generation is the slowest step and the most valuable
         // full-pipeline signal.
@@ -353,7 +383,12 @@ mod tests {
             result.completed_models.contains(&"blip"),
             "BLIP captioning should run"
         );
-        println!("caption: {:?}", result.caption);
+        let caption = result
+            .caption
+            .as_deref()
+            .expect("BLIP should produce a caption");
+        assert!(!caption.trim().is_empty(), "BLIP caption must be non-empty");
+        println!("caption: {caption:?}");
 
         let _ = std::fs::remove_dir_all(&config_dir);
     }

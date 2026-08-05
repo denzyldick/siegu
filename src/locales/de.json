@@ -142,7 +142,9 @@
     "folder_init_error": "Sync-Ordner konnte nicht initialisiert werden: {error}",
     "status": "Synchronisiert",
     "paused": "Sync pausiert – Gerät offline",
-    "reconnect": "Neu verbinden"
+    "reconnect": "Neu verbinden",
+    "stop": "Stoppen",
+    "stopped_resume": "Angehalten — wird fortgesetzt, wo es aufhörte"
   },
   "filters": {
     "favorites_only": "Nur Favoriten",
@@ -324,7 +326,32 @@
     "appearance": "Erscheinungsbild",
     "theme_system": "System",
     "theme_light": "Hell",
-    "theme_dark": "Dunkel"
+    "theme_dark": "Dunkel",
+    "download_failed": "Modell-Download fehlgeschlagen",
+    "performance": "Leistung",
+    "performance_desc": "Geschwindigkeit und Ressourcen ausbalancieren. Wählen Sie einen Modus, der zu Ihrem Gerät passt.",
+    "preset_low": "Niedrig",
+    "preset_low_desc": "Schonend — ideal für Smartphones und Laptops.",
+    "preset_balanced": "Ausgewogen",
+    "preset_balanced_desc": "Gute Geschwindigkeit bei vernünftiger Ressourcennutzung.",
+    "preset_full": "Voll",
+    "preset_full_desc": "Am schnellsten — nutzt alle CPU-Kerne.",
+    "preset_custom": "Benutzerdefiniert",
+    "preset_custom_desc": "Fein abgestimmt über die erweiterten Regler.",
+    "preset_applied": "Modus {name} angewendet",
+    "show_advanced": "Erweitert anzeigen",
+    "hide_advanced": "Erweitert ausblenden",
+    "ml_threads": "KI-Threads",
+    "batch_delay": "Pause zwischen Fotos",
+    "batch_delay_desc": "Sekunden zwischen Stapeln, um das Gerät kühl zu halten.",
+    "memory_budget": "Speicherlimit",
+    "memory_budget_desc": "Maximaler RAM für KI-Modelle. 0 = keine Begrenzung.",
+    "memory_budget_none": "Keine Begrenzung",
+    "ram_estimate": "~{size} RAM",
+    "memory_total": "Geladene Modelle verwenden ~{size} RAM",
+    "no_models_in_memory": "Keine Modelle im Speicher",
+    "free_memory": "Speicher freigeben",
+    "memory_freed": "Modelle aus dem Speicher entfernt. Sie werden vor der nächsten Analyse neu geladen."
   },
   "open_with": {
     "opened_in_siegu": "In Siegu geöffnet: {file}"

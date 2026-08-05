@@ -142,7 +142,9 @@
     "folder_init_error": "Échec d'initialisation du dossier de synchronisation : {error}",
     "status": "Synchronisation",
     "paused": "Synchronisation en pause — appareil hors ligne",
-    "reconnect": "Reconnecter"
+    "reconnect": "Reconnecter",
+    "stop": "Arrêter",
+    "stopped_resume": "Arrêté — reprend là où il s'est arrêté"
   },
   "filters": {
     "favorites_only": "Favoris uniquement",
@@ -324,7 +326,32 @@
     "appearance": "Apparence",
     "theme_system": "Système",
     "theme_light": "Clair",
-    "theme_dark": "Sombre"
+    "theme_dark": "Sombre",
+    "download_failed": "Échec du téléchargement du modèle",
+    "performance": "Performances",
+    "performance_desc": "Équilibrez vitesse et ressources. Choisissez un mode adapté à votre appareil.",
+    "preset_low": "Faible",
+    "preset_low_desc": "Douce — idéale pour téléphones et portables.",
+    "preset_balanced": "Équilibré",
+    "preset_balanced_desc": "Bonne vitesse avec une utilisation raisonnable des ressources.",
+    "preset_full": "Complet",
+    "preset_full_desc": "La plus rapide — utilise tous vos cœurs CPU.",
+    "preset_custom": "Personnalisé",
+    "preset_custom_desc": "Réglé finement avec les curseurs avancés.",
+    "preset_applied": "Mode {name} appliqué",
+    "show_advanced": "Afficher les options avancées",
+    "hide_advanced": "Masquer les options avancées",
+    "ml_threads": "Threads IA",
+    "batch_delay": "Intervalle entre photos",
+    "batch_delay_desc": "Secondes entre les lots pour garder l'appareil au frais.",
+    "memory_budget": "Limite de mémoire",
+    "memory_budget_desc": "RAM maximale pour les modèles IA. 0 = aucune limite.",
+    "memory_budget_none": "Aucune limite",
+    "ram_estimate": "~{size} de RAM",
+    "memory_total": "Les modèles chargés utilisent ~{size} de RAM",
+    "no_models_in_memory": "Aucun modèle en mémoire",
+    "free_memory": "Libérer la mémoire",
+    "memory_freed": "Modèles retirés de la mémoire. Ils se rechargeront avant la prochaine analyse."
   },
   "open_with": {
     "opened_in_siegu": "Ouvert dans Siegu : {file}"

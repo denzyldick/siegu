@@ -142,7 +142,9 @@
     "folder_init_error": "No por a inisialisa karpeta di sinkronisashon: {error}",
     "status": "Sinkronisá",
     "paused": "Sinkronisashon pausá — aparato offline",
-    "reconnect": "Rekonektá"
+    "reconnect": "Rekonektá",
+    "stop": "Stop",
+    "stopped_resume": "Stop — ta bai dalinda unda el a keda"
   },
   "filters": {
     "favorites_only": "Solamente faboritonan",
@@ -324,7 +326,32 @@
     "appearance": "Apariencia",
     "theme_system": "Sistema",
     "theme_light": "Klaru",
-    "theme_dark": "Skur"
+    "theme_dark": "Skur",
+    "download_failed": "Descarga di modelo a falla",
+    "performance": "Prestashon",
+    "performance_desc": "Balanseá velosidat i rekursonan. Skohe un modu ku ta pas na bo aparato.",
+    "preset_low": "Baha",
+    "preset_low_desc": "Suabe — ideal pa tèl i laptop.",
+    "preset_balanced": "Balansiá",
+    "preset_balanced_desc": "Bone velosidat ku uso sensato di rekursonan.",
+    "preset_full": "Kompleto",
+    "preset_full_desc": "Mihó rapido — usa tur e nukleonan di CPU.",
+    "preset_custom": "Personalisá",
+    "preset_custom_desc": "Ajustá fino ku e sliders avansá.",
+    "preset_applied": "Modu {name} apliká",
+    "show_advanced": "Mustra avansá",
+    "hide_advanced": "Sconde avansá",
+    "ml_threads": "Threads di IA",
+    "batch_delay": "Pausa entre fotonan",
+    "batch_delay_desc": "Sekòndnan entre grupo pa tene e aparato fresku.",
+    "memory_budget": "Límite di memoria",
+    "memory_budget_desc": "RAM máximo pa modelonan di IA. 0 = sin límite.",
+    "memory_budget_none": "Sin límite",
+    "ram_estimate": "~{size} di RAM",
+    "memory_total": "Modelonan kargá ta usa ~{size} di RAM",
+    "no_models_in_memory": "No tin modelnan den memoria",
+    "free_memory": "Liberá memoria",
+    "memory_freed": "Modelonan kita for di memoria. Nan lo bolbe karga promé ku e siguiente analisis."
   },
   "open_with": {
     "opened_in_siegu": "Habri na Siegu: {file}"

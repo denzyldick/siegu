@@ -46,20 +46,28 @@
           :format-indexing-count="formatIndexingCount"
           :format-eta="formatEta"
           :toggle-model="toggleModel"
+          :model-ram="modelRam"
+          :models-loaded="modelsLoaded"
+          :total-ram-estimate="totalModelRamEstimate"
+          :is-memory-freeing="isMemoryFreeing"
           @download-models="downloadModels"
           @run-model="runModel"
           @update-selected-models="onUpdateSelectedModels"
+          @free-memory="freeMemory"
         />
 
-        <LanguageSection
+        <PerformanceSection
           v-if="!embedded"
-          :initial-lang="currentLang"
+          :performance="performance"
+          :current-preset="currentPreset"
+          @apply-preset="onApplyPreset"
+          @update-batch-delay="onBatchDelayChange"
+          @update-memory-budget="onMemoryBudgetChange"
         />
 
-        <AppearanceSection
-          v-if="!embedded"
-          :initial-theme="currentTheme"
-        />
+        <LanguageSection v-if="!embedded" :initial-lang="currentLang" />
+
+        <AppearanceSection v-if="!embedded" :initial-theme="currentTheme" />
 
         <MaintenanceSection
           v-if="!embedded"
@@ -69,6 +77,7 @@
           :logs="logs"
           @cleanup-db="cleanupDb"
           @update-scan-threads="onScanThreadsChange"
+          @update-ml-threads="onMlThreadsChange"
           @set-indexing-mode="setIndexingMode"
           @clear-logs="clearLogs"
           @copy-logs="copyLogs"
@@ -259,30 +268,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useSettings } from '@/composables/useSettings'
-import FolderPicker from './FolderPicker.vue'
-import FoldersSection from './settings/FoldersSection.vue'
-import ModelsSection from './settings/ModelsSection.vue'
-import LanguageSection from './settings/LanguageSection.vue'
-import AppearanceSection from './settings/AppearanceSection.vue'
-import MaintenanceSection from './settings/MaintenanceSection.vue'
-import SignallingSection from './settings/SignallingSection.vue'
-import UpdateSection from './settings/UpdateSection.vue'
-import AboutSection from './settings/AboutSection.vue'
+import { ref, computed, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useSettings } from '@/composables/useSettings';
+import FolderPicker from './FolderPicker.vue';
+import FoldersSection from './settings/FoldersSection.vue';
+import ModelsSection from './settings/ModelsSection.vue';
+import PerformanceSection from './settings/PerformanceSection.vue';
+import LanguageSection from './settings/LanguageSection.vue';
+import AppearanceSection from './settings/AppearanceSection.vue';
+import MaintenanceSection from './settings/MaintenanceSection.vue';
+import SignallingSection from './settings/SignallingSection.vue';
+import UpdateSection from './settings/UpdateSection.vue';
+import AboutSection from './settings/AboutSection.vue';
 
 defineProps<{
-  embedded?: boolean
-  hideAiSection?: boolean
-  hideFolderSection?: boolean
-}>()
+  embedded?: boolean;
+  hideAiSection?: boolean;
+  hideFolderSection?: boolean;
+}>();
 
 const emit = defineEmits<{
-  'folder-added': [directories: unknown[]]
-  'models-ready': []
-  done: []
-}>()
+  'folder-added': [directories: unknown[]];
+  'models-ready': [];
+  done: [];
+}>();
 
 const {
   directories,
@@ -327,6 +337,11 @@ const {
   getProgress,
   formatIndexingCount,
   formatEta,
+  modelRam,
+  modelsLoaded,
+  totalModelRamEstimate,
+  isMemoryFreeing,
+  currentPreset,
   init,
   selectDirectory,
   removeDirectory,
@@ -338,6 +353,8 @@ const {
   runModel,
   savePerformanceConfig,
   setIndexingMode,
+  applyPreset,
+  freeMemory,
   saveSignallingConfig,
   testSignalling,
   clearLogs,
@@ -345,71 +362,90 @@ const {
   checkUpdate,
   downloadUpdate,
   startConfirmedCleanup,
-} = useSettings()
+} = useSettings();
 
-const currentLang = ref(localStorage.getItem('siegu_language') || 'en')
-const currentTheme = ref(localStorage.getItem('siegu_theme') || 'system')
+const currentLang = ref(localStorage.getItem('siegu_language') || 'en');
+const currentTheme = ref(localStorage.getItem('siegu_theme') || 'system');
 
 const isStoreManaged = computed(
   () => currentPlatform.value === 'android' || currentPlatform.value === 'ios',
-)
+);
 
-const { t } = useI18n()
+const { t } = useI18n();
 
 function onScanThreadsChange(value: number): void {
-  performance.scanThreads = value
-  void savePerformanceConfig()
+  performance.scanThreads = value;
+  void savePerformanceConfig();
+}
+
+function onMlThreadsChange(value: number): void {
+  performance.mlThreads = value;
+  void savePerformanceConfig();
+}
+
+function onBatchDelayChange(valueMs: number): void {
+  performance.batchDelayMs = valueMs;
+  void savePerformanceConfig();
+}
+
+function onMemoryBudgetChange(valueMb: number): void {
+  performance.memoryBudgetMb = valueMb;
+  void savePerformanceConfig();
+}
+
+function onApplyPreset(preset: string): void {
+  void applyPreset(preset as 'low' | 'balanced' | 'full');
 }
 
 async function copyLogs(): Promise<void> {
   try {
-    const text = logs.value.map((log) => `[${log.time}] ${log.message}`).join('\n')
-    await navigator.clipboard.writeText(text)
-    showSnackbar(t('settings.logs_copied'))
+    const text = logs.value.map((log) => `[${log.time}] ${log.message}`).join('\n');
+    await navigator.clipboard.writeText(text);
+    showSnackbar(t('settings.logs_copied'));
   } catch {
-    showSnackbar(t('settings.logs_copy_failed'), true)
+    showSnackbar(t('settings.logs_copy_failed'), true);
   }
 }
 
 function cleanupDb(): void {
-  cleanupDialog.show = true
+  cleanupDialog.show = true;
 }
 
-const signallingSaving = ref(false)
+const signallingSaving = ref(false);
 
 function onSignallingUrl(v: string): void {
-  signalingUrl.value = v
+  signalingUrl.value = v;
 }
 
 function onSignallingToken(v: string): void {
-  signalingToken.value = v
+  signalingToken.value = v;
 }
 
 async function saveSignalling(): Promise<void> {
-  signallingSaving.value = true
+  signallingSaving.value = true;
   try {
-    await saveSignallingConfig()
+    await saveSignallingConfig();
   } finally {
-    signallingSaving.value = false
+    signallingSaving.value = false;
   }
 }
 
 function confirmDownload(): void {
-  downloadDialog.show = false
+  downloadDialog.show = false;
 }
 
 function onUpdateSelectedModels(models: string[]): void {
-  selectedModels.value = models
+  selectedModels.value = models;
 }
 
 onMounted(async () => {
   try {
-    await init()
+    await init();
   } catch (e) {
-    console.error('[Setting] init failed:', e)
+    console.error('[Setting] init failed:', e);
   }
-  emit('folder-added', directories.value)
-})
+  emit('folder-added', directories.value);
+});
 </script>
 
 <style scoped>

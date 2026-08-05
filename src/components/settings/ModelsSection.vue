@@ -1,10 +1,5 @@
 <template>
-  <v-card
-    variant="flat"
-    color="surface"
-    rounded="xl"
-    class="mb-6 overflow-hidden border-subtle"
-  >
+  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 overflow-hidden border-subtle">
     <v-card-item class="bg-zinc-100 py-4">
       <template v-slot:prepend>
         <div class="siegu-icon-circle-dark mr-3">
@@ -16,20 +11,13 @@
       }}</v-card-title>
       <template v-slot:append v-if="activeModelSummary || pendingCount > 0">
         <div class="text-right">
-          <div
-            v-if="activeModelSummary"
-            class="text-caption font-weight-bold text-zinc-primary"
-          >
+          <div v-if="activeModelSummary" class="text-caption font-weight-bold text-zinc-primary">
             {{ activeModelSummary }}
           </div>
           <div v-else class="text-caption font-weight-bold text-zinc-primary">
             {{ $t('settings.indexing_jobs', { count: formatIndexingCount(pendingCount) }) }}
           </div>
-          <div
-            v-if="pendingCount > 0"
-            class="text-caption text-zinc-muted"
-            style="font-size: 10px"
-          >
+          <div v-if="pendingCount > 0" class="text-caption text-zinc-muted" style="font-size: 10px">
             {{ $t('settings.eta_label', { time: formatEta(globalEta) }) }}
           </div>
         </div>
@@ -149,6 +137,9 @@
                 <span class="text-caption text-zinc-muted">{{
                   $t('settings.file_size', { size: model.size })
                 }}</span>
+                <span class="text-caption text-zinc-muted">
+                  {{ $t('settings.ram_estimate', { size: modelRam[model.id] }) }}
+                </span>
                 <div class="d-flex align-center">
                   <v-icon
                     v-if="
@@ -160,7 +151,8 @@
                     color="success"
                     :title="$t('settings.ready')"
                     class="mr-1"
-                  >mdi-check-circle</v-icon>
+                    >mdi-check-circle</v-icon
+                  >
                   <span
                     v-if="getModelStatusText(model.id)"
                     class="text-caption font-weight-bold model-status-text"
@@ -288,62 +280,92 @@
       >
         {{ $t('settings.all_selected_ready') }}
       </v-btn>
+      <v-spacer></v-spacer>
+      <div class="text-right">
+        <div
+          class="text-caption text-zinc-muted"
+          :class="modelsLoaded ? 'font-weight-bold text-zinc-primary' : ''"
+        >
+          {{
+            modelsLoaded
+              ? $t('settings.memory_total', { size: totalRamEstimate })
+              : $t('settings.no_models_in_memory')
+          }}
+        </div>
+        <v-btn
+          variant="tonal"
+          color="secondary"
+          size="small"
+          class="font-weight-bold mt-1"
+          prepend-icon="mdi-memory"
+          :loading="isMemoryFreeing"
+          :disabled="!modelsLoaded || isMemoryFreeing"
+          @click="$emit('free-memory')"
+        >
+          {{ $t('settings.free_memory') }}
+        </v-btn>
+      </div>
     </v-card-actions>
   </v-card>
 </template>
 
 <script setup lang="ts">
 interface ModelEntry {
-  id: string
-  size: string
+  id: string;
+  size: string;
 }
 
 const props = defineProps<{
-  embedded: boolean
-  sortedModels: ModelEntry[]
-  downloadedModels: string[]
-  selectedModels: string[]
-  modelEnabled: Record<string, boolean>
-  isDownloading: boolean
-  isAnyModelProcessing: boolean
-  missingSelectedCount: number
-  pendingCount: number
-  globalEta: number
-  visibleActivityModel: ModelEntry | null
-  activeModelSummary: string
-  isModelProcessing: (modelId: string) => boolean
-  isModelActive: (modelId: string) => boolean
-  isModelDownloading: (modelId: string) => boolean
-  getModelProgressPercent: (modelId: string) => number
-  getModelProgressText: (modelId: string) => string
-  getModelStatusLabel: (modelId: string) => string
-  getModelStatusText: (modelId: string) => string
-  getModelActivityIcon: (modelId: string) => string
-  getProgress: (modelId: string) => number
-  formatIndexingCount: (value: number) => string
-  formatEta: (ms: number) => string
-  toggleModel: (modelId: string) => void
-}>()
+  embedded: boolean;
+  sortedModels: ModelEntry[];
+  downloadedModels: string[];
+  selectedModels: string[];
+  modelEnabled: Record<string, boolean>;
+  isDownloading: boolean;
+  isAnyModelProcessing: boolean;
+  missingSelectedCount: number;
+  pendingCount: number;
+  globalEta: number;
+  visibleActivityModel: ModelEntry | null;
+  activeModelSummary: string;
+  isModelProcessing: (modelId: string) => boolean;
+  isModelActive: (modelId: string) => boolean;
+  isModelDownloading: (modelId: string) => boolean;
+  getModelProgressPercent: (modelId: string) => number;
+  getModelProgressText: (modelId: string) => string;
+  getModelStatusLabel: (modelId: string) => string;
+  getModelStatusText: (modelId: string) => string;
+  getModelActivityIcon: (modelId: string) => string;
+  getProgress: (modelId: string) => number;
+  formatIndexingCount: (value: number) => string;
+  formatEta: (ms: number) => string;
+  toggleModel: (modelId: string) => void;
+  modelRam: Record<string, string>;
+  modelsLoaded: boolean;
+  totalRamEstimate: string;
+  isMemoryFreeing: boolean;
+}>();
 
 const emit = defineEmits<{
-  'download-models': [forceUpdate: boolean, models: string[]]
-  'run-model': [modelId: string]
-  'update-selected-models': [models: string[]]
-}>()
+  'download-models': [forceUpdate: boolean, models: string[]];
+  'run-model': [modelId: string];
+  'update-selected-models': [models: string[]];
+  'free-memory': [];
+}>();
 
 function hasModelProgressTotal(modelId: string): boolean {
-  return props.getModelProgressPercent(modelId) > 0
+  return props.getModelProgressPercent(modelId) > 0;
 }
 
 function toggleModelSelection(modelId: string): void {
-  const current = [...props.selectedModels]
-  const index = current.indexOf(modelId)
+  const current = [...props.selectedModels];
+  const index = current.indexOf(modelId);
   if (index >= 0) {
-    current.splice(index, 1)
+    current.splice(index, 1);
   } else {
-    current.push(modelId)
+    current.push(modelId);
   }
-  emit('update-selected-models', current)
+  emit('update-selected-models', current);
 }
 </script>
 

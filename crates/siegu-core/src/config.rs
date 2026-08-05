@@ -34,6 +34,9 @@ pub fn default_config_dir() -> PathBuf {
 pub const ALLOWED_CONFIG_KEYS: &[&str] = &[
     "sync_path",
     "scan_threads",
+    "ml_threads",
+    "batch_delay_ms",
+    "ml_memory_budget_mb",
     "indexing_mode",
     "theme",
     "language",
@@ -84,6 +87,48 @@ pub fn validate_config_value(key: &str, value: &str) -> Result<(), ConfigError> 
                     key: key.to_string(),
                     min: 1,
                     max: 32,
+                });
+            }
+        }
+        "ml_threads" => {
+            let n: usize = value.parse().map_err(|_| ConfigError::InvalidType {
+                key: key.to_string(),
+                expected: "usize".to_string(),
+                got: value.to_string(),
+            })?;
+            if n == 0 || n > 32 {
+                return Err(ConfigError::OutOfRange {
+                    key: key.to_string(),
+                    min: 1,
+                    max: 32,
+                });
+            }
+        }
+        "batch_delay_ms" => {
+            let n: usize = value.parse().map_err(|_| ConfigError::InvalidType {
+                key: key.to_string(),
+                expected: "usize".to_string(),
+                got: value.to_string(),
+            })?;
+            if n > 2000 {
+                return Err(ConfigError::OutOfRange {
+                    key: key.to_string(),
+                    min: 0,
+                    max: 2000,
+                });
+            }
+        }
+        "ml_memory_budget_mb" => {
+            let n: u64 = value.parse().map_err(|_| ConfigError::InvalidType {
+                key: key.to_string(),
+                expected: "u64".to_string(),
+                got: value.to_string(),
+            })?;
+            if !(128..=1_048_576).contains(&n) {
+                return Err(ConfigError::OutOfRange {
+                    key: key.to_string(),
+                    min: 128,
+                    max: 1_048_576,
                 });
             }
         }
@@ -286,6 +331,52 @@ mod tests {
     fn test_validate_config_signaling_token() {
         assert!(validate_config_value("signaling_token", "s3cret").is_ok());
         assert!(validate_config_value("signaling_token", "").is_ok());
+    }
+
+    #[test]
+    fn test_validate_config_ml_threads() {
+        assert!(validate_config_value("ml_threads", "1").is_ok());
+        assert!(validate_config_value("ml_threads", "32").is_ok());
+        assert!(matches!(
+            validate_config_value("ml_threads", "0"),
+            Err(ConfigError::OutOfRange { .. })
+        ));
+        assert!(matches!(
+            validate_config_value("ml_threads", "33"),
+            Err(ConfigError::OutOfRange { .. })
+        ));
+        assert!(matches!(
+            validate_config_value("ml_threads", "many"),
+            Err(ConfigError::InvalidType { .. })
+        ));
+    }
+
+    #[test]
+    fn test_validate_config_batch_delay_ms() {
+        assert!(validate_config_value("batch_delay_ms", "0").is_ok());
+        assert!(validate_config_value("batch_delay_ms", "2000").is_ok());
+        assert!(matches!(
+            validate_config_value("batch_delay_ms", "2001"),
+            Err(ConfigError::OutOfRange { .. })
+        ));
+        assert!(matches!(
+            validate_config_value("batch_delay_ms", "soon"),
+            Err(ConfigError::InvalidType { .. })
+        ));
+    }
+
+    #[test]
+    fn test_validate_config_ml_memory_budget_mb() {
+        assert!(validate_config_value("ml_memory_budget_mb", "2048").is_ok());
+        assert!(validate_config_value("ml_memory_budget_mb", "128").is_ok());
+        assert!(matches!(
+            validate_config_value("ml_memory_budget_mb", "127"),
+            Err(ConfigError::OutOfRange { .. })
+        ));
+        assert!(matches!(
+            validate_config_value("ml_memory_budget_mb", "plenty"),
+            Err(ConfigError::InvalidType { .. })
+        ));
     }
 
     #[test]

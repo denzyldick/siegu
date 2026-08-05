@@ -678,7 +678,7 @@ mod tests {
         let enc_path = models_dir.join("whisper.onnx");
         let dec_path = models_dir.join("whisper-decoder.onnx");
 
-        let enc = super::super::ep::build_session(&enc_path).unwrap();
+        let enc = super::super::ep::build_session(&enc_path, None).unwrap();
         eprintln!("=== ENCODER ===");
         for input in enc.inputs().iter() {
             eprintln!("  input: {:?}", input);
@@ -687,7 +687,7 @@ mod tests {
             eprintln!("  output: {:?}", output);
         }
 
-        let dec = super::super::ep::build_session(&dec_path).unwrap();
+        let dec = super::super::ep::build_session(&dec_path, None).unwrap();
         eprintln!("=== DECODER ===");
         for input in dec.inputs().iter() {
             eprintln!("  input: {:?}", input);
@@ -710,8 +710,8 @@ mod tests {
             eprintln!("whisper models not found, skipping");
             return;
         }
-        let enc = super::super::ep::build_session(&enc_path).unwrap();
-        let dec = super::super::ep::build_session(&dec_path).unwrap();
+        let enc = super::super::ep::build_session(&enc_path, None).unwrap();
+        let dec = super::super::ep::build_session(&dec_path, None).unwrap();
         let tok = tokenizers::Tokenizer::from_file(&tok_path).unwrap();
         let enc = std::sync::Arc::new(super::super::models::SessionPool::new(vec![enc]));
         let dec = std::sync::Arc::new(super::super::models::SessionPool::new(vec![dec]));
