@@ -81,14 +81,31 @@ jobs:
 
       - run: npm install
 
-      - name: Write signing key
+      - name: Prepare signing key
         shell: bash
         run: |
-          mkdir -p ~/.tauri
-          printf '%s' "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" > ~/.tauri/siegu.key
-          echo "TAURI_SIGNING_PRIVATE_KEY=$HOME/.tauri/siegu.key" >> $GITHUB_ENV
+          KEY='${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}'
+          # Only use the key when it looks like a real updater key: base64 that
+          # decodes to UTF-8 and has the minisign/rsign "encrypted secret key"
+          # box header (a pasted public key box is rejected). A malformed secret
+          # otherwise kills every desktop build at the updater signing step (the
+          # same `tauri build` that is green in CI with --no-bundle), so fall
+          # back to an unsigned build instead of failing the release.
+          if [ -n "$KEY" ] \
+            && DECODED="$(printf '%s' "$KEY" | base64 -d 2>/dev/null)" \
+            && printf '%s' "$DECODED" | iconv -f UTF-8 -t UTF-8 >/dev/null 2>&1 \
+            && printf '%s' "$DECODED" | grep -q 'encrypted secret key'; then
+            mkdir -p ~/.tauri
+            printf '%s' "$KEY" > ~/.tauri/siegu.key
+            echo "TAURI_SIGNING_PRIVATE_KEY=$HOME/.tauri/siegu.key" >> "$GITHUB_ENV"
+            echo "SIGNING_READY=true" >> "$GITHUB_ENV"
+          else
+            echo "::warning::TAURI_SIGNING_PRIVATE_KEY missing or malformed (not a valid minisign key box); building unsigned installers."
+            echo "SIGNING_READY=false" >> "$GITHUB_ENV"
+          fi
 
       - name: Build Tauri App
+        if: env.SIGNING_READY == 'true'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -99,6 +116,19 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.platform == 'ubuntu-24.04' && '--bundles appimage deb' || '' }}
+
+      - name: Build Tauri App (unsigned)
+        if: env.SIGNING_READY != 'true'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Siegu v__VERSION__'
+          releaseBody: 'See the attached assets for the latest release versions.'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.platform == 'ubuntu-24.04' && '--bundles appimage deb --no-sign' || '--no-sign' }}
 
   # ── Android APK ─────────────────────────────────────────────────────────
   android:
@@ -170,16 +200,28 @@ jobs:
           cp target/aarch64-linux-android/release/libsiegu_lib.so \
              src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a/
 
-      - name: Generate tauri.build.gradle.kts
-        working-directory: src-tauri/gen/android
+      - name: Generate missing Android Gradle project files
+        working-directory: src-tauri
         run: |
-          if [ ! -f app/tauri.build.gradle.kts ]; then
-            timeout 15 npx tauri android android-studio-script 2>&1 || true
-          fi
+          # tauri.settings.gradle and app/tauri.build.gradle.kts are gitignored
+          # (they carry machine-specific absolute paths into the cargo registry)
+          # so they must be regenerated on the CI machine. The old step used the
+          # non-existent `tauri android android-studio-script` subcommand and
+          # swallowed the failure with `|| true`, which is why gradle could never
+          # read the settings script.
+          npx tauri android init --ci --skip-targets-install
+          # init also re-emits its stock buildSrc under a fresh package dir; the
+          # tracked copy is customized (cargo-ndk + -PskipRustBuild) and shares
+          # the default package with the regenerated one, which would make Gradle
+          # fail to compile buildSrc on duplicate RustPlugin classes.
+          rm -rf gen/android/buildSrc/src/main/java/io/denzyl/siegu
 
       - name: Build APK
         working-directory: src-tauri/gen/android
-        run: ./gradlew assembleUniversalRelease
+        # The .so was already built with cargo-ndk and copied into jniLibs
+        # above; skip the in-Gradle Rust rebuild (which would also need the
+        # x86_64-linux-android target this job does not install).
+        run: ./gradlew assembleUniversalRelease -PskipRustBuild=true
 
       - name: Upload APK to Release
         if: github.event_name == 'release'
@@ -197,6 +239,11 @@ jobs:
       ORT_STRATEGY: download
     container:
       image: archlinux:base-devel
+    # Rolling Arch ships FFmpeg newer than ffmpeg-sys-next v8.1.0 supports, so
+    # the Rust build breaks on the bleeding-edge headers. This is an environment
+    # mismatch, not a code failure, and it does not block the release; the job
+    # still reports its status in the run so the breakage stays visible.
+    continue-on-error: true
     steps:
       - name: Install dependencies
         run: |
