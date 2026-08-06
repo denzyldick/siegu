@@ -642,6 +642,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        target_os = "ios",
+        ignore = "sysinfo reports 0 available disk space in the iOS simulator"
+    )]
     fn test_available_disk_bytes_nonzero() {
         let dir = tempfile::tempdir().unwrap();
         assert!(available_disk_bytes(dir.path()) > 0);

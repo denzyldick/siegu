@@ -405,6 +405,73 @@ fn days_from_civil(year: i32, month: i32, day: i32) -> i64 {
     era as i64 * 146_097 + doe - 719_468
 }
 
+/// Today's date as `YYYY-MM-DD` (UTC), or empty if the system clock is unusable.
+fn today_ymd() -> String {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()
+        .and_then(|d| day_index_to_date((d.as_secs() / 86_400) as i64))
+        .unwrap_or_default()
+}
+
+/// Parses `YYYY-MM-DD` into `(year, month, day)`.
+fn ymd_from_date(value: &str) -> Option<(i32, i32, i32)> {
+    let mut parts = value.split('-');
+    let year: i32 = parts.next()?.parse().ok()?;
+    let month: i32 = parts.next()?.parse().ok()?;
+    let day: i32 = parts.next()?.parse().ok()?;
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return None;
+    }
+    Some((year, month, day))
+}
+
+/// Day-of-year index for `(month, day)` in a fixed non-leap year (2001), so
+/// differences between two results equal calendar-day differences.
+fn day_of_year_non_leap(month: i32, day: i32) -> i64 {
+    let month = month.clamp(1, 12);
+    let day = if month == 2 {
+        day.clamp(1, 28)
+    } else {
+        day.clamp(1, 31)
+    };
+    days_from_civil(2001, month, day)
+}
+
+/// Smallest number of days between two day-of-year indexes, wrapping across
+/// year boundaries (e.g. Dec 30 and Jan 2 are 3 days apart).
+fn circular_year_distance(a: i64, b: i64) -> i64 {
+    let diff = (a - b).abs();
+    diff.min(365 - diff)
+}
+
+/// Seasonal proximity of a place's visit dates (`YYYY-MM-DD`) to
+/// `reference_date`: prefers visits from past years, falling back to any
+/// visit. Lower means the place is visited closer to this time of year.
+fn seasonal_distance(visit_dates: &[String], reference_date: &str) -> i64 {
+    let Some((ref_year, ref_month, ref_day)) = ymd_from_date(reference_date) else {
+        return i64::MAX;
+    };
+    let reference = day_of_year_non_leap(ref_month, ref_day);
+    let mut past = Vec::new();
+    let mut all = Vec::new();
+    for date in visit_dates {
+        if let Some((year, month, day)) = ymd_from_date(date) {
+            let doy = day_of_year_non_leap(month, day);
+            if year < ref_year {
+                past.push(doy);
+            }
+            all.push(doy);
+        }
+    }
+    let candidates = if past.is_empty() { all } else { past };
+    candidates
+        .iter()
+        .map(|&doy| circular_year_distance(doy, reference))
+        .min()
+        .unwrap_or(i64::MAX)
+}
+
 /// Photo data for syncing between devices.
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct PhotoSyncInfo {
@@ -1625,6 +1692,7 @@ impl Database {
     }
 
     /// Locations with counts and a representative photo thumbnail for the rail.
+    /// Ordered by most photos (used for search facets).
     pub fn get_location_groups(&self, limit: i64) -> Vec<LocationGroup> {
         let mut groups = Vec::new();
         let sql = "SELECT pr.value AS name, COUNT(*) AS cnt, \
@@ -1651,6 +1719,60 @@ impl Database {
             }
         }
         groups
+    }
+
+    /// Locations ordered by how close their historical visits fall to today's
+    /// date (or an explicit `reference_date`, `YYYY-MM-DD`). A place visited
+    /// around the same time of year in past years surfaces first; ties break
+    /// by photo count. Powers the Albums "Places" rail.
+    pub fn get_location_groups_sorted_by_date(
+        &self,
+        limit: i64,
+        reference_date: Option<&str>,
+    ) -> Vec<LocationGroup> {
+        let reference = match reference_date {
+            Some(date) if !date.is_empty() => date.to_string(),
+            _ => today_ymd(),
+        };
+        let sql = "SELECT pr.value AS name, COUNT(*) AS cnt, \
+            (SELECT p2.location FROM photo p2 JOIN properties pr2 ON pr2.photo_id=p2.id \
+                WHERE pr2.key='location_name' AND pr2.value=pr.value \
+                ORDER BY (p2.encoded != '') DESC, p2.created DESC LIMIT 1) AS rep_loc, \
+            (SELECT p2.encoded FROM photo p2 JOIN properties pr2 ON pr2.photo_id=p2.id \
+                WHERE pr2.key='location_name' AND pr2.value=pr.value \
+                ORDER BY (p2.encoded != '') DESC, p2.created DESC LIMIT 1) AS rep_enc, \
+            (SELECT GROUP_CONCAT(DISTINCT substr(p2.created, 1, 10)) FROM photo p2 \
+                JOIN properties pr2 ON pr2.photo_id=p2.id \
+                WHERE pr2.key='location_name' AND pr2.value=pr.value) AS visit_dates \
+            FROM properties pr WHERE pr.key='location_name' GROUP BY pr.value";
+        let mut groups: Vec<(LocationGroup, i64)> = Vec::new();
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) = stmt.query_map([], |row| {
+                let visit_dates: String = row.get(4).unwrap_or_default();
+                Ok((
+                    LocationGroup {
+                        name: row.get(0)?,
+                        count: row.get(1)?,
+                        photo_location: row.get(2).ok(),
+                        encoded: row.get(3).ok(),
+                    },
+                    visit_dates,
+                ))
+            }) {
+                for (group, dates) in iter.flatten() {
+                    let visit_dates: Vec<String> = dates
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .map(str::to_string)
+                        .collect();
+                    groups.push((group, seasonal_distance(&visit_dates, &reference)));
+                }
+            }
+        }
+        groups.sort_by(|a, b| a.1.cmp(&b.1).then(b.0.count.cmp(&a.0.count)));
+        groups.truncate(limit as usize);
+        groups.into_iter().map(|(g, _)| g).collect()
     }
 
     /// Day-level photo/video counts within a date range (inclusive, `YYYY-MM-DD`).
@@ -3322,7 +3444,7 @@ impl Database {
         }
 
         let places: Vec<AlbumSectionItem> = self
-            .get_location_groups(100)
+            .get_location_groups_sorted_by_date(100, None)
             .into_iter()
             .map(|g| AlbumSectionItem {
                 id: format!("place:{}", g.name),
@@ -4410,6 +4532,59 @@ mod tests {
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].name, "Paris, France");
         assert_eq!(groups[0].count, 1);
+    }
+
+    #[test]
+    fn test_location_groups_sorted_by_date() {
+        let db = test_db();
+        let insert = |id: &str, created: &str, location: &str| {
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded) VALUES (?1, ?2, ?3, '')",
+                    (id, format!("/{id}.jpg"), created),
+                )
+                .unwrap();
+            db.connection
+                .execute(
+                    "INSERT INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
+                    (id, location),
+                )
+                .unwrap();
+        };
+        insert("a1", "2023-08-05 12:00:00", "Paris");
+        insert("a2", "2024-01-01 12:00:00", "Paris");
+        insert("b1", "2023-12-30 12:00:00", "Rome");
+        insert("c1", "2026-02-01 12:00:00", "Tokyo");
+
+        let groups = db.get_location_groups_sorted_by_date(10, Some("2026-08-06"));
+        let names: Vec<&str> = groups.iter().map(|g| g.name.as_str()).collect();
+        assert_eq!(names, vec!["Paris", "Rome", "Tokyo"]);
+        assert_eq!(groups[0].count, 2);
+    }
+
+    #[test]
+    fn test_location_groups_sorted_by_date_wraps_year() {
+        let db = test_db();
+        let insert = |id: &str, created: &str, location: &str| {
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded) VALUES (?1, ?2, ?3, '')",
+                    (id, format!("/{id}.jpg"), created),
+                )
+                .unwrap();
+            db.connection
+                .execute(
+                    "INSERT INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
+                    (id, location),
+                )
+                .unwrap();
+        };
+        insert("a1", "2023-12-30 12:00:00", "Beach");
+        insert("b1", "2023-07-01 12:00:00", "Mountains");
+
+        let groups = db.get_location_groups_sorted_by_date(10, Some("2026-01-02"));
+        let names: Vec<&str> = groups.iter().map(|g| g.name.as_str()).collect();
+        assert_eq!(names, vec!["Beach", "Mountains"]);
     }
 
     #[test]
