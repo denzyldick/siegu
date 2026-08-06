@@ -133,6 +133,7 @@ pub fn analyze_photo(
     let orientation = thumbnail::read_exif_orientation(location);
     let dynamic_img = thumbnail::apply_orientation(dynamic_img, orientation);
     let img = dynamic_img.to_rgb8();
+    let img = cap_decode_dimension(img, config);
 
     analyze_image(
         photo_id,
@@ -144,6 +145,23 @@ pub fn analyze_photo(
         target_model,
         faces_dir,
     )
+}
+
+fn cap_decode_dimension(img: image::RgbImage, config: &HashMap<String, String>) -> image::RgbImage {
+    let (w, h) = (img.width(), img.height());
+    let max_dim = config
+        .get("ml_max_decode_dim")
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(2048);
+    if max_dim == 0 || w <= max_dim && h <= max_dim {
+        return img;
+    }
+    let scale = max_dim as f32 / w.max(h) as f32;
+    let (nw, nh) = (
+        (w as f32 * scale).max(1.0) as u32,
+        (h as f32 * scale).max(1.0) as u32,
+    );
+    image::imageops::resize(&img, nw, nh, image::imageops::FilterType::Triangle)
 }
 
 #[allow(clippy::too_many_arguments)]
