@@ -147,14 +147,10 @@ const computedVideoUrl = computed(() => {
 const posterFailed = ref(false);
 
 const imageSrc = computed(() => {
-  if (!props.path?.location) return undefined;
-  if (props.path.encoded) return props.path.encoded;
-  if (!isVideo.value) {
-    const ext = props.path.location.split('.').pop()?.toLowerCase();
-    if (['heic', 'heif'].includes(ext ?? '')) return undefined;
-    return buildThumbUrl(props.path.location);
-  }
-  return undefined;
+  if (!props.path?.location || isVideo.value) return undefined;
+  const thumb = buildThumbUrl(props.path.location);
+  if (thumb) return thumb;
+  return props.path.encoded || undefined;
 });
 
 // Prefer a generated poster (320px thumb from ffmpeg) over mounting a video

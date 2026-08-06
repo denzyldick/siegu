@@ -774,6 +774,11 @@ impl Database {
         // Enable WAL mode for better concurrency and set a busy timeout
         let _ = conn.execute("PRAGMA journal_mode=WAL;", ());
         let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+        // Write/read tuning: with WAL, NORMAL only fsyncs on checkpoint, and a
+        // larger page cache plus mmap avoids re-reading thumbnails/embeddings.
+        let _ = conn.execute("PRAGMA synchronous=NORMAL;", ());
+        let _ = conn.execute("PRAGMA cache_size=-32768;", ());
+        let _ = conn.execute("PRAGMA mmap_size=268435456;", ());
 
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS photo (id STRING PRIMARY KEY, location STRING, encoded STRING, created DATE_TIME, latitude REAL, longitude REAL, indexed INTEGER DEFAULT 0, caption TEXT, aesthetics_score REAL);", ());
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS ai_status (photo_id STRING PRIMARY KEY, clip INTEGER DEFAULT 0, face INTEGER DEFAULT 0, ocr INTEGER DEFAULT 0, nsfw INTEGER DEFAULT 0, aesthetics INTEGER DEFAULT 0, yolo INTEGER DEFAULT 0, blip INTEGER DEFAULT 0, arcface INTEGER DEFAULT 0, midas INTEGER DEFAULT 0, whisper INTEGER DEFAULT 0, sam INTEGER DEFAULT 0, superres INTEGER DEFAULT 0);", ());
@@ -1276,6 +1281,7 @@ impl Database {
             favorites_only,
             videos_only,
             &PhotoFilter::default(),
+            true,
         )
     }
 
@@ -1471,6 +1477,7 @@ impl Database {
 
     /// List photos with search, pagination, favorite/video filters, and facet
     /// filters (person, location, tag, date range) combined with AND.
+    #[allow(clippy::too_many_arguments)]
     pub fn list_photos_filtered(
         &self,
         query: &str,
@@ -1479,6 +1486,7 @@ impl Database {
         favorites_only: bool,
         videos_only: bool,
         filter: &PhotoFilter,
+        include_encoded: bool,
     ) -> Vec<Photo> {
         let mut photos = Vec::new();
         let (where_clause, params) =
@@ -1497,7 +1505,12 @@ impl Database {
             "ORDER BY p.created DESC"
         };
 
-        let sql = format!("SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, 
+        let encoded_col = if include_encoded {
+            "p.encoded"
+        } else {
+            "NULL AS encoded"
+        };
+        let sql = format!("SELECT p.id, p.location, {encoded_col}, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, 
             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received 
             FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id {where_clause} {order_by} LIMIT ?1, ?2");
         if let Ok(mut stmt) = self.connection.prepare(&sql) {
@@ -1506,7 +1519,11 @@ impl Database {
                 Ok(Photo {
                     id: row.get(0)?,
                     location: row.get(1)?,
-                    encoded: row.get(2)?,
+                    encoded: row
+                        .get::<_, Option<String>>(2)
+                        .ok()
+                        .flatten()
+                        .unwrap_or_default(),
                     created: row.get(5).unwrap_or_default(),
                     objects: HashMap::new(),
                     properties: HashMap::new(),
@@ -3193,7 +3210,7 @@ impl Database {
                     let mut cover_filter = filter.clone();
                     cover_filter.order_by = Some("best".to_string());
                     let first =
-                        self.list_photos_filtered(query, 0, 1, false, videos, &cover_filter);
+                        self.list_photos_filtered(query, 0, 1, false, videos, &cover_filter, false);
                     if let Some(photo) = first.first() {
                         album.cover_photo_id = Some(photo.id.clone());
                     }
@@ -3674,7 +3691,8 @@ impl Database {
             if let Some(filter) = Self::album_rule_filter(&album) {
                 let query = filter.query.as_deref().unwrap_or("");
                 let videos = filter.videos.unwrap_or(false);
-                return self.list_photos_filtered(query, offset, limit, false, videos, &filter);
+                return self
+                    .list_photos_filtered(query, offset, limit, false, videos, &filter, true);
             }
             return Vec::new();
         }
@@ -4493,7 +4511,7 @@ mod tests {
             )
             .unwrap();
 
-        let filter = |f: PhotoFilter| db.list_photos_filtered("", 0, 100, false, false, &f);
+        let filter = |f: PhotoFilter| db.list_photos_filtered("", 0, 100, false, false, &f, true);
 
         let by_person = filter(PhotoFilter {
             person_ids: vec!["person-1".into()],
@@ -4824,7 +4842,7 @@ mod tests {
             )
             .unwrap();
 
-        let filter = |f: PhotoFilter| db.list_photos_filtered("", 0, 100, false, false, &f);
+        let filter = |f: PhotoFilter| db.list_photos_filtered("", 0, 100, false, false, &f, true);
 
         let favs = filter(PhotoFilter {
             favorite: true,

@@ -85,7 +85,15 @@ pub fn do_list_files_filtered(
         order_by,
         album_id,
     };
-    db.list_photos_filtered(query, offset, limit, favorites_only, videos_only, &filter)
+    db.list_photos_filtered(
+        query,
+        offset,
+        limit,
+        favorites_only,
+        videos_only,
+        &filter,
+        false,
+    )
 }
 
 /// Pure business logic — testable without Tauri.
