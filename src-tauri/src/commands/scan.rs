@@ -114,7 +114,7 @@ pub fn scan_files(app: tauri::AppHandle) {
         .abort
         .store(false, std::sync::atomic::Ordering::SeqCst);
 
-    let (batch_tx, mut batch_rx) = tokio::sync::mpsc::unbounded_channel::<database::Photo>();
+    let (batch_tx, mut batch_rx) = tokio::sync::mpsc::channel::<database::Photo>(512);
     let app_handle_for_batch = app.clone();
     let path_for_batch = path.clone();
 
@@ -132,9 +132,7 @@ pub fn scan_files(app: tauri::AppHandle) {
                 interval.tick().await;
                 let batch = {
                     let mut buf = ui.lock().await;
-                    let b = buf.clone();
-                    buf.clear();
-                    b
+                    std::mem::take(&mut *buf)
                 };
                 if !batch.is_empty() {
                     emit_log(&app, format!("[ui-buffer] emitting {} photos", batch.len()));

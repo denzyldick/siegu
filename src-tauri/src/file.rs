@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use crate::ml::MlContext;
 use tauri::{Emitter, Manager};
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::mpsc::Sender;
 
 pub async fn start_watcher(app: tauri::AppHandle) {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -79,7 +79,7 @@ pub fn scan_folder(
     app: &tauri::AppHandle,
     directory: String,
     path: &str,
-    batch_tx: &UnboundedSender<database::Photo>,
+    batch_tx: &Sender<database::Photo>,
 ) {
     let existing = Arc::new(siegu_core::scanner::load_existing_paths(path));
     emit_log(
@@ -184,7 +184,9 @@ pub fn scan_folder(
                 );
             }
 
-            let _ = batch_tx.send(photo);
+            if batch_tx.blocking_send(photo).is_err() {
+                return Err(());
+            }
 
             Ok(())
         });
