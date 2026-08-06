@@ -1003,6 +1003,7 @@ mod tests {
             whisper_decoder: None,
             whisper_tokenizer: None,
             known_people: Vec::new(),
+            known_people_named: 0,
             selected_ep: "cpu".to_string(),
         }
     }

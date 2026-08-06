@@ -470,6 +470,15 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                                 let mut m = models_ref.lock().unwrap_or_else(|e| e.into_inner());
                                 if let Some(models) = m.as_mut() {
                                     models.known_people.extend(new_people.iter().cloned());
+                                    let recent_max: usize = config_ref
+                                        .get("ml_known_people_max")
+                                        .and_then(|s| s.parse().ok())
+                                        .unwrap_or(64);
+                                    super::models::LoadedModels::trim_known_people_recent(
+                                        &mut models.known_people,
+                                        models.known_people_named,
+                                        recent_max,
+                                    );
                                 }
                                 pending_people.extend(new_people);
                             }

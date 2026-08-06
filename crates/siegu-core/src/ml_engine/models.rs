@@ -160,10 +160,32 @@ pub struct LoadedModels {
     pub whisper_decoder: Option<ModelEngine>,
     pub whisper_tokenizer: Option<tokenizers::Tokenizer>,
     pub known_people: Vec<(String, Vec<f32>)>,
+    /// How many entries at the front of `known_people` were loaded from the DB
+    /// (named people). Session-created anonymous people are appended after this
+    /// boundary and are the first candidates for recent-cache eviction.
+    pub known_people_named: usize,
     pub selected_ep: String,
 }
 
 impl LoadedModels {
+    /// Evicts the oldest session-created (anonymous) people from `known_people`
+    /// so matching stays bounded. Entries `[0, named)` are DB-loaded people and
+    /// are always retained; only anonymous entries beyond `recent_max` are
+    /// drained (oldest anonymous first), keeping the most recent matches.
+    pub fn trim_known_people_recent(
+        known_people: &mut Vec<(String, Vec<f32>)>,
+        named: usize,
+        recent_max: usize,
+    ) {
+        let anonymous_start = named.min(known_people.len());
+        let overflow = known_people
+            .len()
+            .saturating_sub(anonymous_start + recent_max);
+        if overflow > 0 {
+            known_people.drain(anonymous_start..anonymous_start + overflow);
+        }
+    }
+
     /// Whether the given model's engines are actually in memory. Used to
     /// distinguish "disabled / dropped / not downloaded" (intentionally absent)
     /// from "failed to build a session" (broken on this device).
@@ -602,6 +624,8 @@ pub fn load_models(
 
     let selected_ep = super::ep::selected_ep();
 
+    let known_people_named = known_people.len();
+
     LoadedModels {
         clip_visual,
         clip_text,
@@ -622,6 +646,7 @@ pub fn load_models(
         whisper_decoder,
         whisper_tokenizer,
         known_people,
+        known_people_named,
         selected_ep,
     }
 }
@@ -797,6 +822,30 @@ mod tests {
         let pool = SessionPool::new(Vec::new());
         assert!(pool.is_empty());
         assert!(pool.lock().is_err());
+    }
+
+    #[test]
+    fn trim_keeps_named_and_most_recent_anonymous() {
+        let mut people = vec![
+            ("named_a".to_string(), vec![1.0]),
+            ("named_b".to_string(), vec![2.0]),
+            ("anon_1".to_string(), vec![3.0]),
+            ("anon_2".to_string(), vec![4.0]),
+            ("anon_3".to_string(), vec![5.0]),
+        ];
+        LoadedModels::trim_known_people_recent(&mut people, 2, 2);
+        let ids: Vec<&str> = people.iter().map(|(id, _)| id.as_str()).collect();
+        assert_eq!(ids, ["named_a", "named_b", "anon_2", "anon_3"]);
+    }
+
+    #[test]
+    fn trim_under_limit_is_noop() {
+        let mut people = vec![
+            ("named_a".to_string(), vec![1.0]),
+            ("anon_1".to_string(), vec![3.0]),
+        ];
+        LoadedModels::trim_known_people_recent(&mut people, 1, 4);
+        assert_eq!(people.len(), 2);
     }
 
     fn config_with(budget_mb: &str, enabled: &[&str]) -> HashMap<String, String> {
