@@ -253,7 +253,7 @@ onUnmounted(() => {
   width: 100%;
   aspect-ratio: 1;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   position: relative;
   background-color: var(--color-bg-zinc-100);
   border: 1px solid var(--color-border-subtle);
@@ -363,7 +363,7 @@ onUnmounted(() => {
   color: white;
   background: color-mix(in srgb, var(--color-error) 90%, transparent);
   backdrop-filter: blur(8px);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 3px 8px;
   z-index: 5;
 }
@@ -374,7 +374,7 @@ onUnmounted(() => {
   right: 12px;
   width: 32px;
   height: 32px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(8px);
   display: flex;
@@ -416,7 +416,7 @@ onUnmounted(() => {
 }
 
 .shadow-sm {
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .media-card-info {

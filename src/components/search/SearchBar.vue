@@ -947,10 +947,8 @@ function iconForFilter(type: string): string {
 
 .search-dropdown {
   background: var(--color-bg-surface);
-  border-radius: 20px;
-  box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.45),
-    0 4px 16px rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-popover);
   overflow-y: auto;
   max-height: min(76vh, 640px);
   padding: 10px 0;
@@ -995,7 +993,7 @@ function iconForFilter(type: string): string {
   width: 88px;
   height: 88px;
   padding: 12px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   border: none;
   -webkit-appearance: none;
   appearance: none;
@@ -1017,7 +1015,7 @@ function iconForFilter(type: string): string {
 .magic-icon {
   width: 32px;
   height: 32px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1055,7 +1053,7 @@ function iconForFilter(type: string): string {
   font-weight: 700;
   color: var(--color-text-muted);
   background: var(--color-bg-hover);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 2px 8px;
 }
 
@@ -1078,7 +1076,7 @@ function iconForFilter(type: string): string {
   gap: 4px;
   min-width: 72px;
   padding: 6px 4px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
   user-select: none;
   transition: background 0.15s ease;
@@ -1135,7 +1133,7 @@ function iconForFilter(type: string): string {
   position: relative;
   width: 92px;
   height: 122px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   cursor: pointer;
   flex-shrink: 0;
@@ -1163,7 +1161,7 @@ function iconForFilter(type: string): string {
   color: #fff;
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(6px);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 2px 7px;
 }
 
@@ -1178,7 +1176,7 @@ function iconForFilter(type: string): string {
   position: relative;
   width: 150px;
   height: 96px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   cursor: pointer;
   flex-shrink: 0;
@@ -1226,7 +1224,7 @@ function iconForFilter(type: string): string {
   font-size: 10px;
   font-weight: 700;
   background: rgba(255, 255, 255, 0.22);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 6px;
 }
 
@@ -1258,7 +1256,7 @@ function iconForFilter(type: string): string {
   color: var(--color-text-secondary);
   background: var(--color-bg-hover);
   border: 1px solid var(--color-border-subtle);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 5px 12px;
   cursor: pointer;
   user-select: none;
@@ -1293,7 +1291,7 @@ function iconForFilter(type: string): string {
   white-space: nowrap;
   color: var(--color-text-muted);
   background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 6px;
 }
 
@@ -1312,7 +1310,7 @@ function iconForFilter(type: string): string {
   font-weight: 500;
   color: var(--color-text-secondary);
   background: var(--color-bg-hover);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 5px 12px;
   cursor: pointer;
   user-select: none;
@@ -1331,7 +1329,7 @@ function iconForFilter(type: string): string {
 
 .inline-thumb {
   aspect-ratio: 1;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   cursor: pointer;
 }
@@ -1349,7 +1347,7 @@ function iconForFilter(type: string): string {
   font-weight: 700;
   color: rgb(var(--v-theme-primary));
   background: var(--color-bg-hover);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 6px 14px;
   cursor: pointer;
   user-select: none;
@@ -1364,7 +1362,7 @@ function iconForFilter(type: string): string {
   align-items: center;
   justify-content: center;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   user-select: none;
   font-weight: 600;
@@ -1396,7 +1394,7 @@ function iconForFilter(type: string): string {
   font-weight: 600;
   color: var(--color-text-muted);
   padding: 8px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   user-select: none;
 }
@@ -1413,7 +1411,7 @@ function iconForFilter(type: string): string {
   font-weight: 600;
   color: rgb(var(--v-theme-primary));
   padding: 8px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   user-select: none;
 }

@@ -253,7 +253,7 @@ onUnmounted(() => {
 }
 .tour-spotlight {
   position: fixed;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   box-shadow: 0 0 0 2px white;
   pointer-events: none;
   z-index: 10000;
@@ -277,7 +277,7 @@ onUnmounted(() => {
 }
 .tour-card-inner {
   background: white;
-  border-radius: 20px;
+  border-radius: var(--radius-2xl);
   padding: 24px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
 }

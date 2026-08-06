@@ -951,7 +951,7 @@ onUnmounted(() => {
   font-weight: 600;
   color: rgb(var(--v-theme-primary));
   padding: 4px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   user-select: none;
 }
@@ -972,7 +972,7 @@ onUnmounted(() => {
 .album-cover {
   position: relative;
   aspect-ratio: 1;
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   overflow: hidden;
   background: var(--color-bg-field);
 }
@@ -996,7 +996,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
   font-size: 11px;
@@ -1017,7 +1017,7 @@ onUnmounted(() => {
 }
 
 .drag-item {
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   transition:
     opacity 0.2s ease,
     transform 0.2s ease;
@@ -1031,7 +1031,7 @@ onUnmounted(() => {
 .empty-state-icon {
   width: 120px;
   height: 120px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--color-bg-zinc-100) 60%, transparent);
   display: flex;
   align-items: center;

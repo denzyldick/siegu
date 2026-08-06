@@ -369,7 +369,7 @@ watch(currentPhotoIndex, (idx) => {
   width: 120px;
   height: 120px;
   background: var(--color-bg-zinc-100);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -377,7 +377,7 @@ watch(currentPhotoIndex, (idx) => {
   width: 120px;
   height: 120px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
@@ -394,7 +394,7 @@ watch(currentPhotoIndex, (idx) => {
 :deep(.leaflet-popup-content-wrapper) {
   padding: 0;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 

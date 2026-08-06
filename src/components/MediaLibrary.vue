@@ -745,17 +745,17 @@ onUnmounted(() => {
 .siegu-btn-modern {
   background: var(--color-bg-btn);
   color: var(--color-text-btn);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   text-transform: none;
   font-weight: 700;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
 }
 
 .siegu-btn-outline {
   background: var(--color-bg-surface);
   color: var(--color-text-primary);
   border: 1px solid var(--color-border-default);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   text-transform: none;
   font-weight: 600;
 }

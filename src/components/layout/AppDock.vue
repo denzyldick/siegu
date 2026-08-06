@@ -170,7 +170,7 @@ function navigate(page: 'home' | 'albums' | 'location' | 'devices' | 'settings')
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-error);
   color: #fff;
   font-size: 9px;

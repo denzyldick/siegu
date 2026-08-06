@@ -259,7 +259,7 @@ onUnmounted(() => {
 <style scoped>
 .date-range-picker {
   background: var(--color-bg-hover);
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   padding: 12px;
 }
 
@@ -296,7 +296,7 @@ onUnmounted(() => {
   color: var(--color-text-muted);
   background: transparent;
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
   user-select: none;
 }
@@ -319,7 +319,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
@@ -365,7 +365,7 @@ onUnmounted(() => {
   justify-content: center;
   gap: 1px;
   height: 38px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: transparent;
   cursor: pointer;
   user-select: none;
@@ -415,7 +415,7 @@ onUnmounted(() => {
 .drp-cell--start,
 .drp-cell--end {
   background: var(--color-bg-btn);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .drp-cell--start .drp-day,
@@ -453,7 +453,7 @@ onUnmounted(() => {
   cursor: pointer;
   user-select: none;
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .drp-today:hover {

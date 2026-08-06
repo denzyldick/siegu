@@ -43,7 +43,7 @@ const searchStore = useSearchStore();
 <style scoped>
 .person-toggle-group {
   display: inline-flex;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
   border: 1px solid var(--color-border-subtle);
 }
@@ -77,7 +77,7 @@ const searchStore = useSearchStore();
 }
 
 .person-toggle--solo {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--color-border-subtle);
 }
 
