@@ -314,7 +314,7 @@ pub fn scan_files(app: tauri::AppHandle) {
         database.set_last_scan_time(timestamp);
 
         if let Some(state) = app.try_state::<ml::MlContext>() {
-            let _ = state.tx.send(ml::Job::ProcessAll);
+            let _ = state.tx.blocking_send(ml::Job::ProcessAll);
         }
     });
 }

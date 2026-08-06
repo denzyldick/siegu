@@ -249,7 +249,7 @@ pub async fn download_models(
                 );
             }
         }
-        let _ = tx.send(ml::Job::ProcessAll);
+        let _ = tx.send(ml::Job::ProcessAll).await;
         let _ = app.emit("download-complete", ());
     });
 

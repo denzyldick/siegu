@@ -23,6 +23,41 @@ pub fn batch_delay_ms_from_config(config: &HashMap<String, String>) -> u64 {
         .min(2000)
 }
 
+/// Waits for the next analysis job, unloading the loaded models (freeing their
+/// memory) once the channel has been idle for `unload_idle` and no analysis is
+/// in flight. When `unload_idle` is zero or no models are loaded, this simply
+/// blocks on the channel.
+fn recv_next_job(
+    rx: &mut tokio::sync::mpsc::Receiver<Job>,
+    models: &Arc<Mutex<Option<LoadedModels>>>,
+    pending_count: &AtomicUsize,
+    unload_idle: Duration,
+) -> Option<Job> {
+    let models_loaded = models.lock().map(|m| m.is_some()).unwrap_or(false);
+    if unload_idle.is_zero() || !models_loaded {
+        return rx.blocking_recv();
+    }
+
+    let deadline = Instant::now() + unload_idle;
+    loop {
+        if let Ok(job) = rx.try_recv() {
+            return Some(job);
+        }
+        if rx.is_closed() {
+            return None;
+        }
+        if Instant::now() >= deadline && pending_count.load(Ordering::SeqCst) == 0 {
+            if let Ok(mut m) = models.lock() {
+                if m.take().is_some() {
+                    tracing::info!("Unloaded AI models after idle timeout");
+                }
+            }
+            return rx.blocking_recv();
+        }
+        std::thread::sleep(Duration::from_millis(250));
+    }
+}
+
 pub trait AnalysisCallbacks: Send + Sync {
     fn on_photo_complete(
         &self,
@@ -145,7 +180,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
     config_path: String,
     batch_size: usize,
 ) -> MlContext {
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Job>();
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<Job>(ml_worker::JOB_CHANNEL_CAPACITY);
     let pending_count = Arc::new(AtomicUsize::new(0));
     let pending_count_clone = Arc::clone(&pending_count);
     let abort = Arc::new(AtomicBool::new(false));
@@ -165,6 +200,12 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
             .get("scan_threads")
             .and_then(|s| s.parse().ok())
             .unwrap_or(2);
+        let unload_idle = Duration::from_secs(
+            config
+                .get("ml_unload_idle_seconds")
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(0),
+        );
 
         let pool = match rayon::ThreadPoolBuilder::new()
             .num_threads(num_threads)
@@ -184,7 +225,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
         let models = models_thread;
         let total_processed = 0usize;
 
-        while let Some(job) = rx.blocking_recv() {
+        while let Some(job) = recv_next_job(&mut rx, &models, &pending_count_clone, unload_idle) {
             if abort_clone.load(Ordering::SeqCst) && !job.is_single() {
                 continue;
             }

@@ -24,52 +24,58 @@ pub fn do_get_unindexed_count(db: &database::Database) -> usize {
     count as usize
 }
 
-/// Pure business logic — sends ProcessModel job and sets indexing mode.
-pub fn do_index_faces(
-    db: &database::Database,
-    tx: &tokio::sync::mpsc::UnboundedSender<ml::Job>,
-) -> Result<(), String> {
+/// Pure business logic — sets indexing mode to "immediate".
+pub fn do_index_faces(db: &database::Database) -> Result<(), String> {
     use std::collections::HashMap;
     let mut state_map = HashMap::new();
     state_map.insert("indexing_mode".to_string(), "immediate".to_string());
     db.set_state(state_map);
-    let _ = tx.send(ml::Job::ProcessModel("face".to_string()));
     Ok(())
+}
+
+/// Sends the face-indexing job on the worker channel.
+async fn send_index_faces_job(tx: &tokio::sync::mpsc::Sender<ml::Job>) -> Result<(), String> {
+    tx.send(ml::Job::ProcessModel("face".to_string()))
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Pure business logic — sets abort flag and sends AnalyzeSingle job.
-pub fn do_analyze_photo(
+pub async fn do_analyze_photo(
     abort: &AtomicBool,
-    tx: &tokio::sync::mpsc::UnboundedSender<ml::Job>,
+    tx: &tokio::sync::mpsc::Sender<ml::Job>,
     id: &str,
 ) -> Result<(), String> {
     abort.store(true, std::sync::atomic::Ordering::SeqCst);
-    let _ = tx.send(ml::Job::AnalyzeSingle(id.to_string()));
-    Ok(())
+    tx.send(ml::Job::AnalyzeSingle(id.to_string()))
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Pure business logic — sets abort flag and sends AnalyzeSingleWithModel job.
-pub fn do_analyze_photo_model(
+pub async fn do_analyze_photo_model(
     abort: &AtomicBool,
-    tx: &tokio::sync::mpsc::UnboundedSender<ml::Job>,
+    tx: &tokio::sync::mpsc::Sender<ml::Job>,
     id: &str,
     model_id: &str,
 ) -> Result<(), String> {
     abort.store(true, std::sync::atomic::Ordering::SeqCst);
-    let _ = tx.send(ml::Job::AnalyzeSingleWithModel(
+    tx.send(ml::Job::AnalyzeSingleWithModel(
         id.to_string(),
         model_id.to_string(),
-    ));
-    Ok(())
+    ))
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// Pure business logic — sends ProcessModel job.
-pub fn do_analyze_model(
-    tx: &tokio::sync::mpsc::UnboundedSender<ml::Job>,
+pub async fn do_analyze_model(
+    tx: &tokio::sync::mpsc::Sender<ml::Job>,
     model_id: &str,
 ) -> Result<(), String> {
-    let _ = tx.send(ml::Job::ProcessModel(model_id.to_string()));
-    Ok(())
+    tx.send(ml::Job::ProcessModel(model_id.to_string()))
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Pure business logic — sets abort flag and resets pending count to 0.
@@ -106,7 +112,8 @@ pub async fn index_faces(
         return Err("Config error".to_string());
     }
     let db = database::Database::new(&path);
-    do_index_faces(&db, &state.tx)
+    do_index_faces(&db)?;
+    send_index_faces_job(&state.tx).await
 }
 
 #[tauri::command]
@@ -114,7 +121,7 @@ pub async fn analyze_photo(
     state: tauri::State<'_, ml::MlContext>,
     id: String,
 ) -> Result<(), String> {
-    do_analyze_photo(&state.abort, &state.tx, &id)
+    do_analyze_photo(&state.abort, &state.tx, &id).await
 }
 
 #[tauri::command]
@@ -123,7 +130,7 @@ pub async fn analyze_photo_model(
     id: String,
     model_id: String,
 ) -> Result<(), String> {
-    do_analyze_photo_model(&state.abort, &state.tx, &id, &model_id)
+    do_analyze_photo_model(&state.abort, &state.tx, &id, &model_id).await
 }
 
 #[tauri::command]
@@ -131,7 +138,7 @@ pub async fn analyze_model(
     state: tauri::State<'_, ml::MlContext>,
     model_id: String,
 ) -> Result<(), String> {
-    do_analyze_model(&state.tx, &model_id)
+    do_analyze_model(&state.tx, &model_id).await
 }
 
 #[tauri::command]
@@ -227,11 +234,10 @@ mod tests {
         assert_eq!(do_get_unindexed_count(&db), 0);
     }
 
-    #[test]
-    fn index_faces_sends_process_model_job() {
-        let (db, _dir) = test_db();
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-        do_index_faces(&db, &tx).unwrap();
+    #[tokio::test]
+    async fn index_faces_sends_process_model_job() {
+        let (tx, mut rx) = tokio::sync::mpsc::channel(siegu_core::ml_worker::JOB_CHANNEL_CAPACITY);
+        send_index_faces_job(&tx).await.unwrap();
         let job = rx.try_recv().unwrap();
         assert!(matches!(job, ml::Job::ProcessModel(ref m) if m == "face"));
     }
@@ -239,27 +245,28 @@ mod tests {
     #[test]
     fn index_faces_sets_indexing_mode() {
         let (db, _dir) = test_db();
-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
-        do_index_faces(&db, &tx).unwrap();
+        do_index_faces(&db).unwrap();
         let config = db.get_state();
         assert_eq!(config.get("indexing_mode").unwrap(), "immediate");
     }
 
-    #[test]
-    fn analyze_photo_sends_job_and_sets_abort() {
+    #[tokio::test]
+    async fn analyze_photo_sends_job_and_sets_abort() {
         let abort = AtomicBool::new(false);
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-        do_analyze_photo(&abort, &tx, "photo1").unwrap();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(siegu_core::ml_worker::JOB_CHANNEL_CAPACITY);
+        do_analyze_photo(&abort, &tx, "photo1").await.unwrap();
         assert!(abort.load(std::sync::atomic::Ordering::SeqCst));
         let job = rx.try_recv().unwrap();
         assert!(matches!(job, ml::Job::AnalyzeSingle(ref id) if id == "photo1"));
     }
 
-    #[test]
-    fn analyze_photo_model_sends_correct_job() {
+    #[tokio::test]
+    async fn analyze_photo_model_sends_correct_job() {
         let abort = AtomicBool::new(false);
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-        do_analyze_photo_model(&abort, &tx, "photo1", "clip").unwrap();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(siegu_core::ml_worker::JOB_CHANNEL_CAPACITY);
+        do_analyze_photo_model(&abort, &tx, "photo1", "clip")
+            .await
+            .unwrap();
         assert!(abort.load(std::sync::atomic::Ordering::SeqCst));
         let job = rx.try_recv().unwrap();
         assert!(
@@ -267,10 +274,10 @@ mod tests {
         );
     }
 
-    #[test]
-    fn analyze_model_sends_process_model() {
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-        do_analyze_model(&tx, "yolo").unwrap();
+    #[tokio::test]
+    async fn analyze_model_sends_process_model() {
+        let (tx, mut rx) = tokio::sync::mpsc::channel(siegu_core::ml_worker::JOB_CHANNEL_CAPACITY);
+        do_analyze_model(&tx, "yolo").await.unwrap();
         let job = rx.try_recv().unwrap();
         assert!(matches!(job, ml::Job::ProcessModel(ref m) if m == "yolo"));
     }

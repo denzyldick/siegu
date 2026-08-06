@@ -14,8 +14,8 @@ pub fn test_db() -> (Database, TempDir) {
 }
 
 /// Create a mock MlContext with a receiver to inspect sent jobs.
-pub fn mock_ml_context() -> (MlContext, mpsc::UnboundedReceiver<Job>) {
-    let (tx, rx) = mpsc::unbounded_channel();
+pub fn mock_ml_context() -> (MlContext, mpsc::Receiver<Job>) {
+    let (tx, rx) = mpsc::channel(siegu_core::ml_worker::JOB_CHANNEL_CAPACITY);
     let ctx = MlContext {
         tx,
         pending_count: Arc::new(AtomicUsize::new(0)),

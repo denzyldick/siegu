@@ -715,7 +715,9 @@ pub fn run_analyze_all(config_dir: &Path) {
     let callbacks = TuiCallbacks { tx };
     let ml_context = start_worker(callbacks, config_path, 32);
 
-    let _ = ml_context.tx.send(siegu_core::ml_worker::Job::ProcessAll);
+    let _ = ml_context
+        .tx
+        .blocking_send(siegu_core::ml_worker::Job::ProcessAll);
 
     run_tui(ml_context, rx, total);
 }
@@ -740,7 +742,7 @@ pub fn run_analyze_photo(config_dir: &Path, photo_id: &str) {
 
     let _ = ml_context
         .tx
-        .send(siegu_core::ml_worker::Job::AnalyzeSingle(
+        .blocking_send(siegu_core::ml_worker::Job::AnalyzeSingle(
             photo_id.to_string(),
         ));
 
@@ -769,9 +771,11 @@ pub fn run_analyze_model(config_dir: &Path, model_id: &str) {
     let callbacks = TuiCallbacks { tx };
     let ml_context = start_worker(callbacks, config_path, 32);
 
-    let _ = ml_context.tx.send(siegu_core::ml_worker::Job::ProcessModel(
-        model_id.to_string(),
-    ));
+    let _ = ml_context
+        .tx
+        .blocking_send(siegu_core::ml_worker::Job::ProcessModel(
+            model_id.to_string(),
+        ));
 
     run_tui(ml_context, rx, total);
 }
@@ -929,7 +933,9 @@ pub fn run_analyze_all_headless(config_dir: &Path) {
     let callbacks = HeadlessCallbacks { tx };
     let ml_context = start_worker(callbacks, config_path, 32);
 
-    let _ = ml_context.tx.send(siegu_core::ml_worker::Job::ProcessAll);
+    let _ = ml_context
+        .tx
+        .blocking_send(siegu_core::ml_worker::Job::ProcessAll);
 
     run_headless_loop(ml_context, rx, config_dir);
 }
@@ -954,7 +960,7 @@ pub fn run_analyze_photo_headless(config_dir: &Path, photo_id: &str) {
 
     let _ = ml_context
         .tx
-        .send(siegu_core::ml_worker::Job::AnalyzeSingle(
+        .blocking_send(siegu_core::ml_worker::Job::AnalyzeSingle(
             photo_id.to_string(),
         ));
 
@@ -982,9 +988,11 @@ pub fn run_analyze_model_headless(config_dir: &Path, model_id: &str) {
     let callbacks = HeadlessCallbacks { tx };
     let ml_context = start_worker(callbacks, config_path, 32);
 
-    let _ = ml_context.tx.send(siegu_core::ml_worker::Job::ProcessModel(
-        model_id.to_string(),
-    ));
+    let _ = ml_context
+        .tx
+        .blocking_send(siegu_core::ml_worker::Job::ProcessModel(
+            model_id.to_string(),
+        ));
 
     run_headless_loop(ml_context, rx, config_dir);
 }

@@ -144,7 +144,7 @@ pub fn assign_name_to_face(
     let database = database::Database::new(&path);
     let id = do_assign_name_to_face(&database, &face_id, &name);
 
-    let _ = state.tx.send(ml::Job::ProcessAll);
+    let _ = state.tx.blocking_send(ml::Job::ProcessAll);
     id
 }
 
@@ -220,7 +220,7 @@ pub fn merge_people(
     let db = database::Database::new(&path);
     do_merge_people(&db, &from_id, &to_id);
 
-    let _ = state.tx.send(ml::Job::ProcessAll);
+    let _ = state.tx.blocking_send(ml::Job::ProcessAll);
 }
 
 #[tauri::command]
@@ -465,7 +465,7 @@ mod tests {
         let (ml_ctx, mut rx) = mock_ml_context();
         db.store_face(make_face("p1", "f1", None));
         db.assign_name_to_face("f1", "TestPerson");
-        let _ = ml_ctx.tx.send(ml::Job::ProcessAll);
+        let _ = ml_ctx.tx.blocking_send(ml::Job::ProcessAll);
         let job = rx.try_recv().unwrap();
         assert!(matches!(job, ml::Job::ProcessAll));
     }

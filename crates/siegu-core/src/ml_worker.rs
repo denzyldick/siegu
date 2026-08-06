@@ -1,14 +1,18 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Arc, Mutex};
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::mpsc::Sender;
+
+/// Capacity of the worker job channel. Senders block once this many jobs are
+/// queued, applying backpressure so the UI cannot outpace analysis.
+pub const JOB_CHANNEL_CAPACITY: usize = 1000;
 
 /// Handle to the worker's loaded models cache. `None` means no models are
 /// loaded; they reload lazily before the next analysis job.
 pub type LoadedModelsHandle = Arc<Mutex<Option<crate::ml_engine::models::LoadedModels>>>;
 
 pub struct MlContext {
-    pub tx: UnboundedSender<Job>,
+    pub tx: Sender<Job>,
     pub pending_count: Arc<AtomicUsize>,
     pub abort: Arc<AtomicBool>,
     pub models: LoadedModelsHandle,
