@@ -315,6 +315,7 @@ pub fn run() {
             // Photos
             commands::photos::list_files,
             commands::photos::toggle_favorite,
+            commands::photos::set_favorites,
             commands::photos::get_photo_by_id,
             commands::photos::get_photo_ocr,
             commands::photos::get_photo_encoded_batch,

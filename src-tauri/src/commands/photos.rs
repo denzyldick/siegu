@@ -102,6 +102,11 @@ pub fn do_toggle_favorite(db: &Database, id: &str) -> bool {
 }
 
 /// Pure business logic — testable without Tauri.
+pub fn do_set_favorites(db: &Database, ids: &[String], favorite: bool) -> usize {
+    db.set_favorites(ids, favorite)
+}
+
+/// Pure business logic — testable without Tauri.
 pub fn do_get_photo_by_id(db: &Database, id: &str) -> Option<Photo> {
     db.get_photo_by_id(id)
 }
@@ -192,6 +197,16 @@ pub async fn toggle_favorite(app: tauri::AppHandle, id: String) -> bool {
     }
     let database = database::Database::new(&path);
     do_toggle_favorite(&database, &id)
+}
+
+#[tauri::command]
+pub async fn set_favorites(app: tauri::AppHandle, ids: Vec<String>, favorite: bool) -> usize {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return 0;
+    }
+    let database = database::Database::new(&path);
+    do_set_favorites(&database, &ids, favorite)
 }
 
 #[tauri::command]

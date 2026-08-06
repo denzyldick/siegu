@@ -215,7 +215,7 @@ import MediaCard from './MediaCard.vue';
 import MediaViewer from './MediaViewer.vue';
 import AddToAlbumSheet from '@/components/albums/AddToAlbumSheet.vue';
 import { useSyncStore } from '@/stores/sync';
-import { getPhotosByIds } from '@/services/tauri';
+import { getPhotosByIds, setFavorites } from '@/services/tauri';
 import { useI18n } from 'vue-i18n';
 import type { MediaItem } from '@/types/media';
 import type { FacetType } from '@/types/search';
@@ -461,8 +461,15 @@ function clearSelection(): void {
 
 async function bulkFavorite(): Promise<void> {
   const ids = [...selectedIds.value];
-  for (const id of ids) {
-    await handleToggleFavorite(id);
+  if (ids.length === 0) return;
+  try {
+    await setFavorites(ids, true);
+    for (const id of ids) {
+      const photo = imagesMap.value[id];
+      if (photo) photo.favorite = true;
+    }
+  } catch (error) {
+    console.error('Failed to bulk favorite:', error);
   }
   clearSelection();
 }

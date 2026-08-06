@@ -1890,6 +1890,40 @@ impl Database {
         }
     }
 
+    /// Set the favorite flag for many photos in a single transaction.
+    /// Returns the number of photos affected.
+    pub fn set_favorites(&self, photo_ids: &[String], favorite: bool) -> usize {
+        if photo_ids.is_empty() {
+            return 0;
+        }
+        let placeholders: Vec<String> = (1..=photo_ids.len()).map(|i| format!("?{i}")).collect();
+        let in_clause = placeholders.join(", ");
+        let params: Vec<&dyn rusqlite::ToSql> = photo_ids
+            .iter()
+            .map(|id| id as &dyn rusqlite::ToSql)
+            .collect();
+        let affected = if favorite {
+            let sql = format!(
+                "INSERT INTO properties (photo_id, key, value) \
+                 SELECT id, 'favorite', 'true' FROM photo \
+                 WHERE id IN ({in_clause}) \
+                 AND NOT EXISTS (SELECT 1 FROM properties p2 \
+                     WHERE p2.photo_id = photo.id AND p2.key = 'favorite')"
+            );
+            self.connection
+                .execute(&sql, params.as_slice())
+                .unwrap_or(0)
+        } else {
+            let sql = format!(
+                "DELETE FROM properties WHERE key = 'favorite' AND photo_id IN ({in_clause})"
+            );
+            self.connection
+                .execute(&sql, params.as_slice())
+                .unwrap_or(0)
+        };
+        affected as usize
+    }
+
     /// Get all photos that have non-zero GPS coordinates, for map heatmap display.
     pub fn get_heatmap_points(&self) -> Vec<MapPoint> {
         let mut points = Vec::new();

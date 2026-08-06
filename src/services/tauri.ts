@@ -98,6 +98,13 @@ export async function toggleFavorite(id: number): Promise<boolean> {
   return call<boolean>('toggle_favorite', { id });
 }
 
+export async function setFavorites(
+  ids: Array<string | number>,
+  favorite: boolean,
+): Promise<number> {
+  return call<number>('set_favorites', { ids, favorite });
+}
+
 export async function setWallpaper(path: string): Promise<void> {
   await call<unknown>('set_wallpaper', { path });
 }
