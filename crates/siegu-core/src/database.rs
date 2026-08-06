@@ -782,6 +782,27 @@ impl Database {
 
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS photo (id STRING PRIMARY KEY, location STRING, encoded STRING, created DATE_TIME, latitude REAL, longitude REAL, indexed INTEGER DEFAULT 0, caption TEXT, aesthetics_score REAL);", ());
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS ai_status (photo_id STRING PRIMARY KEY, clip INTEGER DEFAULT 0, face INTEGER DEFAULT 0, ocr INTEGER DEFAULT 0, nsfw INTEGER DEFAULT 0, aesthetics INTEGER DEFAULT 0, yolo INTEGER DEFAULT 0, blip INTEGER DEFAULT 0, arcface INTEGER DEFAULT 0, midas INTEGER DEFAULT 0, whisper INTEGER DEFAULT 0, sam INTEGER DEFAULT 0, superres INTEGER DEFAULT 0);", ());
+        for model in [
+            "clip",
+            "face",
+            "ocr",
+            "nsfw",
+            "aesthetics",
+            "yolo",
+            "blip",
+            "arcface",
+            "midas",
+            "whisper",
+            "sam",
+            "superres",
+        ] {
+            let _ = conn.execute(
+                &format!(
+                    "CREATE INDEX IF NOT EXISTS idx_ai_status_{model} ON ai_status({model}) WHERE {model} = 0;"
+                ),
+                (),
+            );
+        }
         let _ = conn.execute(
             "CREATE TABLE IF NOT EXISTS ocr (photo_id STRING, text TEXT);",
             (),
@@ -2950,7 +2971,16 @@ impl Database {
     }
 
     /// Get photo IDs that have not been processed by the given model.
-    pub fn get_photos_missing_model(&self, model: &str) -> Vec<String> {
+    ///
+    /// Explicit `{model} = 0` rows are served by a partial index
+    /// (`idx_ai_status_{model}`); photos with no status row are found via an
+    /// anti-join. Results are ordered by creation time and optionally paginated.
+    pub fn get_photos_missing_model(
+        &self,
+        model: &str,
+        limit: Option<u32>,
+        offset: Option<u32>,
+    ) -> Vec<String> {
         let mut ids = Vec::new();
         match model {
             "clip" | "face" | "ocr" | "nsfw" | "aesthetics" | "yolo" | "blip" | "arcface"
@@ -2960,9 +2990,19 @@ impl Database {
                 return ids;
             }
         }
-        let sql = format!("SELECT p.id FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE s.{model} = 0 OR s.{model} IS NULL");
+        let sql = format!(
+            "SELECT p.id, p.created FROM ai_status s JOIN photo p ON p.id = s.photo_id WHERE s.{model} = 0 \
+             UNION ALL \
+             SELECT p.id, p.created FROM photo p WHERE NOT EXISTS (SELECT 1 FROM ai_status s WHERE s.photo_id = p.id) \
+             ORDER BY 2 DESC, 1 DESC \
+             LIMIT ?1 OFFSET ?2"
+        );
+        let limit_val = limit.unwrap_or(u32::MAX);
+        let offset_val = offset.unwrap_or(0);
         if let Ok(mut stmt) = self.connection.prepare(&sql) {
-            if let Ok(iter) = stmt.query_map([], |row| row.get::<_, String>(0)) {
+            if let Ok(iter) = stmt.query_map(rusqlite::params![limit_val, offset_val], |row| {
+                row.get::<_, String>(0)
+            }) {
                 for id in iter.flatten() {
                     ids.push(id);
                 }
@@ -4312,13 +4352,50 @@ mod tests {
         };
         let _ = db.store_photo_batch(&[photo]);
 
-        let missing = db.get_photos_missing_model("clip");
+        let missing = db.get_photos_missing_model("clip", None, None);
         assert_eq!(missing.len(), 1);
         assert_eq!(missing[0], "ai_1");
 
         db.update_ai_status("ai_1", "clip", 1);
-        let missing = db.get_photos_missing_model("clip");
+        let missing = db.get_photos_missing_model("clip", None, None);
         assert!(missing.is_empty());
+    }
+
+    #[test]
+    fn test_get_photos_missing_model_paginates() {
+        let mut db = test_db();
+        let mut photos = Vec::new();
+        for i in 0..5 {
+            photos.push(Photo {
+                id: format!("pg_{i}"),
+                location: format!("/tmp/pg_{i}.jpg"),
+                encoded: String::new(),
+                created: format!("2024-01-0{}", i + 1),
+                objects: HashMap::new(),
+                properties: HashMap::new(),
+                latitude: 0.0,
+                longitude: 0.0,
+                favorite: false,
+                indexed: 0,
+                caption: None,
+                aesthetics_score: None,
+                ai_status: AiStatus::default(),
+                sync_needed: true,
+                received: false,
+            });
+        }
+        let _ = db.store_photo_batch(&photos);
+
+        let page1 = db.get_photos_missing_model("clip", Some(2), Some(0));
+        let page2 = db.get_photos_missing_model("clip", Some(2), Some(2));
+        assert_eq!(page1.len(), 2);
+        assert_eq!(page2.len(), 2);
+        for id in page1.iter().chain(page2.iter()) {
+            assert!(
+                page1.contains(id) ^ page2.contains(id),
+                "pages must not overlap"
+            );
+        }
     }
 
     #[test]

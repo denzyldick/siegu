@@ -756,7 +756,7 @@ pub fn run_analyze_model(config_dir: &Path, model_id: &str) {
 
     let status_model = siegu_core::ml_worker::job_status_model(model_id).unwrap_or(model_id);
     let db = Database::new(&config_dir.display().to_string());
-    let missing = db.get_photos_missing_model(status_model);
+    let missing = db.get_photos_missing_model(status_model, None, None);
     let total = missing.len();
 
     if total == 0 {
@@ -970,7 +970,7 @@ pub fn run_analyze_model_headless(config_dir: &Path, model_id: &str) {
 
     let status_model = siegu_core::ml_worker::job_status_model(model_id).unwrap_or(model_id);
     let db = Database::new(&config_dir.display().to_string());
-    let missing = db.get_photos_missing_model(status_model);
+    let missing = db.get_photos_missing_model(status_model, None, None);
     if missing.is_empty() {
         println!("No media need '{model_id}' analysis.");
         print_e2e_summary(config_dir);

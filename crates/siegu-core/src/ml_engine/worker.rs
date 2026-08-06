@@ -243,7 +243,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                     if let Some(status_model) = ml_worker::job_status_model(model_id) {
                         let lock = db.lock().unwrap_or_else(|e| e.into_inner());
                         (
-                            lock.get_photos_missing_model(status_model),
+                            lock.get_photos_missing_model(status_model, None, None),
                             Some(status_model.to_string()),
                             Some(model_id.clone()),
                         )
