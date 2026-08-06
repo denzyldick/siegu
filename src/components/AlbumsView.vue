@@ -221,7 +221,47 @@
         {{ $t('albums.reorder_hint') }}
       </div>
 
+      <DynamicScroller
+        v-if="displayItems.length > 0 && useVirtualScroller"
+        class="animate-fade-in"
+        :items="virtualItems"
+        :min-item-size="240"
+        key-field="key"
+        page-mode
+        v-slot="{ item, active }"
+      >
+        <DynamicScrollerItem :item="item" :active="active">
+          <div
+            class="photo-row"
+            :style="{ gridTemplateColumns: `repeat(${columns}, 1fr)` }"
+            @dragover.prevent
+            @drop="onDrop"
+          >
+            <div
+              v-for="(photo, i) in item.photos"
+              :key="photo.id"
+              class="drag-item"
+              :class="{ 'drag-over': dragIndex === item.startIndex + i }"
+              :draggable="isManualAlbum && !selectionActive"
+              @dragstart="onDragStart(photo, item.startIndex + i)"
+              @dragover.prevent="onDragOver(item.startIndex + i)"
+              @dragend="onDragEnd"
+            >
+              <MediaCard
+                :path="photo"
+                :selected="selectedIds.includes(photo.id)"
+                :selection-mode="selectedIds.length > 0"
+                @click="openViewer(item.startIndex + i)"
+                @select="toggleSelection"
+                @toggle-favorite="handleToggleFavorite"
+              />
+            </div>
+          </div>
+        </DynamicScrollerItem>
+      </DynamicScroller>
+
       <div
+        v-else
         class="photo-row"
         :style="{ gridTemplateColumns: `repeat(${columns}, 1fr)` }"
         @dragover.prevent
@@ -405,6 +445,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller';
+import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
 import { useI18n } from 'vue-i18n';
 import MediaCard from '@/components/MediaCard.vue';
 import MediaViewer from '@/components/MediaViewer.vue';
@@ -485,6 +527,24 @@ const showPeopleManageFallback = computed(
 const searching = computed(() => query.value.trim().length > 0);
 const selectionActive = computed(() => selectedIds.value.length > 0);
 const displayItems = computed(() => (searching.value ? searchResults.value : items.value));
+
+const useVirtualScroller = computed(
+  () => typeof IntersectionObserver !== 'undefined' && displayItems.value.length > 48,
+);
+
+const virtualItems = computed(() => {
+  const cols = columns.value;
+  const rows: Array<{ type: 'row'; key: string; startIndex: number; photos: MediaItem[] }> = [];
+  for (let i = 0; i < displayItems.value.length; i += cols) {
+    rows.push({
+      type: 'row',
+      key: `r-${i}-${displayItems.value[i]?.id}`,
+      startIndex: i,
+      photos: displayItems.value.slice(i, i + cols),
+    });
+  }
+  return rows;
+});
 
 const dragId = ref<string | null>(null);
 const dragIndex = ref<number | null>(null);
