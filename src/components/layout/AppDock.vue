@@ -159,7 +159,7 @@ function navigate(page: 'home' | 'albums' | 'location' | 'devices' | 'settings')
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #ef4444;
+  background: var(--color-error);
   animation: siegu-pulse 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
@@ -171,7 +171,7 @@ function navigate(page: 'home' | 'albums' | 'location' | 'devices' | 'settings')
   height: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  background: #ef4444;
+  background: var(--color-error);
   color: #fff;
   font-size: 9px;
   font-weight: 800;
@@ -182,13 +182,13 @@ function navigate(page: 'home' | 'albums' | 'location' | 'devices' | 'settings')
 
 @keyframes siegu-pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-error) 60%, transparent);
   }
   70% {
-    box-shadow: 0 0 0 7px rgba(239, 68, 68, 0);
+    box-shadow: 0 0 0 7px transparent;
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    box-shadow: 0 0 0 0 transparent;
   }
 }
 </style>

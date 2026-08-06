@@ -1,10 +1,10 @@
 <template>
   <div class="d-flex justify-center ga-5 mb-4">
-    <v-icon size="28" color="#a1a1aa">mdi-microsoft-windows</v-icon>
-    <v-icon size="28" color="#a1a1aa">mdi-apple</v-icon>
-    <v-icon size="28" color="#a1a1aa">mdi-linux</v-icon>
-    <v-icon size="28" color="#a1a1aa">mdi-android</v-icon>
-    <v-icon size="28" color="#a1a1aa">mdi-apple-ios</v-icon>
+    <v-icon size="28" color="var(--color-text-secondary)">mdi-microsoft-windows</v-icon>
+    <v-icon size="28" color="var(--color-text-secondary)">mdi-apple</v-icon>
+    <v-icon size="28" color="var(--color-text-secondary)">mdi-linux</v-icon>
+    <v-icon size="28" color="var(--color-text-secondary)">mdi-android</v-icon>
+    <v-icon size="28" color="var(--color-text-secondary)">mdi-apple-ios</v-icon>
   </div>
 
   <template v-if="isConnected">
@@ -50,7 +50,7 @@
       <v-chip
         v-for="(word, index) in passphrase"
         :key="index"
-        color="#f4f4f5"
+        color="var(--color-bg-zinc-100)"
         variant="flat"
         class="font-weight-medium mx-1 text-zinc-primary border-subtle"
         size="small"

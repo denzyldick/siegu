@@ -34,7 +34,7 @@
           <v-icon
             size="72"
             class="connect-illustration"
-            color="#22c55e"
+            color="var(--color-success)"
           >mdi-lan-connect</v-icon>
         </div>
 
@@ -117,7 +117,7 @@
             href="https://siegu.app/waitlist"
             target="_blank"
             class="text-caption font-weight-medium mb-4 d-inline-block"
-            style="color: #22c55e; text-decoration: none"
+            style="color: var(--color-success); text-decoration: none"
           >
             {{ $t('connect.join_waitlist') }} →
           </a>

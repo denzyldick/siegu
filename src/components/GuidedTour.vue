@@ -300,11 +300,11 @@ onUnmounted(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #d4d4d8;
+  background: var(--color-text-muted);
   transition: all 0.2s ease;
 }
 .tour-dot--active {
-  background: #18181b;
+  background: var(--color-text-primary);
   transform: scale(1.3);
 }
 @keyframes tourSlideUp {

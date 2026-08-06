@@ -43,7 +43,7 @@
         >
           <v-list-item-title>{{ album.name }}</v-list-item-title>
           <template v-slot:append>
-            <v-icon size="20" color="#a1a1aa">mdi-plus-circle-outline</v-icon>
+            <v-icon size="20" color="var(--color-text-secondary)">mdi-plus-circle-outline</v-icon>
           </template>
         </v-list-item>
       </v-list>

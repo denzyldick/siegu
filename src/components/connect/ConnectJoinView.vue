@@ -153,6 +153,6 @@ const syncStatusText = computed(() => {
 }
 
 .join-passphrase :deep(.v-label) {
-  color: #71717a !important;
+  color: var(--color-text-muted) !important;
 }
 </style>
