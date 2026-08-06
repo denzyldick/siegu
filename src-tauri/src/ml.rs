@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::common::emit_log;
 use tauri::AppHandle;
@@ -13,7 +13,7 @@ use siegu_core::ml_engine::PhotoResult;
 
 struct TauriCallbacks {
     app: AppHandle,
-    config_path: String,
+    db: Mutex<Database>,
     sync_tx: Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<SyncMessage>>>>,
 }
 
@@ -26,7 +26,7 @@ impl AnalysisCallbacks for TauriCallbacks {
         remaining: usize,
         progress_model: Option<&str>,
     ) {
-        let db = Database::new(&self.config_path);
+        let db = self.db.lock().unwrap_or_else(|e| e.into_inner());
         let has_caption: bool = db
             .connection
             .query_row("SELECT caption FROM photo WHERE id = ?1", [photo_id], |r| {
@@ -93,7 +93,7 @@ impl AnalysisCallbacks for TauriCallbacks {
     }
 
     fn on_scan_complete(&self) {
-        let db = Database::new(&self.config_path);
+        let db = self.db.lock().unwrap_or_else(|e| e.into_inner());
         let pending: i64 = db
             .connection
             .query_row(
@@ -192,7 +192,7 @@ pub fn start_background_worker(
 ) -> MlContext {
     let callbacks = TauriCallbacks {
         app: app.clone(),
-        config_path: config_path.clone(),
+        db: Mutex::new(Database::new(&config_path)),
         sync_tx,
     };
     siegu_core::ml_engine::worker::start_worker(callbacks, config_path, 32)
