@@ -8,6 +8,25 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 12px -3px rgba(0, 0, 0, 0.1);
+  --shadow-popover: 0 24px 60px rgba(0, 0, 0, 0.45), 0 4px 16px rgba(0, 0, 0, 0.2);
+
+  --color-brand-favorite: #f59e0b;
+  --color-brand-videos: #8b5cf6;
+  --color-brand-faces: #0ea5e9;
+  --color-brand-papers: #10b981;
+  --color-brand-nsfw: #ef4444;
+  --color-brand-surprise: #f43f5e;
 }
 
 .v-theme--light,
@@ -31,6 +50,24 @@
   --color-text-btn: #ffffff;
   --color-bg-glass: rgba(255, 255, 255, 0.6);
   --color-bg-rail: rgba(255, 255, 255, 0.8);
+  --color-icon-empty: #d4d4d8;
+
+  --color-success: #22c55e;
+  --color-success-tint: #f0fdf4;
+  --color-success-border: #bbf7d0;
+  --color-success-strong: #166534;
+  --color-warning: #f59e0b;
+  --color-warning-tint: #fffbeb;
+  --color-warning-border: #fde68a;
+  --color-warning-strong: #b45309;
+  --color-error: #ef4444;
+  --color-error-tint: #fef2f2;
+  --color-error-border: #fee2e2;
+  --color-error-strong: #b91c1c;
+  --color-info: #3b82f6;
+  --color-info-tint: #eff6ff;
+  --color-info-border: #bfdbfe;
+  --color-info-strong: #1d4ed8;
 }
 
 .v-theme--dark,
@@ -54,4 +91,22 @@
   --color-text-btn: #09090b;
   --color-bg-glass: rgba(24, 24, 27, 0.6);
   --color-bg-rail: rgba(9, 9, 11, 0.85);
+  --color-icon-empty: #3f3f46;
+
+  --color-success: #22c55e;
+  --color-success-tint: #052e16;
+  --color-success-border: #166534;
+  --color-success-strong: #4ade80;
+  --color-warning: #f59e0b;
+  --color-warning-tint: #451a03;
+  --color-warning-border: #92400e;
+  --color-warning-strong: #fcd34d;
+  --color-error: #ef4444;
+  --color-error-tint: #450a0a;
+  --color-error-border: #7f1d1d;
+  --color-error-strong: #fca5a5;
+  --color-info: #3b82f6;
+  --color-info-tint: #172554;
+  --color-info-border: #1e40af;
+  --color-info-strong: #93c5fd;
 }

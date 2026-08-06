@@ -37,18 +37,6 @@ function resolveTheme(): string {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
-function syncDataTheme(): void {
-  document.documentElement.dataset.theme = resolveTheme()
-}
-
-syncDataTheme()
-
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-  if ((localStorage.getItem('siegu_theme') || 'system') === 'system') {
-    syncDataTheme()
-  }
-})
-
 const vuetify = createVuetify({
   components,
   theme: {
@@ -131,6 +119,20 @@ const vuetify = createVuetify({
       rounded: 'lg',
     },
   },
+})
+
+function syncTheme(): void {
+  const resolved = resolveTheme()
+  document.documentElement.dataset.theme = resolved
+  vuetify.theme.global.name.value = resolved
+}
+
+syncTheme()
+
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if ((localStorage.getItem('siegu_theme') || 'system') === 'system') {
+    syncTheme()
+  }
 })
 
 const pinia = createPinia()
