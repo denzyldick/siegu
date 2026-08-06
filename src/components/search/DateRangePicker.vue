@@ -400,11 +400,11 @@ onUnmounted(() => {
 }
 
 .drp-count--photos {
-  background: rgba(14, 165, 233, 0.85);
+  background: color-mix(in srgb, var(--color-brand-faces) 85%, transparent);
 }
 
 .drp-count--videos {
-  background: rgba(168, 85, 247, 0.85);
+  background: color-mix(in srgb, var(--color-brand-videos) 85%, transparent);
 }
 
 .drp-cell--inrange {
@@ -474,11 +474,11 @@ onUnmounted(() => {
 }
 
 .drp-legend-dot--photos {
-  background: rgba(14, 165, 233, 0.85);
+  background: color-mix(in srgb, var(--color-brand-faces) 85%, transparent);
 }
 
 .drp-legend-dot--videos {
-  background: rgba(168, 85, 247, 0.85);
+  background: color-mix(in srgb, var(--color-brand-videos) 85%, transparent);
 }
 
 .drp-legend-text {

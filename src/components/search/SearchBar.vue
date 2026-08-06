@@ -409,7 +409,7 @@ function iconForFilter(type: string): string {
 <template>
   <div ref="searchWrapRef" class="search-wrapper">
     <div class="search-field" data-tour="search" @click="openDropdown">
-      <v-icon size="20" class="search-icon" color="#a1a1aa">mdi-magnify</v-icon>
+      <v-icon size="20" class="search-icon" color="var(--color-text-secondary)">mdi-magnify</v-icon>
       <input
         v-model="searchStore.query"
         class="search-input"
@@ -420,7 +420,7 @@ function iconForFilter(type: string): string {
       <v-icon
         v-if="searchStore.query || searchStore.hasFilters"
         size="18"
-        color="#a1a1aa"
+        color="var(--color-text-secondary)"
         class="cursor-pointer"
         @click.stop="clearAll"
       >
@@ -455,7 +455,7 @@ function iconForFilter(type: string): string {
                 :class="{ 'magic-card--active': isMediaActive('favoritesOnly') }"
                 @click="toggleMedia('favorites')"
               >
-                <div class="magic-icon" style="--magic: #f59e0b">
+                <div class="magic-icon" style="--magic: var(--color-brand-favorite)">
                   <v-icon size="20">mdi-heart</v-icon>
                 </div>
                 <div class="magic-label">{{ t('search.magic.favorites') }}</div>
@@ -466,7 +466,7 @@ function iconForFilter(type: string): string {
                 :class="{ 'magic-card--active': isMediaActive('videosOnly') }"
                 @click="toggleMedia('videos')"
               >
-                <div class="magic-icon" style="--magic: #8b5cf6">
+                <div class="magic-icon" style="--magic: var(--color-brand-videos)">
                   <v-icon size="20">mdi-video</v-icon>
                 </div>
                 <div class="magic-label">{{ t('search.magic.videos') }}</div>
@@ -477,7 +477,7 @@ function iconForFilter(type: string): string {
                 :class="{ 'magic-card--active': isMediaActive('facesOnly') }"
                 @click="toggleMedia('faces')"
               >
-                <div class="magic-icon" style="--magic: #0ea5e9">
+                <div class="magic-icon" style="--magic: var(--color-brand-faces)">
                   <v-icon size="20">mdi-face-man</v-icon>
                 </div>
                 <div class="magic-label">{{ t('search.magic.faces') }}</div>
@@ -488,7 +488,7 @@ function iconForFilter(type: string): string {
                 :class="{ 'magic-card--active': isMediaActive('papersOnly') }"
                 @click="toggleMedia('papers')"
               >
-                <div class="magic-icon" style="--magic: #10b981">
+                <div class="magic-icon" style="--magic: var(--color-brand-papers)">
                   <v-icon size="20">mdi-file-document-outline</v-icon>
                 </div>
                 <div class="magic-label">{{ t('search.magic.papers') }}</div>
@@ -500,14 +500,14 @@ function iconForFilter(type: string): string {
                 :class="{ 'magic-card--active': isMediaActive('nsfwOnly') }"
                 @click="toggleMedia('nsfw')"
               >
-                <div class="magic-icon" style="--magic: #ef4444">
+                <div class="magic-icon" style="--magic: var(--color-brand-nsfw)">
                   <v-icon size="20">mdi-alert-octagon</v-icon>
                 </div>
                 <div class="magic-label">{{ t('search.magic.nsfw') }}</div>
                 <div class="magic-count">{{ activeCount('nsfw') }}</div>
               </button>
               <button class="magic-card" @click="surpriseMe">
-                <div class="magic-icon" style="--magic: #f43f5e">
+                <div class="magic-icon" style="--magic: var(--color-brand-surprise)">
                   <v-icon size="20">mdi-dice-multiple</v-icon>
                 </div>
                 <div class="magic-label">{{ t('search.magic.surprise') }}</div>
@@ -550,7 +550,7 @@ function iconForFilter(type: string): string {
                   <div class="best-badge" :title="t('search.best_shot')">
                     <v-icon size="12">mdi-star-four-points</v-icon>
                   </div>
-                  <v-icon v-if="photo.favorite" size="14" color="#f59e0b" class="best-fav"
+                  <v-icon v-if="photo.favorite" size="14" color="var(--color-brand-favorite)" class="best-fav"
                     >mdi-heart</v-icon
                   >
                 </div>
@@ -832,7 +832,7 @@ function iconForFilter(type: string): string {
                 {{ t('search.no_matches', { query: searchStore.query.trim() }) }}
               </div>
               <button class="run-search-item mx-auto" @click="runSearch">
-                <v-icon size="18" class="mr-2" color="#0ea5e9">mdi-text-search</v-icon>
+                <v-icon size="18" class="mr-2" color="var(--color-brand-faces)">mdi-text-search</v-icon>
                 {{ t('search.enter_to_search', { query: searchStore.query.trim() }) }}
               </button>
             </div>
@@ -915,16 +915,16 @@ function iconForFilter(type: string): string {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgb(var(--v-theme-surface));
-  border: 1px solid rgba(128, 128, 128, 0.25);
-  border-radius: 14px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
   padding: 0 14px;
   height: 44px;
   cursor: text;
 }
 
 .search-field:focus-within {
-  border-color: rgb(var(--v-theme-primary));
+  border-color: var(--color-text-primary);
 }
 
 .search-icon {
@@ -937,12 +937,12 @@ function iconForFilter(type: string): string {
   border: none;
   outline: none;
   background: transparent;
-  color: rgb(var(--v-theme-on-surface));
+  color: var(--color-text-primary);
   font-size: 14px;
 }
 
 .search-input::placeholder {
-  color: rgba(128, 128, 128, 0.8);
+  color: var(--color-text-muted);
 }
 
 .search-dropdown {
