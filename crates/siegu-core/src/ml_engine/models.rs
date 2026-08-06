@@ -139,6 +139,7 @@ impl Drop for SessionGuard<'_> {
 ///
 /// Each field is `Option<ModelEngine>` — `None` means the model was
 /// disabled in config, not found on disk, or failed to load.
+#[derive(Clone)]
 pub struct LoadedModels {
     pub clip_visual: Option<ModelEngine>,
     pub clip_text: Option<ModelEngine>,

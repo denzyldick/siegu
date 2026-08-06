@@ -120,7 +120,7 @@ pub fn analyze_photo(
     photo_id: &str,
     location: &str,
     ai_status: &AiStatus,
-    models: &mut LoadedModels,
+    models: &LoadedModels,
     config: &HashMap<String, String>,
     target_model: Option<&str>,
     faces_dir: &str,
@@ -170,7 +170,7 @@ pub fn analyze_image(
     frame_index: usize,
     img: &image::RgbImage,
     ai_status: &AiStatus,
-    models: &mut LoadedModels,
+    models: &LoadedModels,
     config: &HashMap<String, String>,
     target_model: Option<&str>,
     faces_dir: &str,
@@ -499,7 +499,7 @@ pub fn analyze_image(
 /// 1. Runs `blip.onnx` (vision encoder) to produce image embeddings
 /// 2. Runs `blip_decoder.onnx` (text decoder) autoregressively from [CLS]
 /// 3. Returns the decoded caption string, or [`None`] on failure
-pub fn generate_blip_caption(img: &image::RgbImage, models: &mut LoadedModels) -> Option<String> {
+pub fn generate_blip_caption(img: &image::RgbImage, models: &LoadedModels) -> Option<String> {
     let vision_encoder = models.blip.as_ref()?;
     let decoder = models.blip_decoder.as_ref()?;
     let tokenizer = models.blip_tokenizer.as_ref()?;
@@ -658,7 +658,7 @@ pub fn analyze_video(
     photo_id: &str,
     location: &str,
     ai_status: &AiStatus,
-    models: &mut LoadedModels,
+    models: &LoadedModels,
     config: &HashMap<String, String>,
     target_model: Option<&str>,
     faces_dir: &str,

@@ -415,9 +415,9 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
 
                             let is_video = pipeline::is_video_file(&photo_entry.location);
 
-                            let mut result = {
-                                let mut m = models_ref.lock().unwrap_or_else(|e| e.into_inner());
-                                let Some(models) = m.as_mut() else {
+                            let model_snapshot = {
+                                let m = models_ref.lock().unwrap_or_else(|e| e.into_inner());
+                                let Some(models) = m.as_ref() else {
                                     tracing::error!(
                                         "AI models not loaded; skipping analysis for {}",
                                         photo_entry.id
@@ -425,27 +425,29 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                                     decrement_pending_count(&pending_count_ref);
                                     continue;
                                 };
-                                if is_video {
-                                    pipeline::analyze_video(
-                                        &photo_entry.id,
-                                        &photo_entry.location,
-                                        &photo_entry.ai_status,
-                                        models,
-                                        &config_ref,
-                                        target_model_ref.as_deref(),
-                                        &faces_dir_ref,
-                                    )
-                                } else {
-                                    pipeline::analyze_photo(
-                                        &photo_entry.id,
-                                        &photo_entry.location,
-                                        &photo_entry.ai_status,
-                                        models,
-                                        &config_ref,
-                                        target_model_ref.as_deref(),
-                                        &faces_dir_ref,
-                                    )
-                                }
+                                models.clone()
+                            };
+
+                            let mut result = if is_video {
+                                pipeline::analyze_video(
+                                    &photo_entry.id,
+                                    &photo_entry.location,
+                                    &photo_entry.ai_status,
+                                    &model_snapshot,
+                                    &config_ref,
+                                    target_model_ref.as_deref(),
+                                    &faces_dir_ref,
+                                )
+                            } else {
+                                pipeline::analyze_photo(
+                                    &photo_entry.id,
+                                    &photo_entry.location,
+                                    &photo_entry.ai_status,
+                                    &model_snapshot,
+                                    &config_ref,
+                                    target_model_ref.as_deref(),
+                                    &faces_dir_ref,
+                                )
                             };
 
                             let new_people: Vec<(String, Vec<f32>)> = {
