@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::process::Command;
+use std::io::Read;
+use std::process::{Command, Stdio};
 
 use ndarray::{Array1, Array2, Array3, Array4};
 use rustfft::num_complex::Complex;
@@ -13,41 +14,19 @@ const FRAME_INTERVAL_SECS: u32 = 2;
 /// Maximum number of frames to extract from a single video.
 const MAX_FRAMES: usize = 30;
 
+/// Maximum side length of extracted frames; full-res frames are downscaled.
+const MAX_FRAME_SIDE: u32 = 640;
+
 /// Extracts RGB frames from a video file using ffmpeg.
 ///
 /// Runs `ffmpeg -vf fps=1/{FRAME_INTERVAL_SECS}` to capture one frame every
-/// `FRAME_INTERVAL_SECS` seconds, up to `MAX_FRAMES` total frames. The frames
-/// are returned as raw `RgbImage` objects in memory (no disk I/O beyond ffmpeg).
+/// `FRAME_INTERVAL_SECS` seconds, up to `MAX_FRAMES` total frames, downscaled
+/// so the longest side fits `MAX_FRAME_SIDE`. Frames are read incrementally
+/// from a piped stdout so only one frame is buffered in memory at a time.
 ///
 /// Returns an empty vector if the video doesn't exist, has no video stream,
 /// or if ffmpeg/ffprobe fails.
 pub fn extract_frames(video_path: &str) -> Vec<image::RgbImage> {
-    let fps_filter = format!("fps=1/{}", FRAME_INTERVAL_SECS);
-    let Ok(output) = Command::new("ffmpeg")
-        .args([
-            "-i",
-            video_path,
-            "-vf",
-            &fps_filter,
-            "-frames:v",
-            &MAX_FRAMES.to_string(),
-            "-f",
-            "rawvideo",
-            "-pix_fmt",
-            "rgb24",
-            "-v",
-            "quiet",
-            "-",
-        ])
-        .output()
-    else {
-        return Vec::new();
-    };
-
-    if !output.status.success() || output.stdout.is_empty() {
-        return Vec::new();
-    }
-
     let probe = Command::new("ffprobe")
         .args([
             "-v",
@@ -80,16 +59,73 @@ pub fn extract_frames(video_path: &str) -> Vec<image::RgbImage> {
         (640, 480)
     };
 
-    let frame_size = (width * height * 3) as usize;
-    let raw = &output.stdout;
-    let mut frames = Vec::new();
+    let max_dim = width.max(height);
+    let (w, h) = if max_dim > MAX_FRAME_SIDE {
+        let scale = MAX_FRAME_SIDE as f32 / max_dim as f32;
+        (
+            (width as f32 * scale).max(1.0) as u32,
+            (height as f32 * scale).max(1.0) as u32,
+        )
+    } else {
+        (width, height)
+    };
 
-    for chunk in raw.chunks_exact(frame_size) {
-        let img = image::ImageBuffer::from_raw(width, height, chunk.to_vec());
-        if let Some(img) = img {
+    let fps_filter = format!("fps=1/{}", FRAME_INTERVAL_SECS);
+    let scale_filter = format!("scale={w}:{h}");
+    let filter = format!("{fps_filter},{scale_filter}");
+
+    let mut child = match Command::new("ffmpeg")
+        .args([
+            "-i",
+            video_path,
+            "-vf",
+            &filter,
+            "-frames:v",
+            &MAX_FRAMES.to_string(),
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "-v",
+            "quiet",
+            "-",
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut stdout = match child.stdout.take() {
+        Some(stdout) => stdout,
+        None => return Vec::new(),
+    };
+
+    let frame_size = (w * h * 3) as usize;
+    let mut frames = Vec::new();
+    let mut buf = vec![0u8; frame_size];
+    loop {
+        if frames.len() >= MAX_FRAMES {
+            break;
+        }
+        let mut filled = 0;
+        while filled < frame_size {
+            match stdout.read(&mut buf[filled..]) {
+                Ok(0) => break,
+                Ok(n) => filled += n,
+                Err(_) => break,
+            }
+        }
+        if filled < frame_size {
+            break;
+        }
+        if let Some(img) = image::ImageBuffer::from_raw(w, h, buf.clone()) {
             frames.push(img);
         }
     }
+    let _ = child.wait();
 
     frames
 }
@@ -124,12 +160,16 @@ pub(crate) const NO_TIMESTAMPS: i64 = 50363;
 /// Extracts mono 16kHz audio from a video file using ffmpeg.
 ///
 /// Resamples to 16kHz mono PCM s16le, then normalizes each sample to [-1.0, 1.0].
-/// Returns `None` if ffmpeg fails or produces no output.
+/// Only the first `CHUNK_LENGTH` seconds are extracted since transcription
+/// analyzes the leading 30s chunk. Returns `None` if ffmpeg fails or produces
+/// no output.
 pub fn extract_audio(video_path: &str) -> Option<Vec<f32>> {
     let output = Command::new("ffmpeg")
         .args([
             "-i",
             video_path,
+            "-t",
+            &CHUNK_LENGTH.to_string(),
             "-ar",
             &SAMPLE_RATE.to_string(),
             "-ac",
