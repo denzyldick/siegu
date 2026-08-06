@@ -3,7 +3,7 @@
     <div class="d-flex align-center justify-space-between mb-8">
       <div>
         <div class="d-flex align-center mb-1">
-          <v-icon color="#18181b" size="28" class="mr-3">mdi-devices</v-icon>
+          <v-icon color="var(--color-text-primary)" size="28" class="mr-3">mdi-devices</v-icon>
           <h1 class="text-h4 font-weight-bold text-zinc-primary">{{ $t('devices.title') }}</h1>
         </div>
         <div class="text-subtitle-1 text-zinc-secondary">{{ $t('devices.desc') }}</div>
@@ -16,7 +16,7 @@
       v-if="devices.length === 0"
       class="d-flex flex-column align-center justify-center py-16 text-center animate-fade-in"
     >
-      <v-icon size="64" color="#d4d4d8" class="mb-4">mdi-laptop-off</v-icon>
+      <v-icon size="64" color="var(--color-icon-empty)" class="mb-4">mdi-laptop-off</v-icon>
       <div class="text-h6 text-zinc-secondary font-weight-bold">{{ $t('devices.no_devices') }}</div>
       <p class="text-body-2 text-zinc-muted mt-1 max-w-400 mx-auto">
         {{ $t('devices.no_devices_desc') }}
@@ -35,7 +35,7 @@
           <v-card-item class="py-4">
             <template v-slot:prepend>
               <div class="siegu-icon-circle-dark mr-3 device-icon-wrap">
-                <v-icon color="#ffffff" size="small">{{ device.icon }}</v-icon>
+                <v-icon color="var(--color-text-btn)" size="small">{{ device.icon }}</v-icon>
                 <span
                   v-if="!device.host"
                   class="device-status-dot"
@@ -148,7 +148,7 @@
                 color="black"
                 height="6"
                 rounded
-                bg-color="#f4f4f5"
+                bg-color="var(--color-bg-zinc-100)"
                 bg-opacity="1"
               ></v-progress-linear>
             </div>
@@ -206,7 +206,7 @@
         <v-card-actions class="px-0 ga-3">
           <v-btn
             variant="flat"
-            color="#f4f4f5"
+            color="var(--color-bg-zinc-100)"
             class="siegu-btn flex-grow-1 text-zinc-primary"
             height="44"
             @click="deleteDialog = false"
@@ -231,7 +231,7 @@
     <v-dialog v-model="renameDialog" max-width="400" rounded="xl">
       <v-card class="pa-6 border-subtle bg-siegu-white">
         <div class="siegu-icon-circle-dark mb-4">
-          <v-icon color="white">mdi-pencil-outline</v-icon>
+          <v-icon color="var(--color-text-btn)">mdi-pencil-outline</v-icon>
         </div>
         <v-card-title class="text-h5 font-weight-bold text-zinc-primary px-0 pb-2">{{
           $t('devices.rename_device_title')
@@ -249,7 +249,7 @@
         <v-card-actions class="px-0 ga-3">
           <v-btn
             variant="flat"
-            color="#f4f4f5"
+            color="var(--color-bg-zinc-100)"
             class="siegu-btn flex-grow-1 text-zinc-primary"
             height="44"
             @click="renameDialog = false"
@@ -276,12 +276,12 @@
 .siegu-icon-circle-error {
   width: 48px;
   height: 48px;
-  background: #ef4444;
+  background: var(--color-error);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+  box-shadow: color-mix(in srgb, var(--color-error) 20%, transparent) 0 4px 12px;
 }
 .device-icon-wrap {
   position: relative;
@@ -296,13 +296,13 @@
   border: 2px solid #fff;
 }
 .dot-connected {
-  background: #22c55e;
+  background: var(--color-success);
 }
 .dot-offline {
-  background: #ef4444;
+  background: var(--color-error);
 }
 .dot-idle {
-  background: #a1a1aa;
+  background: var(--color-text-secondary);
 }
 .device-card {
   transition: all 0.2s ease;

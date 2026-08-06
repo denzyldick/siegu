@@ -88,6 +88,11 @@ body {
   color: var(--color-info-strong) !important;
 }
 
+.v-application .text-btn,
+.text-btn {
+  color: var(--color-text-btn) !important;
+}
+
 .border-bottom-subtle {
   border-bottom: 1px solid var(--color-border-subtle);
 }

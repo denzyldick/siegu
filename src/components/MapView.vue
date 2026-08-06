@@ -5,7 +5,7 @@
       <div
         class="d-flex flex-column align-center justify-center h-100 px-6 text-center animate-fade-in"
       >
-        <v-icon size="48" color="#3f3f46" class="mb-4">mdi-map-marker-off-outline</v-icon>
+        <v-icon size="48" color="var(--color-text-secondary)" class="mb-4">mdi-map-marker-off-outline</v-icon>
         <div class="text-h6 text-zinc-secondary font-weight-bold">{{ $t('map.no_photos') }}</div>
         <p class="text-body-2 text-zinc-muted mt-1 max-w-400">{{ $t('map.no_photos_desc') }}</p>
       </div>
@@ -24,7 +24,7 @@
       @ready="onMapReady"
       :minZoom="2"
       :options="{ zoomControl: false, attributionControl: false, preferCanvas: true }"
-      style="height: 100%; width: 100%; background: #e2e2e7"
+      style="height: 100%; width: 100%; background: var(--color-bg-zinc-100)"
       class="light-map"
     >
       <l-tile-layer
@@ -191,7 +191,7 @@ async function loadMapData() {
     for (const p of mapPoints.value) {
       const marker = L.circleMarker([p.latitude, p.longitude], {
         radius: 5,
-        fillColor: '#2563eb',
+        fillColor: 'var(--color-info)',
         color: '#ffffff',
         weight: 1.5,
         opacity: 0.9,
@@ -289,7 +289,7 @@ watch(currentPhotoIndex, (idx) => {
 <style scoped>
 :deep(.leaflet-container) {
   height: 100%;
-  background: #f4f4f5;
+  background: var(--color-bg-zinc-100);
 }
 
 .map-empty-state {
@@ -343,20 +343,20 @@ watch(currentPhotoIndex, (idx) => {
 :deep(.cluster-sm) {
   width: 40px;
   height: 40px;
-  background: rgba(37, 99, 235, 0.7);
+  background: color-mix(in srgb, var(--color-info) 70%, transparent);
 }
 
 :deep(.cluster-md) {
   width: 44px;
   height: 44px;
-  background: rgba(37, 99, 235, 0.8);
+  background: color-mix(in srgb, var(--color-info) 80%, transparent);
   font-size: 14px;
 }
 
 :deep(.cluster-lg) {
   width: 48px;
   height: 48px;
-  background: rgba(37, 99, 235, 0.9);
+  background: color-mix(in srgb, var(--color-info) 90%, transparent);
   font-size: 15px;
 }
 
@@ -368,7 +368,7 @@ watch(currentPhotoIndex, (idx) => {
 :deep(.thumb-loading) {
   width: 120px;
   height: 120px;
-  background: #e4e4e7;
+  background: var(--color-bg-zinc-100);
   border-radius: 6px;
   animation: pulse 1.5s ease-in-out infinite;
 }

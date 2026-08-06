@@ -4,7 +4,7 @@
       <div v-if="selectedIds.size > 0" class="bulk-toolbar-container">
         <v-sheet
           class="bulk-toolbar d-flex align-center px-6 py-3 rounded-pill shadow-xl"
-          color="#18181b"
+          color="var(--color-text-primary)"
         >
           <v-btn
             icon="mdi-close"
@@ -124,13 +124,13 @@
     >
       <div class="empty-state-icon mb-6">
         <template v-if="searchQuery">
-          <v-icon size="80" color="#d4d4d8">mdi-text-search-variant</v-icon>
+          <v-icon size="80" color="var(--color-icon-empty)">mdi-text-search-variant</v-icon>
         </template>
         <template v-else-if="filters.favoritesOnly">
-          <v-icon size="80" color="#fee2e2">mdi-heart-multiple</v-icon>
+          <v-icon size="80" color="var(--color-error-tint)">mdi-heart-multiple</v-icon>
         </template>
         <template v-else>
-          <v-icon size="80" color="#f4f4f5">mdi-image-multiple-outline</v-icon>
+          <v-icon size="80" color="var(--color-icon-empty)">mdi-image-multiple-outline</v-icon>
         </template>
       </div>
 
@@ -170,7 +170,7 @@
         <div v-if="loading" class="d-flex flex-column align-center">
           <v-progress-circular
             indeterminate
-            color="#18181b"
+            color="var(--color-text-primary)"
             size="32"
             width="3"
           ></v-progress-circular>
@@ -743,8 +743,8 @@ onUnmounted(() => {
 }
 
 .siegu-btn-modern {
-  background: #000000;
-  color: #ffffff;
+  background: var(--color-bg-btn);
+  color: var(--color-text-btn);
   border-radius: 12px;
   text-transform: none;
   font-weight: 700;

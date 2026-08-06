@@ -4,25 +4,25 @@
       <div v-if="isManualAlbum && selectedIds.length > 0" class="bulk-toolbar-container">
         <v-sheet
           class="bulk-toolbar d-flex align-center px-6 py-3 rounded-pill shadow-xl"
-          color="#18181b"
+          color="var(--color-bg-btn)"
         >
           <v-btn
             icon="mdi-close"
             variant="text"
             density="comfortable"
-            color="white"
+            color="var(--color-text-btn)"
             @click="clearSelection"
           ></v-btn>
           <div class="ml-4">
-            <div class="text-subtitle-2 font-weight-bold text-white">
+            <div class="text-subtitle-2 font-weight-bold text-btn">
               {{ $t('albums.selected', { count: selectedIds.length }) }}
             </div>
           </div>
           <v-spacer></v-spacer>
           <v-btn
             variant="flat"
-            color="rgba(255,255,255,0.1)"
-            class="text-white px-6 rounded-xl text-none font-weight-bold"
+            color="var(--color-bg-surface)"
+            class="text-btn px-6 rounded-xl text-none font-weight-bold"
             size="small"
             @click="bulkRemoveFromAlbum"
           >
@@ -96,7 +96,7 @@
                     class="album-cover-img"
                   />
                   <div v-else class="album-cover-placeholder d-flex align-center justify-center">
-                    <v-icon size="44" color="#d4d4d8">{{ tileIcon(item.kind) }}</v-icon>
+                    <v-icon size="44" color="var(--color-icon-empty)">{{ tileIcon(item.kind) }}</v-icon>
                   </div>
                   <div class="album-count">
                     <v-icon size="12">mdi-image</v-icon>
@@ -135,7 +135,7 @@
         class="empty-state-container d-flex flex-column align-center justify-center text-center"
       >
         <div class="empty-state-icon mb-6">
-          <v-icon size="80" color="#d4d4d8">mdi-image-album</v-icon>
+          <v-icon size="80" color="var(--color-icon-empty)">mdi-image-album</v-icon>
         </div>
         <h3 class="text-h5 font-weight-bold text-zinc-primary mb-2">
           {{ $t('albums.no_albums') }}
@@ -293,7 +293,7 @@
         class="empty-state-container d-flex flex-column align-center justify-center text-center"
       >
         <div class="empty-state-icon mb-6">
-          <v-icon size="80" color="#d4d4d8">mdi-image-outline</v-icon>
+          <v-icon size="80" color="var(--color-icon-empty)">mdi-image-outline</v-icon>
         </div>
         <h3 class="text-h5 font-weight-bold text-zinc-primary mb-2">
           {{ $t('albums.empty_album') }}
@@ -308,7 +308,7 @@
         class="empty-state-container d-flex flex-column align-center justify-center text-center"
       >
         <div class="empty-state-icon mb-6">
-          <v-icon size="80" color="#d4d4d8">mdi-text-search-variant</v-icon>
+          <v-icon size="80" color="var(--color-icon-empty)">mdi-text-search-variant</v-icon>
         </div>
         <h3 class="text-h5 font-weight-bold text-zinc-primary mb-2">
           {{ $t('albums.no_results_in_album', { query }) }}
@@ -320,7 +320,7 @@
           <div v-if="loadingContents || searchLoading" class="d-flex align-center">
             <v-progress-circular
               indeterminate
-              color="#18181b"
+              color="var(--color-text-primary)"
               size="28"
               width="3"
             ></v-progress-circular>
@@ -1032,7 +1032,7 @@ onUnmounted(() => {
   width: 120px;
   height: 120px;
   border-radius: 999px;
-  background: rgba(244, 244, 245, 0.6);
+  background: color-mix(in srgb, var(--color-bg-zinc-100) 60%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;

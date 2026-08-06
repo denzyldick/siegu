@@ -4,12 +4,12 @@
       <v-layout class="fill-height">
         <v-main
           class="fill-height position-relative d-flex flex-column align-center justify-center p-0"
-          style="background-color: rgb(var(--v-theme-background))"
+          style="background-color: var(--color-bg-primary)"
         >
           <v-btn
             icon="mdi-close"
             variant="text"
-            color="#18181b"
+            color="var(--color-text-primary)"
             class="viewer-nav-btn top-left"
             @click="close"
           ></v-btn>
@@ -17,7 +17,7 @@
             <v-btn
               icon="mdi-dots-vertical"
               variant="text"
-              color="#71717a"
+              color="var(--color-text-muted)"
               class="viewer-nav-btn top-left-more"
               @click="moreMenuOpen = true"
             ></v-btn>
@@ -40,7 +40,7 @@
                 v-bind="menuProps"
                 icon="mdi-dots-vertical"
                 variant="text"
-                color="#71717a"
+                color="var(--color-text-muted)"
                 class="viewer-nav-btn top-left-more"
               ></v-btn>
             </template>
@@ -59,7 +59,7 @@
             v-if="!isVideo && !showInfo"
             icon="mdi-information-outline"
             variant="text"
-            color="#71717a"
+            color="var(--color-text-muted)"
             class="viewer-nav-btn top-right"
             @click="showInfo = !showInfo"
           ></v-btn>
@@ -78,7 +78,7 @@
               v-if="!isMobile"
               icon="mdi-chevron-left"
               variant="text"
-              color="#18181b"
+              color="var(--color-text-primary)"
               size="x-large"
               @click="prev"
               class="side-nav-btn left"
@@ -106,7 +106,7 @@
               v-if="!isMobile"
               icon="mdi-chevron-right"
               variant="text"
-              color="#18181b"
+              color="var(--color-text-primary)"
               size="x-large"
               @click="next"
               class="side-nav-btn right"
@@ -217,7 +217,7 @@
                 {{ $t('media_viewer.file_details') }}
               </div>
               <div class="d-flex align-start mb-2">
-                <v-icon size="small" color="#71717a" class="mr-2 mt-1"
+                <v-icon size="small" color="var(--color-text-muted)" class="mr-2 mt-1"
                   >mdi-file-document-outline</v-icon
                 >
                 <div class="text-body-2 text-zinc-secondary word-break-all">
@@ -264,7 +264,7 @@
               </div>
 
               <div class="d-flex align-center mb-4" v-if="exifData.make || exifData.model">
-                <v-icon size="small" color="#71717a" class="mr-2">mdi-camera</v-icon>
+                <v-icon size="small" color="var(--color-text-muted)" class="mr-2">mdi-camera</v-icon>
                 <span class="text-body-2 text-zinc-secondary"
                   >{{ exifData.make }} {{ exifData.model }}</span
                 >
@@ -380,7 +380,7 @@
                 </div>
                 <v-progress-linear
                   :model-value="tag.percent"
-                  color="#18181b"
+                  color="var(--color-text-primary)"
                   height="2"
                   rounded
                   class="mt-1 opacity-10"
@@ -1073,7 +1073,7 @@ onUnmounted(() => {
 }
 
 .info-drawer {
-  border-left: 1px solid rgba(0, 0, 0, 0.05);
+  border-left: 1px solid var(--color-border-subtle);
   z-index: 3000;
 }
 

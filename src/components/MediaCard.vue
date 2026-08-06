@@ -65,7 +65,7 @@
           :class="{ 'is-fav': path.favorite }"
           @click.stop="toggleFavorite"
         >
-          <v-icon size="18" :color="path.favorite ? '#ef4444' : 'white'">
+          <v-icon size="18" :color="path.favorite ? 'var(--color-error)' : 'white'">
             {{ path.favorite ? 'mdi-heart' : 'mdi-heart-outline' }}
           </v-icon>
         </button>
@@ -78,7 +78,7 @@
           <span v-for="tag in tags" :key="tag" class="info-tag">{{ tag }}</span>
         </div>
         <div class="media-card-meta" v-if="hasResults">
-          <v-icon size="12" color="#a1a1aa">mdi-auto-fix</v-icon>
+          <v-icon size="12" color="var(--color-text-secondary)">mdi-auto-fix</v-icon>
         </div>
       </div>
       <div
@@ -94,15 +94,15 @@
           class="detail-item"
           :title="$t('media_card.aesthetics_score')"
         >
-          <v-icon size="10" color="#a1a1aa">mdi-star</v-icon>
+          <v-icon size="10" color="var(--color-text-secondary)">mdi-star</v-icon>
           {{ formatScore(path.aesthetics_score) }}
         </span>
         <span v-if="faceCount > 0" class="detail-item" :title="$t('media_card.faces_detected')">
-          <v-icon size="10" color="#a1a1aa">mdi-face</v-icon>
+          <v-icon size="10" color="var(--color-text-secondary)">mdi-face</v-icon>
           {{ faceCount }}
         </span>
         <span v-if="path.indexed === 2" class="detail-item" :title="$t('media_card.fully_indexed')">
-          <v-icon size="10" color="#22c55e">mdi-check-circle</v-icon>
+          <v-icon size="10" color="var(--color-success)">mdi-check-circle</v-icon>
         </span>
       </div>
     </div>
@@ -255,16 +255,16 @@ onUnmounted(() => {
   overflow: hidden;
   border-radius: 16px;
   position: relative;
-  background-color: #f4f4f5;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  background-color: var(--color-bg-zinc-100);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .viewport-placeholder {
-  background-color: #f4f4f5;
+  background-color: var(--color-bg-zinc-100);
 }
 
 .img-placeholder {
-  background-color: #f4f4f5;
+  background-color: var(--color-bg-zinc-100);
 }
 
 .media-card-img {
@@ -306,7 +306,7 @@ onUnmounted(() => {
 }
 
 .is-selected .media-card-wrapper {
-  border: 4px solid #000000;
+  border: 4px solid var(--color-bg-btn);
   transform: scale(0.92);
 }
 
@@ -331,8 +331,8 @@ onUnmounted(() => {
 }
 
 .check-circle.checked {
-  background: #000000;
-  border-color: #000000;
+  background: var(--color-bg-btn);
+  border-color: var(--color-bg-btn);
 }
 
 .video-indicator {
@@ -361,7 +361,7 @@ onUnmounted(() => {
   font-size: 10px;
   font-weight: 700;
   color: white;
-  background: rgba(220, 38, 38, 0.9);
+  background: color-mix(in srgb, var(--color-error) 90%, transparent);
   backdrop-filter: blur(8px);
   border-radius: 999px;
   padding: 3px 8px;
@@ -405,14 +405,14 @@ onUnmounted(() => {
   right: auto;
   width: 28px;
   height: 28px;
-  background: rgba(245, 158, 11, 0.9);
+  background: color-mix(in srgb, var(--color-warning) 90%, transparent);
   opacity: 1;
   transform: none;
   z-index: 6;
 }
 
 .not-synced-badge:hover {
-  background: #d97706;
+  background: var(--color-warning-strong);
 }
 
 .shadow-sm {
@@ -442,8 +442,8 @@ onUnmounted(() => {
 .info-tag {
   font-size: 10px;
   font-weight: 600;
-  color: #71717a;
-  background: #f4f4f5;
+  color: var(--color-text-muted);
+  background: var(--color-bg-zinc-100);
   padding: 1px 6px;
   border-radius: 4px;
   text-transform: capitalize;
@@ -457,7 +457,7 @@ onUnmounted(() => {
 
 .media-card-caption {
   font-size: 11px;
-  color: #52525b;
+  color: var(--color-text-secondary);
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -469,7 +469,7 @@ onUnmounted(() => {
 }
 
 .click-caption:hover {
-  color: #18181b;
+  color: var(--color-text-primary);
   text-decoration: underline;
 }
 
@@ -482,7 +482,7 @@ onUnmounted(() => {
 
 .detail-item {
   font-size: 10px;
-  color: #a1a1aa;
+  color: var(--color-text-secondary);
   display: inline-flex;
   align-items: center;
   gap: 2px;
