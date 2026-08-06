@@ -31,6 +31,22 @@ const uiStore = useUiStore();
 const currentPage = computed(() => uiStore.currentPage);
 const searchStore = useSearchStore();
 
+const mediaFilters = computed(() => ({
+  favoritesOnly: searchStore.mediaFilters.favoritesOnly,
+  videosOnly: searchStore.mediaFilters.videosOnly,
+  facesOnly: searchStore.mediaFilters.facesOnly,
+  papersOnly: searchStore.mediaFilters.papersOnly,
+  nsfwOnly: searchStore.mediaFilters.nsfwOnly,
+  camera: searchStore.camera,
+  aestheticsMin: searchStore.aestheticsMin,
+  surprise: searchStore.surprise,
+  orderBy: searchStore.sortOrder,
+  personMatch: searchStore.personMatch,
+  personAlone: searchStore.personAlone,
+  dateRange: 'all',
+  folder: null,
+}));
+
 const openedFile = ref<string | null>(null);
 const fileSnackbar = ref(false);
 
@@ -166,21 +182,7 @@ function removeFilterChip(index: number): void {
               v-if="currentPage === 'home'"
               :search-query="searchStore.query"
               :facets="searchStore.activeFilters"
-              :filters="{
-                favoritesOnly: searchStore.mediaFilters.favoritesOnly,
-                videosOnly: searchStore.mediaFilters.videosOnly,
-                facesOnly: searchStore.mediaFilters.facesOnly,
-                papersOnly: searchStore.mediaFilters.papersOnly,
-                nsfwOnly: searchStore.mediaFilters.nsfwOnly,
-                camera: searchStore.camera,
-                aestheticsMin: searchStore.aestheticsMin,
-                surprise: searchStore.surprise,
-                orderBy: searchStore.sortOrder,
-                personMatch: searchStore.personMatch,
-                personAlone: searchStore.personAlone,
-                dateRange: 'all',
-                folder: null,
-              }"
+              :filters="mediaFilters"
               @clear-search="handleClearSearch"
               @search-person="handleSearchPerson"
             />

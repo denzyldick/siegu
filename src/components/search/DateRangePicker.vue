@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { dayCounts } from '@/services/tauri';
 import type { DayCount } from '@/types/search';
@@ -174,6 +174,11 @@ watch([viewYear, viewMonth], () => {
 
 onMounted(() => {
   void fetchCounts();
+});
+
+onUnmounted(() => {
+  if (fetchTimer) clearTimeout(fetchTimer);
+  fetchTimer = null;
 });
 </script>
 

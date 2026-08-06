@@ -85,7 +85,12 @@
             ></v-btn>
 
             <div class="media-wrapper">
-              <img v-if="currentPhoto && !isVideo" :src="currentPhotoSrc" class="viewer-image" />
+              <img
+                v-if="currentPhoto && !isVideo"
+                :src="currentPhotoSrc"
+                class="viewer-image"
+                decoding="async"
+              />
               <video
                 v-if="currentPhoto && isVideo && computedVideoUrl"
                 ref="videoPlayer"
