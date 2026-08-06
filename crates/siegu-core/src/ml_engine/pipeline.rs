@@ -346,6 +346,7 @@ pub fn analyze_image(
                 let sx = orig_w / 640.0;
                 let sy = orig_h / 640.0;
                 let dets = face_detector::scale_yunet_faces(&dets, sx, sy);
+                let mut buffer = std::io::Cursor::new(Vec::new());
                 for det in &dets {
                     let bbox = det.bbox;
                     let xmin = bbox[0].max(0.0) as u32;
@@ -427,7 +428,8 @@ pub fn analyze_image(
                                     }
                                 }
 
-                                let mut buffer = std::io::Cursor::new(Vec::new());
+                                buffer.get_mut().clear();
+                                buffer.set_position(0);
                                 let _ = face_crop.write_to(&mut buffer, image::ImageFormat::Jpeg);
                                 let encoded = format!(
                                     "data:image/jpeg;base64,{}",
@@ -472,8 +474,11 @@ pub fn analyze_image(
         }
     }
 
-    // MiDaS
-    if should_run_model(target_model, "midas", Some(config)) && ai_status.midas == 0 {
+    // MiDaS (opt-in: depth output is currently unused, so it is gated off by default)
+    if config.get("midas_enabled").is_some_and(|v| v == "true")
+        && should_run_model(target_model, "midas", Some(config))
+        && ai_status.midas == 0
+    {
         if let Some(ref model) = models.midas {
             let start = Instant::now();
             let input = preprocessing::midas_preprocess(img);
