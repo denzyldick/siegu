@@ -8,7 +8,7 @@
     <v-card-item class="bg-zinc-100 py-4">
       <template v-slot:prepend>
         <div class="siegu-icon-circle-dark mr-3">
-          <v-icon color="#ffffff" size="small">mdi-update</v-icon>
+          <v-icon color="var(--color-text-btn)" size="small">mdi-update</v-icon>
         </div>
       </template>
       <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
@@ -30,7 +30,6 @@
             <v-btn
               size="small"
               variant="flat"
-              color="#000000"
               theme="dark"
               :loading="status === 'checking'"
               :disabled="!supported || status === 'downloading'"
@@ -39,7 +38,7 @@
             >
               <div class="d-flex align-center">
                 <div class="siegu-icon-circle siegu-icon-circle-md mr-3">
-                  <v-icon color="#ffffff" size="small">{{ btnIcon }}</v-icon>
+                  <v-icon color="var(--color-text-btn)" size="small">{{ btnIcon }}</v-icon>
                 </div>
                 <span class="font-weight-bold">{{ btnText }}</span>
               </div>

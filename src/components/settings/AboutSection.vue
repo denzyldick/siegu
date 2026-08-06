@@ -8,7 +8,7 @@
     <v-card-item class="bg-zinc-100 py-4">
       <template v-slot:prepend>
         <div class="siegu-icon-circle-dark mr-3">
-          <v-icon color="#ffffff" size="small">mdi-information-outline</v-icon>
+          <v-icon color="var(--color-text-btn)" size="small">mdi-information-outline</v-icon>
         </div>
       </template>
       <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
@@ -24,7 +24,7 @@
       <v-expansion-panels class="bg-transparent">
         <v-expansion-panel class="bg-transparent">
           <v-expansion-panel-title class="px-0 text-body-2 font-weight-bold text-zinc-primary">
-            <v-icon size="small" color="#71717a" class="mr-2">mdi-xml</v-icon>
+            <v-icon size="small" color="var(--color-text-muted)" class="mr-2">mdi-xml</v-icon>
             {{ $t('about_open_source_licenses') }}
           </v-expansion-panel-title>
           <v-expansion-panel-text class="text-zinc-secondary">

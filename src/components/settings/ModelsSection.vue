@@ -3,7 +3,7 @@
     <v-card-item class="bg-zinc-100 py-4">
       <template v-slot:prepend>
         <div class="siegu-icon-circle-dark mr-3">
-          <v-icon color="#ffffff" size="small">mdi-robot-outline</v-icon>
+          <v-icon color="var(--color-text-btn)" size="small">mdi-robot-outline</v-icon>
         </div>
       </template>
       <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
@@ -28,7 +28,7 @@
       <v-sheet
         v-if="visibleActivityModel"
         class="ai-activity-strip d-flex align-center justify-space-between px-4 py-3 mb-4 rounded-lg"
-        color="#f4f4f5"
+        color="var(--color-bg-zinc-100)"
         border
       >
         <div class="d-flex align-center min-width-0">
@@ -37,10 +37,10 @@
             indeterminate
             size="20"
             width="2"
-            color="black"
+            color="var(--color-text-primary)"
             class="mr-3 flex-shrink-0"
           ></v-progress-circular>
-          <v-icon v-else size="20" color="#18181b" class="mr-3 flex-shrink-0">
+          <v-icon v-else size="20" color="var(--color-text-primary)" class="mr-3 flex-shrink-0">
             {{ getModelActivityIcon(visibleActivityModel.id) }}
           </v-icon>
           <div class="min-width-0">
@@ -194,8 +194,8 @@
                 <v-progress-linear
                   :indeterminate="!hasModelProgressTotal(model.id)"
                   :model-value="getModelProgressPercent(model.id)"
-                  color="black"
-                  bg-color="#e4e4e7"
+                  color="var(--color-text-primary)"
+                  bg-color="var(--color-bg-zinc-100)"
                   height="4"
                   rounded
                 ></v-progress-linear>
@@ -214,8 +214,8 @@
                 <v-progress-linear
                   :indeterminate="!hasDownloadProgressTotal(model.id)"
                   :model-value="getProgress(model.id)"
-                  color="black"
-                  bg-color="#f4f4f5"
+                  color="var(--color-text-primary)"
+                  bg-color="var(--color-bg-zinc-100)"
                   height="4"
                   rounded
                 ></v-progress-linear>
@@ -441,7 +441,7 @@ function toggleModelSelection(modelId: string): void {
 }
 .ai-model-card-blocked {
   opacity: 0.75;
-  border-color: rgba(245, 158, 11, 0.4) !important;
+  border-color: color-mix(in srgb, var(--color-warning) 40%, transparent) !important;
 }
 .model-status-line {
   gap: 12px;

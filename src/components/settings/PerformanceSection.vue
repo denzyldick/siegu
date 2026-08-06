@@ -3,7 +3,7 @@
     <v-card-item class="bg-zinc-100 py-4">
       <template v-slot:prepend>
         <div class="siegu-icon-circle-dark mr-3">
-          <v-icon color="#ffffff" size="small">mdi-speedometer</v-icon>
+          <v-icon color="var(--color-text-btn)" size="small">mdi-speedometer</v-icon>
         </div>
       </template>
       <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
@@ -79,9 +79,8 @@
               </div>
               <v-chip
                 size="small"
-                color="#000000"
                 variant="flat"
-                class="font-weight-bold text-white"
+                class="bg-btn font-weight-bold"
               >
                 {{ gapSeconds.toFixed(1) }}s
               </v-chip>
@@ -93,7 +92,7 @@
               :step="0.1"
               hide-details
               color="primary"
-              track-color="#f4f4f5"
+              track-color="var(--color-bg-zinc-100)"
               @update:model-value="onGapChange"
             ></v-slider>
             <div class="text-caption text-zinc-muted mt-1">
@@ -106,9 +105,8 @@
               </div>
               <v-chip
                 size="small"
-                color="#000000"
                 variant="flat"
-                class="font-weight-bold text-white"
+                class="bg-btn font-weight-bold"
               >
                 {{
                   performance.memoryBudgetMb === 0
@@ -124,7 +122,7 @@
               :step="0.25"
               hide-details
               color="primary"
-              track-color="#f4f4f5"
+              track-color="var(--color-bg-zinc-100)"
               @update:model-value="onMemoryBudgetChange"
             ></v-slider>
             <div class="text-caption text-zinc-muted mt-1">

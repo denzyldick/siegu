@@ -5,7 +5,7 @@
         <div v-if="!embedded" class="d-flex align-center justify-space-between mb-6">
           <div>
             <div class="d-flex align-center mb-1">
-              <v-icon color="#18181b" size="28" class="mr-3">mdi-cog-outline</v-icon>
+              <v-icon color="var(--color-text-primary)" size="28" class="mr-3">mdi-cog-outline</v-icon>
               <h1 class="text-h4 font-weight-bold text-zinc-primary">{{ $t('settings.title') }}</h1>
             </div>
             <div class="text-subtitle-1 text-zinc-secondary">{{ $t('settings.desc') }}</div>
@@ -119,7 +119,7 @@
         <v-card-item class="bg-zinc-100 py-4">
           <template v-slot:prepend>
             <div class="siegu-icon-circle-dark mr-3">
-              <v-icon color="#ffffff" size="small">mdi-cloud-download-outline</v-icon>
+              <v-icon color="var(--color-text-btn)" size="small">mdi-cloud-download-outline</v-icon>
             </div>
           </template>
           <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
@@ -167,7 +167,7 @@
         <v-card-item class="bg-zinc-100 py-4">
           <template v-slot:prepend>
             <div class="siegu-icon-circle-dark mr-3">
-              <v-icon color="#ffffff" size="small">mdi-wrench-outline</v-icon>
+              <v-icon color="var(--color-text-btn)" size="small">mdi-wrench-outline</v-icon>
             </div>
           </template>
           <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
@@ -215,7 +215,7 @@
         <v-card-item class="bg-zinc-100 py-4">
           <template v-slot:prepend>
             <div class="siegu-icon-circle-dark mr-3">
-              <v-icon color="#ffffff" size="small">mdi-folder-remove-outline</v-icon>
+              <v-icon color="var(--color-text-btn)" size="small">mdi-folder-remove-outline</v-icon>
             </div>
           </template>
           <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
@@ -453,9 +453,3 @@ onMounted(async () => {
   emit('folder-added', directories.value);
 });
 </script>
-
-<style scoped>
-.border-top-subtle {
-  border-top: 1px solid var(--color-border-subtle) !important;
-}
-</style>

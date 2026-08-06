@@ -3,7 +3,7 @@
     <v-card-item class="bg-zinc-100 py-4">
       <template v-slot:prepend>
         <div class="siegu-icon-circle-dark mr-3">
-          <v-icon color="#ffffff" size="small">mdi-wrench-outline</v-icon>
+          <v-icon color="var(--color-text-btn)" size="small">mdi-wrench-outline</v-icon>
         </div>
       </template>
       <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
@@ -49,9 +49,8 @@
             </div>
             <v-chip
               size="small"
-              color="#000000"
               variant="flat"
-              class="font-weight-bold text-white"
+              class="bg-btn font-weight-bold"
               >{{ performance.scanThreads }}</v-chip
             >
           </div>
@@ -62,7 +61,7 @@
             :step="1"
             hide-details
             color="primary"
-            track-color="#f4f4f5"
+            track-color="var(--color-bg-zinc-100)"
             @update:model-value="onScanThreadsChange"
           ></v-slider>
 
@@ -72,9 +71,8 @@
             </div>
             <v-chip
               size="small"
-              color="#000000"
               variant="flat"
-              class="font-weight-bold text-white"
+              class="bg-btn font-weight-bold"
               >{{ performance.mlThreads }}</v-chip
             >
           </div>
@@ -85,7 +83,7 @@
             :step="1"
             hide-details
             color="primary"
-            track-color="#f4f4f5"
+            track-color="var(--color-bg-zinc-100)"
             @update:model-value="onMlThreadsChange"
           ></v-slider>
 
@@ -133,7 +131,7 @@
           {{ $t('settings.system_logs') }}
         </div>
         <v-sheet
-          color="#f4f4f5"
+          color="var(--color-bg-zinc-100)"
           class="pa-4 rounded-lg overflow-y-auto border-subtle debug-logs-sheet mb-4"
           max-height="300"
         >

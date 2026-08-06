@@ -8,7 +8,7 @@
     <v-card-item class="bg-zinc-100 py-4">
       <template v-slot:prepend>
         <div class="siegu-icon-circle-dark mr-3">
-          <v-icon color="#ffffff" size="small">mdi-theme-light-dark</v-icon>
+          <v-icon color="var(--color-text-btn)" size="small">mdi-theme-light-dark</v-icon>
         </div>
       </template>
       <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
@@ -25,7 +25,7 @@
         <v-radio value="system">
           <template v-slot:label>
             <span class="d-flex align-center">
-              <v-icon size="small" color="#71717a" class="mr-2">mdi-theme-light-dark</v-icon>
+              <v-icon size="small" color="var(--color-text-muted)" class="mr-2">mdi-theme-light-dark</v-icon>
               {{ $t('settings.theme_system') }}
             </span>
           </template>
@@ -33,7 +33,7 @@
         <v-radio value="light">
           <template v-slot:label>
             <span class="d-flex align-center">
-              <v-icon size="small" color="#f59e0b" class="mr-2">mdi-white-balance-sunny</v-icon>
+              <v-icon size="small" color="var(--color-brand-favorite)" class="mr-2">mdi-white-balance-sunny</v-icon>
               {{ $t('settings.theme_light') }}
             </span>
           </template>
@@ -41,7 +41,7 @@
         <v-radio value="dark">
           <template v-slot:label>
             <span class="d-flex align-center">
-              <v-icon size="small" color="#71717a" class="mr-2">mdi-weather-night</v-icon>
+              <v-icon size="small" color="var(--color-text-muted)" class="mr-2">mdi-weather-night</v-icon>
               {{ $t('settings.theme_dark') }}
             </span>
           </template>

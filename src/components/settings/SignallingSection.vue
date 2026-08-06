@@ -8,7 +8,7 @@
     <v-card-item class="bg-zinc-100 py-4">
       <template v-slot:prepend>
         <div class="siegu-icon-circle-dark mr-3">
-          <v-icon color="#ffffff" size="small">mdi-signal-variant</v-icon>
+          <v-icon color="var(--color-text-btn)" size="small">mdi-signal-variant</v-icon>
         </div>
       </template>
       <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
@@ -135,9 +135,9 @@ watch(token, (val) => emit('update:token', val))
 
 <style scoped>
 .bg-green-50 {
-  background-color: #f0fdf4;
+  background-color: var(--color-success-tint);
 }
 .bg-red-50 {
-  background-color: #fef2f2;
+  background-color: var(--color-error-tint);
 }
 </style>

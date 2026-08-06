@@ -195,3 +195,8 @@ body {
 .bg-siegu-main {
   background-color: var(--color-bg-primary) !important;
 }
+
+.bg-btn {
+  background-color: var(--color-bg-btn) !important;
+  color: var(--color-text-btn) !important;
+}

@@ -8,7 +8,7 @@
     <v-card-item class="bg-zinc-100 py-4">
       <template v-slot:prepend>
         <div class="siegu-icon-circle-dark mr-3">
-          <v-icon color="#ffffff" size="small">mdi-folder-lock</v-icon>
+          <v-icon color="var(--color-text-btn)" size="small">mdi-folder-lock</v-icon>
         </div>
       </template>
       <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
@@ -26,7 +26,7 @@
               class="px-0"
             >
               <template v-slot:prepend>
-                <v-icon color="#71717a" class="mr-2">mdi-folder</v-icon>
+                <v-icon color="var(--color-text-muted)" class="mr-2">mdi-folder</v-icon>
               </template>
               <v-list-item-title class="text-zinc-primary font-weight-medium text-truncate">{{
                 directory.title
@@ -41,7 +41,7 @@
                       icon="mdi-dots-vertical"
                       variant="text"
                       size="small"
-                      color="#71717a"
+                      color="var(--color-text-muted)"
                       v-bind="props"
                     ></v-btn>
                   </template>
@@ -79,7 +79,6 @@
     <v-card-actions class="pa-4 bg-zinc-50 border-top-subtle">
       <v-btn
         variant="flat"
-        color="#000000"
         theme="dark"
         @click="$emit('select-directory')"
         block
@@ -88,7 +87,7 @@
       >
         <div class="d-flex align-center">
           <div class="siegu-icon-circle siegu-icon-circle-sm mr-2">
-            <v-icon size="14" color="white">mdi-folder-plus</v-icon>
+            <v-icon size="14" color="var(--color-text-btn)">mdi-folder-plus</v-icon>
           </div>
           <span class="font-weight-bold">{{ $t('settings.add_folder') }}</span>
         </div>
