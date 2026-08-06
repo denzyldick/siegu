@@ -365,22 +365,20 @@ fn make_empty_past(n_layers: usize, n_heads: usize, head_dim: usize) -> KvCache 
     past
 }
 
-/// Merges old and new KV caches, preserving old entries when new ones are empty.
+/// Merges a freshly decoded KV cache into `current` in place, preserving old
+/// entries when the new ones are empty.
 ///
 /// The decoder ONNX model sometimes returns empty encoder KV tensors on
 /// subsequent calls. This function keeps the old (valid) cache entries in
-/// those cases, only overwriting with new data when it's non-empty.
-fn merge_kv(old: &KvCache, new: &KvCache) -> KvCache {
-    old.iter()
-        .zip(new.iter())
-        .map(|(o, n)| {
-            if n.shape().contains(&0) {
-                o.clone()
-            } else {
-                n.clone()
-            }
-        })
-        .collect()
+/// those cases, only overwriting slots with non-empty new tensors. New
+/// tensors are moved in, so no per-step full-cache allocation or clone of
+/// the untouched old entries occurs.
+fn merge_kv_into(current: &mut KvCache, new: KvCache) {
+    for (slot, n) in current.iter_mut().zip(new) {
+        if !n.shape().contains(&0) {
+            *slot = n;
+        }
+    }
 }
 
 /// Converts a KV cache tensor to an ORT Value with the given input name.
@@ -638,7 +636,7 @@ pub fn whisper_transcribe(
                 whisper_debug!("step {step}: token {}", next[0]);
                 generated_tokens.push(next[0]);
                 if !new_past.is_empty() {
-                    current_past = merge_kv(&current_past, &new_past);
+                    merge_kv_into(&mut current_past, new_past);
                 }
             }
             None => {
@@ -825,30 +823,60 @@ mod tests {
     }
 
     #[test]
-    fn test_merge_kv_preserves_old_when_new_empty() {
+    fn test_merge_kv_into_preserves_old_when_new_empty() {
         let n_layers = 2;
         let n_heads = 6;
         let head_dim = 64;
-        let old = make_empty_past(n_layers, n_heads, head_dim);
+        let mut current = make_empty_past(n_layers, n_heads, head_dim);
+        let old = current.clone();
         let new: KvCache = (0..old.len())
             .map(|_| Array4::<f32>::zeros((0, 0, 0, 0)))
             .collect();
-        let merged = merge_kv(&old, &new);
-        assert_eq!(merged.len(), old.len());
-        for (m, o) in merged.iter().zip(old.iter()) {
-            assert_eq!(m.shape(), o.shape());
+        merge_kv_into(&mut current, new);
+        assert_eq!(current.len(), old.len());
+        for (c, o) in current.iter().zip(old.iter()) {
+            assert_eq!(c.shape(), o.shape());
         }
     }
 
     #[test]
-    fn test_merge_kv_uses_new_when_nonempty() {
+    fn test_merge_kv_into_uses_new_when_nonempty() {
         let n_layers = 2;
         let n_heads = 6;
         let head_dim = 64;
-        let old = make_empty_past(n_layers, n_heads, head_dim);
+        let mut current = make_empty_past(n_layers, n_heads, head_dim);
+        let old = current.clone();
         let new = make_empty_past(n_layers, n_heads, head_dim);
-        let merged = merge_kv(&old, &new);
-        assert_eq!(merged.len(), old.len());
+        merge_kv_into(&mut current, new);
+        assert_eq!(current.len(), old.len());
+    }
+
+    #[test]
+    fn test_merge_kv_into_moves_nonempty_keeps_old_for_empty_encoder_slots() {
+        let n_layers = 2;
+        let n_heads = 2;
+        let head_dim = 4;
+        let mut current = make_empty_past(n_layers, n_heads, head_dim);
+        for (i, slot) in current.iter_mut().enumerate() {
+            *slot = Array4::<f32>::from_elem((1, n_heads, i as usize + 1, head_dim), 1.0);
+        }
+        let mut new = Vec::new();
+        for _layer in 0..n_layers {
+            new.push(Array4::<f32>::from_elem((1, n_heads, 3, head_dim), 2.0));
+            new.push(Array4::<f32>::from_elem((1, n_heads, 3, head_dim), 3.0));
+            new.push(Array4::<f32>::zeros((0, 0, 0, 0)));
+            new.push(Array4::<f32>::zeros((0, 0, 0, 0)));
+        }
+        merge_kv_into(&mut current, new);
+        for layer in 0..n_layers {
+            let base = layer * 4;
+            assert!(current[base].iter().all(|&v| v == 2.0));
+            assert!(current[base + 1].iter().all(|&v| v == 3.0));
+            assert!(current[base + 2].iter().all(|&v| v == 1.0));
+            assert!(current[base + 3].iter().all(|&v| v == 1.0));
+            assert_eq!(current[base + 2].shape()[2], (base + 2 + 1) as usize);
+            assert_eq!(current[base + 3].shape()[2], (base + 3 + 1) as usize);
+        }
     }
 
     #[test]
