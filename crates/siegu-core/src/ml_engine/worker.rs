@@ -336,7 +336,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
 
                         let photo_entry = {
                             let lock = db_ref.lock().unwrap_or_else(|e| e.into_inner());
-                            lock.get_photo_by_id(photo_id)
+                            lock.get_photo_for_indexing(photo_id)
                         };
 
                         if let Some(photo_entry) = photo_entry {

@@ -2040,6 +2040,52 @@ impl Database {
         Some(photo)
     }
 
+    /// Slim photo row for the ML worker: only the fields inference needs
+    /// (id, location, ai_status). Avoids loading base64 thumbnails, captions,
+    /// aesthetics, objects and properties that the indexing path never reads.
+    pub fn get_photo_for_indexing(&self, photo_id: &str) -> Option<Photo> {
+        let sql = "SELECT p.id, p.location, p.created, \
+             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, \
+             s.whisper, s.sam, s.superres \
+             FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE p.id = ?1";
+        let mut stmt = self.connection.prepare(sql).ok()?;
+        let mut rows = stmt
+            .query_map([photo_id], |row| {
+                Ok(Photo {
+                    id: row.get(0)?,
+                    location: row.get(1)?,
+                    encoded: String::new(),
+                    created: row.get(2).unwrap_or_default(),
+                    objects: HashMap::new(),
+                    properties: HashMap::new(),
+                    latitude: 0.0,
+                    longitude: 0.0,
+                    favorite: false,
+                    indexed: 0,
+                    caption: None,
+                    aesthetics_score: None,
+                    ai_status: AiStatus {
+                        clip: row.get(3).unwrap_or(0),
+                        face: row.get(4).unwrap_or(0),
+                        ocr: row.get(5).unwrap_or(0),
+                        nsfw: row.get(6).unwrap_or(0),
+                        aesthetics: row.get(7).unwrap_or(0),
+                        yolo: row.get(8).unwrap_or(0),
+                        blip: row.get(9).unwrap_or(0),
+                        arcface: row.get(10).unwrap_or(0),
+                        midas: row.get(11).unwrap_or(0),
+                        whisper: row.get(12).unwrap_or(0),
+                        sam: row.get(13).unwrap_or(0),
+                        superres: row.get(14).unwrap_or(0),
+                    },
+                    sync_needed: false,
+                    received: false,
+                })
+            })
+            .ok()?;
+        rows.next()?.ok()
+    }
+
     /// Get base64-encoded thumbnails for a batch of photo IDs.
     pub fn get_photo_encoded_batch(&self, photo_ids: &[String]) -> HashMap<String, String> {
         let mut result = HashMap::new();
@@ -2805,7 +2851,7 @@ impl Database {
     /// Get a paginated batch of unindexed photos.
     pub fn get_unindexed_photos_batch(&self, offset: usize, limit: usize) -> Vec<Photo> {
         let mut photos = Vec::new();
-        let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, p.indexed, p.caption, p.aesthetics_score, 
+        let sql = "SELECT p.id, p.location, p.latitude, p.longitude, p.created, p.indexed, 
             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres 
             FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE p.indexed < 2 LIMIT ?1 OFFSET ?2";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
@@ -2814,29 +2860,29 @@ impl Database {
                     Ok(Photo {
                         id: row.get(0)?,
                         location: row.get(1)?,
-                        encoded: row.get(2)?,
-                        created: row.get(5).unwrap_or_default(),
+                        encoded: String::new(),
+                        created: row.get(4).unwrap_or_default(),
                         objects: HashMap::new(),
                         properties: HashMap::new(),
-                        latitude: row.get(3).unwrap_or(0.0),
-                        longitude: row.get(4).unwrap_or(0.0),
+                        latitude: row.get(2).unwrap_or(0.0),
+                        longitude: row.get(3).unwrap_or(0.0),
                         favorite: false,
-                        indexed: row.get(6).unwrap_or(0),
-                        caption: row.get(7).ok(),
-                        aesthetics_score: row.get(8).ok(),
+                        indexed: row.get(5).unwrap_or(0),
+                        caption: None,
+                        aesthetics_score: None,
                         ai_status: AiStatus {
-                            clip: row.get(9).unwrap_or(0),
-                            face: row.get(10).unwrap_or(0),
-                            ocr: row.get(11).unwrap_or(0),
-                            nsfw: row.get(12).unwrap_or(0),
-                            aesthetics: row.get(13).unwrap_or(0),
-                            yolo: row.get(14).unwrap_or(0),
-                            blip: row.get(15).unwrap_or(0),
-                            arcface: row.get(16).unwrap_or(0),
-                            midas: row.get(17).unwrap_or(0),
-                            whisper: row.get(18).unwrap_or(0),
-                            sam: row.get(19).unwrap_or(0),
-                            superres: row.get(20).unwrap_or(0),
+                            clip: row.get(6).unwrap_or(0),
+                            face: row.get(7).unwrap_or(0),
+                            ocr: row.get(8).unwrap_or(0),
+                            nsfw: row.get(9).unwrap_or(0),
+                            aesthetics: row.get(10).unwrap_or(0),
+                            yolo: row.get(11).unwrap_or(0),
+                            blip: row.get(12).unwrap_or(0),
+                            arcface: row.get(13).unwrap_or(0),
+                            midas: row.get(14).unwrap_or(0),
+                            whisper: row.get(15).unwrap_or(0),
+                            sam: row.get(16).unwrap_or(0),
+                            superres: row.get(17).unwrap_or(0),
                         },
                         sync_needed: false,
                         received: false,
