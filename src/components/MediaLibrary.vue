@@ -294,6 +294,7 @@ let unlistenAnalysisResult: UnlistenFn | null = null;
 let unlistenPhotoReceived: UnlistenFn | null = null;
 let reloadTimer: ReturnType<typeof setTimeout> | null = null;
 let discoveredTimer: ReturnType<typeof setTimeout> | null = null;
+let photoReceivedTimer: ReturnType<typeof setTimeout> | null = null;
 let discoveredBuffer: MediaItem[] = [];
 let analysisTimer: ReturnType<typeof setTimeout> | null = null;
 let analysisPendingIds = new Set<string | number>();
@@ -665,8 +666,12 @@ onMounted(async () => {
     },
   );
 
-  unlistenPhotoReceived = await listen('photo-received', () => {
-    scheduleReload();
+  unlistenPhotoReceived = await listen<MediaItem>('photo-received', (event) => {
+    if (event.payload?.id) {
+      updateGroups([event.payload]);
+    }
+    if (photoReceivedTimer) clearTimeout(photoReceivedTimer);
+    photoReceivedTimer = setTimeout(scheduleReload, 500);
   });
 
   updateColumns();
@@ -682,6 +687,7 @@ onUnmounted(() => {
   unlistenPhotoReceived?.();
   if (reloadTimer) clearTimeout(reloadTimer);
   if (discoveredTimer) clearTimeout(discoveredTimer);
+  if (photoReceivedTimer) clearTimeout(photoReceivedTimer);
   if (analysisTimer) clearTimeout(analysisTimer);
 });
 </script>
