@@ -516,7 +516,7 @@ mod tests {
     }
 
     #[test]
-    fn sections_include_people_places_trips_smart_manual() {
+    fn sections_include_people_trips_smart_manual() {
         let (db, _dir) = test_db();
         db.connection
             .execute(
@@ -553,14 +553,13 @@ mod tests {
 
         let sections = do_get_album_sections(&db);
         let ids: Vec<String> = sections.iter().map(|s| s.id.clone()).collect();
-        assert_eq!(ids, vec!["people", "places", "trips", "smart", "albums"]);
+        assert_eq!(ids, vec!["people", "trips", "smart", "albums"]);
         assert_eq!(sections[0].items.len(), 1);
         assert_eq!(sections[0].items[0].name, "Alice");
-        assert_eq!(sections[1].items[0].name, "Paris, France");
-        assert_eq!(sections[2].items.len(), 1);
-        assert_eq!(sections[2].items[0].kind, "trip");
-        assert_eq!(sections[3].items[0].kind, "smart");
-        assert_eq!(sections[4].items[0].kind, "manual");
+        assert_eq!(sections[1].items.len(), 1);
+        assert_eq!(sections[1].items[0].kind, "trip");
+        assert_eq!(sections[2].items[0].kind, "smart");
+        assert_eq!(sections[3].items[0].kind, "manual");
     }
 
     #[test]

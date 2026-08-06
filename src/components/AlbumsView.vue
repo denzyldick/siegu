@@ -507,8 +507,6 @@ function tileIcon(kind: string): string {
   switch (kind) {
     case 'person':
       return 'mdi-account-circle';
-    case 'location':
-      return 'mdi-map-marker-outline';
     case 'trip':
       return 'mdi-airplane';
     case 'smart':
@@ -522,8 +520,6 @@ function kindLabel(kind: string): string {
   switch (kind) {
     case 'person':
       return t('albums.kind_person');
-    case 'location':
-      return t('albums.kind_location');
     case 'trip':
       return t('albums.kind_trip');
     case 'smart':
@@ -660,9 +656,6 @@ function baseFilterOptions(): Omit<ListFilesOptions, 'offset' | 'limit'> {
   if (item.kind === 'person' && item.id.startsWith('person:')) {
     return { personIds: [item.id.slice('person:'.length)], personMatch: 'and' };
   }
-  if (item.kind === 'location' && item.id.startsWith('place:')) {
-    return { location: item.id.slice('place:'.length) };
-  }
   return { albumId: item.id };
 }
 
@@ -672,7 +665,7 @@ async function loadContents(): Promise<void> {
   loadingContents.value = true;
   try {
     let photos: MediaItem[];
-    if (item.kind === 'person' || item.kind === 'location') {
+    if (item.kind === 'person') {
       photos = await listFiles({
         offset: offset.value,
         limit: PAGE_SIZE,

@@ -405,73 +405,6 @@ fn days_from_civil(year: i32, month: i32, day: i32) -> i64 {
     era as i64 * 146_097 + doe - 719_468
 }
 
-/// Today's date as `YYYY-MM-DD` (UTC), or empty if the system clock is unusable.
-fn today_ymd() -> String {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .ok()
-        .and_then(|d| day_index_to_date((d.as_secs() / 86_400) as i64))
-        .unwrap_or_default()
-}
-
-/// Parses `YYYY-MM-DD` into `(year, month, day)`.
-fn ymd_from_date(value: &str) -> Option<(i32, i32, i32)> {
-    let mut parts = value.split('-');
-    let year: i32 = parts.next()?.parse().ok()?;
-    let month: i32 = parts.next()?.parse().ok()?;
-    let day: i32 = parts.next()?.parse().ok()?;
-    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
-        return None;
-    }
-    Some((year, month, day))
-}
-
-/// Day-of-year index for `(month, day)` in a fixed non-leap year (2001), so
-/// differences between two results equal calendar-day differences.
-fn day_of_year_non_leap(month: i32, day: i32) -> i64 {
-    let month = month.clamp(1, 12);
-    let day = if month == 2 {
-        day.clamp(1, 28)
-    } else {
-        day.clamp(1, 31)
-    };
-    days_from_civil(2001, month, day)
-}
-
-/// Smallest number of days between two day-of-year indexes, wrapping across
-/// year boundaries (e.g. Dec 30 and Jan 2 are 3 days apart).
-fn circular_year_distance(a: i64, b: i64) -> i64 {
-    let diff = (a - b).abs();
-    diff.min(365 - diff)
-}
-
-/// Seasonal proximity of a place's visit dates (`YYYY-MM-DD`) to
-/// `reference_date`: prefers visits from past years, falling back to any
-/// visit. Lower means the place is visited closer to this time of year.
-fn seasonal_distance(visit_dates: &[String], reference_date: &str) -> i64 {
-    let Some((ref_year, ref_month, ref_day)) = ymd_from_date(reference_date) else {
-        return i64::MAX;
-    };
-    let reference = day_of_year_non_leap(ref_month, ref_day);
-    let mut past = Vec::new();
-    let mut all = Vec::new();
-    for date in visit_dates {
-        if let Some((year, month, day)) = ymd_from_date(date) {
-            let doy = day_of_year_non_leap(month, day);
-            if year < ref_year {
-                past.push(doy);
-            }
-            all.push(doy);
-        }
-    }
-    let candidates = if past.is_empty() { all } else { past };
-    candidates
-        .iter()
-        .map(|&doy| circular_year_distance(doy, reference))
-        .min()
-        .unwrap_or(i64::MAX)
-}
-
 /// Photo data for syncing between devices.
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct PhotoSyncInfo {
@@ -528,6 +461,174 @@ pub struct FaceWithPerson {
     pub encoded: String,
     pub person_id: Option<String>,
     pub person_name: Option<String>,
+}
+
+/// Maximum gap (days) between consecutive photos that keeps them in one trip
+/// cluster. Larger gaps start a new cluster.
+const TRIP_GAP_DAYS: i64 = 3;
+
+/// Minimum photos a trip must contain to be shown.
+const TRIP_MIN_PHOTOS: usize = 3;
+
+/// Window (days) within which an adjacent same-country cluster is folded into
+/// the current trip, so one journey spanning several cities with quiet gaps
+/// in between reads as a single trip.
+const TRIP_MERGE_DAYS: i64 = 6;
+
+/// Country part of a `"City, Country"` location name, if any.
+fn location_country(location: &str) -> Option<&str> {
+    location
+        .rsplit_once(", ")
+        .map(|(_, country)| country.trim())
+        .filter(|c| !c.is_empty())
+}
+
+/// Parses `YYYY-MM-DD` into `(year, month, day)`.
+fn ymd_parts(value: &str) -> Option<(i32, i32, i32)> {
+    let mut parts = value.split('-');
+    let year: i32 = parts.next()?.parse().ok()?;
+    let month: i32 = parts.next()?.parse().ok()?;
+    let day: i32 = parts.next()?.parse().ok()?;
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return None;
+    }
+    Some((year, month, day))
+}
+
+/// Day-of-year index for `(month, day)` in a fixed non-leap year (2001), so
+/// differences between two results equal calendar-day differences.
+fn day_of_year_non_leap(month: i32, day: i32) -> i64 {
+    let month = month.clamp(1, 12);
+    let day = if month == 2 {
+        day.clamp(1, 28)
+    } else {
+        day.clamp(1, 31)
+    };
+    days_from_civil(2001, month, day)
+}
+
+/// Smallest number of days between two day-of-year indexes, wrapping across
+/// year boundaries (e.g. Dec 30 and Jan 2 are 3 days apart).
+fn circular_year_gap(a: i64, b: i64) -> i64 {
+    let diff = (a - b).abs();
+    diff.min(365 - diff)
+}
+
+/// Seasonal gap (0..=182) between a `YYYY-MM-DD` date and today, ignoring the
+/// year so trips from past years surface when they fall around this time of
+/// year. `None` when either date cannot be parsed.
+fn seasonal_distance_from_today(date: &str) -> Option<i64> {
+    let today = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()
+        .and_then(|d| day_index_to_date((d.as_secs() / 86_400) as i64))?;
+    let (_, tm, td) = ymd_parts(&today)?;
+    let (_, m, d) = ymd_parts(date)?;
+    let today_doy = day_of_year_non_leap(tm, td);
+    let date_doy = day_of_year_non_leap(m, d);
+    Some(circular_year_gap(today_doy, date_doy))
+}
+
+/// Sort key for a trip album id (`trip:YYYY-MM-DD:YYYY-MM-DD`): seasonal gap
+/// to today first (closest time of year surfaces), then recency so trips in
+/// the same season order newest first.
+fn trip_sort_key(album_id: &str) -> (i64, i64) {
+    let start = album_id
+        .strip_prefix("trip:")
+        .and_then(|rest| rest.split(':').next());
+    match start {
+        Some(date) => (
+            seasonal_distance_from_today(date).unwrap_or(i64::MAX),
+            -date_day_index(date).unwrap_or(0),
+        ),
+        None => (i64::MAX, 0),
+    }
+}
+
+/// Accumulator for one candidate trip: its photos, date span, and resolved
+/// locations (`location_name` → photo count). Used to fold same-country
+/// clusters into a single trip and to derive a display name.
+#[derive(Default)]
+struct TripAcc {
+    photos: Vec<String>,
+    first_day: i64,
+    last_day: i64,
+    locations: std::collections::HashMap<String, i64>,
+}
+
+impl TripAcc {
+    fn from_cluster(cluster: &[(String, i64, String)]) -> Self {
+        let mut acc = TripAcc {
+            first_day: cluster.iter().map(|c| c.1).min().unwrap_or(0),
+            last_day: cluster.iter().map(|c| c.1).max().unwrap_or(0),
+            ..TripAcc::default()
+        };
+        for (id, _day, location) in cluster {
+            acc.photos.push(id.clone());
+            if !location.is_empty() {
+                *acc.locations.entry(location.clone()).or_insert(0) += 1;
+            }
+        }
+        acc
+    }
+
+    fn merge(&mut self, other: TripAcc) {
+        self.first_day = self.first_day.min(other.first_day);
+        self.last_day = self.last_day.max(other.last_day);
+        self.photos.extend(other.photos);
+        for (location, count) in other.locations {
+            *self.locations.entry(location).or_insert(0) += count;
+        }
+    }
+
+    /// Distinct countries visited by this trip's photos.
+    fn countries(&self) -> Vec<&str> {
+        let mut countries: Vec<&str> = Vec::new();
+        for location in self.locations.keys() {
+            if let Some(country) = location_country(location) {
+                if !countries.contains(&country) {
+                    countries.push(country);
+                }
+            }
+        }
+        countries
+    }
+
+    /// True when both trips resolve to at least one location and share a
+    /// country. Trips without location data never merge.
+    fn shares_country_with(&self, other: &TripAcc) -> bool {
+        let mine = self.countries();
+        if mine.is_empty() {
+            return false;
+        }
+        let theirs = other.countries();
+        !theirs.is_empty() && theirs.iter().any(|c| mine.contains(c))
+    }
+
+    /// Compact display name: `"City, Country"` for a single location,
+    /// `"Country"` when one country spans several cities, else the two most
+    /// photographed locations. Falls back to `"Trip"` without location data.
+    fn display_name(&self) -> String {
+        let mut ranked: Vec<(&str, i64)> = self
+            .locations
+            .iter()
+            .map(|(k, v)| (k.as_str(), *v))
+            .collect();
+        ranked.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+        if ranked.is_empty() {
+            return "Trip".to_string();
+        }
+        let countries = self.countries();
+        if countries.len() == 1 && ranked.len() > 1 {
+            return countries[0].to_string();
+        }
+        ranked.truncate(2);
+        ranked
+            .into_iter()
+            .map(|(name, _)| name.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
 }
 
 impl Database {
@@ -1719,60 +1820,6 @@ impl Database {
             }
         }
         groups
-    }
-
-    /// Locations ordered by how close their historical visits fall to today's
-    /// date (or an explicit `reference_date`, `YYYY-MM-DD`). A place visited
-    /// around the same time of year in past years surfaces first; ties break
-    /// by photo count. Powers the Albums "Places" rail.
-    pub fn get_location_groups_sorted_by_date(
-        &self,
-        limit: i64,
-        reference_date: Option<&str>,
-    ) -> Vec<LocationGroup> {
-        let reference = match reference_date {
-            Some(date) if !date.is_empty() => date.to_string(),
-            _ => today_ymd(),
-        };
-        let sql = "SELECT pr.value AS name, COUNT(*) AS cnt, \
-            (SELECT p2.location FROM photo p2 JOIN properties pr2 ON pr2.photo_id=p2.id \
-                WHERE pr2.key='location_name' AND pr2.value=pr.value \
-                ORDER BY (p2.encoded != '') DESC, p2.created DESC LIMIT 1) AS rep_loc, \
-            (SELECT p2.encoded FROM photo p2 JOIN properties pr2 ON pr2.photo_id=p2.id \
-                WHERE pr2.key='location_name' AND pr2.value=pr.value \
-                ORDER BY (p2.encoded != '') DESC, p2.created DESC LIMIT 1) AS rep_enc, \
-            (SELECT GROUP_CONCAT(DISTINCT substr(p2.created, 1, 10)) FROM photo p2 \
-                JOIN properties pr2 ON pr2.photo_id=p2.id \
-                WHERE pr2.key='location_name' AND pr2.value=pr.value) AS visit_dates \
-            FROM properties pr WHERE pr.key='location_name' GROUP BY pr.value";
-        let mut groups: Vec<(LocationGroup, i64)> = Vec::new();
-        if let Ok(mut stmt) = self.connection.prepare(sql) {
-            if let Ok(iter) = stmt.query_map([], |row| {
-                let visit_dates: String = row.get(4).unwrap_or_default();
-                Ok((
-                    LocationGroup {
-                        name: row.get(0)?,
-                        count: row.get(1)?,
-                        photo_location: row.get(2).ok(),
-                        encoded: row.get(3).ok(),
-                    },
-                    visit_dates,
-                ))
-            }) {
-                for (group, dates) in iter.flatten() {
-                    let visit_dates: Vec<String> = dates
-                        .split(',')
-                        .map(str::trim)
-                        .filter(|s| !s.is_empty())
-                        .map(str::to_string)
-                        .collect();
-                    groups.push((group, seasonal_distance(&visit_dates, &reference)));
-                }
-            }
-        }
-        groups.sort_by(|a, b| a.1.cmp(&b.1).then(b.0.count.cmp(&a.0.count)));
-        groups.truncate(limit as usize);
-        groups.into_iter().map(|(g, _)| g).collect()
     }
 
     /// Day-level photo/video counts within a date range (inclusive, `YYYY-MM-DD`).
@@ -3143,7 +3190,10 @@ impl Database {
                 let videos = filter.videos.unwrap_or(false);
                 album.item_count = self.count_photos_filtered(query, false, videos, &filter);
                 if album.cover_photo_id.is_none() {
-                    let first = self.list_photos_filtered(query, 0, 1, false, videos, &filter);
+                    let mut cover_filter = filter.clone();
+                    cover_filter.order_by = Some("best".to_string());
+                    let first =
+                        self.list_photos_filtered(query, 0, 1, false, videos, &cover_filter);
                     if let Some(photo) = first.first() {
                         album.cover_photo_id = Some(photo.id.clone());
                     }
@@ -3274,95 +3324,89 @@ impl Database {
             .ok()
     }
 
-    /// Turn one contiguous cluster of photos into a trip: a display name (the
-    /// dominant resolved location, else "Trip"), a `from|to` date range, and
-    /// the photo ids. Returns None for clusters that are too small (fewer than
-    /// `TRIP_MIN_PHOTOS`).
-    fn finalize_trip(&self, photos: &[(String, String)]) -> Option<(String, String, Vec<String>)> {
-        if photos.len() < 3 {
+    /// Turn one time-clustered group of photos into a trip: a display name, a
+    /// `from|to` date range, and the photo ids. Returns None for clusters that
+    /// are too small (fewer than `TRIP_MIN_PHOTOS`).
+    fn finalize_trip(&self, acc: &TripAcc) -> Option<(String, String, Vec<String>)> {
+        if acc.photos.len() < TRIP_MIN_PHOTOS {
             return None;
         }
-        let mut days: Vec<i64> = Vec::new();
-        for (_, created) in photos {
-            if let Some(d) = date_day_index(created) {
-                days.push(d);
-            }
-        }
-        let first_day = *days.iter().min()?;
-        let last_day = *days.iter().max()?;
-        let date_from = day_index_to_date(first_day)?;
-        let date_to = day_index_to_date(last_day)?;
-        let photo_ids: Vec<String> = photos.iter().map(|(id, _)| id.clone()).collect();
-
-        let mut location: Option<String> = None;
-        let sql = "SELECT pr.value, COUNT(*) AS c FROM properties pr \
-            JOIN photo p ON p.id = pr.photo_id \
-            WHERE pr.key = 'location_name' AND substr(p.created, 1, 10) BETWEEN ?1 AND ?2 \
-            GROUP BY pr.value ORDER BY c DESC LIMIT 1";
-        if let Ok(mut stmt) = self.connection.prepare(sql) {
-            if let Ok(iter) = stmt.query_map(rusqlite::params![&date_from, &date_to], |r| {
-                r.get::<_, String>(0)
-            }) {
-                location = iter.flatten().next();
-            }
-        }
+        let date_from = day_index_to_date(acc.first_day)?;
+        let date_to = day_index_to_date(acc.last_day)?;
         let year = &date_from[..4];
-        let name = match location {
-            Some(loc) => format!("{loc} · {year}"),
-            None => format!("Trip · {year}"),
-        };
-        Some((name, format!("{date_from}|{date_to}"), photo_ids))
+        let name = format!("{} · {year}", acc.display_name());
+        Some((name, format!("{date_from}|{date_to}"), acc.photos.clone()))
     }
 
-    /// Recompute trip clusters from photo timestamps and upsert them as `trip`
-    /// albums under stable signatures (so re-scanning never duplicates a trip
-    /// and manual edits to a trip's name survive). Returns the number of trips
+    /// Recompute trips from photo timestamps and upsert them as `trip` albums
+    /// under stable signatures (so re-scanning never duplicates a trip and
+    /// manual edits to a trip's name survive). Returns the number of trips
     /// synced. Gaps of more than `TRIP_GAP_DAYS` between consecutive photos
-    /// split trips; clusters need at least `TRIP_MIN_PHOTOS` photos (even on a
-    /// single day, e.g. a day trip).
+    /// split trips; adjacent clusters that revisit the same country within
+    /// `TRIP_MERGE_DAYS` are then folded into a single trip (Rome → Florence
+    /// → Venice shows as one "Italy" trip). Clusters need at least
+    /// `TRIP_MIN_PHOTOS` photos (even on a single day, e.g. a day trip).
     pub fn sync_trips(&self) -> i64 {
-        let gap_days = 3_i64;
-        let mut rows: Vec<(String, String)> = Vec::new();
-        if let Ok(mut stmt) = self
-            .connection
-            .prepare("SELECT id, created FROM photo WHERE created IS NOT NULL AND created != ''")
-        {
-            if let Ok(iter) =
-                stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
-            {
+        let mut rows: Vec<(String, i64, String)> = Vec::new();
+        let sql = "SELECT p.id, p.created, COALESCE( \
+            (SELECT value FROM properties WHERE photo_id = p.id AND key = 'location_name' LIMIT 1), '') \
+            FROM photo p WHERE p.created IS NOT NULL AND p.created != ''";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) = stmt.query_map([], |r| {
+                let created: String = r.get(1)?;
+                Ok((
+                    r.get::<_, String>(0)?,
+                    date_day_index(&created).unwrap_or(i64::MIN),
+                    r.get::<_, String>(2).unwrap_or_default(),
+                ))
+            }) {
                 for row in iter.flatten() {
-                    rows.push(row);
-                }
-            }
-        }
-        rows.sort_by(|a, b| a.1.cmp(&b.1));
-
-        // Cluster photos into trips by timestamp gaps.
-        let mut clusters: Vec<(String, String, Vec<String>)> = Vec::new();
-        let mut current: Vec<(String, String)> = Vec::new();
-        let mut prev_day: Option<i64> = None;
-        for (id, created) in rows {
-            let day = match date_day_index(&created) {
-                Some(d) => d,
-                None => continue,
-            };
-            if let Some(prev) = prev_day {
-                if day - prev > gap_days {
-                    if let Some(cluster) = self.finalize_trip(&current) {
-                        clusters.push(cluster);
+                    if row.1 != i64::MIN {
+                        rows.push(row);
                     }
-                    current.clear();
                 }
             }
-            current.push((id, created));
-            prev_day = Some(day);
         }
-        if let Some(cluster) = self.finalize_trip(&current) {
-            clusters.push(cluster);
+        rows.sort_by(|a, b| a.1.cmp(&b.1).then(a.0.cmp(&b.0)));
+
+        // Stage 1: cluster photos into time runs separated by large gaps.
+        let mut time_clusters: Vec<Vec<(String, i64, String)>> = Vec::new();
+        let mut current: Vec<(String, i64, String)> = Vec::new();
+        let mut prev_day: Option<i64> = None;
+        for row in rows {
+            if let Some(prev) = prev_day {
+                if row.1 - prev > TRIP_GAP_DAYS {
+                    time_clusters.push(std::mem::take(&mut current));
+                }
+            }
+            prev_day = Some(row.1);
+            current.push(row);
+        }
+        if !current.is_empty() {
+            time_clusters.push(current);
+        }
+
+        // Stage 2: fold adjacent clusters back together when they revisit the
+        // same country within a short window (one trip spanning several cities).
+        let mut merged: Vec<TripAcc> = Vec::new();
+        for cluster in time_clusters {
+            let acc = TripAcc::from_cluster(&cluster);
+            if let Some(prev) = merged.last_mut() {
+                if acc.first_day - prev.last_day <= TRIP_MERGE_DAYS
+                    && prev.shares_country_with(&acc)
+                {
+                    prev.merge(acc);
+                    continue;
+                }
+            }
+            merged.push(acc);
         }
 
         let mut trip_ids: Vec<String> = Vec::new();
-        for (name, range, _photo_ids) in clusters {
+        for acc in merged {
+            let Some((name, range, _photo_ids)) = self.finalize_trip(&acc) else {
+                continue;
+            };
             let (date_from, date_to) = match range.split_once('|') {
                 Some((f, t)) => (f.to_string(), t.to_string()),
                 _ => continue,
@@ -3443,28 +3487,8 @@ impl Database {
             });
         }
 
-        let places: Vec<AlbumSectionItem> = self
-            .get_location_groups_sorted_by_date(100, None)
-            .into_iter()
-            .map(|g| AlbumSectionItem {
-                id: format!("place:{}", g.name),
-                name: g.name,
-                count: g.count,
-                cover_encoded: g.encoded,
-                cover_crop: None,
-                kind: "location".to_string(),
-                album: None,
-            })
-            .collect();
-        if !places.is_empty() {
-            sections.push(AlbumSection {
-                id: "places".to_string(),
-                items: places,
-            });
-        }
-
         self.sync_trips();
-        let trips: Vec<AlbumSectionItem> = self
+        let mut trips: Vec<AlbumSectionItem> = self
             .list_albums_by_kind(AlbumKind::Trip)
             .into_iter()
             .map(|album| AlbumSectionItem {
@@ -3477,6 +3501,9 @@ impl Database {
                 album: Some(album),
             })
             .collect();
+        // Surface trips that fall around this time of year (newest first on
+        // ties) instead of always showing the oldest first.
+        trips.sort_by_key(|item| trip_sort_key(&item.id));
         if !trips.is_empty() {
             sections.push(AlbumSection {
                 id: "trips".to_string(),
@@ -3742,6 +3769,168 @@ mod tests {
         let (photos, videos) = db.get_media_counts();
         assert!(photos >= 0);
         assert!(videos >= 0);
+    }
+
+    #[test]
+    fn test_sync_trips_merges_same_country_clusters() {
+        let db = test_db();
+        let insert = |id: &str, created: &str, location: &str| {
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded) VALUES (?1, ?2, ?3, '')",
+                    (id, format!("/{id}.jpg"), created),
+                )
+                .unwrap();
+            db.connection
+                .execute(
+                    "INSERT INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
+                    (id, location),
+                )
+                .unwrap();
+        };
+        // Rome June 1–3, then Florence June 8–10: 5-day gap, same country.
+        for (i, day) in [1, 2, 3].iter().enumerate() {
+            insert(
+                &format!("r{i}"),
+                &format!("2023-06-{day:02} 10:00:00"),
+                "Rome, Italy",
+            );
+        }
+        for (i, day) in [8, 9, 10].iter().enumerate() {
+            insert(
+                &format!("f{i}"),
+                &format!("2023-06-{day:02} 10:00:00"),
+                "Florence, Italy",
+            );
+        }
+        // Tokyo months later: a separate trip.
+        for (i, day) in [1, 2, 3].iter().enumerate() {
+            insert(
+                &format!("t{i}"),
+                &format!("2023-09-{day:02} 10:00:00"),
+                "Tokyo, Japan",
+            );
+        }
+
+        assert_eq!(db.sync_trips(), 2);
+        let trips = db.list_albums_by_kind(AlbumKind::Trip);
+        let mut names: Vec<&str> = trips.iter().map(|a| a.name.as_str()).collect();
+        names.sort_unstable();
+        assert_eq!(names, vec!["Italy · 2023", "Tokyo, Japan · 2023"]);
+        let italy = trips.iter().find(|a| a.name == "Italy · 2023").unwrap();
+        assert_eq!(italy.item_count, 6);
+    }
+
+    #[test]
+    fn test_sync_trips_keeps_different_countries_separate() {
+        let db = test_db();
+        let insert = |id: &str, created: &str, location: &str| {
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded) VALUES (?1, ?2, ?3, '')",
+                    (id, format!("/{id}.jpg"), created),
+                )
+                .unwrap();
+            db.connection
+                .execute(
+                    "INSERT INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
+                    (id, location),
+                )
+                .unwrap();
+        };
+        for (i, day) in [1, 2, 3].iter().enumerate() {
+            insert(
+                &format!("r{i}"),
+                &format!("2023-06-{day:02} 10:00:00"),
+                "Rome, Italy",
+            );
+        }
+        // Same window, different country: must stay a separate trip.
+        for (i, day) in [8, 9, 10].iter().enumerate() {
+            insert(
+                &format!("p{i}"),
+                &format!("2023-06-{day:02} 10:00:00"),
+                "Paris, France",
+            );
+        }
+
+        assert_eq!(db.sync_trips(), 2);
+        let trips = db.list_albums_by_kind(AlbumKind::Trip);
+        let mut names: Vec<&str> = trips.iter().map(|a| a.name.as_str()).collect();
+        names.sort_unstable();
+        assert_eq!(names, vec!["Paris, France · 2023", "Rome, Italy · 2023"]);
+    }
+
+    #[test]
+    fn test_trip_cover_prefers_highest_aesthetics() {
+        let db = test_db();
+        for (id, aesthetics) in [("p1", 0.2f64), ("p2", 0.5), ("p3", 0.9)] {
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded, aesthetics_score) \
+                     VALUES (?1, ?2, ?3, '', ?4)",
+                    (id, format!("/{id}.jpg"), "2023-06-01 10:00:00", aesthetics),
+                )
+                .unwrap();
+            db.connection
+                .execute(
+                    "INSERT INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
+                    (id, "Rome, Italy"),
+                )
+                .unwrap();
+        }
+
+        assert_eq!(db.sync_trips(), 1);
+        let trips = db.list_albums_by_kind(AlbumKind::Trip);
+        assert_eq!(trips.len(), 1);
+        assert_eq!(trips[0].cover_photo_id.as_deref(), Some("p3"));
+    }
+
+    #[test]
+    fn test_sync_trips_dismissed_trip_is_skipped() {
+        let db = test_db();
+        for (id, day) in [("d1", 1), ("d2", 2), ("d3", 3)] {
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded) VALUES (?1, ?2, ?3, '')",
+                    (
+                        id,
+                        format!("/{id}.jpg"),
+                        format!("2023-06-{day:02} 10:00:00"),
+                    ),
+                )
+                .unwrap();
+        }
+
+        assert_eq!(db.sync_trips(), 1);
+        let id = db.list_albums_by_kind(AlbumKind::Trip)[0].id.clone();
+        db.connection
+            .execute("INSERT INTO dismissed_trip (id) VALUES (?1)", [&id])
+            .unwrap();
+        assert_eq!(db.sync_trips(), 0);
+        assert!(db.list_albums_by_kind(AlbumKind::Trip).is_empty());
+    }
+
+    #[test]
+    fn test_sync_trips_names_trip_without_location() {
+        let db = test_db();
+        for (id, day) in [("n1", 1), ("n2", 2), ("n3", 3)] {
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded) VALUES (?1, ?2, ?3, '')",
+                    (
+                        id,
+                        format!("/{id}.jpg"),
+                        format!("2023-06-{day:02} 10:00:00"),
+                    ),
+                )
+                .unwrap();
+        }
+
+        assert_eq!(db.sync_trips(), 1);
+        let trips = db.list_albums_by_kind(AlbumKind::Trip);
+        assert_eq!(trips.len(), 1);
+        assert_eq!(trips[0].name, "Trip · 2023");
     }
 
     #[test]
@@ -4532,59 +4721,6 @@ mod tests {
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].name, "Paris, France");
         assert_eq!(groups[0].count, 1);
-    }
-
-    #[test]
-    fn test_location_groups_sorted_by_date() {
-        let db = test_db();
-        let insert = |id: &str, created: &str, location: &str| {
-            db.connection
-                .execute(
-                    "INSERT INTO photo (id, location, created, encoded) VALUES (?1, ?2, ?3, '')",
-                    (id, format!("/{id}.jpg"), created),
-                )
-                .unwrap();
-            db.connection
-                .execute(
-                    "INSERT INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
-                    (id, location),
-                )
-                .unwrap();
-        };
-        insert("a1", "2023-08-05 12:00:00", "Paris");
-        insert("a2", "2024-01-01 12:00:00", "Paris");
-        insert("b1", "2023-12-30 12:00:00", "Rome");
-        insert("c1", "2026-02-01 12:00:00", "Tokyo");
-
-        let groups = db.get_location_groups_sorted_by_date(10, Some("2026-08-06"));
-        let names: Vec<&str> = groups.iter().map(|g| g.name.as_str()).collect();
-        assert_eq!(names, vec!["Paris", "Rome", "Tokyo"]);
-        assert_eq!(groups[0].count, 2);
-    }
-
-    #[test]
-    fn test_location_groups_sorted_by_date_wraps_year() {
-        let db = test_db();
-        let insert = |id: &str, created: &str, location: &str| {
-            db.connection
-                .execute(
-                    "INSERT INTO photo (id, location, created, encoded) VALUES (?1, ?2, ?3, '')",
-                    (id, format!("/{id}.jpg"), created),
-                )
-                .unwrap();
-            db.connection
-                .execute(
-                    "INSERT INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
-                    (id, location),
-                )
-                .unwrap();
-        };
-        insert("a1", "2023-12-30 12:00:00", "Beach");
-        insert("b1", "2023-07-01 12:00:00", "Mountains");
-
-        let groups = db.get_location_groups_sorted_by_date(10, Some("2026-01-02"));
-        let names: Vec<&str> = groups.iter().map(|g| g.name.as_str()).collect();
-        assert_eq!(names, vec!["Beach", "Mountains"]);
     }
 
     #[test]
