@@ -20,8 +20,54 @@
           @remove-directory-full="openRemoveFolderFull"
         />
 
+        <PerformanceSection
+          v-if="!embedded"
+          :embedded="embedded"
+          :performance="performance"
+          :current-preset="currentPreset"
+          :max-threads="maxThreads"
+          :sorted-models="sortedModels"
+          :downloaded-models="downloadedModels"
+          :selected-models="selectedModels"
+          :model-enabled="modelEnabled"
+          :is-downloading="isDownloading"
+          :is-any-model-processing="isAnyModelProcessing"
+          :missing-selected-count="missingSelectedCount"
+          :pending-count="pendingCount"
+          :global-eta="globalEta"
+          :visible-activity-model="visibleActivityModel"
+          :active-model-summary="activeModelSummary"
+          :is-model-processing="isModelProcessing"
+          :is-model-active="isModelActive"
+          :is-model-downloading="isModelDownloading"
+          :get-model-progress-percent="getModelProgressPercent"
+          :get-model-progress-text="getModelProgressText"
+          :get-model-status-label="getModelStatusLabel"
+          :get-model-status-text="getModelStatusText"
+          :get-model-activity-icon="getModelActivityIcon"
+          :get-progress="getProgress"
+          :get-download-stats="getDownloadStats"
+          :is-model-blocked="isModelBlocked"
+          :get-model-block-reason="getModelBlockReason"
+          :format-indexing-count="formatIndexingCount"
+          :format-eta="formatEta"
+          :toggle-model="toggleModel"
+          :model-ram="modelRam"
+          :models-loaded="modelsLoaded"
+          :total-ram-estimate="totalModelRamEstimate"
+          :is-memory-freeing="isMemoryFreeing"
+          @apply-preset="onApplyPreset"
+          @update-batch-delay="onBatchDelayChange"
+          @update-memory-budget="onMemoryBudgetChange"
+          @update-ml-threads="onMlThreadsChange"
+          @download-models="downloadModels"
+          @run-model="runModel"
+          @update-selected-models="onUpdateSelectedModels"
+          @free-memory="freeMemory"
+        />
+
         <ModelsSection
-          v-if="!hideAiSection"
+          v-if="embedded && !hideAiSection"
           :embedded="embedded"
           :sorted-models="sortedModels"
           :downloaded-models="downloadedModels"
@@ -59,15 +105,6 @@
           @free-memory="freeMemory"
         />
 
-        <PerformanceSection
-          v-if="!embedded"
-          :performance="performance"
-          :current-preset="currentPreset"
-          @apply-preset="onApplyPreset"
-          @update-batch-delay="onBatchDelayChange"
-          @update-memory-budget="onMemoryBudgetChange"
-        />
-
         <LanguageSection v-if="!embedded" :initial-lang="currentLang" />
 
         <AppearanceSection v-if="!embedded" :initial-theme="currentTheme" />
@@ -80,7 +117,6 @@
           :logs="logs"
           @cleanup-db="cleanupDb"
           @update-scan-threads="onScanThreadsChange"
-          @update-ml-threads="onMlThreadsChange"
           @set-indexing-mode="setIndexingMode"
           @clear-logs="clearLogs"
           @copy-logs="copyLogs"

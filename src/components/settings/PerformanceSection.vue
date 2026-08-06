@@ -57,6 +57,46 @@
 
       <v-divider class="my-4 border-subtle"></v-divider>
 
+      <ModelsSection
+        :embedded="embedded"
+        :sorted-models="sortedModels"
+        :downloaded-models="downloadedModels"
+        :selected-models="selectedModels"
+        :model-enabled="modelEnabled"
+        :is-downloading="isDownloading"
+        :is-any-model-processing="isAnyModelProcessing"
+        :missing-selected-count="missingSelectedCount"
+        :pending-count="pendingCount"
+        :global-eta="globalEta"
+        :visible-activity-model="visibleActivityModel"
+        :active-model-summary="activeModelSummary"
+        :is-model-processing="isModelProcessing"
+        :is-model-active="isModelActive"
+        :is-model-downloading="isModelDownloading"
+        :get-model-progress-percent="getModelProgressPercent"
+        :get-model-progress-text="getModelProgressText"
+        :get-model-status-label="getModelStatusLabel"
+        :get-model-status-text="getModelStatusText"
+        :get-model-activity-icon="getModelActivityIcon"
+        :get-progress="getProgress"
+        :get-download-stats="getDownloadStats"
+        :is-model-blocked="isModelBlocked"
+        :get-model-block-reason="getModelBlockReason"
+        :format-indexing-count="formatIndexingCount"
+        :format-eta="formatEta"
+        :toggle-model="toggleModel"
+        :model-ram="modelRam"
+        :models-loaded="modelsLoaded"
+        :total-ram-estimate="totalRamEstimate"
+        :is-memory-freeing="isMemoryFreeing"
+        @download-models="(force, models) => emit('download-models', force, models)"
+        @run-model="(id) => emit('run-model', id)"
+        @update-selected-models="(models) => emit('update-selected-models', models)"
+        @free-memory="emit('free-memory')"
+      />
+
+      <v-divider class="my-4 border-subtle"></v-divider>
+
       <div>
         <v-btn
           variant="text"
@@ -128,6 +168,29 @@
             <div class="text-caption text-zinc-muted mt-1">
               {{ $t('settings.memory_budget_desc') }}
             </div>
+
+            <div class="d-flex justify-space-between align-center mb-2 mt-4">
+              <div class="text-caption font-weight-bold text-zinc-primary">
+                {{ $t('settings.ml_threads') }}
+              </div>
+              <v-chip
+                size="small"
+                variant="flat"
+                class="bg-btn font-weight-bold"
+              >
+                {{ performance.mlThreads }}
+              </v-chip>
+            </div>
+            <v-slider
+              :model-value="performance.mlThreads"
+              :min="1"
+              :max="maxThreads"
+              :step="1"
+              hide-details
+              color="primary"
+              track-color="var(--color-bg-zinc-100)"
+              @update:model-value="onMlThreadsChange"
+            ></v-slider>
           </div>
         </v-expand-transition>
       </div>
@@ -137,17 +200,60 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import type { PerformanceConfig, PerformancePreset } from '@/types/settings';
+import ModelsSection from './ModelsSection.vue';
+import type { DownloadStats, PerformanceConfig, PerformancePreset } from '@/types/settings';
+
+interface ModelEntry {
+  id: string;
+  size: string;
+}
 
 const props = defineProps<{
+  embedded: boolean;
   performance: PerformanceConfig;
   currentPreset: PerformancePreset;
+  maxThreads: number;
+  sortedModels: ModelEntry[];
+  downloadedModels: string[];
+  selectedModels: string[];
+  modelEnabled: Record<string, boolean>;
+  isDownloading: boolean;
+  isAnyModelProcessing: boolean;
+  missingSelectedCount: number;
+  pendingCount: number;
+  globalEta: number;
+  visibleActivityModel: ModelEntry | null;
+  activeModelSummary: string;
+  isModelProcessing: (modelId: string) => boolean;
+  isModelActive: (modelId: string) => boolean;
+  isModelDownloading: (modelId: string) => boolean;
+  getModelProgressPercent: (modelId: string) => number;
+  getModelProgressText: (modelId: string) => string;
+  getModelStatusLabel: (modelId: string) => string;
+  getModelStatusText: (modelId: string) => string;
+  getModelActivityIcon: (modelId: string) => string;
+  getDownloadStats: (modelId: string) => DownloadStats;
+  getProgress: (modelId: string) => number;
+  isModelBlocked: (modelId: string) => boolean;
+  getModelBlockReason: (modelId: string) => string;
+  formatIndexingCount: (value: number) => string;
+  formatEta: (ms: number) => string;
+  toggleModel: (modelId: string) => void;
+  modelRam: Record<string, string>;
+  modelsLoaded: boolean;
+  totalRamEstimate: string;
+  isMemoryFreeing: boolean;
 }>();
 
 const emit = defineEmits<{
   'apply-preset': [preset: string];
   'update-batch-delay': [valueMs: number];
   'update-memory-budget': [valueMb: number];
+  'update-ml-threads': [value: number];
+  'download-models': [forceUpdate: boolean, models: string[]];
+  'run-model': [modelId: string];
+  'update-selected-models': [models: string[]];
+  'free-memory': [];
 }>();
 
 const presets = [{ value: 'low' }, { value: 'balanced' }, { value: 'full' }];
@@ -166,6 +272,10 @@ function onGapChange(value: number | [number, number]): void {
 function onMemoryBudgetChange(value: number | [number, number]): void {
   const gb = typeof value === 'number' ? value : value[0];
   emit('update-memory-budget', Math.round(gb * 1024));
+}
+
+function onMlThreadsChange(value: number | [number, number]): void {
+  emit('update-ml-threads', typeof value === 'number' ? value : value[0]);
 }
 </script>
 

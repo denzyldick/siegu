@@ -65,28 +65,6 @@
             @update:model-value="onScanThreadsChange"
           ></v-slider>
 
-          <div class="d-flex justify-space-between align-center mb-2 mt-4">
-            <div class="text-caption font-weight-bold text-zinc-primary">
-              {{ $t('settings.ml_threads') }}
-            </div>
-            <v-chip
-              size="small"
-              variant="flat"
-              class="bg-btn font-weight-bold"
-              >{{ performance.mlThreads }}</v-chip
-            >
-          </div>
-          <v-slider
-            :model-value="performance.mlThreads"
-            :min="1"
-            :max="maxThreads"
-            :step="1"
-            hide-details
-            color="primary"
-            track-color="var(--color-bg-zinc-100)"
-            @update:model-value="onMlThreadsChange"
-          ></v-slider>
-
           <v-list-item class="px-0 mt-4">
             <v-list-item-title class="text-caption font-weight-bold text-zinc-primary">{{
               $t('settings.indexing_mode')
@@ -189,7 +167,6 @@ defineProps<{
 const emit = defineEmits<{
   'cleanup-db': [];
   'update-scan-threads': [value: number];
-  'update-ml-threads': [value: number];
   'set-indexing-mode': [mode: string];
   'clear-logs': [];
   'copy-logs': [];
@@ -199,10 +176,6 @@ const indexingModes = [{ value: 'immediate' }, { value: 'idle' }, { value: 'manu
 
 function onScanThreadsChange(value: number | [number, number]): void {
   emit('update-scan-threads', typeof value === 'number' ? value : value[0]);
-}
-
-function onMlThreadsChange(value: number | [number, number]): void {
-  emit('update-ml-threads', typeof value === 'number' ? value : value[0]);
 }
 
 function getModeLabel(val: string): string {
