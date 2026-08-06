@@ -102,8 +102,8 @@ function handleSave(): void {
 
 <style scoped>
 .name-field-modern :deep(.v-field) {
-  border-radius: 12px !important;
-  background: white !important;
+  border-radius: var(--radius-md) !important;
+  background: var(--color-bg-field) !important;
 }
 .name-field-modern :deep(.v-field__outline) {
   --v-field-border-opacity: 0.15 !important;

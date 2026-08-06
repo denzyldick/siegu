@@ -15,7 +15,7 @@ function retry(): void {
 
 <template>
   <div v-if="error" class="error-boundary pa-8 d-flex flex-column align-center justify-center text-center">
-    <v-icon size="48" color="#ef4444" class="mb-4">mdi-alert-circle-outline</v-icon>
+    <v-icon size="48" color="var(--color-error)" class="mb-4">mdi-alert-circle-outline</v-icon>
     <h3 class="text-h6 font-weight-bold text-zinc-primary mb-2">Something went wrong</h3>
     <p class="text-body-2 text-zinc-secondary mb-6 max-w-300">
       {{ error.message || 'An unexpected error occurred.' }}

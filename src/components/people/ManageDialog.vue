@@ -64,8 +64,8 @@ function handleMerge(): void {
 
         <v-tabs
           v-model="manageTab"
-          bg-color="#f4f4f5"
-          color="#18181b"
+          bg-color="var(--color-bg-zinc-100)"
+          color="var(--color-text-primary)"
           grow
           mandatory
           class="rounded-xl mb-8 p-1 border-subtle"
@@ -107,8 +107,8 @@ function handleMerge(): void {
             <div
               class="bg-amber-50 rounded-xl pa-4 mb-8 d-flex align-start ga-3 border-amber-subtle"
             >
-              <v-icon color="#b45309" size="20" class="mt-1">mdi-alert-circle-outline</v-icon>
-              <div class="text-body-2 text-amber-darken-4 font-weight-medium">
+              <v-icon color="var(--color-warning-strong)" size="20" class="mt-1">mdi-alert-circle-outline</v-icon>
+              <div class="text-body-2 text-warning font-weight-medium">
                 <span>{{ $t('people.merge_desc', { name: activePerson?.name }) }}</span>
               </div>
             </div>
@@ -144,16 +144,16 @@ function handleMerge(): void {
 
 <style scoped>
 .name-field-modern :deep(.v-field) {
-  border-radius: 12px !important;
-  background: white !important;
+  border-radius: var(--radius-md) !important;
+  background: var(--color-bg-field) !important;
 }
 .name-field-modern :deep(.v-field__outline) {
   --v-field-border-opacity: 0.15 !important;
 }
 .bg-amber-50 {
-  background-color: #fffbeb !important;
+  background-color: var(--color-warning-tint) !important;
 }
 .border-amber-subtle {
-  border: 1px solid #fde68a !important;
+  border: 1px solid var(--color-warning-border) !important;
 }
 </style>

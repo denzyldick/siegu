@@ -43,7 +43,7 @@ const formattedCount = computed(() =>
           indeterminate
           size="16"
           width="2"
-          color="#18181b"
+          color="var(--color-text-primary)"
         ></v-progress-circular>
         <span class="text-caption text-zinc-muted">
           {{ t('people.indexing_remaining', { count: formattedCount }) }}

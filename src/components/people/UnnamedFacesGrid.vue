@@ -51,11 +51,11 @@ defineEmits<{
               {{ group.face_count }}
             </v-chip>
           </div>
-          <div class="pa-2 bg-white">
+          <div class="pa-2 bg-surface">
             <v-btn
               block
               variant="flat"
-              color="#f4f4f5"
+              color="var(--color-bg-zinc-100)"
               size="small"
               class="text-none font-weight-bold rounded-lg py-4 text-zinc-primary border-subtle"
               @click.stop="$emit('promptName', group)"
@@ -72,14 +72,14 @@ defineEmits<{
 <style scoped>
 .unnamed-card-reimagined {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  background: white !important;
+  background: var(--color-bg-surface) !important;
 }
 .unnamed-card-reimagined:hover {
   transform: scale(1.02);
-  box-shadow: 0 8px 12px -3px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: var(--shadow-lg) !important;
 }
 .image-wrapper {
-  background: #f1f5f9;
+  background: var(--color-bg-zinc-100);
   overflow: hidden;
 }
 .hover-scale:hover {
