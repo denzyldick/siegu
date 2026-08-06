@@ -1893,14 +1893,15 @@ impl Database {
     /// Get all photos that have non-zero GPS coordinates, for map heatmap display.
     pub fn get_heatmap_points(&self) -> Vec<MapPoint> {
         let mut points = Vec::new();
-        let sql =
-            "SELECT id, latitude, longitude FROM photo WHERE (latitude != 0.0 OR longitude != 0.0)";
+        let sql = "SELECT id, latitude, longitude, location FROM photo \
+            WHERE (latitude != 0.0 OR longitude != 0.0)";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([], |row| {
                 Ok(MapPoint {
                     id: row.get(0)?,
                     latitude: row.get(1).unwrap_or(0.0),
                     longitude: row.get(2).unwrap_or(0.0),
+                    location: row.get(3).unwrap_or_default(),
                 })
             }) {
                 for p in iter.flatten() {
@@ -2964,6 +2965,7 @@ pub struct MapPoint {
     pub id: String,
     pub latitude: f64,
     pub longitude: f64,
+    pub location: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

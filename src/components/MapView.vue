@@ -57,16 +57,18 @@ if (typeof window !== 'undefined') {
   window.L = L;
 }
 import 'leaflet.markercluster';
-import { ref, nextTick, watch } from 'vue';
+import { ref, nextTick, watch, onUnmounted } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import type { Map as LeafletMap } from 'leaflet';
 import MediaViewer from './MediaViewer.vue';
+import { useMediaUrl } from '@/composables/useMediaUrl';
 import type { MediaItem } from '@/types/media';
 
 interface MapPoint {
   id: number;
   latitude: number;
   longitude: number;
+  location: string;
 }
 
 const zoom = ref(2);
@@ -77,17 +79,53 @@ const viewerOpen = ref(false);
 const viewerPhotos = ref<MediaItem[]>([]);
 const currentPhotoIndex = ref(0);
 
+const { thumbUrl } = useMediaUrl();
+
 let leafletMap: LeafletMap | null = null;
 let clusterGroup: L.MarkerClusterGroup | null = null;
 
+const GRID_CELL_DEG = 1;
+const pointGrid = new Map<string, MapPoint[]>();
+
+function buildPointGrid(points: MapPoint[]): void {
+  pointGrid.clear();
+  for (const p of points) {
+    const key = `${Math.floor(p.latitude / GRID_CELL_DEG)}:${Math.floor(p.longitude / GRID_CELL_DEG)}`;
+    const cell = pointGrid.get(key);
+    if (cell) cell.push(p);
+    else pointGrid.set(key, [p]);
+  }
+}
+
+function squaredDist(a: MapPoint, lat: number, lng: number): number {
+  return Math.pow(a.latitude - lat, 2) + Math.pow(a.longitude - lng, 2);
+}
+
 function nearestPoints(lat: number, lng: number, count: number): MapPoint[] {
+  const cx = Math.floor(lat / GRID_CELL_DEG);
+  const cy = Math.floor(lng / GRID_CELL_DEG);
+  for (let radius = 0; radius < 8; radius++) {
+    const candidates: MapPoint[] = [];
+    for (let dx = -radius; dx <= radius; dx++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+        const cell = pointGrid.get(`${cx + dx}:${cy + dy}`);
+        if (cell) candidates.push(...cell);
+      }
+    }
+    if (candidates.length >= count) {
+      return candidates
+        .map((p) => ({ p, d: squaredDist(p, lat, lng) }))
+        .sort((a, b) => a.d - b.d)
+        .slice(0, count)
+        .map((x) => x.p);
+    }
+  }
   return mapPoints.value
-    .map((p) => ({
-      ...p,
-      dist: Math.sqrt(Math.pow(p.latitude - lat, 2) + Math.pow(p.longitude - lng, 2)),
-    }))
-    .sort((a, b) => a.dist - b.dist)
-    .slice(0, count);
+    .map((p) => ({ p, d: squaredDist(p, lat, lng) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, count)
+    .map((x) => x.p);
 }
 
 async function openCarouselForIds(ids: number[]) {
@@ -116,6 +154,7 @@ async function loadMapData() {
   try {
     const pointsJson = await invoke<string>('get_heatmap_data');
     mapPoints.value = JSON.parse(pointsJson);
+    buildPointGrid(mapPoints.value);
 
     if (mapPoints.value.length === 0) {
       loading.value = false;
@@ -161,23 +200,20 @@ async function loadMapData() {
       marker.on('click', () => openCarouselForPoint(p));
       marker.on('mouseover', () => {
         const thumbnailDiv = L.DomUtil.create('div', 'map-thumb-popup');
-        thumbnailDiv.innerHTML = '<div class="thumb-loading"></div>';
+        const thumb = thumbUrl(p.location);
+        thumbnailDiv.innerHTML = thumb
+          ? `<img src="${thumb}" class="thumb-img" decoding="async" loading="lazy">`
+          : '<div class="thumb-loading"></div>';
         marker
           .bindPopup(thumbnailDiv, {
             closeButton: false,
             offset: L.point(0, -10),
           })
           .openPopup();
-        invoke<Record<string, string>>('get_photo_encoded_batch', { ids: [p.id] }).then(
-          (thumbnails) => {
-            const encoded = thumbnails[p.id];
-            if (encoded && encoded.startsWith('data:image/')) {
-              thumbnailDiv.innerHTML = `<img src="${encoded}" class="thumb-img">`;
-              marker.setRadius(7);
-              marker.setStyle({ fillOpacity: 0.8 });
-            }
-          },
-        );
+        if (thumb) {
+          marker.setRadius(7);
+          marker.setStyle({ fillOpacity: 0.8 });
+        }
       });
       marker.on('mouseout', () => {
         marker.closePopup();
@@ -224,6 +260,20 @@ async function onMapReady(map: LeafletMap) {
     }
   }, 100);
 }
+
+onUnmounted(() => {
+  if (clusterGroup) {
+    leafletMap?.removeLayer(clusterGroup);
+    clusterGroup = null;
+  }
+  if (leafletMap) {
+    leafletMap.off('click');
+    leafletMap.remove();
+    leafletMap = null;
+  }
+  pointGrid.clear();
+  mapPoints.value = [];
+});
 
 watch(currentPhotoIndex, (idx) => {
   const photo = viewerPhotos.value[idx];
