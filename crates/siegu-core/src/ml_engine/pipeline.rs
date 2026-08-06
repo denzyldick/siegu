@@ -871,73 +871,99 @@ pub fn flush_results_to_db(
     use crate::ml_worker::flush_batch_in_transaction;
 
     let _ = flush_batch_in_transaction(&db.connection, || {
-        for (class, prob) in &result.objects {
-            let _ = db.connection.execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES(?1, ?2, ?3)",
-                (photo_id, class, prob),
-            );
-        }
-        if let Some(ref text) = result.ocr {
-            let _ = db.connection.execute(
-                "INSERT INTO ocr (photo_id, text) VALUES(?1, ?2)",
-                (photo_id, text),
-            );
-        }
-        if let Some(ref score) = result.nsfw {
-            let _ = db.connection.execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES(?1, 'nsfw', ?2)",
-                (photo_id, score),
-            );
-        }
-        if let Some(score) = result.aesthetics {
-            let _ = db.connection.execute(
-                "UPDATE photo SET aesthetics_score = ?1 WHERE id = ?2",
-                (score, photo_id),
-            );
-        }
-        if let Some(ref caption) = result.caption {
-            let _ = db.connection.execute(
-                "UPDATE photo SET caption = ?1 WHERE id = ?2",
-                (caption, photo_id),
-            );
-        }
-        let _ = db.connection.execute(
-            "INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES(?1, 'face_count', ?2)",
-            (photo_id, &result.face_count.to_string()),
-        );
-
-        for face_info in &result.faces {
-            db.store_face(Face {
-                photo_id: photo_id.to_string(),
-                face_id: face_info.face_id.clone(),
-                crop_path: face_info.crop_path.clone(),
-                encoded: face_info.encoded.clone(),
-                embedding: face_info.embedding.clone(),
-                person_id: face_info.person_id.clone(),
-            });
-        }
-
-        for model in &result.completed_models {
-            db.update_ai_status(photo_id, model, 1);
-        }
-
-        if let Some(ref transcript) = result.transcript {
-            let _ = db.connection.execute(
-                "INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES(?1, 'transcript', ?2)",
-                (photo_id, transcript),
-            );
-        }
-
-        if target_model.is_none() {
-            db.update_photo_indexed(photo_id, 2);
-        }
-        let _ = db.connection.execute(
-            "UPDATE photo SET sync_needed = 1 WHERE id = ?1 AND received = 0",
-            [photo_id],
-        );
-
+        flush_results_statements(db, photo_id, result, target_model)?;
         Ok(())
     });
+}
+
+/// Flushes results for several photos inside a single transaction.
+pub fn flush_results_batch_to_db(
+    db: &crate::database::Database,
+    results: &[(String, PhotoResult)],
+    target_model: Option<&str>,
+) {
+    use crate::ml_worker::flush_batch_in_transaction;
+
+    let _ = flush_batch_in_transaction(&db.connection, || {
+        for (photo_id, result) in results {
+            flush_results_statements(db, photo_id, result, target_model)?;
+        }
+        Ok(())
+    });
+}
+
+fn flush_results_statements(
+    db: &crate::database::Database,
+    photo_id: &str,
+    result: &PhotoResult,
+    target_model: Option<&str>,
+) -> Result<(), String> {
+    for (class, prob) in &result.objects {
+        let _ = db.connection.execute(
+            "INSERT INTO object (photo_id, class, probability) VALUES(?1, ?2, ?3)",
+            (photo_id, class, prob),
+        );
+    }
+    if let Some(ref text) = result.ocr {
+        let _ = db.connection.execute(
+            "INSERT INTO ocr (photo_id, text) VALUES(?1, ?2)",
+            (photo_id, text),
+        );
+    }
+    if let Some(ref score) = result.nsfw {
+        let _ = db.connection.execute(
+            "INSERT INTO properties (photo_id, key, value) VALUES(?1, 'nsfw', ?2)",
+            (photo_id, score),
+        );
+    }
+    if let Some(score) = result.aesthetics {
+        let _ = db.connection.execute(
+            "UPDATE photo SET aesthetics_score = ?1 WHERE id = ?2",
+            (score, photo_id),
+        );
+    }
+    if let Some(ref caption) = result.caption {
+        let _ = db.connection.execute(
+            "UPDATE photo SET caption = ?1 WHERE id = ?2",
+            (caption, photo_id),
+        );
+    }
+    let _ = db.connection.execute(
+        "INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES(?1, 'face_count', ?2)",
+        (photo_id, &result.face_count.to_string()),
+    );
+
+    for face_info in &result.faces {
+        db.store_face(Face {
+            photo_id: photo_id.to_string(),
+            face_id: face_info.face_id.clone(),
+            crop_path: face_info.crop_path.clone(),
+            encoded: face_info.encoded.clone(),
+            embedding: face_info.embedding.clone(),
+            person_id: face_info.person_id.clone(),
+        });
+    }
+
+    for model in &result.completed_models {
+        db.update_ai_status(photo_id, model, 1);
+    }
+
+    if let Some(ref transcript) = result.transcript {
+        let _ = db.connection.execute(
+            "INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES(?1, 'transcript', ?2)",
+            (photo_id, transcript),
+        );
+    }
+
+    if target_model.is_none() {
+        db.update_photo_indexed(photo_id, 2);
+    }
+    let _ = db.connection.execute(
+        "UPDATE photo SET sync_needed = 1 WHERE id = ?1 AND received = 0",
+        [photo_id],
+    );
+
+    Ok(())
 }
 
 #[cfg(test)]

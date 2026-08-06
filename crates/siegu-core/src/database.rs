@@ -2251,6 +2251,23 @@ impl Database {
         id
     }
 
+    /// Create multiple unnamed people records using one prepared statement.
+    pub fn create_anonymous_people(&self, people: &[(String, Vec<f32>)]) {
+        let Ok(mut stmt) = self
+            .connection
+            .prepare("INSERT INTO people (id, name, embedding) VALUES (?1, NULL, ?2)")
+        else {
+            tracing::warn!("create_anonymous_people: failed to prepare statement");
+            return;
+        };
+        for (id, embedding) in people {
+            let embedding_bytes: Vec<u8> = embedding.iter().flat_map(|f| f.to_le_bytes()).collect();
+            if let Err(e) = stmt.execute((id, &embedding_bytes)) {
+                tracing::warn!("create_anonymous_people: failed to insert person {id}: {e}");
+            }
+        }
+    }
+
     /// Recompute the average face embedding (centroid) for a person.
     pub fn update_person_centroid(&self, person_id: &str) {
         let mut embeddings = Vec::new();

@@ -9,6 +9,10 @@ use crate::ml_worker::{self, decrement_pending_count, increment_pending_count, J
 use super::models::LoadedModels;
 use super::pipeline::{self, PhotoResult};
 
+/// Number of analysis results accumulated before DB writes are flushed in a
+/// single transaction (see [`pipeline::flush_results_batch_to_db`]).
+const FLUSH_BATCH_SIZE: usize = 32;
+
 /// Pacing delay (in milliseconds) applied between batches of a bulk analysis
 /// job. Parsed from the `batch_delay_ms` config value; clamped to 0..=2000.
 pub fn batch_delay_ms_from_config(config: &HashMap<String, String>) -> u64 {
@@ -324,10 +328,32 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                 let photo_ids_batches: Vec<Vec<String>> =
                     photo_ids.chunks(batch_size).map(|c| c.to_vec()).collect();
 
+                let flush_pending =
+                    |pending_flush: &mut Vec<(String, PhotoResult)>,
+                     pending_people: &mut Vec<(String, Vec<f32>)>| {
+                        if !pending_people.is_empty() {
+                            let db = db_ref.lock().unwrap_or_else(|e| e.into_inner());
+                            db.create_anonymous_people(pending_people);
+                            pending_people.clear();
+                        }
+                        if !pending_flush.is_empty() {
+                            let db = db_ref.lock().unwrap_or_else(|e| e.into_inner());
+                            pipeline::flush_results_batch_to_db(
+                                &db,
+                                pending_flush,
+                                target_model_ref.as_deref(),
+                            );
+                            pending_flush.clear();
+                        }
+                    };
+
                 for batch in photo_ids_batches {
                     if abort_flag.load(Ordering::SeqCst) {
                         break;
                     }
+
+                    let mut pending_flush: Vec<(String, PhotoResult)> = Vec::new();
+                    let mut pending_people: Vec<(String, Vec<f32>)> = Vec::new();
 
                     for photo_id in &batch {
                         if abort_flag.load(Ordering::SeqCst) {
@@ -382,20 +408,17 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                             };
 
                             let new_people: Vec<(String, Vec<f32>)> = {
-                                let lock = db_ref.lock().unwrap_or_else(|e| e.into_inner());
                                 let mut new_people = Vec::new();
                                 for face in &mut result.faces {
                                     if face.person_id.is_none() {
+                                        let new_id = uuid::Uuid::new_v4().to_string();
                                         if !face.embedding.is_empty() {
-                                            let new_id =
-                                                lock.create_anonymous_person(&face.embedding);
                                             new_people
                                                 .push((new_id.clone(), face.embedding.clone()));
-                                            face.person_id = Some(new_id);
                                         } else {
-                                            let new_id = lock.create_anonymous_person(&[]);
-                                            face.person_id = Some(new_id);
+                                            new_people.push((new_id.clone(), Vec::new()));
                                         }
+                                        face.person_id = Some(new_id);
                                     }
                                 }
                                 new_people
@@ -403,16 +426,10 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                             if !new_people.is_empty() {
                                 let mut m = models_ref.lock().unwrap_or_else(|e| e.into_inner());
                                 if let Some(models) = m.as_mut() {
-                                    models.known_people.extend(new_people);
+                                    models.known_people.extend(new_people.iter().cloned());
                                 }
+                                pending_people.extend(new_people);
                             }
-
-                            pipeline::flush_results_to_db(
-                                &db_ref.lock().unwrap_or_else(|e| e.into_inner()),
-                                &photo_entry.id,
-                                &result,
-                                target_model_ref.as_deref(),
-                            );
 
                             if result.caption.is_some() || result.aesthetics.is_some() {
                                 callbacks.on_metadata_updated(
@@ -430,10 +447,17 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                                 remaining,
                                 progress_model_ref.as_deref(),
                             );
+
+                            pending_flush.push((photo_entry.id.clone(), result));
+                            if pending_flush.len() >= FLUSH_BATCH_SIZE {
+                                flush_pending(&mut pending_flush, &mut pending_people);
+                            }
                         } else {
                             decrement_pending_count(&pending_count_ref);
                         }
                     }
+
+                    flush_pending(&mut pending_flush, &mut pending_people);
 
                     if batch_delay_ms > 0 {
                         std::thread::sleep(Duration::from_millis(batch_delay_ms));
