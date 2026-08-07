@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import SearchBar from '@/components/search/SearchBar.vue'
-import { useSearchStore } from '@/stores/search'
-import { useI18n } from 'vue-i18n'
+import SearchBar from '@/components/search/SearchBar.vue';
+import { useSearchStore } from '@/stores/search';
+import { useI18n } from 'vue-i18n';
 
-const { t } = useI18n()
-const searchStore = useSearchStore()
+const { t } = useI18n();
+const searchStore = useSearchStore();
 
 const sortOptions = [
   { value: 'newest', label: () => t('search.sort_newest'), icon: 'mdi-sort-calendar-descending' },
   { value: 'best', label: () => t('search.sort_best'), icon: 'mdi-star' },
   { value: 'random', label: () => t('search.sort_random'), icon: 'mdi-dice-multiple' },
-] as const
+] as const;
 </script>
 
 <template>
@@ -21,11 +21,7 @@ const sortOptions = [
       </v-col>
       <v-col cols="auto" class="ml-2">
         <div class="d-flex ga-1">
-          <v-tooltip
-            v-for="opt in sortOptions"
-            :key="opt.value"
-            location="top"
-          >
+          <v-tooltip v-for="opt in sortOptions" :key="opt.value" location="top">
             <template #activator="{ props: tipProps }">
               <v-btn
                 v-bind="tipProps"

@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import type { Person, UnnamedFace } from '@/types/person'
-import { getFaceImageSrc } from '@/composables/useMediaUtils'
+import type { Person, UnnamedFace } from '@/types/person';
+import { getFaceImageSrc } from '@/composables/useMediaUtils';
 
 defineProps<{
-  modelValue: boolean
-  cluster: Person | null
-  faces: UnnamedFace[]
-}>()
+  modelValue: boolean;
+  cluster: Person | null;
+  faces: UnnamedFace[];
+}>();
 
 const emit = defineEmits<{
-  'update:modelValue': [value: boolean]
-  removeFace: [faceId: number]
-  promptName: [group: Person]
-}>()
+  'update:modelValue': [value: boolean];
+  removeFace: [faceId: number];
+  promptName: [group: Person];
+}>();
 </script>
 
 <template>
@@ -29,9 +29,7 @@ const emit = defineEmits<{
           <div class="text-h5 font-weight-black text-zinc-primary">
             {{ $t('people.grouped_faces') }}
           </div>
-          <div
-            class="text-caption text-zinc-secondary font-weight-bold uppercase tracking-widest"
-          >
+          <div class="text-caption text-zinc-secondary font-weight-bold uppercase tracking-widest">
             {{ $t('people.appearances_in_cluster', { count: faces.length }) }}
           </div>
         </div>

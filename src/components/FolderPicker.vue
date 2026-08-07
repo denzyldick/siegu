@@ -68,88 +68,91 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { readDir } from '@tauri-apps/plugin-fs'
-import type { DirEntry } from '@tauri-apps/plugin-fs'
+import { ref, computed, watch, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { readDir } from '@tauri-apps/plugin-fs';
+import type { DirEntry } from '@tauri-apps/plugin-fs';
 
-const { t } = useI18n()
+const { t } = useI18n();
 
 const props = defineProps<{
-  modelValue: boolean
-  initialPath?: string
-}>()
+  modelValue: boolean;
+  initialPath?: string;
+}>();
 
 const emit = defineEmits<{
-  'update:modelValue': [value: boolean]
-  select: [path: string]
-}>()
+  'update:modelValue': [value: boolean];
+  select: [path: string];
+}>();
 
-const DEFAULT_PATH = '/storage/emulated/0'
+const DEFAULT_PATH = '/storage/emulated/0';
 
-const currentPath = ref(props.initialPath ?? DEFAULT_PATH)
-const folders = ref<DirEntry[]>([])
-const loading = ref(false)
+const currentPath = ref(props.initialPath ?? DEFAULT_PATH);
+const folders = ref<DirEntry[]>([]);
+const loading = ref(false);
 
 const show = computed({
   get: () => props.modelValue,
   set: (val: boolean) => emit('update:modelValue', val),
-})
+});
 
 const canGoUp = computed(() => {
-  return currentPath.value !== '/' && currentPath.value !== DEFAULT_PATH
-})
+  return currentPath.value !== '/' && currentPath.value !== DEFAULT_PATH;
+});
 
 watch(show, (val) => {
   if (val) {
-    loadDirectory(currentPath.value)
+    loadDirectory(currentPath.value);
   }
-})
+});
 
 onMounted(() => {
   if (props.initialPath) {
-    currentPath.value = props.initialPath
+    currentPath.value = props.initialPath;
   }
-})
+});
 
 async function loadDirectory(path: string) {
-  loading.value = true
+  loading.value = true;
   try {
-    const entries = await readDir(path)
+    const entries = await readDir(path);
     folders.value = entries
-      .filter((entry): entry is DirEntry & { isDirectory: true; name: string } => entry.isDirectory === true && entry.name != null)
-      .sort((a, b) => a.name.localeCompare(b.name))
-    currentPath.value = path
+      .filter(
+        (entry): entry is DirEntry & { isDirectory: true; name: string } =>
+          entry.isDirectory === true && entry.name != null,
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+    currentPath.value = path;
   } catch {
-    alert(t('folder_picker.permission_error'))
+    alert(t('folder_picker.permission_error'));
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 async function navigate(folderName: string) {
   const newPath = currentPath.value.endsWith('/')
     ? currentPath.value + folderName
-    : currentPath.value + '/' + folderName
-  await loadDirectory(newPath)
+    : currentPath.value + '/' + folderName;
+  await loadDirectory(newPath);
 }
 
 async function goUp() {
-  const parts = currentPath.value.split('/')
+  const parts = currentPath.value.split('/');
   if (parts.length > 1) {
-    parts.pop()
-    let newPath = parts.join('/')
-    if (newPath === '') newPath = '/'
-    await loadDirectory(newPath)
+    parts.pop();
+    let newPath = parts.join('/');
+    if (newPath === '') newPath = '/';
+    await loadDirectory(newPath);
   }
 }
 
 function selectCurrent() {
-  emit('select', currentPath.value)
-  close()
+  emit('select', currentPath.value);
+  close();
 }
 
 function close() {
-  emit('update:modelValue', false)
+  emit('update:modelValue', false);
 }
 </script>

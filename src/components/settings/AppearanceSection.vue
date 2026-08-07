@@ -1,10 +1,5 @@
 <template>
-  <v-card
-    variant="flat"
-    color="surface"
-    rounded="xl"
-    class="mb-6 border-subtle overflow-hidden"
-  >
+  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
     <v-card-item class="bg-zinc-100 py-4">
       <template v-slot:prepend>
         <div class="siegu-icon-circle-dark mr-3">
@@ -25,7 +20,9 @@
         <v-radio value="system">
           <template v-slot:label>
             <span class="d-flex align-center">
-              <v-icon size="small" color="var(--color-text-muted)" class="mr-2">mdi-theme-light-dark</v-icon>
+              <v-icon size="small" color="var(--color-text-muted)" class="mr-2"
+                >mdi-theme-light-dark</v-icon
+              >
               {{ $t('settings.theme_system') }}
             </span>
           </template>
@@ -33,7 +30,9 @@
         <v-radio value="light">
           <template v-slot:label>
             <span class="d-flex align-center">
-              <v-icon size="small" color="var(--color-brand-favorite)" class="mr-2">mdi-white-balance-sunny</v-icon>
+              <v-icon size="small" color="var(--color-brand-favorite)" class="mr-2"
+                >mdi-white-balance-sunny</v-icon
+              >
               {{ $t('settings.theme_light') }}
             </span>
           </template>
@@ -41,7 +40,9 @@
         <v-radio value="dark">
           <template v-slot:label>
             <span class="d-flex align-center">
-              <v-icon size="small" color="var(--color-text-muted)" class="mr-2">mdi-weather-night</v-icon>
+              <v-icon size="small" color="var(--color-text-muted)" class="mr-2"
+                >mdi-weather-night</v-icon
+              >
               {{ $t('settings.theme_dark') }}
             </span>
           </template>
@@ -52,28 +53,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useTheme } from 'vuetify'
+import { ref } from 'vue';
+import { useTheme } from 'vuetify';
 
 const props = defineProps<{
-  initialTheme: string
-}>()
+  initialTheme: string;
+}>();
 
-const theme = useTheme()
-const currentTheme = ref(props.initialTheme)
+const theme = useTheme();
+const currentTheme = ref(props.initialTheme);
 
 function onThemeChange(val: string | null): void {
-  if (!val) return
-  currentTheme.value = val
-  localStorage.setItem('siegu_theme', val)
+  if (!val) return;
+  currentTheme.value = val;
+  localStorage.setItem('siegu_theme', val);
 
   if (val === 'system') {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    theme.global.name.value = prefersDark ? 'dark' : 'light'
-    document.documentElement.dataset.theme = prefersDark ? 'dark' : 'light'
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    theme.global.name.value = prefersDark ? 'dark' : 'light';
+    document.documentElement.dataset.theme = prefersDark ? 'dark' : 'light';
   } else {
-    theme.global.name.value = val
-    document.documentElement.dataset.theme = val
+    theme.global.name.value = val;
+    document.documentElement.dataset.theme = val;
   }
 }
 </script>

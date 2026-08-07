@@ -1,10 +1,5 @@
 <template>
-  <v-card
-    variant="flat"
-    color="surface"
-    rounded="xl"
-    class="mb-6 overflow-hidden border-subtle"
-  >
+  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 overflow-hidden border-subtle">
     <v-card-item class="bg-zinc-100 py-4">
       <template v-slot:prepend>
         <div class="siegu-icon-circle-dark mr-3">
@@ -47,9 +42,7 @@
                   </template>
                   <v-list size="small" class="siegu-list">
                     <v-list-item @click="$emit('remove-directory', directory.value)">
-                      <v-list-item-title>{{
-                        $t('settings.remove_folder')
-                      }}</v-list-item-title>
+                      <v-list-item-title>{{ $t('settings.remove_folder') }}</v-list-item-title>
                     </v-list-item>
                     <v-list-item
                       @click="$emit('remove-directory-full', directory.value)"
@@ -60,10 +53,7 @@
                   </v-list>
                 </v-menu>
               </template>
-              <v-divider
-                v-if="index < directories.length - 1"
-                class="border-subtle"
-              ></v-divider>
+              <v-divider v-if="index < directories.length - 1" class="border-subtle"></v-divider>
             </v-list-item>
           </v-list>
         </div>
@@ -97,15 +87,15 @@
 </template>
 
 <script setup lang="ts">
-import type { DirectoryEntry } from '@/types/settings'
+import type { DirectoryEntry } from '@/types/settings';
 
 defineProps<{
-  directories: DirectoryEntry[]
-}>()
+  directories: DirectoryEntry[];
+}>();
 
 defineEmits<{
-  'select-directory': []
-  'remove-directory': [path: string]
-  'remove-directory-full': [path: string]
-}>()
+  'select-directory': [];
+  'remove-directory': [path: string];
+  'remove-directory-full': [path: string];
+}>();
 </script>

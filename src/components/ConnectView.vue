@@ -31,11 +31,9 @@
           v-if="!confirmDialog && !(started && mode === 'host' && !isConnected)"
           class="d-flex justify-center mb-3"
         >
-          <v-icon
-            size="72"
-            class="connect-illustration"
-            color="var(--color-success)"
-          >mdi-lan-connect</v-icon>
+          <v-icon size="72" class="connect-illustration" color="var(--color-success)"
+            >mdi-lan-connect</v-icon
+          >
         </div>
 
         <div

@@ -47,12 +47,9 @@
             <div class="text-caption font-weight-bold text-zinc-primary">
               {{ $t('settings.scan_threads') }}
             </div>
-            <v-chip
-              size="small"
-              variant="flat"
-              class="bg-btn font-weight-bold"
-              >{{ performance.scanThreads }}</v-chip
-            >
+            <v-chip size="small" variant="flat" class="bg-btn font-weight-bold">{{
+              performance.scanThreads
+            }}</v-chip>
           </div>
           <v-slider
             :model-value="performance.scanThreads"

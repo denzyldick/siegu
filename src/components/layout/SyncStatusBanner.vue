@@ -1,40 +1,40 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useSyncStore } from '@/stores/sync'
-import { autoReconnect } from '@/services/tauri'
+import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useSyncStore } from '@/stores/sync';
+import { autoReconnect } from '@/services/tauri';
 
-const { t } = useI18n()
-const syncStore = useSyncStore()
-const reconnecting = ref(false)
+const { t } = useI18n();
+const syncStore = useSyncStore();
+const reconnecting = ref(false);
 
-const isOffline = computed(() => syncStore.connection === 'offline')
+const isOffline = computed(() => syncStore.connection === 'offline');
 
 const isVisible = computed(() => {
-  if (isOffline.value) return true
+  if (isOffline.value) return true;
   return (
     syncStore.status !== 'idle' &&
     syncStore.status !== 'completed' &&
     syncStore.progress.items_total > 0
-  )
-})
+  );
+});
 
 const displayProgress = computed(() => {
-  if (syncStore.progress.items_total === 0) return 0
-  return Math.round((syncStore.progress.items_completed / syncStore.progress.items_total) * 100)
-})
+  if (syncStore.progress.items_total === 0) return 0;
+  return Math.round((syncStore.progress.items_completed / syncStore.progress.items_total) * 100);
+});
 
 function dismiss(): void {
-  syncStore.status = 'idle'
+  syncStore.status = 'idle';
 }
 
 async function reconnect(): Promise<void> {
-  if (reconnecting.value) return
-  reconnecting.value = true
+  if (reconnecting.value) return;
+  reconnecting.value = true;
   try {
-    await autoReconnect()
+    await autoReconnect();
   } finally {
-    reconnecting.value = false
+    reconnecting.value = false;
   }
 }
 </script>
@@ -55,12 +55,7 @@ async function reconnect(): Promise<void> {
           class="mr-3"
         />
         <div v-else-if="!isOffline" class="mr-3 d-flex align-center">
-          <v-progress-circular
-            :model-value="displayProgress"
-            size="22"
-            width="3"
-            color="black"
-          >
+          <v-progress-circular :model-value="displayProgress" size="22" width="3" color="black">
             <span style="font-size: 8px; font-weight: bold">{{ displayProgress }}</span>
           </v-progress-circular>
         </div>

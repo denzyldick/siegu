@@ -1,43 +1,46 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import type { Person } from '@/types/person'
+import { ref, computed, watch } from 'vue';
+import type { Person } from '@/types/person';
 
 const props = defineProps<{
-  modelValue: boolean
-  activePerson: Person | null
-  people: Person[]
-}>()
+  modelValue: boolean;
+  activePerson: Person | null;
+  people: Person[];
+}>();
 
 const emit = defineEmits<{
-  'update:modelValue': [value: boolean]
-  rename: [id: number, newName: string]
-  merge: [fromId: number, toId: number]
-}>()
+  'update:modelValue': [value: boolean];
+  rename: [id: number, newName: string];
+  merge: [fromId: number, toId: number];
+}>();
 
-const newName = ref('')
-const manageTab = ref('rename')
-const mergeTargetId = ref<number | null>(null)
+const newName = ref('');
+const manageTab = ref('rename');
+const mergeTargetId = ref<number | null>(null);
 
 const otherPeople = computed(() => {
-  return props.people.filter((p) => p.id !== props.activePerson?.id)
-})
+  return props.people.filter((p) => p.id !== props.activePerson?.id);
+});
 
-watch(() => props.modelValue, (open) => {
-  if (open && props.activePerson) {
-    newName.value = props.activePerson.name
-    manageTab.value = 'rename'
-    mergeTargetId.value = null
-  }
-})
+watch(
+  () => props.modelValue,
+  (open) => {
+    if (open && props.activePerson) {
+      newName.value = props.activePerson.name;
+      manageTab.value = 'rename';
+      mergeTargetId.value = null;
+    }
+  },
+);
 
 function handleRename(): void {
-  if (!props.activePerson || !newName.value) return
-  emit('rename', props.activePerson.id, newName.value)
+  if (!props.activePerson || !newName.value) return;
+  emit('rename', props.activePerson.id, newName.value);
 }
 
 function handleMerge(): void {
-  if (!props.activePerson || !mergeTargetId.value) return
-  emit('merge', props.activePerson.id, mergeTargetId.value)
+  if (!props.activePerson || !mergeTargetId.value) return;
+  emit('merge', props.activePerson.id, mergeTargetId.value);
 }
 </script>
 
@@ -107,7 +110,9 @@ function handleMerge(): void {
             <div
               class="bg-amber-50 rounded-xl pa-4 mb-8 d-flex align-start ga-3 border-amber-subtle"
             >
-              <v-icon color="var(--color-warning-strong)" size="20" class="mt-1">mdi-alert-circle-outline</v-icon>
+              <v-icon color="var(--color-warning-strong)" size="20" class="mt-1"
+                >mdi-alert-circle-outline</v-icon
+              >
               <div class="text-body-2 text-warning font-weight-medium">
                 <span>{{ $t('people.merge_desc', { name: activePerson?.name }) }}</span>
               </div>

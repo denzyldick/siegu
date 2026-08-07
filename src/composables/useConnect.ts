@@ -1,6 +1,6 @@
-import { ref, onUnmounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { ref, onUnmounted } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import {
   generatePairingCodes,
   hashPairingCode,
@@ -8,248 +8,253 @@ import {
   startLanHost,
   stopWebrtcSession,
   requestStartSync,
-} from '@/services/tauri'
-import type { DiscoveredHost, PeerDevice } from '@/types/sync'
-import { getConfiguredSignalingUrl } from '@/services/signalling'
+} from '@/services/tauri';
+import type { DiscoveredHost, PeerDevice } from '@/types/sync';
+import { getConfiguredSignalingUrl } from '@/services/signalling';
 
-export type ConnectMode = 'host' | 'join'
+export type ConnectMode = 'host' | 'join';
 
 export interface SyncProgressState {
-  status: string
-  progress: number
-  items_completed: number
-  items_total: number
+  status: string;
+  progress: number;
+  items_completed: number;
+  items_total: number;
 }
 
 export function useConnect() {
-  const { t } = useI18n()
+  const { t } = useI18n();
 
-  const mode = ref<ConnectMode>('host')
-  const uuid = ref('')
-  const passphrase = ref<string[]>([])
-  const joinPassphrase = ref('')
-  const connectionStatus = ref('')
-  const isConnected = ref(false)
-  const peerJoined = ref(false)
-  const loading = ref(false)
-  const syncing = ref(false)
-  const disconnecting = ref(false)
-  const syncProgress = ref<SyncProgressState>({ status: '', progress: 0, items_completed: 0, items_total: 0 })
-  const selectedLanHost = ref<DiscoveredHost | null>(null)
-  const peerList = ref<PeerDevice[]>([])
-  const hostIp = ref('')
-  const hostPort = ref(0)
+  const mode = ref<ConnectMode>('host');
+  const uuid = ref('');
+  const passphrase = ref<string[]>([]);
+  const joinPassphrase = ref('');
+  const connectionStatus = ref('');
+  const isConnected = ref(false);
+  const peerJoined = ref(false);
+  const loading = ref(false);
+  const syncing = ref(false);
+  const disconnecting = ref(false);
+  const syncProgress = ref<SyncProgressState>({
+    status: '',
+    progress: 0,
+    items_completed: 0,
+    items_total: 0,
+  });
+  const selectedLanHost = ref<DiscoveredHost | null>(null);
+  const peerList = ref<PeerDevice[]>([]);
+  const hostIp = ref('');
+  const hostPort = ref(0);
 
-  let unlistenWebRtc: UnlistenFn | null = null
-  let unlistenSync: UnlistenFn | null = null
-  let unlistenRoomCode: UnlistenFn | null = null
-  let unlistenPeerConnected: UnlistenFn | null = null
-  let unlistenPeerDisconnected: UnlistenFn | null = null
+  let unlistenWebRtc: UnlistenFn | null = null;
+  let unlistenSync: UnlistenFn | null = null;
+  let unlistenRoomCode: UnlistenFn | null = null;
+  let unlistenPeerConnected: UnlistenFn | null = null;
+  let unlistenPeerDisconnected: UnlistenFn | null = null;
 
   function handleWebRtcState(payload: string): void {
-    connectionStatus.value = payload
+    connectionStatus.value = payload;
     if (payload === 'Peer Joined') {
-      peerJoined.value = true
+      peerJoined.value = true;
     }
     if (payload === 'Connected' || payload === 'connected') {
-      isConnected.value = true
-      peerJoined.value = false
-      loading.value = false
+      isConnected.value = true;
+      peerJoined.value = false;
+      loading.value = false;
     }
     if (
       payload.toLowerCase().includes('error') ||
       payload.toLowerCase().includes('failed') ||
       payload.toLowerCase().includes('disconnected')
     ) {
-      isConnected.value = false
-      peerJoined.value = false
-      loading.value = false
+      isConnected.value = false;
+      peerJoined.value = false;
+      loading.value = false;
     }
   }
 
   function handleSyncProgress(payload: {
-    status: string
-    phase?: 'idle' | 'syncing' | 'completed'
-    progress: number
-    items_completed: number
-    items_total: number
+    status: string;
+    phase?: 'idle' | 'syncing' | 'completed';
+    progress: number;
+    items_completed: number;
+    items_total: number;
   }): void {
     syncProgress.value = {
       status: payload.status,
       progress: payload.progress,
       items_completed: payload.items_completed ?? 0,
       items_total: payload.items_total ?? 0,
-    }
+    };
     if (payload.phase === 'syncing') {
-      syncing.value = true
+      syncing.value = true;
     } else if (payload.phase === 'completed') {
-      syncing.value = false
+      syncing.value = false;
     }
   }
 
   function handleRoomCode(payload: string): void {
-    passphrase.value = [payload]
-    uuid.value = payload
+    passphrase.value = [payload];
+    uuid.value = payload;
   }
 
   function handlePeerConnected(device: PeerDevice): void {
-    const existing = peerList.value.findIndex((p) => p.device_id === device.device_id)
+    const existing = peerList.value.findIndex((p) => p.device_id === device.device_id);
     if (existing >= 0) {
-      peerList.value[existing] = device
+      peerList.value[existing] = device;
     } else {
-      peerList.value.push(device)
+      peerList.value.push(device);
     }
-    connectionStatus.value = `Peer Connected: ${device.name}`
-    isConnected.value = true
+    connectionStatus.value = `Peer Connected: ${device.name}`;
+    isConnected.value = true;
   }
 
   function handlePeerDisconnected(peerId: string): void {
-    peerList.value = peerList.value.filter((p) => p.device_id !== peerId)
+    peerList.value = peerList.value.filter((p) => p.device_id !== peerId);
     if (peerList.value.length === 0) {
-      isConnected.value = false
-      connectionStatus.value = t('connect.disconnected')
+      isConnected.value = false;
+      connectionStatus.value = t('connect.disconnected');
     }
   }
 
   async function getSignalingUrl(): Promise<string> {
     if (selectedLanHost.value) {
-      return `ws://${selectedLanHost.value.ip}:${selectedLanHost.value.port}`
+      return `ws://${selectedLanHost.value.ip}:${selectedLanHost.value.port}`;
     }
     if (hostIp.value && hostPort.value) {
-      return `ws://${hostIp.value}:${hostPort.value}`
+      return `ws://${hostIp.value}:${hostPort.value}`;
     }
-    return getConfiguredSignalingUrl()
+    return getConfiguredSignalingUrl();
   }
 
   async function initialize(): Promise<void> {
-    connectionStatus.value = t('connect.generating_key')
+    connectionStatus.value = t('connect.generating_key');
     try {
-      const codes = await generatePairingCodes()
-      uuid.value = codes.uuid
-      passphrase.value = codes.passphrase
-      const roomId = await hashPairingCode(codes.uuid)
+      const codes = await generatePairingCodes();
+      uuid.value = codes.uuid;
+      passphrase.value = codes.passphrase;
+      const roomId = await hashPairingCode(codes.uuid);
       if (mode.value === 'host') {
-        const info = await startLanHost(roomId, false)
-        hostIp.value = info.ip
-        hostPort.value = info.port
+        const info = await startLanHost(roomId, false);
+        hostIp.value = info.ip;
+        hostPort.value = info.port;
       }
     } catch (error) {
-      console.error('Pairing Error:', error)
-      connectionStatus.value = t('connect.pairing_error')
+      console.error('Pairing Error:', error);
+      connectionStatus.value = t('connect.pairing_error');
     }
   }
 
   function selectLanHost(host: DiscoveredHost): void {
-    selectedLanHost.value = host
+    selectedLanHost.value = host;
   }
 
   async function joinWebRTC(ip?: string, port?: string): Promise<void> {
-    if (!joinPassphrase.value || loading.value) return
+    if (!joinPassphrase.value || loading.value) return;
     if (ip && port) {
-      hostIp.value = ip
-      hostPort.value = parseInt(port) || 0
+      hostIp.value = ip;
+      hostPort.value = parseInt(port) || 0;
     }
-    loading.value = true
-    connectionStatus.value = t('connect.joining_room')
-    const signalingUrl = await getSignalingUrl()
+    loading.value = true;
+    connectionStatus.value = t('connect.joining_room');
+    const signalingUrl = await getSignalingUrl();
     try {
-      const roomId = await hashPairingCode(joinPassphrase.value)
-      await startWebrtcSession(roomId, true, signalingUrl)
-      connectionStatus.value = t('connect.awaiting_webrtc_receiver')
+      const roomId = await hashPairingCode(joinPassphrase.value);
+      await startWebrtcSession(roomId, true, signalingUrl);
+      connectionStatus.value = t('connect.awaiting_webrtc_receiver');
     } catch (error) {
-      loading.value = false
-      connectionStatus.value = t('connect.error_joining', { error })
+      loading.value = false;
+      connectionStatus.value = t('connect.error_joining', { error });
     }
   }
 
   async function triggerSync(): Promise<void> {
-    syncing.value = true
+    syncing.value = true;
     try {
-      await requestStartSync()
+      await requestStartSync();
     } catch (err) {
-      console.error('Failed to start sync:', err)
-      syncing.value = false
+      console.error('Failed to start sync:', err);
+      syncing.value = false;
     }
   }
 
   async function disconnectSession(): Promise<void> {
-    if (disconnecting.value) return
-    disconnecting.value = true
+    if (disconnecting.value) return;
+    disconnecting.value = true;
     try {
-      await stopWebrtcSession()
-      connectionStatus.value = t('connect.disconnected')
-      uuid.value = ''
-      passphrase.value = []
-      isConnected.value = false
-      peerJoined.value = false
-      syncProgress.value = { status: '', progress: 0, items_completed: 0, items_total: 0 }
-      selectedLanHost.value = null
-      peerList.value = []
+      await stopWebrtcSession();
+      connectionStatus.value = t('connect.disconnected');
+      uuid.value = '';
+      passphrase.value = [];
+      isConnected.value = false;
+      peerJoined.value = false;
+      syncProgress.value = { status: '', progress: 0, items_completed: 0, items_total: 0 };
+      selectedLanHost.value = null;
+      peerList.value = [];
     } catch (error) {
-      console.error('Disconnect Error:', error)
+      console.error('Disconnect Error:', error);
     } finally {
-      disconnecting.value = false
+      disconnecting.value = false;
     }
   }
 
   async function startEventListeners(): Promise<void> {
     unlistenWebRtc = await listen<string>('webrtc-state', (event) => {
-      handleWebRtcState(event.payload)
-    })
+      handleWebRtcState(event.payload);
+    });
     unlistenSync = await listen<{
-      status: string
-      progress: number
-      items_completed: number
-      items_total: number
+      status: string;
+      progress: number;
+      items_completed: number;
+      items_total: number;
     }>('sync-progress', (event) => {
-      handleSyncProgress(event.payload)
-    })
+      handleSyncProgress(event.payload);
+    });
     unlistenRoomCode = await listen<string>('room-code', (event) => {
-      handleRoomCode(event.payload)
-    })
+      handleRoomCode(event.payload);
+    });
     unlistenPeerConnected = await listen<PeerDevice>('peer-connected', (event) => {
-      handlePeerConnected(event.payload)
-    })
+      handlePeerConnected(event.payload);
+    });
     unlistenPeerDisconnected = await listen<string>('peer-disconnected', (event) => {
-      handlePeerDisconnected(event.payload)
-    })
+      handlePeerDisconnected(event.payload);
+    });
   }
 
   function stopEventListeners(): void {
     if (unlistenWebRtc) {
-      unlistenWebRtc()
-      unlistenWebRtc = null
+      unlistenWebRtc();
+      unlistenWebRtc = null;
     }
     if (unlistenSync) {
-      unlistenSync()
-      unlistenSync = null
+      unlistenSync();
+      unlistenSync = null;
     }
     if (unlistenRoomCode) {
-      unlistenRoomCode()
-      unlistenRoomCode = null
+      unlistenRoomCode();
+      unlistenRoomCode = null;
     }
     if (unlistenPeerConnected) {
-      unlistenPeerConnected()
-      unlistenPeerConnected = null
+      unlistenPeerConnected();
+      unlistenPeerConnected = null;
     }
     if (unlistenPeerDisconnected) {
-      unlistenPeerDisconnected()
-      unlistenPeerDisconnected = null
+      unlistenPeerDisconnected();
+      unlistenPeerDisconnected = null;
     }
   }
 
   function resetJoinState(): void {
-    connectionStatus.value = ''
-    peerJoined.value = false
-    syncProgress.value = { status: '', progress: 0, items_completed: 0, items_total: 0 }
-    selectedLanHost.value = null
-    hostIp.value = ''
-    hostPort.value = 0
+    connectionStatus.value = '';
+    peerJoined.value = false;
+    syncProgress.value = { status: '', progress: 0, items_completed: 0, items_total: 0 };
+    selectedLanHost.value = null;
+    hostIp.value = '';
+    hostPort.value = 0;
   }
 
   onUnmounted(() => {
-    stopEventListeners()
-  })
+    stopEventListeners();
+  });
 
   return {
     mode,
@@ -275,5 +280,5 @@ export function useConnect() {
     startEventListeners,
     stopEventListeners,
     resetJoinState,
-  }
+  };
 }

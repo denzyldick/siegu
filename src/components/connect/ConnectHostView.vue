@@ -11,7 +11,9 @@
     <div class="d-flex flex-column align-center py-2 ga-2" style="width: 100%">
       <div class="d-flex align-center ga-2">
         <v-icon color="success" size="18">mdi-check-circle</v-icon>
-        <span class="text-body-2 font-weight-bold text-success">{{ $t('connect.device_linked') }}</span>
+        <span class="text-body-2 font-weight-bold text-success">{{
+          $t('connect.device_linked')
+        }}</span>
       </div>
       <div v-if="peerName" class="text-caption text-zinc-secondary">
         {{ $t('connect.connected_to') }} <strong>{{ peerName }}</strong>
@@ -29,13 +31,7 @@
             {{ itemsCompleted }}/{{ itemsTotal }}
           </span>
         </div>
-        <v-progress-linear
-          v-else
-          indeterminate
-          color="success"
-          height="4"
-          class="w-100"
-        />
+        <v-progress-linear v-else indeterminate color="success" height="4" class="w-100" />
         <span class="text-caption text-zinc-muted">{{ $t('connect.syncing') }}</span>
       </div>
     </div>
@@ -84,29 +80,34 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref } from 'vue';
 
-const props = withDefaults(defineProps<{
-  passphrase: string[]
-  isConnected?: boolean
-  syncing?: boolean
-  itemsCompleted?: number
-  itemsTotal?: number
-  peerName?: string
-}>(), {
-  isConnected: false,
-  syncing: false,
-  itemsCompleted: 0,
-  itemsTotal: 0,
-  peerName: '',
-})
+const props = withDefaults(
+  defineProps<{
+    passphrase: string[];
+    isConnected?: boolean;
+    syncing?: boolean;
+    itemsCompleted?: number;
+    itemsTotal?: number;
+    peerName?: string;
+  }>(),
+  {
+    isConnected: false,
+    syncing: false,
+    itemsCompleted: 0,
+    itemsTotal: 0,
+    peerName: '',
+  },
+);
 
-const copied = ref(false)
+const copied = ref(false);
 
 function copyPassphrase() {
-  const text = props.passphrase.join(' ')
-  navigator.clipboard.writeText(text)
-  copied.value = true
-  setTimeout(() => { copied.value = false }, 2000)
+  const text = props.passphrase.join(' ');
+  navigator.clipboard.writeText(text);
+  copied.value = true;
+  setTimeout(() => {
+    copied.value = false;
+  }, 2000);
 }
 </script>

@@ -5,7 +5,9 @@
       <div
         class="d-flex flex-column align-center justify-center h-100 px-6 text-center animate-fade-in"
       >
-        <v-icon size="48" color="var(--color-text-secondary)" class="mb-4">mdi-map-marker-off-outline</v-icon>
+        <v-icon size="48" color="var(--color-text-secondary)" class="mb-4"
+          >mdi-map-marker-off-outline</v-icon
+        >
         <div class="text-h6 text-zinc-secondary font-weight-bold">{{ $t('map.no_photos') }}</div>
         <p class="text-body-2 text-zinc-muted mt-1 max-w-400">{{ $t('map.no_photos_desc') }}</p>
       </div>

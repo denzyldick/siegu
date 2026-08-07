@@ -1,42 +1,42 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 
-const { t } = useI18n()
+const { t } = useI18n();
 
 const props = defineProps<{
-  modelValue: string
-  loading: boolean
-  isConnected: boolean
-  showSyncButton: boolean
-  syncing: boolean
-  hostIp: string
-  hostPort: number
-  deviceName: string
-  itemsCompleted: number
-  itemsTotal: number
-}>()
+  modelValue: string;
+  loading: boolean;
+  isConnected: boolean;
+  showSyncButton: boolean;
+  syncing: boolean;
+  hostIp: string;
+  hostPort: number;
+  deviceName: string;
+  itemsCompleted: number;
+  itemsTotal: number;
+}>();
 
 const emit = defineEmits<{
-  'update:modelValue': [value: string]
-  join: [ip: string, port: string]
-  sync: []
-}>()
+  'update:modelValue': [value: string];
+  join: [ip: string, port: string];
+  sync: [];
+}>();
 
 const localValue = computed({
   get: () => props.modelValue,
   set: (val: string) => emit('update:modelValue', val),
-})
+});
 
 const syncStatusText = computed(() => {
   if (props.itemsTotal > 0) {
     return t('connect.syncing_files', {
       completed: props.itemsCompleted,
       total: props.itemsTotal,
-    })
+    });
   }
-  return t('connect.syncing')
-})
+  return t('connect.syncing');
+});
 </script>
 
 <template>
@@ -82,10 +82,7 @@ const syncStatusText = computed(() => {
       </div>
     </v-btn>
 
-    <div
-      v-if="syncing"
-      class="d-flex flex-column align-center py-4 ga-2"
-    >
+    <div v-if="syncing" class="d-flex flex-column align-center py-4 ga-2">
       <div v-if="deviceName" class="text-caption text-zinc-secondary">
         {{ t('connect.connected_to') }} <strong>{{ deviceName }}</strong>
       </div>
@@ -101,20 +98,11 @@ const syncStatusText = computed(() => {
           {{ itemsCompleted }}/{{ itemsTotal }}
         </span>
       </div>
-      <v-progress-linear
-        v-else
-        indeterminate
-        color="success"
-        height="4"
-        class="w-100"
-      />
+      <v-progress-linear v-else indeterminate color="success" height="4" class="w-100" />
       <span class="text-caption text-zinc-muted">{{ syncStatusText }}</span>
     </div>
 
-    <div
-      v-else-if="isConnected"
-      class="d-flex flex-column align-center py-4 ga-1"
-    >
+    <div v-else-if="isConnected" class="d-flex flex-column align-center py-4 ga-1">
       <v-icon size="16" color="success" class="mr-2">mdi-check-circle</v-icon>
       <span class="text-caption text-success">{{ t('connect.sync_complete') }}</span>
       <span v-if="itemsCompleted > 0" class="text-caption text-zinc-muted">

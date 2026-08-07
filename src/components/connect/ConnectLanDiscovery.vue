@@ -1,63 +1,63 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { discoverLanDevices, isAndroid, pingMdnsPlugin } from '@/services/tauri'
-import type { DiscoveredHost } from '@/types/sync'
+import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { discoverLanDevices, isAndroid, pingMdnsPlugin } from '@/services/tauri';
+import type { DiscoveredHost } from '@/types/sync';
 
 const emit = defineEmits<{
-  select: [host: DiscoveredHost]
-}>()
+  select: [host: DiscoveredHost];
+}>();
 
-const hosts = ref<DiscoveredHost[]>([])
-const scanning = ref(true)
-const error = ref('')
-const elapsed = ref(0)
-let pollTimer: ReturnType<typeof setInterval> | null = null
-let elapsedTimer: ReturnType<typeof setInterval> | null = null
+const hosts = ref<DiscoveredHost[]>([]);
+const scanning = ref(true);
+const error = ref('');
+const elapsed = ref(0);
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+let elapsedTimer: ReturnType<typeof setInterval> | null = null;
 
-const noDevices = computed(() => elapsed.value >= 15 && hosts.value.length === 0) // Show the spinner for the first 15s
+const noDevices = computed(() => elapsed.value >= 15 && hosts.value.length === 0); // Show the spinner for the first 15s
 
 async function initPlugin(): Promise<boolean> {
   if (isAndroid) {
     try {
-      await pingMdnsPlugin()
-      return true
+      await pingMdnsPlugin();
+      return true;
     } catch {
-      error.value = 'mDNS plugin not available'
-      scanning.value = false
-      return false
+      error.value = 'mDNS plugin not available';
+      scanning.value = false;
+      return false;
     }
   }
-  return true
+  return true;
 }
 
 async function poll(): Promise<void> {
   try {
-    const results = await discoverLanDevices(2)
+    const results = await discoverLanDevices(2);
     if (results.length > 0) {
-      hosts.value = results
-      error.value = ''
-      scanning.value = false
+      hosts.value = results;
+      error.value = '';
+      scanning.value = false;
     }
   } catch (e) {
-    error.value = String(e)
+    error.value = String(e);
   }
 }
 
 onMounted(async () => {
-  const ok = await initPlugin()
+  const ok = await initPlugin();
   if (ok) {
-    poll()
-    pollTimer = setInterval(poll, 3000)
+    poll();
+    pollTimer = setInterval(poll, 3000);
   }
   elapsedTimer = setInterval(() => {
-    elapsed.value++
-  }, 1000)
-})
+    elapsed.value++;
+  }, 1000);
+});
 
 onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer)
-  if (elapsedTimer) clearInterval(elapsedTimer)
-})
+  if (pollTimer) clearInterval(pollTimer);
+  if (elapsedTimer) clearInterval(elapsedTimer);
+});
 </script>
 
 <template>
@@ -82,7 +82,9 @@ onUnmounted(() => {
         <template v-slot:prepend>
           <v-icon size="20" color="black">mdi-laptop</v-icon>
         </template>
-        <v-list-item-title class="text-body-2 font-weight-medium">{{ host.name }}</v-list-item-title>
+        <v-list-item-title class="text-body-2 font-weight-medium">{{
+          host.name
+        }}</v-list-item-title>
         <v-list-item-subtitle class="text-caption">{{ host.ip }}</v-list-item-subtitle>
         <template v-slot:append>
           <v-icon size="16" color="grey">mdi-chevron-right</v-icon>
@@ -90,10 +92,7 @@ onUnmounted(() => {
       </v-list-item>
     </v-list>
 
-    <div
-      v-if="noDevices"
-      class="text-caption text-zinc-muted text-center py-4"
-    >
+    <div v-if="noDevices" class="text-caption text-zinc-muted text-center py-4">
       {{ error || $t('connect.no_devices_found') }}
     </div>
   </div>

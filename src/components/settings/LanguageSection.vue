@@ -1,10 +1,5 @@
 <template>
-  <v-card
-    variant="flat"
-    color="surface"
-    rounded="xl"
-    class="mb-6 border-subtle overflow-hidden"
-  >
+  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
     <v-card-item class="bg-zinc-100 py-4">
       <template v-slot:prepend>
         <div class="siegu-icon-circle-dark mr-3">
@@ -34,31 +29,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 interface LanguageOption {
-  code: string
-  label: string
+  code: string;
+  label: string;
 }
 
 const props = defineProps<{
-  initialLang: string
-}>()
+  initialLang: string;
+}>();
 
-const { t } = useI18n()
-const currentLang = ref(props.initialLang)
+const { t } = useI18n();
+const currentLang = ref(props.initialLang);
 
 const languages: LanguageOption[] = ['en', 'nl', 'fr', 'es', 'pap', 'de', 'it', 'pt'].map(
   (code) => ({
     code,
     label: t(`language.${code}`),
   }),
-)
+);
 
 function onLanguageChange(code: string): void {
-  currentLang.value = code
-  localStorage.setItem('siegu_language', code)
-  window.location.reload()
+  currentLang.value = code;
+  localStorage.setItem('siegu_language', code);
+  window.location.reload();
 }
 </script>

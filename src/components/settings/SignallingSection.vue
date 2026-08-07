@@ -1,10 +1,5 @@
 <template>
-  <v-card
-    variant="flat"
-    color="surface"
-    rounded="xl"
-    class="mb-6 border-subtle overflow-hidden"
-  >
+  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
     <v-card-item class="bg-zinc-100 py-4">
       <template v-slot:prepend>
         <div class="siegu-icon-circle-dark mr-3">
@@ -60,7 +55,10 @@
         <v-icon size="small" class="mr-2" :color="pingResult.ok ? 'success' : 'error'">
           {{ pingResult.ok ? 'mdi-check-circle-outline' : 'mdi-alert-circle-outline' }}
         </v-icon>
-        <span class="text-caption font-weight-bold" :class="pingResult.ok ? 'text-success' : 'text-error'">
+        <span
+          class="text-caption font-weight-bold"
+          :class="pingResult.ok ? 'text-success' : 'text-error'"
+        >
           {{ pingResult.message }}
         </span>
       </div>
@@ -96,41 +94,41 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import type { PingResult } from '@/services/signalling'
+import { ref, watch } from 'vue';
+import type { PingResult } from '@/services/signalling';
 
 const props = defineProps<{
-  modelValue: string
-  token: string
-  testing: boolean
-  saving: boolean
-  pingResult: PingResult | null
-}>()
+  modelValue: string;
+  token: string;
+  testing: boolean;
+  saving: boolean;
+  pingResult: PingResult | null;
+}>();
 
 const emit = defineEmits<{
-  'update:modelValue': [value: string]
-  'update:token': [value: string]
-  test: []
-  save: []
-}>()
+  'update:modelValue': [value: string];
+  'update:token': [value: string];
+  test: [];
+  save: [];
+}>();
 
-const url = ref(props.modelValue)
-const token = ref(props.token)
+const url = ref(props.modelValue);
+const token = ref(props.token);
 
 watch(
   () => props.modelValue,
   (val) => {
-    url.value = val
+    url.value = val;
   },
-)
+);
 watch(
   () => props.token,
   (val) => {
-    token.value = val
+    token.value = val;
   },
-)
-watch(url, (val) => emit('update:modelValue', val))
-watch(token, (val) => emit('update:token', val))
+);
+watch(url, (val) => emit('update:modelValue', val));
+watch(token, (val) => emit('update:token', val));
 </script>
 
 <style scoped>

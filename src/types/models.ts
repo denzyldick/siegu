@@ -1,59 +1,59 @@
 export type AiModelId =
-  | 'clip'
-  | 'face'
-  | 'ocr'
-  | 'nsfw'
-  | 'aesthetics'
-  | 'yolo'
-  | 'blip'
-  | 'midas'
-  | 'whisper'
+  'clip' | 'face' | 'ocr' | 'nsfw' | 'aesthetics' | 'yolo' | 'blip' | 'midas' | 'whisper';
 
 export const AI_MODEL_IDS: readonly AiModelId[] = [
-  'clip', 'face', 'ocr', 'nsfw', 'aesthetics', 'yolo', 'blip', 'midas', 'whisper',
-] as const
+  'clip',
+  'face',
+  'ocr',
+  'nsfw',
+  'aesthetics',
+  'yolo',
+  'blip',
+  'midas',
+  'whisper',
+] as const;
 
 export interface AiModelInfo {
-  id: AiModelId
-  name: string
-  description: string
-  size: string
-  downloaded: boolean
+  id: AiModelId;
+  name: string;
+  description: string;
+  size: string;
+  downloaded: boolean;
 }
 
 export interface ModelProgress {
-  model: string
-  pending: number | null
-  total: number | null
-  status: string
-  message: string
+  model: string;
+  pending: number | null;
+  total: number | null;
+  status: string;
+  message: string;
 }
 
 export interface DownloadProgress {
-  model: string
-  downloaded: number
-  total: number | null
+  model: string;
+  downloaded: number;
+  total: number | null;
 }
 
 export interface ModelCapability {
-  model: string
-  runnable: boolean
-  reason: string | null
+  model: string;
+  runnable: boolean;
+  reason: string | null;
 }
 
-export type ModelBlockReason = 'low_ram' | 'memory_budget' | 'load_failed'
+export type ModelBlockReason = 'low_ram' | 'memory_budget' | 'load_failed';
 
 /** Reason codes that mean a model cannot run on this device at all. */
 export const MODEL_BLOCK_REASONS: readonly ModelBlockReason[] = [
   'low_ram',
   'memory_budget',
   'load_failed',
-]
+];
 
 export interface AiJob {
-  photo_id: number
-  model: AiModelId
-  status: 'pending' | 'running' | 'completed' | 'failed'
+  photo_id: number;
+  model: AiModelId;
+  status: 'pending' | 'running' | 'completed' | 'failed';
 }
 
 export const MODEL_DISPLAY_NAMES: Record<AiModelId, string> = {
@@ -66,7 +66,7 @@ export const MODEL_DISPLAY_NAMES: Record<AiModelId, string> = {
   blip: 'BLIP',
   midas: 'MiDaS',
   whisper: 'Whisper',
-}
+};
 
 export const MODEL_DESCRIPTIONS: Record<AiModelId, string> = {
   clip: 'Image-text understanding and search',
@@ -78,4 +78,4 @@ export const MODEL_DESCRIPTIONS: Record<AiModelId, string> = {
   blip: 'Image captioning',
   midas: 'Depth estimation',
   whisper: 'Audio transcription for videos',
-}
+};

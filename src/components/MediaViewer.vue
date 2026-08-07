@@ -264,7 +264,9 @@
               </div>
 
               <div class="d-flex align-center mb-4" v-if="exifData.make || exifData.model">
-                <v-icon size="small" color="var(--color-text-muted)" class="mr-2">mdi-camera</v-icon>
+                <v-icon size="small" color="var(--color-text-muted)" class="mr-2"
+                  >mdi-camera</v-icon
+                >
                 <span class="text-body-2 text-zinc-secondary"
                   >{{ exifData.make }} {{ exifData.model }}</span
                 >

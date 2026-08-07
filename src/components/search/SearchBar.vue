@@ -550,7 +550,11 @@ function iconForFilter(type: string): string {
                   <div class="best-badge" :title="t('search.best_shot')">
                     <v-icon size="12">mdi-star-four-points</v-icon>
                   </div>
-                  <v-icon v-if="photo.favorite" size="14" color="var(--color-brand-favorite)" class="best-fav"
+                  <v-icon
+                    v-if="photo.favorite"
+                    size="14"
+                    color="var(--color-brand-favorite)"
+                    class="best-fav"
                     >mdi-heart</v-icon
                   >
                 </div>
@@ -832,7 +836,9 @@ function iconForFilter(type: string): string {
                 {{ t('search.no_matches', { query: searchStore.query.trim() }) }}
               </div>
               <button class="run-search-item mx-auto" @click="runSearch">
-                <v-icon size="18" class="mr-2" color="var(--color-brand-faces)">mdi-text-search</v-icon>
+                <v-icon size="18" class="mr-2" color="var(--color-brand-faces)"
+                  >mdi-text-search</v-icon
+                >
                 {{ t('search.enter_to_search', { query: searchStore.query.trim() }) }}
               </button>
             </div>

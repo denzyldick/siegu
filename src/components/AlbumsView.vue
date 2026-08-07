@@ -96,7 +96,9 @@
                     class="album-cover-img"
                   />
                   <div v-else class="album-cover-placeholder d-flex align-center justify-center">
-                    <v-icon size="44" color="var(--color-icon-empty)">{{ tileIcon(item.kind) }}</v-icon>
+                    <v-icon size="44" color="var(--color-icon-empty)">{{
+                      tileIcon(item.kind)
+                    }}</v-icon>
                   </div>
                   <div class="album-count">
                     <v-icon size="12">mdi-image</v-icon>

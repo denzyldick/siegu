@@ -1,10 +1,5 @@
 <template>
-  <v-card
-    variant="flat"
-    color="surface"
-    rounded="xl"
-    class="mb-6 border-subtle overflow-hidden"
-  >
+  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
     <v-card-item class="bg-zinc-100 py-4">
       <template v-slot:prepend>
         <div class="siegu-icon-circle-dark mr-3">
@@ -45,10 +40,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { getVersion } from '@tauri-apps/api/app'
+import { ref, onMounted } from 'vue';
+import { getVersion } from '@tauri-apps/api/app';
 
-const version = ref('')
+const version = ref('');
 
 const dependencies = [
   { name: 'Vue.js', license: 'MIT' },
@@ -59,13 +54,13 @@ const dependencies = [
   { name: 'ONNX Runtime', license: 'MIT' },
   { name: 'Rust', license: 'MIT OR Apache-2.0' },
   { name: 'FFmpeg', license: 'LGPL-2.1+' },
-]
+];
 
 onMounted(async () => {
   try {
-    version.value = await getVersion()
+    version.value = await getVersion();
   } catch {
-    version.value = ''
+    version.value = '';
   }
-})
+});
 </script>

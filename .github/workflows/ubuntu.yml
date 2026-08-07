@@ -53,6 +53,8 @@ jobs:
 
       - run: npm run lint
 
+      - run: npx prettier --check "src/**/*.{js,vue,ts,css,json}"
+
       - run: npm test
 
       - run: cargo fmt --check

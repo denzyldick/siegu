@@ -5,7 +5,9 @@
         <div v-if="!embedded" class="d-flex align-center justify-space-between mb-6">
           <div>
             <div class="d-flex align-center mb-1">
-              <v-icon color="var(--color-text-primary)" size="28" class="mr-3">mdi-cog-outline</v-icon>
+              <v-icon color="var(--color-text-primary)" size="28" class="mr-3"
+                >mdi-cog-outline</v-icon
+              >
               <h1 class="text-h4 font-weight-bold text-zinc-primary">{{ $t('settings.title') }}</h1>
             </div>
             <div class="text-subtitle-1 text-zinc-secondary">{{ $t('settings.desc') }}</div>

@@ -53,71 +53,71 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useAlbumsStore } from '@/stores/albums'
-import type { Album } from '@/types/albums'
+import { ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useAlbumsStore } from '@/stores/albums';
+import type { Album } from '@/types/albums';
 
 const props = defineProps<{
-  modelValue: boolean
-  photoIds: string[]
-}>()
+  modelValue: boolean;
+  photoIds: string[];
+}>();
 
 const emit = defineEmits<{
-  'update:modelValue': [value: boolean]
-  added: [albumName: string]
-}>()
+  'update:modelValue': [value: boolean];
+  added: [albumName: string];
+}>();
 
-const { t } = useI18n()
-const albumsStore = useAlbumsStore()
+const { t } = useI18n();
+const albumsStore = useAlbumsStore();
 
-const visible = ref(props.modelValue)
-const newName = ref('')
-const creating = ref(false)
-const albums = ref<Album[]>(albumsStore.albums)
+const visible = ref(props.modelValue);
+const newName = ref('');
+const creating = ref(false);
+const albums = ref<Album[]>(albumsStore.albums);
 
 watch(
   () => props.modelValue,
   (value) => {
-    visible.value = value
+    visible.value = value;
     if (value) {
-      newName.value = ''
-      void albumsStore.loadAlbums()
-      albums.value = albumsStore.albums
+      newName.value = '';
+      void albumsStore.loadAlbums();
+      albums.value = albumsStore.albums;
     }
   },
-)
+);
 
-watch(visible, (value) => emit('update:modelValue', value))
+watch(visible, (value) => emit('update:modelValue', value));
 
 watch(
   () => albumsStore.albums,
   (value) => {
-    albums.value = value
+    albums.value = value;
   },
-)
+);
 
 async function addTo(album: Album): Promise<void> {
-  visible.value = false
-  await albumsStore.addItems(album.id, props.photoIds)
-  emit('added', album.name)
+  visible.value = false;
+  await albumsStore.addItems(album.id, props.photoIds);
+  emit('added', album.name);
 }
 
 async function createAndAdd(): Promise<void> {
-  const name = newName.value.trim()
-  if (!name || creating.value) return
-  creating.value = true
+  const name = newName.value.trim();
+  if (!name || creating.value) return;
+  creating.value = true;
   try {
-    const album = await albumsStore.createAlbum(name)
+    const album = await albumsStore.createAlbum(name);
     if (album) {
-      visible.value = false
-      await albumsStore.addItems(album.id, props.photoIds)
-      emit('added', album.name)
+      visible.value = false;
+      await albumsStore.addItems(album.id, props.photoIds);
+      emit('added', album.name);
     }
   } finally {
-    creating.value = false
+    creating.value = false;
   }
 }
 
-void t
+void t;
 </script>

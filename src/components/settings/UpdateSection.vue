@@ -1,10 +1,5 @@
 <template>
-  <v-card
-    variant="flat"
-    color="surface"
-    rounded="xl"
-    class="mb-6 overflow-hidden border-subtle"
-  >
+  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 overflow-hidden border-subtle">
     <v-card-item class="bg-zinc-100 py-4">
       <template v-slot:prepend>
         <div class="siegu-icon-circle-dark mr-3">
@@ -52,15 +47,15 @@
 
 <script setup lang="ts">
 defineProps<{
-  status: string
-  statusText: string
-  btnText: string
-  btnIcon: string
-  supported: boolean
-}>()
+  status: string;
+  statusText: string;
+  btnText: string;
+  btnIcon: string;
+  supported: boolean;
+}>();
 
 defineEmits<{
-  'check-update': []
-  'download-update': []
-}>()
+  'check-update': [];
+  'download-update': [];
+}>();
 </script>

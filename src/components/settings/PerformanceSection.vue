@@ -117,11 +117,7 @@
               <div class="text-caption font-weight-bold text-zinc-primary">
                 {{ $t('settings.batch_delay') }}
               </div>
-              <v-chip
-                size="small"
-                variant="flat"
-                class="bg-btn font-weight-bold"
-              >
+              <v-chip size="small" variant="flat" class="bg-btn font-weight-bold">
                 {{ gapSeconds.toFixed(1) }}s
               </v-chip>
             </div>
@@ -143,11 +139,7 @@
               <div class="text-caption font-weight-bold text-zinc-primary">
                 {{ $t('settings.memory_budget') }}
               </div>
-              <v-chip
-                size="small"
-                variant="flat"
-                class="bg-btn font-weight-bold"
-              >
+              <v-chip size="small" variant="flat" class="bg-btn font-weight-bold">
                 {{
                   performance.memoryBudgetMb === 0
                     ? $t('settings.memory_budget_none')
@@ -173,11 +165,7 @@
               <div class="text-caption font-weight-bold text-zinc-primary">
                 {{ $t('settings.ml_threads') }}
               </div>
-              <v-chip
-                size="small"
-                variant="flat"
-                class="bg-btn font-weight-bold"
-              >
+              <v-chip size="small" variant="flat" class="bg-btn font-weight-bold">
                 {{ performance.mlThreads }}
               </v-chip>
             </div>

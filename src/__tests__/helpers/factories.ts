@@ -1,7 +1,7 @@
-import type { MediaItem, MediaProperties } from '@/types/media'
-import type { Person } from '@/types/person'
+import type { MediaItem, MediaProperties } from '@/types/media';
+import type { Person } from '@/types/person';
 
-let nextId = 1
+let nextId = 1;
 
 export function createMediaItem(overrides: Partial<MediaItem> = {}): MediaItem {
   return {
@@ -19,14 +19,14 @@ export function createMediaItem(overrides: Partial<MediaItem> = {}): MediaItem {
     latitude: null,
     longitude: null,
     ...overrides,
-  }
+  };
 }
 
 export function createVideoItem(overrides: Partial<MediaItem> = {}): MediaItem {
   return createMediaItem({
     location: '/videos/test.mp4',
     ...overrides,
-  })
+  });
 }
 
 export function createPerson(overrides: Partial<Person> = {}): Person {
@@ -38,7 +38,7 @@ export function createPerson(overrides: Partial<Person> = {}): Person {
     encoded: null,
     representative_face_id: null,
     ...overrides,
-  }
+  };
 }
 
 export function createProperties(overrides: Partial<MediaProperties> = {}): MediaProperties {
@@ -47,9 +47,9 @@ export function createProperties(overrides: Partial<MediaProperties> = {}): Medi
     height: 1080,
     fileSize: 5242880,
     ...overrides,
-  }
+  };
 }
 
 export function resetIdCounter(): void {
-  nextId = 1
+  nextId = 1;
 }

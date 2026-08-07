@@ -1,9 +1,9 @@
 export function getLocale(): string {
-  return localStorage.getItem('siegu_language') || 'en'
+  return localStorage.getItem('siegu_language') || 'en';
 }
 
 export function setLocale(locale: string): void {
-  localStorage.setItem('siegu_language', locale)
+  localStorage.setItem('siegu_language', locale);
 }
 
 export const SUPPORTED_LOCALES = [
@@ -15,4 +15,4 @@ export const SUPPORTED_LOCALES = [
   { code: 'de', name: 'Deutsch' },
   { code: 'it', name: 'Italiano' },
   { code: 'pt', name: 'Português' },
-] as const
+] as const;

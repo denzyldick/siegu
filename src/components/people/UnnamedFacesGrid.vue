@@ -1,23 +1,19 @@
 <script setup lang="ts">
-import type { Person } from '@/types/person'
-import { getFaceImageSrc } from '@/composables/useMediaUtils'
+import type { Person } from '@/types/person';
+import { getFaceImageSrc } from '@/composables/useMediaUtils';
 
 defineProps<{
-  faces: Person[]
-}>()
+  faces: Person[];
+}>();
 
 defineEmits<{
-  viewCluster: [group: Person]
-  promptName: [group: Person]
-}>()
+  viewCluster: [group: Person];
+  promptName: [group: Person];
+}>();
 </script>
 
 <template>
-  <section
-    v-if="faces.length > 0"
-    class="animate-fade-up"
-    :style="{ animationDelay: '0.1s' }"
-  >
+  <section v-if="faces.length > 0" class="animate-fade-up" :style="{ animationDelay: '0.1s' }">
     <div class="d-flex align-center mb-8 flex-nowrap">
       <h2 class="text-h5 font-weight-black text-zinc-primary pr-6 flex-shrink-0">
         {{ $t('people.new_faces') }}

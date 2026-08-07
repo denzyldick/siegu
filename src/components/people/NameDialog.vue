@@ -1,29 +1,32 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import type { Person } from '@/types/person'
-import { getFaceImageSrc } from '@/composables/useMediaUtils'
+import { ref, watch } from 'vue';
+import type { Person } from '@/types/person';
+import { getFaceImageSrc } from '@/composables/useMediaUtils';
 
 const props = defineProps<{
-  modelValue: boolean
-  activeFace: Person | null
-  people: Person[]
-}>()
+  modelValue: boolean;
+  activeFace: Person | null;
+  people: Person[];
+}>();
 
 const emit = defineEmits<{
-  'update:modelValue': [value: boolean]
-  save: [faceId: number, name: string]
-}>()
+  'update:modelValue': [value: boolean];
+  save: [faceId: number, name: string];
+}>();
 
-const newName = ref('')
+const newName = ref('');
 
-watch(() => props.modelValue, (open) => {
-  if (open) newName.value = ''
-})
+watch(
+  () => props.modelValue,
+  (open) => {
+    if (open) newName.value = '';
+  },
+);
 
 function handleSave(): void {
-  if (!newName.value || !props.activeFace) return
-  if (props.activeFace.representative_face_id === null) return
-  emit('save', props.activeFace.representative_face_id, newName.value)
+  if (!newName.value || !props.activeFace) return;
+  if (props.activeFace.representative_face_id === null) return;
+  emit('save', props.activeFace.representative_face_id, newName.value);
 }
 </script>
 
@@ -40,7 +43,12 @@ function handleSave(): void {
           <h3 class="text-h5 font-weight-black text-zinc-primary">
             {{ $t('people.who_is_this') }}
           </h3>
-          <v-btn icon="mdi-close" variant="text" size="small" @click="emit('update:modelValue', false)"></v-btn>
+          <v-btn
+            icon="mdi-close"
+            variant="text"
+            size="small"
+            @click="emit('update:modelValue', false)"
+          ></v-btn>
         </div>
 
         <div class="text-body-2 text-zinc-muted mb-4 text-center">
@@ -76,9 +84,7 @@ function handleSave(): void {
             <v-list-item v-bind="itemProps" class="py-2">
               <template v-slot:prepend>
                 <v-avatar size="32" class="mr-2 border-subtle">
-                  <v-img
-                    :src="getFaceImageSrc(item.representative_crop, item.encoded)"
-                  ></v-img>
+                  <v-img :src="getFaceImageSrc(item.representative_crop, item.encoded)"></v-img>
                 </v-avatar>
               </template>
             </v-list-item>

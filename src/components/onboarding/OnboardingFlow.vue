@@ -74,7 +74,11 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
 </script>
 
 <template>
-  <GreetView v-if="step === 'greet'" @setup-local="handleGreetLocal" @setup-sync="handleGreetSync" />
+  <GreetView
+    v-if="step === 'greet'"
+    @setup-local="handleGreetLocal"
+    @setup-sync="handleGreetSync"
+  />
 
   <v-container v-else-if="step === 'folders'" class="fill-height" fluid>
     <v-row justify="center">
@@ -177,7 +181,7 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
           <FolderPicker v-model="showSyncPicker" @select="handleSetSyncPath" />
 
           <div class="d-flex justify-center mb-8">
-<ConnectView
+            <ConnectView
               :embedded="true"
               :initial-mode="connectionMode"
               :hide-mode-toggle="true"
