@@ -260,7 +260,6 @@ export function useSettings() {
     try {
       const response = await invoke<string>('list_directories');
       const dirs = JSON.parse(response) as string[];
-      console.log('[Settings] listDirectories result:', dirs);
       directories.value = dirs.map((dir) => ({ title: dir.split('/').pop() || dir, value: dir }));
     } catch (e) {
       console.error('[Settings] listDirectories failed:', e);
@@ -274,19 +273,13 @@ export function useSettings() {
       return;
     }
     try {
-      console.log('[Settings] Opening directory dialog...');
       const selection = await open({ multiple: true, directory: true });
-      console.log('[Settings] Dialog result:', JSON.stringify(selection));
       if (Array.isArray(selection)) {
         for (const path of selection) {
-          console.log('[Settings] Adding directory:', path);
           await invoke('add_directory', { path });
         }
       } else if (selection) {
-        console.log('[Settings] Adding directory:', selection);
         await invoke('add_directory', { path: selection });
-      } else {
-        console.log('[Settings] Dialog cancelled or empty result');
       }
       await listDirectories();
     } catch (e) {
