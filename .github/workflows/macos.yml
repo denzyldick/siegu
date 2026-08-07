@@ -45,7 +45,7 @@ jobs:
           brew install pkg-config ffmpeg
           echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
-      - run: npm install
+      - run: npm ci
 
       - run: npm run check:translations
 
@@ -55,7 +55,7 @@ jobs:
 
       - run: npx prettier --check "src/**/*.{js,vue,ts,css,json}"
 
-      - run: npm test
+      - run: npm run test:coverage
 
       - run: cargo fmt --check
         working-directory: src-tauri

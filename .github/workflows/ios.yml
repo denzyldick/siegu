@@ -34,7 +34,7 @@ jobs:
           key: ios
           workspaces: crates,src-tauri
 
-      - run: npm install
+      - run: npm ci
 
       - run: cargo fmt --check
         working-directory: src-tauri

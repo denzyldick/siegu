@@ -69,7 +69,7 @@ jobs:
           "FFMPEG_LIB_DIR=$ffmpegDir\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
           "$ffmpegDir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
-      - run: npm install
+      - run: npm ci
 
       - run: npm run check:translations
 
@@ -79,7 +79,7 @@ jobs:
 
       - run: npx prettier --check "src/**/*.{js,vue,ts,css,json}"
 
-      - run: npm test
+      - run: npm run test:coverage
 
       - run: cargo fmt --check
         working-directory: src-tauri

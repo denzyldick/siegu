@@ -79,7 +79,7 @@ jobs:
           "FFMPEG_LIB_DIR=$ffmpegDir\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
           "$ffmpegDir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
-      - run: npm install
+      - run: npm ci
 
       - name: Prepare signing key
         shell: bash
@@ -183,7 +183,7 @@ jobs:
           echo "Patching $BUILD_RS"
           python3 scripts/patch-ffmpeg-android.py "$BUILD_RS"
 
-      - run: npm install
+      - run: npm ci
 
       - name: Build frontend
         run: yarn build
@@ -260,7 +260,7 @@ jobs:
           chown -R builder:builder .
           su builder -c "
             rustup default stable
-            npm install
+            npm ci
             APPIMAGE_EXTRACT_AND_RUN=1 npm run tauri build -- --bundles appimage
           "
 
@@ -292,6 +292,6 @@ jobs:
           key: release-ios
           workspaces: src-tauri
 
-      - run: npm install
+      - run: npm ci
 
       - run: npm run tauri ios build || echo "iOS build skipped/failed. Please configure code signing."
