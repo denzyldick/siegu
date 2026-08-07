@@ -16,7 +16,6 @@ import type {
   DownloadStats,
   ModelProgressState,
   PerformanceConfig,
-  DownloadDialogState,
   CleanupDialogState,
   RemoveFolderDialogState,
   SnackbarState,
@@ -118,12 +117,6 @@ export const useSettingsStore = defineStore('settings', () => {
   const logs = ref<LogEntry[]>([]);
 
   const snackbar = reactive<SnackbarState>({ show: false, text: '', error: false });
-  const downloadDialog = reactive<DownloadDialogState>({
-    show: false,
-    title: '',
-    message: '',
-    models: [],
-  });
   const cleanupDialog = reactive<CleanupDialogState>({ show: false });
   const removeFolderDialog = reactive<RemoveFolderDialogState>({ show: false, path: '' });
 
@@ -946,7 +939,6 @@ export const useSettingsStore = defineStore('settings', () => {
     totalModelRamEstimate,
     logs,
     snackbar,
-    downloadDialog,
     cleanupDialog,
     removeFolderDialog,
     isCleaning,

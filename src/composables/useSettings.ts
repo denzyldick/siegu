@@ -16,7 +16,6 @@ export function useSettings() {
     ...storeToRefs(store),
     performance: store.performance,
     snackbar: store.snackbar,
-    downloadDialog: store.downloadDialog,
     cleanupDialog: store.cleanupDialog,
     removeFolderDialog: store.removeFolderDialog,
   };

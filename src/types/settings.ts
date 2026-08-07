@@ -48,13 +48,6 @@ export interface PerformanceConfig {
   indexingMode: IndexingMode;
 }
 
-export interface DownloadDialogState {
-  show: boolean;
-  title: string;
-  message: string;
-  models: string[];
-}
-
 export interface CleanupDialogState {
   show: boolean;
 }

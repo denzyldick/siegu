@@ -60,54 +60,6 @@
       </v-col>
     </v-row>
 
-    <v-dialog v-model="downloadDialog.show" max-width="400" rounded="xl">
-      <v-card color="surface" border class="border-subtle overflow-hidden">
-        <v-card-item class="bg-zinc-100 py-4">
-          <template v-slot:prepend>
-            <div class="siegu-icon-circle-dark mr-3">
-              <v-icon color="var(--color-text-btn)" size="small">mdi-cloud-download-outline</v-icon>
-            </div>
-          </template>
-          <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
-            downloadDialog.title
-          }}</v-card-title>
-          <template v-slot:append>
-            <v-btn
-              icon="mdi-close"
-              variant="text"
-              size="small"
-              @click="downloadDialog.show = false"
-            ></v-btn>
-          </template>
-        </v-card-item>
-
-        <v-card-text class="py-6 text-center">
-          <div class="text-subtitle-1 text-zinc-secondary px-2">
-            {{ downloadDialog.message }}
-          </div>
-        </v-card-text>
-
-        <v-card-actions class="pa-4 bg-zinc-50 border-top-subtle ga-2">
-          <v-btn
-            variant="flat"
-            color="black"
-            @click="downloadDialog.show = false"
-            class="siegu-btn flex-grow-1"
-            height="44"
-            >{{ $t('settings.cancel') }}</v-btn
-          >
-          <v-btn
-            variant="flat"
-            color="black"
-            @click="confirmDownload"
-            class="siegu-btn flex-grow-1"
-            height="44"
-            >{{ $t('settings.download') }}</v-btn
-          >
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
     <v-dialog v-model="cleanupDialog.show" max-width="400" rounded="xl">
       <v-card color="surface" border class="border-subtle overflow-hidden">
         <v-card-item class="bg-zinc-100 py-4">
@@ -238,15 +190,12 @@ defineProps<{
 
 const emit = defineEmits<{
   'folder-added': [directories: unknown[]];
-  'models-ready': [];
-  done: [];
 }>();
 
 const {
   directories,
   showFolderPicker,
   snackbar,
-  downloadDialog,
   cleanupDialog,
   removeFolderDialog,
   updateStatus,
@@ -297,10 +246,6 @@ async function saveSignalling(): Promise<void> {
   } finally {
     signallingSaving.value = false;
   }
-}
-
-function confirmDownload(): void {
-  downloadDialog.show = false;
 }
 
 onMounted(async () => {
