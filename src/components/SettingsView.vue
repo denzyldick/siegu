@@ -309,7 +309,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useSettings } from '@/composables/useSettings';
 import FolderPicker from './FolderPicker.vue';
@@ -387,6 +387,7 @@ const {
   isMemoryFreeing,
   currentPreset,
   init,
+  stopClock,
   selectDirectory,
   removeDirectory,
   openRemoveFolderFull,
@@ -489,5 +490,9 @@ onMounted(async () => {
     console.error('[Setting] init failed:', e);
   }
   emit('folder-added', directories.value);
+});
+
+onUnmounted(() => {
+  stopClock();
 });
 </script>

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { createPinia, setActivePinia } from 'pinia';
 
 const invoke = vi.hoisted(() => vi.fn());
 
@@ -27,6 +28,10 @@ vi.mock('vue-i18n', () => ({
 }));
 
 import { useSettings } from '@/composables/useSettings';
+
+beforeEach(() => {
+  setActivePinia(createPinia());
+});
 
 function configWith(overrides: Record<string, string>): string {
   const base: Record<string, string> = {
