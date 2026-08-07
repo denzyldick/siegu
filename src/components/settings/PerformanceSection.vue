@@ -22,7 +22,7 @@
             variant="flat"
             class="preset-card rounded-lg"
             :class="{ 'preset-card-active': currentPreset === preset.value }"
-            @click="$emit('apply-preset', preset.value)"
+            @click="applyPreset(preset.value)"
           >
             <v-card-text class="pa-2 text-center">
               <div class="text-body-2 font-weight-bold text-zinc-primary">
@@ -57,43 +57,7 @@
 
       <v-divider class="my-4 border-subtle"></v-divider>
 
-      <ModelsSection
-        :embedded="embedded"
-        :sorted-models="sortedModels"
-        :downloaded-models="downloadedModels"
-        :selected-models="selectedModels"
-        :model-enabled="modelEnabled"
-        :is-downloading="isDownloading"
-        :is-any-model-processing="isAnyModelProcessing"
-        :missing-selected-count="missingSelectedCount"
-        :pending-count="pendingCount"
-        :global-eta="globalEta"
-        :visible-activity-model="visibleActivityModel"
-        :active-model-summary="activeModelSummary"
-        :is-model-processing="isModelProcessing"
-        :is-model-active="isModelActive"
-        :is-model-downloading="isModelDownloading"
-        :get-model-progress-percent="getModelProgressPercent"
-        :get-model-progress-text="getModelProgressText"
-        :get-model-status-label="getModelStatusLabel"
-        :get-model-status-text="getModelStatusText"
-        :get-model-activity-icon="getModelActivityIcon"
-        :get-progress="getProgress"
-        :get-download-stats="getDownloadStats"
-        :is-model-blocked="isModelBlocked"
-        :get-model-block-reason="getModelBlockReason"
-        :format-indexing-count="formatIndexingCount"
-        :format-eta="formatEta"
-        :toggle-model="toggleModel"
-        :model-ram="modelRam"
-        :models-loaded="modelsLoaded"
-        :total-ram-estimate="totalRamEstimate"
-        :is-memory-freeing="isMemoryFreeing"
-        @download-models="(force, models) => emit('download-models', force, models)"
-        @run-model="(id) => emit('run-model', id)"
-        @update-selected-models="(models) => emit('update-selected-models', models)"
-        @free-memory="emit('free-memory')"
-      />
+      <ModelsSection />
 
       <v-divider class="my-4 border-subtle"></v-divider>
 
@@ -188,82 +152,43 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { storeToRefs } from 'pinia';
 import ModelsSection from './ModelsSection.vue';
-import type { DownloadStats, PerformanceConfig, PerformancePreset } from '@/types/settings';
+import { useSettingsStore } from '@/stores/settings';
 
-interface ModelEntry {
-  id: string;
-  size: string;
-}
+const store = useSettingsStore();
 
-const props = defineProps<{
-  embedded: boolean;
-  performance: PerformanceConfig;
-  currentPreset: PerformancePreset;
-  maxThreads: number;
-  sortedModels: ModelEntry[];
-  downloadedModels: string[];
-  selectedModels: string[];
-  modelEnabled: Record<string, boolean>;
-  isDownloading: boolean;
-  isAnyModelProcessing: boolean;
-  missingSelectedCount: number;
-  pendingCount: number;
-  globalEta: number;
-  visibleActivityModel: ModelEntry | null;
-  activeModelSummary: string;
-  isModelProcessing: (modelId: string) => boolean;
-  isModelActive: (modelId: string) => boolean;
-  isModelDownloading: (modelId: string) => boolean;
-  getModelProgressPercent: (modelId: string) => number;
-  getModelProgressText: (modelId: string) => string;
-  getModelStatusLabel: (modelId: string) => string;
-  getModelStatusText: (modelId: string) => string;
-  getModelActivityIcon: (modelId: string) => string;
-  getDownloadStats: (modelId: string) => DownloadStats;
-  getProgress: (modelId: string) => number;
-  isModelBlocked: (modelId: string) => boolean;
-  getModelBlockReason: (modelId: string) => string;
-  formatIndexingCount: (value: number) => string;
-  formatEta: (ms: number) => string;
-  toggleModel: (modelId: string) => void;
-  modelRam: Record<string, string>;
-  modelsLoaded: boolean;
-  totalRamEstimate: string;
-  isMemoryFreeing: boolean;
-}>();
+const { currentPreset } = storeToRefs(store);
 
-const emit = defineEmits<{
-  'apply-preset': [preset: string];
-  'update-batch-delay': [valueMs: number];
-  'update-memory-budget': [valueMb: number];
-  'update-ml-threads': [value: number];
-  'download-models': [forceUpdate: boolean, models: string[]];
-  'run-model': [modelId: string];
-  'update-selected-models': [models: string[]];
-  'free-memory': [];
-}>();
+const { performance, maxThreads, applyPreset, savePerformanceConfig } = store;
 
-const presets = [{ value: 'low' }, { value: 'balanced' }, { value: 'full' }];
+const presets = [
+  { value: 'low' as const },
+  { value: 'balanced' as const },
+  { value: 'full' as const },
+];
 
 const showAdvanced = ref(false);
 
-const gapSeconds = computed(() => props.performance.batchDelayMs / 1000);
+const gapSeconds = computed(() => performance.batchDelayMs / 1000);
 
-const memoryBudgetGigabytes = computed(() => props.performance.memoryBudgetMb / 1024);
+const memoryBudgetGigabytes = computed(() => performance.memoryBudgetMb / 1024);
 
 function onGapChange(value: number | [number, number]): void {
   const seconds = typeof value === 'number' ? value : value[0];
-  emit('update-batch-delay', Math.round(seconds * 1000));
+  performance.batchDelayMs = Math.round(seconds * 1000);
+  void savePerformanceConfig();
 }
 
 function onMemoryBudgetChange(value: number | [number, number]): void {
   const gb = typeof value === 'number' ? value : value[0];
-  emit('update-memory-budget', Math.round(gb * 1024));
+  performance.memoryBudgetMb = Math.round(gb * 1024);
+  void savePerformanceConfig();
 }
 
 function onMlThreadsChange(value: number | [number, number]): void {
-  emit('update-ml-threads', typeof value === 'number' ? value : value[0]);
+  performance.mlThreads = typeof value === 'number' ? value : value[0];
+  void savePerformanceConfig();
 }
 </script>
 

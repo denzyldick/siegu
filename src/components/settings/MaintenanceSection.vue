@@ -25,7 +25,7 @@
               size="small"
               variant="flat"
               color="primary"
-              @click="$emit('cleanup-db')"
+              @click="cleanupDialog.show = true"
               :loading="isCleaning"
               class="siegu-btn px-4"
             >
@@ -84,7 +84,7 @@
                   <v-list-item
                     v-for="mode in indexingModes"
                     :key="mode.value"
-                    @click="$emit('set-indexing-mode', mode.value)"
+                    @click="setIndexingMode(mode.value)"
                   >
                     <v-list-item-title
                       class="text-caption"
@@ -131,7 +131,7 @@
             class="text-none font-weight-bold"
             color="primary"
             prepend-icon="mdi-content-copy"
-            @click.stop="$emit('copy-logs')"
+            @click.stop="copyLogs()"
           >
             {{ $t('settings.copy_logs') }}
           </v-btn>
@@ -141,7 +141,7 @@
             class="text-none font-weight-bold"
             color="error"
             prepend-icon="mdi-trash-can-outline"
-            @click.stop="$emit('clear-logs')"
+            @click.stop="clearLogs()"
           >
             {{ $t('settings.clear_logs') }}
           </v-btn>
@@ -152,31 +152,44 @@
 </template>
 
 <script setup lang="ts">
-import type { PerformanceConfig, LogEntry } from '@/types/settings';
+import { storeToRefs } from 'pinia';
+import { useI18n } from 'vue-i18n';
+import { useSettingsStore } from '@/stores/settings';
 
-defineProps<{
-  performance: PerformanceConfig;
-  maxThreads: number;
-  isCleaning: boolean;
-  logs: LogEntry[];
-}>();
+const store = useSettingsStore();
+const { t } = useI18n();
 
-const emit = defineEmits<{
-  'cleanup-db': [];
-  'update-scan-threads': [value: number];
-  'set-indexing-mode': [mode: string];
-  'clear-logs': [];
-  'copy-logs': [];
-}>();
+const { isCleaning, logs } = storeToRefs(store);
+
+const {
+  performance,
+  maxThreads,
+  cleanupDialog,
+  savePerformanceConfig,
+  setIndexingMode,
+  clearLogs,
+  showSnackbar,
+} = store;
 
 const indexingModes = [{ value: 'immediate' }, { value: 'idle' }, { value: 'manual' }];
 
 function onScanThreadsChange(value: number | [number, number]): void {
-  emit('update-scan-threads', typeof value === 'number' ? value : value[0]);
+  performance.scanThreads = typeof value === 'number' ? value : value[0];
+  void savePerformanceConfig();
 }
 
 function getModeLabel(val: string): string {
   return val;
+}
+
+async function copyLogs(): Promise<void> {
+  try {
+    const text = logs.value.map((log) => `[${log.time}] ${log.message}`).join('\n');
+    await navigator.clipboard.writeText(text);
+    showSnackbar(t('settings.logs_copied'));
+  } catch {
+    showSnackbar(t('settings.logs_copy_failed'), true);
+  }
 }
 </script>
 

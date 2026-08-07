@@ -234,7 +234,7 @@
                   icon="mdi-download"
                   :loading="isModelDownloading(model.id)"
                   :disabled="isAnyModelProcessing || isModelDownloadBlocked(model.id)"
-                  @click="$emit('download-models', false, [model.id])"
+                  @click="downloadModels(false, [model.id])"
                 />
               </template>
             </v-tooltip>
@@ -249,7 +249,7 @@
                     icon="mdi-refresh"
                     :loading="isModelDownloading(model.id)"
                     :disabled="isAnyModelProcessing"
-                    @click="$emit('download-models', true, [model.id])"
+                    @click="downloadModels(true, [model.id])"
                   />
                 </template>
               </v-tooltip>
@@ -275,7 +275,7 @@
                       (isAnyModelProcessing && !isModelProcessing(model.id)) ||
                       isModelBlocked(model.id)
                     "
-                    @click="$emit('run-model', model.id)"
+                    @click="runModel(model.id)"
                   />
                 </template>
               </v-tooltip>
@@ -293,7 +293,7 @@
         size="small"
         class="font-weight-bold"
         prepend-icon="mdi-download-multiple"
-        @click="$emit('download-models', false, selectedModels)"
+        @click="downloadModels(false, selectedModels)"
         :loading="isDownloading"
         :disabled="isAnyModelProcessing"
       >
@@ -330,7 +330,7 @@
           prepend-icon="mdi-memory"
           :loading="isMemoryFreeing"
           :disabled="!modelsLoaded || isMemoryFreeing"
-          @click="$emit('free-memory')"
+          @click="freeMemory()"
         >
           {{ $t('settings.free_memory') }}
         </v-btn>
@@ -340,75 +340,75 @@
 </template>
 
 <script setup lang="ts">
-import type { DownloadStats } from '@/types/settings';
+import { storeToRefs } from 'pinia';
+import { useSettingsStore } from '@/stores/settings';
 
-interface ModelEntry {
-  id: string;
-  size: string;
-}
-
-const props = defineProps<{
-  embedded: boolean;
-  sortedModels: ModelEntry[];
-  downloadedModels: string[];
-  selectedModels: string[];
-  modelEnabled: Record<string, boolean>;
-  isDownloading: boolean;
-  isAnyModelProcessing: boolean;
-  missingSelectedCount: number;
-  pendingCount: number;
-  globalEta: number;
-  visibleActivityModel: ModelEntry | null;
-  activeModelSummary: string;
-  isModelProcessing: (modelId: string) => boolean;
-  isModelActive: (modelId: string) => boolean;
-  isModelDownloading: (modelId: string) => boolean;
-  getModelProgressPercent: (modelId: string) => number;
-  getModelProgressText: (modelId: string) => string;
-  getModelStatusLabel: (modelId: string) => string;
-  getModelStatusText: (modelId: string) => string;
-  getModelActivityIcon: (modelId: string) => string;
-  getDownloadStats: (modelId: string) => DownloadStats;
-  getProgress: (modelId: string) => number;
-  isModelBlocked: (modelId: string) => boolean;
-  getModelBlockReason: (modelId: string) => string;
-  formatIndexingCount: (value: number) => string;
-  formatEta: (ms: number) => string;
-  toggleModel: (modelId: string) => void;
-  modelRam: Record<string, string>;
-  modelsLoaded: boolean;
-  totalRamEstimate: string;
-  isMemoryFreeing: boolean;
+defineProps<{
+  embedded?: boolean;
 }>();
 
-const emit = defineEmits<{
-  'download-models': [forceUpdate: boolean, models: string[]];
-  'run-model': [modelId: string];
-  'update-selected-models': [models: string[]];
-  'free-memory': [];
-}>();
+const store = useSettingsStore();
+
+const {
+  sortedModels,
+  downloadedModels,
+  selectedModels,
+  modelEnabled,
+  isDownloading,
+  isAnyModelProcessing,
+  missingSelectedCount,
+  pendingCount,
+  globalEta,
+  visibleActivityModel,
+  activeModelSummary,
+  modelRam,
+  modelsLoaded,
+  totalModelRamEstimate: totalRamEstimate,
+  isMemoryFreeing,
+} = storeToRefs(store);
+
+const {
+  isModelProcessing,
+  isModelActive,
+  isModelDownloading,
+  getModelProgressPercent,
+  getModelProgressText,
+  getModelStatusLabel,
+  getModelStatusText,
+  getModelActivityIcon,
+  getProgress,
+  getDownloadStats,
+  isModelBlocked,
+  getModelBlockReason,
+  formatIndexingCount,
+  formatEta,
+  toggleModel,
+  downloadModels,
+  runModel,
+  freeMemory,
+} = store;
 
 function hasModelProgressTotal(modelId: string): boolean {
-  return props.getModelProgressPercent(modelId) > 0;
+  return getModelProgressPercent(modelId) > 0;
 }
 
 function hasDownloadProgressTotal(modelId: string): boolean {
-  return props.getDownloadStats(modelId).hasTotal;
+  return getDownloadStats(modelId).hasTotal;
 }
 
 function isModelDownloadBlocked(modelId: string): boolean {
-  return props.isModelBlocked(modelId) && !props.downloadedModels.includes(modelId);
+  return isModelBlocked(modelId) && !downloadedModels.value.includes(modelId);
 }
 
 function toggleModelSelection(modelId: string): void {
-  const current = [...props.selectedModels];
+  const current = [...selectedModels.value];
   const index = current.indexOf(modelId);
   if (index >= 0) {
     current.splice(index, 1);
   } else {
     current.push(modelId);
   }
-  emit('update-selected-models', current);
+  store.selectedModels = current;
 }
 </script>
 

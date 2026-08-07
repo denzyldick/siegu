@@ -22,107 +22,15 @@
           @remove-directory-full="openRemoveFolderFull"
         />
 
-        <PerformanceSection
-          v-if="!embedded"
-          :embedded="embedded"
-          :performance="performance"
-          :current-preset="currentPreset"
-          :max-threads="maxThreads"
-          :sorted-models="sortedModels"
-          :downloaded-models="downloadedModels"
-          :selected-models="selectedModels"
-          :model-enabled="modelEnabled"
-          :is-downloading="isDownloading"
-          :is-any-model-processing="isAnyModelProcessing"
-          :missing-selected-count="missingSelectedCount"
-          :pending-count="pendingCount"
-          :global-eta="globalEta"
-          :visible-activity-model="visibleActivityModel"
-          :active-model-summary="activeModelSummary"
-          :is-model-processing="isModelProcessing"
-          :is-model-active="isModelActive"
-          :is-model-downloading="isModelDownloading"
-          :get-model-progress-percent="getModelProgressPercent"
-          :get-model-progress-text="getModelProgressText"
-          :get-model-status-label="getModelStatusLabel"
-          :get-model-status-text="getModelStatusText"
-          :get-model-activity-icon="getModelActivityIcon"
-          :get-progress="getProgress"
-          :get-download-stats="getDownloadStats"
-          :is-model-blocked="isModelBlocked"
-          :get-model-block-reason="getModelBlockReason"
-          :format-indexing-count="formatIndexingCount"
-          :format-eta="formatEta"
-          :toggle-model="toggleModel"
-          :model-ram="modelRam"
-          :models-loaded="modelsLoaded"
-          :total-ram-estimate="totalModelRamEstimate"
-          :is-memory-freeing="isMemoryFreeing"
-          @apply-preset="onApplyPreset"
-          @update-batch-delay="onBatchDelayChange"
-          @update-memory-budget="onMemoryBudgetChange"
-          @update-ml-threads="onMlThreadsChange"
-          @download-models="downloadModels"
-          @run-model="runModel"
-          @update-selected-models="onUpdateSelectedModels"
-          @free-memory="freeMemory"
-        />
+        <PerformanceSection v-if="!embedded" />
 
-        <ModelsSection
-          v-if="embedded && !hideAiSection"
-          :embedded="embedded"
-          :sorted-models="sortedModels"
-          :downloaded-models="downloadedModels"
-          :selected-models="selectedModels"
-          :model-enabled="modelEnabled"
-          :is-downloading="isDownloading"
-          :is-any-model-processing="isAnyModelProcessing"
-          :missing-selected-count="missingSelectedCount"
-          :pending-count="pendingCount"
-          :global-eta="globalEta"
-          :visible-activity-model="visibleActivityModel"
-          :active-model-summary="activeModelSummary"
-          :is-model-processing="isModelProcessing"
-          :is-model-active="isModelActive"
-          :is-model-downloading="isModelDownloading"
-          :get-model-progress-percent="getModelProgressPercent"
-          :get-model-progress-text="getModelProgressText"
-          :get-model-status-label="getModelStatusLabel"
-          :get-model-status-text="getModelStatusText"
-          :get-model-activity-icon="getModelActivityIcon"
-          :get-progress="getProgress"
-          :get-download-stats="getDownloadStats"
-          :is-model-blocked="isModelBlocked"
-          :get-model-block-reason="getModelBlockReason"
-          :format-indexing-count="formatIndexingCount"
-          :format-eta="formatEta"
-          :toggle-model="toggleModel"
-          :model-ram="modelRam"
-          :models-loaded="modelsLoaded"
-          :total-ram-estimate="totalModelRamEstimate"
-          :is-memory-freeing="isMemoryFreeing"
-          @download-models="downloadModels"
-          @run-model="runModel"
-          @update-selected-models="onUpdateSelectedModels"
-          @free-memory="freeMemory"
-        />
+        <ModelsSection v-if="embedded && !hideAiSection" :embedded="true" />
 
         <LanguageSection v-if="!embedded" :initial-lang="currentLang" />
 
         <AppearanceSection v-if="!embedded" :initial-theme="currentTheme" />
 
-        <MaintenanceSection
-          v-if="!embedded"
-          :performance="performance"
-          :max-threads="maxThreads"
-          :is-cleaning="isCleaning"
-          :logs="logs"
-          @cleanup-db="cleanupDb"
-          @update-scan-threads="onScanThreadsChange"
-          @set-indexing-mode="setIndexingMode"
-          @clear-logs="clearLogs"
-          @copy-logs="copyLogs"
-        />
+        <MaintenanceSection v-if="!embedded" />
 
         <SignallingSection
           v-if="!embedded"
@@ -310,7 +218,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { useI18n } from 'vue-i18n';
 import { useSettings } from '@/composables/useSettings';
 import FolderPicker from './FolderPicker.vue';
 import FoldersSection from './settings/FoldersSection.vue';
@@ -338,23 +245,10 @@ const emit = defineEmits<{
 const {
   directories,
   showFolderPicker,
-  downloadedModels,
-  selectedModels,
-  modelEnabled,
-  isDownloading,
-  pendingCount,
-  globalEta,
-  visibleActivityModel,
-  activeModelSummary,
-  sortedModels,
-  isAnyModelProcessing,
-  missingSelectedCount,
-  logs,
   snackbar,
   downloadDialog,
   cleanupDialog,
   removeFolderDialog,
-  isCleaning,
   updateStatus,
   updateStatusText,
   updateBtnText,
@@ -365,27 +259,6 @@ const {
   signalingToken,
   signalingTesting,
   signalingPingResult,
-  performance,
-  maxThreads,
-  isModelProcessing,
-  isModelActive,
-  isModelDownloading,
-  getModelProgressPercent,
-  getModelProgressText,
-  getModelStatusLabel,
-  getModelStatusText,
-  getModelActivityIcon,
-  getProgress,
-  getDownloadStats,
-  isModelBlocked,
-  getModelBlockReason,
-  formatIndexingCount,
-  formatEta,
-  modelRam,
-  modelsLoaded,
-  totalModelRamEstimate,
-  isMemoryFreeing,
-  currentPreset,
   init,
   stopClock,
   selectDirectory,
@@ -393,17 +266,8 @@ const {
   openRemoveFolderFull,
   startConfirmedRemoveFolder,
   onFolderSelected,
-  toggleModel,
-  downloadModels,
-  runModel,
-  savePerformanceConfig,
-  setIndexingMode,
-  applyPreset,
-  freeMemory,
   saveSignallingConfig,
   testSignalling,
-  clearLogs,
-  showSnackbar,
   checkUpdate,
   downloadUpdate,
   startConfirmedCleanup,
@@ -415,46 +279,6 @@ const currentTheme = ref(localStorage.getItem('siegu_theme') || 'system');
 const isStoreManaged = computed(
   () => currentPlatform.value === 'android' || currentPlatform.value === 'ios',
 );
-
-const { t } = useI18n();
-
-function onScanThreadsChange(value: number): void {
-  performance.scanThreads = value;
-  void savePerformanceConfig();
-}
-
-function onMlThreadsChange(value: number): void {
-  performance.mlThreads = value;
-  void savePerformanceConfig();
-}
-
-function onBatchDelayChange(valueMs: number): void {
-  performance.batchDelayMs = valueMs;
-  void savePerformanceConfig();
-}
-
-function onMemoryBudgetChange(valueMb: number): void {
-  performance.memoryBudgetMb = valueMb;
-  void savePerformanceConfig();
-}
-
-function onApplyPreset(preset: string): void {
-  void applyPreset(preset as 'low' | 'balanced' | 'full');
-}
-
-async function copyLogs(): Promise<void> {
-  try {
-    const text = logs.value.map((log) => `[${log.time}] ${log.message}`).join('\n');
-    await navigator.clipboard.writeText(text);
-    showSnackbar(t('settings.logs_copied'));
-  } catch {
-    showSnackbar(t('settings.logs_copy_failed'), true);
-  }
-}
-
-function cleanupDb(): void {
-  cleanupDialog.show = true;
-}
 
 const signallingSaving = ref(false);
 
@@ -477,10 +301,6 @@ async function saveSignalling(): Promise<void> {
 
 function confirmDownload(): void {
   downloadDialog.show = false;
-}
-
-function onUpdateSelectedModels(models: string[]): void {
-  selectedModels.value = models;
 }
 
 onMounted(async () => {
