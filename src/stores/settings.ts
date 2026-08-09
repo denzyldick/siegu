@@ -89,6 +89,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const modelsLoaded = ref(false);
   const isMemoryFreeing = ref(false);
+  const isAnalyzingAll = ref(false);
 
   const PRESETS = {
     low: { scanThreads: 2, mlThreads: 1, batchDelayMs: 200 },
@@ -380,10 +381,6 @@ export const useSettingsStore = defineStore('settings', () => {
     return `${totalSeconds % 60}s`;
   }
 
-  function getModeLabel(val: string): string {
-    return val;
-  }
-
   async function checkExistingModels(): Promise<void> {
     try {
       const downloaded = await invoke<string[]>('check_models');
@@ -474,6 +471,8 @@ export const useSettingsStore = defineStore('settings', () => {
     performance.mlThreads = values.mlThreads;
     performance.batchDelayMs = values.batchDelayMs;
     await savePerformanceConfig();
+    await invoke('unload_models');
+    modelsLoaded.value = false;
     showSnackbar(t('settings.preset_applied', { name: t('settings.preset_' + preset) }));
   }
 
@@ -546,10 +545,32 @@ export const useSettingsStore = defineStore('settings', () => {
     await invoke('save_config', { key: 'indexing_mode', value: mode });
     if (mode === 'manual') {
       await invoke('abort_indexing');
-      showSnackbar('Manual indexing enabled');
+      showSnackbar(t('settings.indexing_manual_hint'));
     } else {
-      showSnackbar(`Indexing mode set to ${mode}`);
+      showSnackbar(t('settings.indexing_mode_set'));
     }
+  }
+
+  async function setMlThreads(value: number): Promise<void> {
+    performance.mlThreads = value;
+    await invoke('save_config', { key: 'ml_threads', value: value.toString() });
+    await invoke('unload_models');
+    modelsLoaded.value = false;
+    showSnackbar(t('settings.ai_speed_changed'));
+  }
+
+  async function setMemoryBudget(valueMb: number): Promise<void> {
+    performance.memoryBudgetMb = valueMb;
+    await invoke('save_config', { key: 'ml_memory_budget_mb', value: valueMb.toString() });
+    await invoke('unload_models');
+    modelsLoaded.value = false;
+    showSnackbar(t('settings.memory_budget_changed'));
+  }
+
+  async function setScanThreads(value: number): Promise<void> {
+    performance.scanThreads = value;
+    await invoke('save_config', { key: 'scan_threads', value: value.toString() });
+    showSnackbar(t('settings.scan_threads_restart_hint'));
   }
 
   async function loadSignallingConfig(): Promise<void> {
@@ -766,6 +787,25 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  async function runAllModels(): Promise<void> {
+    if (isAnalyzingAll.value) return;
+    isAnalyzingAll.value = true;
+    try {
+      const targets = sortedModels.value
+        .map((m) => m.id)
+        .filter(
+          (id) =>
+            downloadedModels.value.includes(id) && modelEnabled.value[id] && !isModelBlocked(id),
+        );
+      for (const id of targets) {
+        await runModel(id);
+      }
+      showSnackbar(t('settings.analyze_now_started'));
+    } finally {
+      isAnalyzingAll.value = false;
+    }
+  }
+
   async function startConfirmedCleanup(): Promise<void> {
     cleanupDialog.show = false;
     isCleaning.value = true;
@@ -934,6 +974,7 @@ export const useSettingsStore = defineStore('settings', () => {
     maxThreads,
     modelsLoaded,
     isMemoryFreeing,
+    isAnalyzingAll,
     currentPreset,
     modelRam,
     totalModelRamEstimate,
@@ -974,12 +1015,14 @@ export const useSettingsStore = defineStore('settings', () => {
     clearLogs,
     formatIndexingCount,
     formatEta,
-    getModeLabel,
     checkExistingModels,
     toggleModel,
     loadPerformanceConfig,
     savePerformanceConfig,
     setIndexingMode,
+    setMlThreads,
+    setMemoryBudget,
+    setScanThreads,
     applyPreset,
     loadModelsLoaded,
     loadModelCapabilities,
@@ -1003,6 +1046,7 @@ export const useSettingsStore = defineStore('settings', () => {
     getModelBlockReason,
     modelCapabilities,
     runModel,
+    runAllModels,
     startConfirmedCleanup,
     checkUpdate,
     downloadUpdate,

@@ -183,3 +183,79 @@ describe('useSettings model capabilities', () => {
     expect(downloadCalls[0][1].models).toEqual(['yolo']);
   });
 });
+
+describe('useSettings analysis mode actions', () => {
+  beforeEach(() => {
+    invoke.mockReset();
+    invoke.mockResolvedValue(undefined);
+  });
+
+  it('setIndexingMode(manual) saves config and aborts indexing', async () => {
+    const settings = useSettings();
+    await settings.setIndexingMode('manual');
+    expect(settings.performance.indexingMode).toBe('manual');
+    expect(invoke).toHaveBeenCalledWith('save_config', { key: 'indexing_mode', value: 'manual' });
+    expect(invoke).toHaveBeenCalledWith('abort_indexing');
+  });
+
+  it('setIndexingMode(immediate) saves config without aborting', async () => {
+    const settings = useSettings();
+    await settings.setIndexingMode('immediate');
+    expect(settings.performance.indexingMode).toBe('immediate');
+    expect(invoke).toHaveBeenCalledWith('save_config', {
+      key: 'indexing_mode',
+      value: 'immediate',
+    });
+    expect(invoke).not.toHaveBeenCalledWith('abort_indexing');
+  });
+
+  it('setMlThreads saves, unloads models and clears loaded state', async () => {
+    const settings = useSettings();
+    await settings.setMlThreads(4);
+    expect(settings.performance.mlThreads).toBe(4);
+    expect(invoke).toHaveBeenCalledWith('save_config', { key: 'ml_threads', value: '4' });
+    expect(invoke).toHaveBeenCalledWith('unload_models');
+    expect(settings.modelsLoaded.value).toBe(false);
+  });
+
+  it('setMemoryBudget saves, unloads models and clears loaded state', async () => {
+    const settings = useSettings();
+    await settings.setMemoryBudget(2048);
+    expect(settings.performance.memoryBudgetMb).toBe(2048);
+    expect(invoke).toHaveBeenCalledWith('save_config', {
+      key: 'ml_memory_budget_mb',
+      value: '2048',
+    });
+    expect(invoke).toHaveBeenCalledWith('unload_models');
+    expect(settings.modelsLoaded.value).toBe(false);
+  });
+
+  it('setScanThreads saves config without unloading models', async () => {
+    const settings = useSettings();
+    await settings.setScanThreads(8);
+    expect(settings.performance.scanThreads).toBe(8);
+    expect(invoke).toHaveBeenCalledWith('save_config', { key: 'scan_threads', value: '8' });
+    expect(invoke).not.toHaveBeenCalledWith('unload_models');
+  });
+
+  it('runAllModels runs only downloaded enabled unblocked models', async () => {
+    const settings = useSettings();
+    settings.downloadedModels.value = ['clip', 'aesthetics', 'yolo'];
+    settings.modelEnabled.value = { clip: true, aesthetics: true, yolo: false };
+    await settings.runAllModels();
+    const analyzeCalls = invoke.mock.calls.filter(([name]) => name === 'analyze_model');
+    expect(analyzeCalls.map(([, args]) => args.modelId).sort()).toEqual(['aesthetics', 'clip']);
+    expect(settings.isAnalyzingAll.value).toBe(false);
+  });
+
+  it('runAllModels skips blocked models', async () => {
+    invoke.mockResolvedValueOnce([{ model: 'aesthetics', runnable: false, reason: 'low_ram' }]);
+    const settings = useSettings();
+    await settings.loadModelCapabilities();
+    settings.downloadedModels.value = ['clip', 'aesthetics'];
+    settings.modelEnabled.value = { clip: true, aesthetics: true };
+    await settings.runAllModels();
+    const analyzeCalls = invoke.mock.calls.filter(([name]) => name === 'analyze_model');
+    expect(analyzeCalls.map(([, args]) => args.modelId)).toEqual(['clip']);
+  });
+});

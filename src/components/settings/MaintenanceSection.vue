@@ -61,41 +61,6 @@
             track-color="var(--color-bg-zinc-100)"
             @update:model-value="onScanThreadsChange"
           ></v-slider>
-
-          <v-list-item class="px-0 mt-4">
-            <v-list-item-title class="text-caption font-weight-bold text-zinc-primary">{{
-              $t('settings.indexing_mode')
-            }}</v-list-item-title>
-            <template v-slot:append>
-              <v-menu offset-y>
-                <template v-slot:activator="{ props }">
-                  <v-btn
-                    variant="tonal"
-                    size="small"
-                    color="primary"
-                    v-bind="props"
-                    class="font-weight-bold"
-                  >
-                    {{ getModeLabel(performance.indexingMode) }}
-                    <v-icon size="14" class="ml-1">mdi-chevron-down</v-icon>
-                  </v-btn>
-                </template>
-                <v-list density="compact" class="siegu-list">
-                  <v-list-item
-                    v-for="mode in indexingModes"
-                    :key="mode.value"
-                    @click="setIndexingMode(mode.value)"
-                  >
-                    <v-list-item-title
-                      class="text-caption"
-                      :class="{ 'font-weight-bold': performance.indexingMode === mode.value }"
-                      >{{ $t('settings.mode_' + mode.value) }}</v-list-item-title
-                    >
-                  </v-list-item>
-                </v-list>
-              </v-menu>
-            </template>
-          </v-list-item>
         </div>
       </div>
 
@@ -161,25 +126,10 @@ const { t } = useI18n();
 
 const { isCleaning, logs } = storeToRefs(store);
 
-const {
-  performance,
-  maxThreads,
-  cleanupDialog,
-  savePerformanceConfig,
-  setIndexingMode,
-  clearLogs,
-  showSnackbar,
-} = store;
-
-const indexingModes = [{ value: 'immediate' }, { value: 'idle' }, { value: 'manual' }];
+const { performance, maxThreads, cleanupDialog, setScanThreads, clearLogs, showSnackbar } = store;
 
 function onScanThreadsChange(value: number | [number, number]): void {
-  performance.scanThreads = typeof value === 'number' ? value : value[0];
-  void savePerformanceConfig();
-}
-
-function getModeLabel(val: string): string {
-  return val;
+  void setScanThreads(typeof value === 'number' ? value : value[0]);
 }
 
 async function copyLogs(): Promise<void> {

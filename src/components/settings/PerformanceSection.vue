@@ -124,25 +124,6 @@
             <div class="text-caption text-zinc-muted mt-1">
               {{ $t('settings.memory_budget_desc') }}
             </div>
-
-            <div class="d-flex justify-space-between align-center mb-2 mt-4">
-              <div class="text-caption font-weight-bold text-zinc-primary">
-                {{ $t('settings.ml_threads') }}
-              </div>
-              <v-chip size="small" variant="flat" class="bg-btn font-weight-bold">
-                {{ performance.mlThreads }}
-              </v-chip>
-            </div>
-            <v-slider
-              :model-value="performance.mlThreads"
-              :min="1"
-              :max="maxThreads"
-              :step="1"
-              hide-details
-              color="primary"
-              track-color="var(--color-bg-zinc-100)"
-              @update:model-value="onMlThreadsChange"
-            ></v-slider>
           </div>
         </v-expand-transition>
       </div>
@@ -160,7 +141,7 @@ const store = useSettingsStore();
 
 const { currentPreset } = storeToRefs(store);
 
-const { performance, maxThreads, applyPreset, savePerformanceConfig } = store;
+const { performance, applyPreset, savePerformanceConfig, setMemoryBudget } = store;
 
 const presets = [
   { value: 'low' as const },
@@ -182,13 +163,7 @@ function onGapChange(value: number | [number, number]): void {
 
 function onMemoryBudgetChange(value: number | [number, number]): void {
   const gb = typeof value === 'number' ? value : value[0];
-  performance.memoryBudgetMb = Math.round(gb * 1024);
-  void savePerformanceConfig();
-}
-
-function onMlThreadsChange(value: number | [number, number]): void {
-  performance.mlThreads = typeof value === 'number' ? value : value[0];
-  void savePerformanceConfig();
+  void setMemoryBudget(Math.round(gb * 1024));
 }
 </script>
 

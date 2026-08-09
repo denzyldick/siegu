@@ -336,6 +336,73 @@
         </v-btn>
       </div>
     </div>
+
+    <template v-if="!embedded">
+      <v-divider class="my-6 border-subtle"></v-divider>
+
+      <div>
+        <div class="text-caption font-weight-bold text-zinc-muted mb-4 tracking-widest uppercase">
+          {{ $t('settings.indexing_when') }}
+        </div>
+
+        <v-row dense class="mb-2">
+          <v-col v-for="mode in indexingModes" :key="mode.value" cols="4" class="pa-1">
+            <v-card
+              variant="flat"
+              class="preset-card rounded-lg"
+              :class="{ 'preset-card-active': performance.indexingMode === mode.value }"
+              @click="setIndexingMode(mode.value)"
+            >
+              <v-card-text class="pa-2 text-center">
+                <div class="text-caption font-weight-bold text-zinc-primary">
+                  {{ $t('settings.mode_' + mode.value) }}
+                </div>
+              </v-card-text>
+            </v-card>
+          </v-col>
+        </v-row>
+
+        <div class="text-caption text-zinc-muted mb-4">
+          {{ $t('settings.mode_' + performance.indexingMode + '_desc') }}
+        </div>
+
+        <v-btn
+          v-if="performance.indexingMode === 'manual'"
+          variant="flat"
+          color="primary"
+          size="small"
+          class="font-weight-bold mb-4"
+          prepend-icon="mdi-play"
+          :loading="isAnalyzingAll"
+          :disabled="isAnyModelProcessing && !isAnalyzingAll"
+          @click="runAllModels()"
+        >
+          {{ $t('settings.analyze_now') }}
+        </v-btn>
+
+        <div class="d-flex justify-space-between align-center mb-2">
+          <div class="text-caption font-weight-bold text-zinc-primary">
+            {{ $t('settings.ml_threads') }}
+          </div>
+          <v-chip size="small" variant="flat" class="bg-btn font-weight-bold">{{
+            performance.mlThreads
+          }}</v-chip>
+        </div>
+        <v-slider
+          :model-value="performance.mlThreads"
+          :min="1"
+          :max="maxThreads"
+          :step="1"
+          hide-details
+          color="primary"
+          track-color="var(--color-bg-zinc-100)"
+          @update:model-value="onMlThreadsChange"
+        ></v-slider>
+        <div class="text-caption text-zinc-muted mt-1">
+          {{ $t('settings.ml_threads_desc') }}
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -365,9 +432,12 @@ const {
   modelsLoaded,
   totalModelRamEstimate: totalRamEstimate,
   isMemoryFreeing,
+  performance,
+  isAnalyzingAll,
 } = storeToRefs(store);
 
 const {
+  maxThreads,
   isModelProcessing,
   isModelActive,
   isModelDownloading,
@@ -386,7 +456,16 @@ const {
   downloadModels,
   runModel,
   freeMemory,
+  setIndexingMode,
+  setMlThreads,
+  runAllModels,
 } = store;
+
+const indexingModes = [{ value: 'immediate' }, { value: 'idle' }, { value: 'manual' }];
+
+function onMlThreadsChange(value: number | [number, number]): void {
+  void setMlThreads(typeof value === 'number' ? value : value[0]);
+}
 
 function hasModelProgressTotal(modelId: string): boolean {
   return getModelProgressPercent(modelId) > 0;
@@ -444,5 +523,17 @@ function toggleModelSelection(modelId: string): void {
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.preset-card {
+  border: 1px solid var(--color-border-subtle);
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+.preset-card-active {
+  border-color: var(--color-text-primary) !important;
+  box-shadow: inset 0 2px 0 var(--color-text-primary);
 }
 </style>
