@@ -800,7 +800,9 @@ export const useSettingsStore = defineStore('settings', () => {
       for (const id of targets) {
         await runModel(id);
       }
-      showSnackbar(t('settings.analyze_now_started'));
+      if (targets.length > 0) {
+        showSnackbar(t('settings.analyze_now_started'));
+      }
     } finally {
       isAnalyzingAll.value = false;
     }

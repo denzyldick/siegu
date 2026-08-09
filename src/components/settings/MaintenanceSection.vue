@@ -59,7 +59,7 @@
             hide-details
             color="primary"
             track-color="var(--color-bg-zinc-100)"
-            @update:model-value="onScanThreadsChange"
+            @change="onScanThreadsChange"
           ></v-slider>
         </div>
       </div>

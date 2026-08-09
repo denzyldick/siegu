@@ -345,13 +345,18 @@
           {{ $t('settings.indexing_when') }}
         </div>
 
-        <v-row dense class="mb-2">
-          <v-col v-for="mode in indexingModes" :key="mode.value" cols="4" class="pa-1">
+        <v-row dense class="mb-2" role="radiogroup" aria-label="Indexing mode">
+          <v-col v-for="mode in indexingModes" :key="mode.value" cols="6" sm="4" class="pa-1">
             <v-card
               variant="flat"
               class="preset-card rounded-lg"
               :class="{ 'preset-card-active': performance.indexingMode === mode.value }"
+              role="radio"
+              :tabindex="performance.indexingMode === mode.value ? 0 : -1"
+              :aria-checked="performance.indexingMode === mode.value"
+              :aria-label="$t('settings.mode_' + mode.value)"
               @click="setIndexingMode(mode.value)"
+              @keydown="onModeKeydown(mode.value, $event)"
             >
               <v-card-text class="pa-2 text-center">
                 <div class="text-caption font-weight-bold text-zinc-primary">
@@ -380,13 +385,10 @@
           {{ $t('settings.analyze_now') }}
         </v-btn>
 
-        <div class="d-flex justify-space-between align-center mb-2">
-          <div class="text-caption font-weight-bold text-zinc-primary">
-            {{ $t('settings.ml_threads') }}
-          </div>
-          <v-chip size="small" variant="flat" class="bg-btn font-weight-bold">{{
-            performance.mlThreads
-          }}</v-chip>
+        <div
+          class="text-caption font-weight-bold text-zinc-muted mb-2 tracking-widest uppercase mt-4"
+        >
+          {{ $t('settings.ml_threads') }}
         </div>
         <v-slider
           :model-value="performance.mlThreads"
@@ -396,8 +398,14 @@
           hide-details
           color="primary"
           track-color="var(--color-bg-zinc-100)"
-          @update:model-value="onMlThreadsChange"
-        ></v-slider>
+          @change="onMlThreadsChange"
+        >
+          <template v-slot:append>
+            <v-chip size="small" variant="flat" class="bg-btn font-weight-bold">{{
+              performance.mlThreads
+            }}</v-chip>
+          </template>
+        </v-slider>
         <div class="text-caption text-zinc-muted mt-1">
           {{ $t('settings.ml_threads_desc') }}
         </div>
@@ -467,6 +475,35 @@ function onMlThreadsChange(value: number | [number, number]): void {
   void setMlThreads(typeof value === 'number' ? value : value[0]);
 }
 
+function onModeKeydown(mode: string, event: KeyboardEvent): void {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    setIndexingMode(mode);
+    return;
+  }
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    event.preventDefault();
+    moveModeFocus(1);
+  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    moveModeFocus(-1);
+  }
+}
+
+function moveModeFocus(delta: number): void {
+  const group = document.querySelector('[role="radiogroup"]');
+  if (!group) return;
+  const cards = Array.from(group.querySelectorAll<HTMLElement>('[role="radio"]'));
+  if (cards.length === 0) return;
+  const currentIndex = Math.max(
+    0,
+    cards.findIndex(
+      (card) => document.activeElement === card || card.getAttribute('aria-checked') === 'true',
+    ),
+  );
+  cards[(currentIndex + delta + cards.length) % cards.length].focus();
+}
+
 function hasModelProgressTotal(modelId: string): boolean {
   return getModelProgressPercent(modelId) > 0;
 }
@@ -531,6 +568,12 @@ function toggleModelSelection(modelId: string): void {
     border-color 0.18s ease,
     box-shadow 0.18s ease,
     background-color 0.18s ease;
+}
+.preset-card .v-card-text {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .preset-card-active {
   border-color: var(--color-text-primary) !important;

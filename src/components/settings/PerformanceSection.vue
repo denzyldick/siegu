@@ -93,7 +93,7 @@
               hide-details
               color="primary"
               track-color="var(--color-bg-zinc-100)"
-              @update:model-value="onGapChange"
+              @change="onGapChange"
             ></v-slider>
             <div class="text-caption text-zinc-muted mt-1">
               {{ $t('settings.batch_delay_desc') }}
@@ -119,7 +119,7 @@
               hide-details
               color="primary"
               track-color="var(--color-bg-zinc-100)"
-              @update:model-value="onMemoryBudgetChange"
+              @change="onMemoryBudgetChange"
             ></v-slider>
             <div class="text-caption text-zinc-muted mt-1">
               {{ $t('settings.memory_budget_desc') }}
