@@ -124,10 +124,10 @@ pub fn validate_config_value(key: &str, value: &str) -> Result<(), ConfigError> 
                 expected: "u64".to_string(),
                 got: value.to_string(),
             })?;
-            if !(128..=1_048_576).contains(&n) {
+            if !(0..=1_048_576).contains(&n) {
                 return Err(ConfigError::OutOfRange {
                     key: key.to_string(),
-                    min: 128,
+                    min: 0,
                     max: 1_048_576,
                 });
             }
@@ -367,12 +367,9 @@ mod tests {
 
     #[test]
     fn test_validate_config_ml_memory_budget_mb() {
-        assert!(validate_config_value("ml_memory_budget_mb", "2048").is_ok());
+        assert!(validate_config_value("ml_memory_budget_mb", "0").is_ok());
         assert!(validate_config_value("ml_memory_budget_mb", "128").is_ok());
-        assert!(matches!(
-            validate_config_value("ml_memory_budget_mb", "127"),
-            Err(ConfigError::OutOfRange { .. })
-        ));
+        assert!(validate_config_value("ml_memory_budget_mb", "2048").is_ok());
         assert!(matches!(
             validate_config_value("ml_memory_budget_mb", "plenty"),
             Err(ConfigError::InvalidType { .. })

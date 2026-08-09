@@ -281,7 +281,7 @@ fn dropped_over_budget(config: &HashMap<String, String>, log: &dyn Fn(&str)) -> 
         .and_then(|s| s.parse::<u64>().ok());
     dropped_over_cap_bytes(
         config,
-        budget_mb.map(|mb| mb.saturating_mul(1024 * 1024)),
+        budget_mb.and_then(|mb| (mb > 0).then_some(mb.saturating_mul(1024 * 1024))),
         log,
     )
 }
@@ -367,7 +367,7 @@ pub fn model_feasibility_with_ram(
     let user_budget = config
         .get("ml_memory_budget_mb")
         .and_then(|s| s.parse::<u64>().ok())
-        .map(|mb| mb.saturating_mul(1024 * 1024));
+        .and_then(|mb| (mb > 0).then_some(mb.saturating_mul(1024 * 1024)));
     let ram_cap = device_ram.map(|ram| (ram as f64 * RAM_USABLE_FRACTION) as u64);
 
     let mut out = Vec::new();
@@ -875,6 +875,12 @@ mod tests {
     #[test]
     fn budget_unset_returns_nothing() {
         let config = HashMap::new();
+        assert!(dropped_over_budget(&config, &noop_log).is_empty());
+    }
+
+    #[test]
+    fn budget_zero_means_unset() {
+        let config = config_with("0", &["aesthetics", "blip", "clip"]);
         assert!(dropped_over_budget(&config, &noop_log).is_empty());
     }
 
