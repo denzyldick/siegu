@@ -5,9 +5,19 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Siegu</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet">
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem('siegu_theme') || 'system';
+          var dark =
+            pref === 'dark' ||
+            (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var theme = dark ? 'dark' : 'light';
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme;
+        } catch (e) {}
+      })();
+    </script>
   </head>
 
   <body>
@@ -19,6 +29,9 @@
           align-items: center; justify-content: center;
           background: #fafafa; font-family: 'Outfit', sans-serif;
         }
+        html[data-theme='dark'] .splash {
+          background: #09090b;
+        }
         .splash-logo {
           width: 96px; height: 96px; border-radius: 20px;
           margin-bottom: 20px;
@@ -27,6 +40,9 @@
         .splash-text {
           font-size: 15px; font-weight: 600;
           color: #a1a1aa; letter-spacing: 0.04em;
+        }
+        html[data-theme='dark'] .splash-text {
+          color: #71717a;
         }
         @keyframes splash-pulse {
           0%, 100% { opacity: 1; transform: scale(1); }

@@ -55,6 +55,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useTheme } from 'vuetify';
+import { syncTheme } from '@/services/theme';
 
 const props = defineProps<{
   initialTheme: string;
@@ -67,14 +68,8 @@ function onThemeChange(val: string | null): void {
   if (!val) return;
   currentTheme.value = val;
   localStorage.setItem('siegu_theme', val);
-
-  if (val === 'system') {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    theme.global.name.value = prefersDark ? 'dark' : 'light';
-    document.documentElement.dataset.theme = prefersDark ? 'dark' : 'light';
-  } else {
-    theme.global.name.value = val;
-    document.documentElement.dataset.theme = val;
-  }
+  syncTheme((resolved) => {
+    theme.global.name.value = resolved;
+  });
 }
 </script>

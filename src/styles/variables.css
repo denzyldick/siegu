@@ -31,6 +31,7 @@
 
 .v-theme--light,
 [data-theme='light'] {
+  color-scheme: light;
   --color-bg-primary: #fafafa;
   --color-bg-surface: #ffffff;
   --color-bg-zinc-100: #f4f4f5;
@@ -72,6 +73,7 @@
 
 .v-theme--dark,
 [data-theme='dark'] {
+  color-scheme: dark;
   --color-bg-primary: #09090b;
   --color-bg-surface: #18181b;
   --color-bg-zinc-100: #27272a;

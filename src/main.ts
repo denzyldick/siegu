@@ -4,6 +4,7 @@ import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
 import App from './App.vue';
 import 'vuetify/styles';
 import '@mdi/font/css/materialdesignicons.css';
+import '@fontsource-variable/outfit';
 
 import * as components from 'vuetify/components';
 import { createVuetify } from 'vuetify/dist/vuetify.js';
@@ -21,6 +22,8 @@ import './styles/variables.css';
 import './styles/base.css';
 import './styles/animations.css';
 
+import { getThemePreference, initSystemTheme, resolveTheme, syncTheme } from './services/theme';
+
 const savedLang: string = localStorage.getItem('siegu_language') || 'en';
 
 const i18n = createI18n({
@@ -29,13 +32,6 @@ const i18n = createI18n({
   fallbackLocale: 'en',
   messages: { en, nl, fr, es, pap, de, it, pt },
 });
-
-function resolveTheme(): string {
-  const pref: string = localStorage.getItem('siegu_theme') || 'system';
-  if (pref === 'light') return 'light';
-  if (pref === 'dark') return 'dark';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
 
 const vuetify = createVuetify({
   components,
@@ -96,7 +92,7 @@ const vuetify = createVuetify({
   },
   defaults: {
     global: {
-      fontFamily: "'Inter', sans-serif",
+      fontFamily: "'Outfit', sans-serif",
     },
     VBtn: {
       rounded: 'md',
@@ -121,18 +117,22 @@ const vuetify = createVuetify({
   },
 });
 
-function syncTheme(): void {
-  const resolved = resolveTheme();
-  document.documentElement.dataset.theme = resolved;
-  vuetify.theme.global.name.value = resolved;
+function syncThemeLocal(): void {
+  syncTheme((resolved) => {
+    vuetify.theme.global.name.value = resolved;
+  });
 }
 
-syncTheme();
+syncThemeLocal();
 
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-  if ((localStorage.getItem('siegu_theme') || 'system') === 'system') {
-    syncTheme();
+  if (getThemePreference() === 'system') {
+    syncThemeLocal();
   }
+});
+
+void initSystemTheme((resolved) => {
+  vuetify.theme.global.name.value = resolved;
 });
 
 const pinia = createPinia();

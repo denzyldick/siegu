@@ -420,7 +420,7 @@ onUnmounted(() => {
 
 .drp-cell--start .drp-day,
 .drp-cell--end .drp-day {
-  color: #fff;
+  color: var(--color-text-btn);
   font-weight: 800;
 }
 

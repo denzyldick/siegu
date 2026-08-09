@@ -115,27 +115,27 @@ const syncStatusText = computed(() => {
 
 <style scoped>
 .join-passphrase :deep(.v-field) {
-  background: #a1a1aa !important;
+  background: var(--color-bg-field) !important;
 }
 
 .join-passphrase :deep(.v-field__overlay) {
-  background: #a1a1aa !important;
+  background: var(--color-bg-field) !important;
 }
 
 .join-passphrase :deep(.v-field--focused),
 .join-passphrase :deep(.v-field--focused .v-field__overlay) {
-  background: #18181b !important;
+  background: var(--color-bg-surface) !important;
 }
 
 .join-passphrase :deep(input) {
-  color: #fafafa !important;
-  caret-color: #fafafa !important;
+  color: var(--color-text-primary) !important;
+  caret-color: var(--color-text-primary) !important;
   font-size: 14px !important;
   letter-spacing: 0.02em;
 }
 
 .join-passphrase :deep(.v-field__input) {
-  color: #fafafa !important;
+  color: var(--color-text-primary) !important;
   min-height: 40px !important;
   padding: 4px 8px !important;
 }
