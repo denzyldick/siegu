@@ -357,6 +357,7 @@ pub fn run() {
             commands::config::save_config,
             commands::config::get_config,
             commands::config::get_os,
+            commands::config::get_system_dark_mode,
             commands::signalling::ping_signaling,
             // Sync
             commands::sync::start_webrtc_session,

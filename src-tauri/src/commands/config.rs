@@ -51,6 +51,47 @@ pub async fn get_os() -> String {
     do_get_os()
 }
 
+/// Best-effort system dark-mode detection.
+///
+/// Linux WebKitGTK reports `prefers-color-scheme` unreliably, so read the
+/// desktop's actual setting directly. Returns `None` when it cannot be
+/// determined (non-Linux, gsettings missing, schema not present).
+pub fn do_get_system_dark_mode() -> Option<bool> {
+    #[cfg(target_os = "linux")]
+    {
+        gsettings_flag("org.gnome.desktop.interface", "color-scheme", "prefer-dark")
+            .or_else(|| gsettings_flag("org.gnome.desktop.interface", "gtk-theme", "dark"))
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        None
+    }
+}
+
+/// Run `gsettings get <schema> <key>` and return whether its value contains
+/// `needle` (case-insensitive). `None` when the command is missing or fails.
+#[cfg(target_os = "linux")]
+fn gsettings_flag(schema: &str, key: &str, needle: &str) -> Option<bool> {
+    let output = std::process::Command::new("gsettings")
+        .args(["get", schema, key])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let value = String::from_utf8_lossy(&output.stdout);
+    let value = value.trim().trim_matches('\'').to_lowercase();
+    if value.is_empty() {
+        return None;
+    }
+    Some(value.contains(needle))
+}
+
+#[tauri::command]
+pub async fn get_system_dark_mode() -> Option<bool> {
+    do_get_system_dark_mode()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -85,6 +126,12 @@ mod tests {
         let os = do_get_os();
         assert!(!os.is_empty());
         assert!(["linux", "macos", "windows"].contains(&os.as_str()));
+    }
+
+    #[test]
+    fn get_system_dark_mode_never_panics() {
+        // Returns Some(bool) when determinable, None otherwise — never panics.
+        let _ = do_get_system_dark_mode();
     }
 
     #[test]
