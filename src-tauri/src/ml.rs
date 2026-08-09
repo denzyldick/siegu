@@ -295,7 +295,7 @@ mod tests {
         let faces_dir = config_dir.join("faces").display().to_string();
 
         let config: HashMap<String, String> = HashMap::new();
-        let mut loaded =
+        let loaded =
             siegu_core::ml_engine::models::load_models(&config_path, &config, Vec::new(), &|msg| {
                 println!("[models] {msg}")
             });
@@ -335,7 +335,7 @@ mod tests {
             "e2e-inference",
             sample.to_str().unwrap(),
             &AiStatus::default(),
-            &mut loaded,
+            &loaded,
             &config,
             None,
             &faces_dir,
@@ -433,7 +433,7 @@ mod tests {
         let faces_dir = config_dir.join("faces").display().to_string();
 
         let config: HashMap<String, String> = HashMap::new();
-        let mut loaded =
+        let loaded =
             siegu_core::ml_engine::models::load_models(&config_path, &config, Vec::new(), &|msg| {
                 println!("[models] {msg}")
             });
@@ -472,7 +472,7 @@ mod tests {
             "e2e-inference-video",
             sample.to_str().unwrap(),
             &AiStatus::default(),
-            &mut loaded,
+            &loaded,
             &config,
             None,
             &faces_dir,

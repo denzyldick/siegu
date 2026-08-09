@@ -74,7 +74,7 @@ tungstenite = "0.28.0"
 image = { workspace = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-ffmpeg-next = "8.1.0"
+ffmpeg-next = { version = "8.1.0", features = ["build"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
@@ -82,7 +82,7 @@ tauri-plugin-single-instance = "2"
 wallpaper = "3.2.0"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios", target_os = "windows")))'.dependencies]
-ffmpeg-next = "8.1.0"
+ffmpeg-next = { version = "8.1.0", features = ["build"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "2", features = ["v2_40"] }

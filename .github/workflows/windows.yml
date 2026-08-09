@@ -43,34 +43,11 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Cache FFmpeg
-        uses: actions/cache@v4
-        with:
-          path: C:\vcpkg\installed\x64-windows
-          key: ffmpeg-windows-${{ runner.os }}-v1
-
-      - name: Install dependencies
+      # FFmpeg is built from source by ffmpeg-sys-next (features = ["build"]),
+      # which requires nasm for x86 assembly. vcpkg/FFMPEG_DIR is no longer used.
+      - name: Install nasm
         shell: pwsh
-        run: |
-          if (Test-Path "C:\vcpkg\installed\x64-windows\include\libavcodec\avcodec.h") {
-            Write-Host "FFmpeg already cached, skipping install"
-          } else {
-            $retries = 3
-            for ($i = 1; $i -le $retries; $i++) {
-              try {
-                vcpkg install ffmpeg:x64-windows
-                break
-              } catch {
-                Write-Host "Attempt $i failed, retrying..."
-                Start-Sleep -Seconds (10 * $i)
-              }
-            }
-          }
-          $ffmpegDir = "C:\vcpkg\installed\x64-windows"
-          "FFMPEG_DIR=$ffmpegDir" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "FFMPEG_INCLUDE_DIR=$ffmpegDir\include" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "FFMPEG_LIB_DIR=$ffmpegDir\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "$ffmpegDir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+        run: choco install nasm -y --no-progress
 
       - run: npm ci
 

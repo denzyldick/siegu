@@ -38,7 +38,7 @@ crossbeam-channel = "0.5.15"
 tempfile = "3.19.0"
 tungstenite = "0.28.0"
 warp = { version = "0.4.3", features = ["server", "websocket"] }
-ffmpeg-next = "8.1.0"
+ffmpeg-next = { version = "8.1.0", features = ["build"] }
 rustfft = "6.4.1"
 heic = "0.1.6"
 aes-gcm = "0.10"

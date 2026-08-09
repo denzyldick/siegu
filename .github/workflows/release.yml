@@ -40,44 +40,17 @@ jobs:
         if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev libjs-mathjax build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev libavfilter-dev libavdevice-dev libpostproc-dev
+          sudo apt-get install -y pkg-config libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev libjs-mathjax build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev libavfilter-dev libavdevice-dev libpostproc-dev nasm
 
       - name: Install dependencies (macOS only)
         if: matrix.platform == 'macos-latest'
         run: |
-          brew install ffmpeg
-          echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          brew install nasm
 
-      - name: Cache FFmpeg (Windows)
-        if: matrix.platform == 'windows-latest'
-        uses: actions/cache@v4
-        with:
-          path: C:\vcpkg\installed\x64-windows
-          key: ffmpeg-windows-${{ runner.os }}-v1
-
-      - name: Install dependencies (Windows only)
+      - name: Install nasm (Windows)
         if: matrix.platform == 'windows-latest'
         shell: pwsh
-        run: |
-          if (Test-Path "C:\vcpkg\installed\x64-windows\include\libavcodec\avcodec.h") {
-            Write-Host "FFmpeg already cached, skipping install"
-          } else {
-            $retries = 3
-            for ($i = 1; $i -le $retries; $i++) {
-              try {
-                vcpkg install ffmpeg:x64-windows
-                break
-              } catch {
-                Write-Host "Attempt $i failed, retrying..."
-                Start-Sleep -Seconds (10 * $i)
-              }
-            }
-          }
-          $ffmpegDir = "C:\vcpkg\installed\x64-windows"
-          "FFMPEG_DIR=$ffmpegDir" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "FFMPEG_INCLUDE_DIR=$ffmpegDir\include" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "FFMPEG_LIB_DIR=$ffmpegDir\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "$ffmpegDir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+        run: choco install nasm -y --no-progress
 
       - run: npm ci
 
@@ -239,16 +212,15 @@ jobs:
       ORT_STRATEGY: download
     container:
       image: archlinux:base-devel
-    # Rolling Arch ships FFmpeg newer than ffmpeg-sys-next v8.1.0 supports, so
-    # the Rust build breaks on the bleeding-edge headers. This is an environment
-    # mismatch, not a code failure, and it does not block the release; the job
-    # still reports its status in the run so the breakage stays visible.
+    # FFmpeg is bundled (features = ["build"]), so the rolling-Arch FFmpeg no
+    # longer affects this build. The job is still allowed to fail without
+    # blocking the release so any Arch-specific issue stays visible.
     continue-on-error: true
     steps:
       - name: Install dependencies
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm git nodejs npm rustup webkit2gtk-4.1 libayatana-appindicator librsvg xdotool openssl sudo yarn xdg-utils fuse2 ffmpeg pkgconf
+          pacman -S --noconfirm git nodejs npm rustup webkit2gtk-4.1 libayatana-appindicator librsvg xdotool openssl sudo yarn xdg-utils fuse2 ffmpeg nasm pkgconf
 
           useradd -m -G wheel builder
           echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers

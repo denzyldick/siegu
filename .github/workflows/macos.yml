@@ -42,8 +42,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install pkg-config ffmpeg
-          echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          brew install pkg-config nasm
 
       - run: npm ci
 
