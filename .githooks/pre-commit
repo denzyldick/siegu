@@ -33,15 +33,30 @@ if [ -n "$CHANGED_RS" ] && command -v cargo >/dev/null 2>&1; then
   fi
 fi
 
-# Format JS/Vue files
-if command -v npx &> /dev/null; then
-  CHANGED_JS=$(git diff --cached --name-only --diff-filter=ACM -- '*.{js,vue,ts,css,json}')
-  if [ -n "$CHANGED_JS" ]; then
+# Format JS/Vue files using the project's pinned prettier (never fetches a
+# different version than the lockfile, matching CI exactly)
+CHANGED_JS=$(git diff --cached --name-only --diff-filter=ACM -- '*.{js,vue,ts,css,json}')
+if [ -n "$CHANGED_JS" ]; then
+  if [ -x "./node_modules/.bin/prettier" ]; then
     echo "Formatting JS/Vue files..."
-    echo "$CHANGED_JS" | xargs npx prettier --write
+    echo "$CHANGED_JS" | xargs ./node_modules/.bin/prettier --write || {
+      echo ""
+      echo "prettier failed. Run 'npm run format' and re-stage, or commit with --no-verify."
+      exit 1
+    }
     git add $CHANGED_JS
+  else
+    echo "prettier is not installed (node_modules missing). Run 'npm install' first."
+    exit 1
   fi
 fi
+
+# Block whitespace errors (trailing whitespace, space-before-tab, CRLF) in staged files
+git diff --cached --check || {
+  echo ""
+  echo "Whitespace errors detected in staged files."
+  exit 1
+}
 
 # Check translations
 node scripts/check-translations.js
