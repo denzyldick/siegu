@@ -209,16 +209,16 @@ describe('useSettings analysis mode actions', () => {
     expect(invoke).not.toHaveBeenCalledWith('abort_indexing');
   });
 
-  it('setMlThreads saves, unloads models and clears loaded state', async () => {
+  it('setMlThreads saves and triggers a model reload', async () => {
     const settings = useSettings();
     await settings.setMlThreads(4);
     expect(settings.performance.mlThreads).toBe(4);
     expect(invoke).toHaveBeenCalledWith('save_config', { key: 'ml_threads', value: '4' });
-    expect(invoke).toHaveBeenCalledWith('unload_models');
+    expect(invoke).toHaveBeenCalledWith('reload_models');
     expect(settings.modelsLoaded.value).toBe(false);
   });
 
-  it('setMemoryBudget saves, unloads models and clears loaded state', async () => {
+  it('setMemoryBudget saves and triggers a model reload', async () => {
     const settings = useSettings();
     await settings.setMemoryBudget(2048);
     expect(settings.performance.memoryBudgetMb).toBe(2048);
@@ -226,7 +226,7 @@ describe('useSettings analysis mode actions', () => {
       key: 'ml_memory_budget_mb',
       value: '2048',
     });
-    expect(invoke).toHaveBeenCalledWith('unload_models');
+    expect(invoke).toHaveBeenCalledWith('reload_models');
     expect(settings.modelsLoaded.value).toBe(false);
   });
 
@@ -235,7 +235,7 @@ describe('useSettings analysis mode actions', () => {
     await settings.setScanThreads(8);
     expect(settings.performance.scanThreads).toBe(8);
     expect(invoke).toHaveBeenCalledWith('save_config', { key: 'scan_threads', value: '8' });
-    expect(invoke).not.toHaveBeenCalledWith('unload_models');
+    expect(invoke).not.toHaveBeenCalledWith('reload_models');
   });
 
   it('runAllModels runs only downloaded enabled unblocked models', async () => {

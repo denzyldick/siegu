@@ -72,14 +72,16 @@
               >
                 {{ sectionTitle(section.id) }}
               </h2>
-              <button
+              <v-btn
                 v-if="section.id === 'people'"
-                class="manage-people-btn"
+                size="small"
+                variant="text"
+                class="ml-1"
                 @click="togglePeopleManage"
               >
-                <v-icon size="13" class="mr-1">mdi-account-edit-outline</v-icon>
+                <v-icon start size="13">mdi-account-edit-outline</v-icon>
                 {{ $t('albums.manage_people') }}
-              </button>
+              </v-btn>
             </div>
             <div class="album-grid" :style="{ gridTemplateColumns: `repeat(${columns}, 1fr)` }">
               <div
@@ -946,22 +948,6 @@ onUnmounted(() => {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-size: 12px;
-}
-
-.manage-people-btn {
-  display: inline-flex;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: rgb(var(--v-theme-primary));
-  padding: 4px 10px;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  user-select: none;
-}
-
-.manage-people-btn:hover {
-  background: var(--color-bg-hover);
 }
 
 .album-card {

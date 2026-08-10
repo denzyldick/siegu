@@ -21,26 +21,26 @@ pub struct MlContext {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Job {
     ProcessAll,
-    AutoAnalyzeSingle(String),
     AnalyzeSingle(String),
     AnalyzeSingleWithModel(String, String),
     ProcessModel(String),
+    /// Force a reload of all loaded models from the latest config (e.g. after
+    /// the user changed AI speed or memory budget). No photos are processed.
+    ReloadModels,
 }
 
 impl Job {
     pub fn is_single(&self) -> bool {
         matches!(
             self,
-            Job::AnalyzeSingle(_) | Job::AutoAnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _)
+            Job::AnalyzeSingle(_) | Job::AnalyzeSingleWithModel(_, _)
         )
     }
 
     pub fn photo_id(&self) -> Option<&str> {
         match self {
-            Job::ProcessAll | Job::ProcessModel(_) => None,
-            Job::AnalyzeSingle(id)
-            | Job::AutoAnalyzeSingle(id)
-            | Job::AnalyzeSingleWithModel(id, _) => Some(id),
+            Job::ProcessAll | Job::ProcessModel(_) | Job::ReloadModels => None,
+            Job::AnalyzeSingle(id) | Job::AnalyzeSingleWithModel(id, _) => Some(id),
         }
     }
 
@@ -178,10 +178,10 @@ mod tests {
     #[test]
     fn test_job_is_single() {
         assert!(Job::AnalyzeSingle("a".into()).is_single());
-        assert!(Job::AutoAnalyzeSingle("a".into()).is_single());
         assert!(Job::AnalyzeSingleWithModel("a".into(), "b".into()).is_single());
         assert!(!Job::ProcessAll.is_single());
         assert!(!Job::ProcessModel("a".into()).is_single());
+        assert!(!Job::ReloadModels.is_single());
     }
 
     #[test]
@@ -189,6 +189,7 @@ mod tests {
         assert_eq!(Job::AnalyzeSingle("abc".into()).photo_id(), Some("abc"));
         assert_eq!(Job::ProcessAll.photo_id(), None);
         assert_eq!(Job::ProcessModel("x".into()).photo_id(), None);
+        assert_eq!(Job::ReloadModels.photo_id(), None);
     }
 
     #[test]

@@ -38,34 +38,6 @@
 
       <v-divider class="my-4 border-subtle"></v-divider>
 
-      <div class="mb-6">
-        <div class="text-caption font-weight-bold text-zinc-muted mb-4 tracking-widest uppercase">
-          {{ $t('settings.advanced') }}
-        </div>
-        <div class="pt-2">
-          <div class="d-flex justify-space-between align-center mb-2">
-            <div class="text-caption font-weight-bold text-zinc-primary">
-              {{ $t('settings.scan_threads') }}
-            </div>
-            <v-chip size="small" variant="flat" class="bg-btn font-weight-bold">{{
-              performance.scanThreads
-            }}</v-chip>
-          </div>
-          <v-slider
-            :model-value="performance.scanThreads"
-            :min="1"
-            :max="maxThreads"
-            :step="1"
-            hide-details
-            color="primary"
-            track-color="var(--color-bg-zinc-100)"
-            @change="onScanThreadsChange"
-          ></v-slider>
-        </div>
-      </div>
-
-      <v-divider class="my-6 border-subtle"></v-divider>
-
       <div>
         <div class="text-caption font-weight-bold text-zinc-muted mb-4 tracking-widest uppercase">
           {{ $t('settings.system_logs') }}
@@ -126,11 +98,7 @@ const { t } = useI18n();
 
 const { isCleaning, logs } = storeToRefs(store);
 
-const { performance, maxThreads, cleanupDialog, setScanThreads, clearLogs, showSnackbar } = store;
-
-function onScanThreadsChange(value: number | [number, number]): void {
-  void setScanThreads(typeof value === 'number' ? value : value[0]);
-}
+const { cleanupDialog, clearLogs, showSnackbar } = store;
 
 async function copyLogs(): Promise<void> {
   try {

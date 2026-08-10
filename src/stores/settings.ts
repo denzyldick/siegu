@@ -88,6 +88,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const maxThreads = 8;
 
   const modelsLoaded = ref(false);
+  const modelsReloading = ref(false);
   const isMemoryFreeing = ref(false);
   const isAnalyzingAll = ref(false);
 
@@ -155,6 +156,11 @@ export const useSettingsStore = defineStore('settings', () => {
         };
         logs.value.unshift(log);
         if (logs.value.length > MAX_LOG_ENTRIES) logs.value.pop();
+        if (modelsReloading.value && event.payload.endsWith('Models ready.')) {
+          modelsReloading.value = false;
+          modelsLoaded.value = true;
+          showSnackbar(t('settings.models_reloaded'));
+        }
       }),
     );
 
@@ -471,8 +477,7 @@ export const useSettingsStore = defineStore('settings', () => {
     performance.mlThreads = values.mlThreads;
     performance.batchDelayMs = values.batchDelayMs;
     await savePerformanceConfig();
-    await invoke('unload_models');
-    modelsLoaded.value = false;
+    await reloadModels();
     showSnackbar(t('settings.preset_applied', { name: t('settings.preset_' + preset) }));
   }
 
@@ -540,6 +545,24 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  /**
+   * Force the worker to reload every AI model from the latest config. The
+   * worker owns the models mutex, so this can never race. Completion is
+   * detected from the worker's "Models ready." log and flips `modelsReloading`
+   * off, giving the UI a live reload indicator.
+   */
+  async function reloadModels(): Promise<void> {
+    modelsReloading.value = true;
+    modelsLoaded.value = false;
+    try {
+      await invoke('reload_models');
+    } catch (e) {
+      modelsReloading.value = false;
+      showSnackbar(String(e), true);
+      await loadModelsLoaded();
+    }
+  }
+
   async function setIndexingMode(mode: string): Promise<void> {
     performance.indexingMode = mode as IndexingMode;
     await invoke('save_config', { key: 'indexing_mode', value: mode });
@@ -554,23 +577,25 @@ export const useSettingsStore = defineStore('settings', () => {
   async function setMlThreads(value: number): Promise<void> {
     performance.mlThreads = value;
     await invoke('save_config', { key: 'ml_threads', value: value.toString() });
-    await invoke('unload_models');
-    modelsLoaded.value = false;
-    showSnackbar(t('settings.ai_speed_changed'));
+    showSnackbar(t('settings.ai_speed_applied', { cores: value }));
+    await reloadModels();
   }
 
   async function setMemoryBudget(valueMb: number): Promise<void> {
     performance.memoryBudgetMb = valueMb;
     await invoke('save_config', { key: 'ml_memory_budget_mb', value: valueMb.toString() });
-    await invoke('unload_models');
-    modelsLoaded.value = false;
-    showSnackbar(t('settings.memory_budget_changed'));
+    showSnackbar(
+      t('settings.memory_budget_applied', {
+        size: valueMb === 0 ? t('settings.memory_budget_none') : `${valueMb} MB`,
+      }),
+    );
+    await reloadModels();
   }
 
   async function setScanThreads(value: number): Promise<void> {
     performance.scanThreads = value;
     await invoke('save_config', { key: 'scan_threads', value: value.toString() });
-    showSnackbar(t('settings.scan_threads_restart_hint'));
+    showSnackbar(t('settings.scan_threads_applied_hint', { count: value }));
   }
 
   async function loadSignallingConfig(): Promise<void> {
@@ -975,6 +1000,7 @@ export const useSettingsStore = defineStore('settings', () => {
     performance,
     maxThreads,
     modelsLoaded,
+    modelsReloading,
     isMemoryFreeing,
     isAnalyzingAll,
     currentPreset,
@@ -1026,6 +1052,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setMemoryBudget,
     setScanThreads,
     applyPreset,
+    reloadModels,
     loadModelsLoaded,
     loadModelCapabilities,
     freeMemory,

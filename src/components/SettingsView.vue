@@ -23,9 +23,9 @@
           @remove-directory-full="openRemoveFolderFull"
         />
 
-        <PerformanceSection v-if="!embedded" />
+        <AiSection v-if="!embedded" />
 
-        <ModelsSection v-if="embedded && !hideAiSection" :embedded="true" />
+        <AiSection v-if="embedded && !hideAiSection" :embedded="true" />
 
         <LanguageSection v-if="!embedded" :initial-lang="currentLang" />
 
@@ -177,8 +177,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useSettings } from '@/composables/useSettings';
 import FolderPicker from './FolderPicker.vue';
 import FoldersSection from './settings/FoldersSection.vue';
-import ModelsSection from './settings/ModelsSection.vue';
-import PerformanceSection from './settings/PerformanceSection.vue';
+import AiSection from './settings/AiSection.vue';
 import LanguageSection from './settings/LanguageSection.vue';
 import AppearanceSection from './settings/AppearanceSection.vue';
 import MaintenanceSection from './settings/MaintenanceSection.vue';

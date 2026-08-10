@@ -173,6 +173,28 @@ pub async fn unload_models(
     Ok(())
 }
 
+/// Pure business logic — enqueues a model-reload job. The worker owns the
+/// models mutex, so unlike `do_unload_models` this can never race or fail.
+pub async fn do_reload_models(tx: &tokio::sync::mpsc::Sender<ml::Job>) -> Result<(), String> {
+    tx.send(ml::Job::ReloadModels)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn reload_models(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, ml::MlContext>,
+) -> Result<(), String> {
+    use crate::common::emit_log;
+    do_reload_models(&state.tx).await?;
+    emit_log(
+        &app,
+        "Reloading AI models with the new settings...".to_string(),
+    );
+    Ok(())
+}
+
 /// True when the worker currently holds loaded models in memory.
 ///
 /// Must never block the UI thread: the worker may hold the models mutex while
@@ -298,6 +320,14 @@ mod tests {
         do_abort_indexing(&abort, &pending).unwrap();
         assert!(abort.load(std::sync::atomic::Ordering::SeqCst));
         assert_eq!(pending.load(std::sync::atomic::Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn reload_models_sends_reload_job() {
+        let (tx, mut rx) = tokio::sync::mpsc::channel(siegu_core::ml_worker::JOB_CHANNEL_CAPACITY);
+        do_reload_models(&tx).await.unwrap();
+        let job = rx.try_recv().unwrap();
+        assert!(matches!(job, ml::Job::ReloadModels));
     }
 
     #[test]

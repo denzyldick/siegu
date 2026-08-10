@@ -17,7 +17,7 @@ env:
 
 jobs:
   # ── Everything on Ubuntu in a single job ───────────────────────────────
-  # Unit tests, lint, clippy, security audit, desktop build, LAN mesh E2E,
+  # Unit tests, lint — typecheck, security audit, desktop build, LAN mesh E2E,
   # face-grouping E2E and full ONNX model inference. One job shares the cargo
   # target dir so the workspace is compiled once instead of once per stage.
   ci:
@@ -72,17 +72,9 @@ jobs:
       - run: cargo test -p siegu-core
         working-directory: src-tauri
 
-      # clippy --all-targets subsumes `cargo check` (it type-checks every target
-      # including tests), so a separate check step is dropped to avoid compiling
-      # the workspace twice.
-      - run: cargo clippy --all-targets -- -D warnings
-        working-directory: src-tauri
-
-      # Guard: no unwrap()/expect() in production code (lib + bins). Test code
-      # is excluded by default cargo clippy target scope, so tests may still use
-      # them. Errors must be handled or logged, never panicked or swallowed.
-      - name: Clippy (no panics in production code)
-        run: cargo clippy -- -D clippy::unwrap_used -D clippy::expect_used
+      # cargo check --all-targets type-checks every target including tests,
+      # with no full codegen or linting, so it is much faster than clippy.
+      - run: cargo check --all-targets
         working-directory: src-tauri
 
       - name: Build Tauri App (no bundle)

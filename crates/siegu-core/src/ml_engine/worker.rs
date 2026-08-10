@@ -196,10 +196,6 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
 
         let db = Arc::new(Mutex::new(Database::new(&db_path)));
         let config = db.lock().unwrap_or_else(|e| e.into_inner()).get_state();
-        let num_threads: usize = config
-            .get("scan_threads")
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(2);
         let unload_idle = Duration::from_secs(
             config
                 .get("ml_unload_idle_seconds")
@@ -207,18 +203,11 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                 .unwrap_or(0),
         );
 
-        let pool = match rayon::ThreadPoolBuilder::new()
-            .num_threads(num_threads)
-            .build()
-        {
-            Ok(pool) => pool,
-            Err(e) => {
-                tracing::error!(
-                    "failed to build rayon thread pool with {num_threads} threads: {e}"
-                );
-                return;
-            }
-        };
+        // Cached rayon pool for parallel photo analysis. Rebuilt lazily whenever
+        // the scan_threads config value changes so the setting applies to the
+        // next analysis without requiring an app restart.
+        let scan_pool: Arc<Mutex<Option<(usize, Arc<rayon::ThreadPool>)>>> =
+            Arc::new(Mutex::new(None));
 
         let avg_photo_time_ms = 1000f64;
         let mut last_auto_job: Option<Instant> = None;
@@ -226,11 +215,20 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
         let total_processed = 0usize;
 
         while let Some(job) = recv_next_job(&mut rx, &models, &pending_count_clone, unload_idle) {
-            if abort_clone.load(Ordering::SeqCst) && !job.is_single() {
+            let is_reload = matches!(job, Job::ReloadModels);
+
+            if abort_clone.load(Ordering::SeqCst) && !job.is_single() && !is_reload {
                 continue;
             }
 
-            let is_auto = matches!(job, Job::AutoAnalyzeSingle(_) | Job::ProcessAll);
+            if is_reload {
+                // Force the lazy-load block below to rebuild every model from the
+                // latest config. No photos are processed for this job.
+                let mut m = models.lock().unwrap_or_else(|e| e.into_inner());
+                *m = None;
+            }
+
+            let is_auto = matches!(job, Job::ProcessAll);
             if is_auto {
                 let mode = db
                     .lock()
@@ -273,9 +271,8 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
             }
 
             let (photo_ids, target_model, progress_model) = match &job {
-                Job::AnalyzeSingle(id) | Job::AutoAnalyzeSingle(id) => {
-                    (vec![id.clone()], None, None)
-                }
+                Job::ReloadModels => (Vec::new(), None, None),
+                Job::AnalyzeSingle(id) => (vec![id.clone()], None, None),
                 Job::AnalyzeSingleWithModel(id, model_id) => {
                     let status_model = ml_worker::job_status_model(model_id).unwrap_or(model_id);
                     (vec![id.clone()], Some(status_model.to_string()), None)
@@ -363,6 +360,34 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
             let config_ref = config.clone();
             let models_ref = Arc::clone(&models);
             let callbacks_ref = Arc::clone(&callbacks);
+
+            let scan_threads: usize = config
+                .get("scan_threads")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(2);
+            let pool = {
+                let mut pool_cell = scan_pool.lock().unwrap_or_else(|e| e.into_inner());
+                match pool_cell.as_ref() {
+                    Some((n, p)) if *n == scan_threads => Arc::clone(p),
+                    _ => match rayon::ThreadPoolBuilder::new()
+                        .num_threads(scan_threads)
+                        .build()
+                    {
+                        Ok(p) => {
+                            callbacks.on_log(&format!("Scan threads set to {scan_threads}."));
+                            let wrapped = Arc::new(p);
+                            *pool_cell = Some((scan_threads, Arc::clone(&wrapped)));
+                            wrapped
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                "failed to build scan thread pool with {scan_threads} threads: {e}"
+                            );
+                            continue;
+                        }
+                    },
+                }
+            };
 
             pool.spawn(move || {
                 let callbacks = callbacks_ref;

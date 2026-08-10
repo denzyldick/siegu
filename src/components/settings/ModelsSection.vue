@@ -312,15 +312,27 @@
       </v-btn>
       <v-spacer></v-spacer>
       <div class="text-right">
-        <div
-          class="text-caption text-zinc-muted"
-          :class="modelsLoaded ? 'font-weight-bold text-zinc-primary' : ''"
-        >
-          {{
-            modelsLoaded
-              ? $t('settings.memory_total', { size: totalRamEstimate })
-              : $t('settings.no_models_in_memory')
-          }}
+        <div class="d-flex align-center justify-end mb-1">
+          <v-progress-circular
+            v-if="modelsReloading"
+            indeterminate
+            size="14"
+            width="2"
+            color="primary"
+            class="mr-2"
+          ></v-progress-circular>
+          <div
+            class="text-caption text-zinc-muted"
+            :class="modelsLoaded ? 'font-weight-bold text-zinc-primary' : ''"
+          >
+            {{
+              modelsReloading
+                ? $t('settings.models_reloading')
+                : modelsLoaded
+                  ? $t('settings.memory_total', { size: totalRamEstimate })
+                  : $t('settings.no_models_in_memory')
+            }}
+          </div>
         </div>
         <v-btn
           variant="tonal"
@@ -329,88 +341,13 @@
           class="font-weight-bold mt-1"
           prepend-icon="mdi-memory"
           :loading="isMemoryFreeing"
-          :disabled="!modelsLoaded || isMemoryFreeing"
+          :disabled="!modelsLoaded || isMemoryFreeing || modelsReloading"
           @click="freeMemory()"
         >
           {{ $t('settings.free_memory') }}
         </v-btn>
       </div>
     </div>
-
-    <template v-if="!embedded">
-      <v-divider class="my-6 border-subtle"></v-divider>
-
-      <div>
-        <div class="text-caption font-weight-bold text-zinc-muted mb-4 tracking-widest uppercase">
-          {{ $t('settings.indexing_when') }}
-        </div>
-
-        <v-row dense class="mb-2" role="radiogroup" aria-label="Indexing mode">
-          <v-col v-for="mode in indexingModes" :key="mode.value" cols="6" sm="4" class="pa-1">
-            <v-card
-              variant="flat"
-              class="preset-card rounded-lg"
-              :class="{ 'preset-card-active': performance.indexingMode === mode.value }"
-              role="radio"
-              :tabindex="performance.indexingMode === mode.value ? 0 : -1"
-              :aria-checked="performance.indexingMode === mode.value"
-              :aria-label="$t('settings.mode_' + mode.value)"
-              @click="setIndexingMode(mode.value)"
-              @keydown="onModeKeydown(mode.value, $event)"
-            >
-              <v-card-text class="pa-2 text-center">
-                <div class="text-caption font-weight-bold text-zinc-primary">
-                  {{ $t('settings.mode_' + mode.value) }}
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
-
-        <div class="text-caption text-zinc-muted mb-4">
-          {{ $t('settings.mode_' + performance.indexingMode + '_desc') }}
-        </div>
-
-        <v-btn
-          v-if="performance.indexingMode === 'manual'"
-          variant="flat"
-          color="primary"
-          size="small"
-          class="font-weight-bold mb-4"
-          prepend-icon="mdi-play"
-          :loading="isAnalyzingAll"
-          :disabled="isAnyModelProcessing && !isAnalyzingAll"
-          @click="runAllModels()"
-        >
-          {{ $t('settings.analyze_now') }}
-        </v-btn>
-
-        <div
-          class="text-caption font-weight-bold text-zinc-muted mb-2 tracking-widest uppercase mt-4"
-        >
-          {{ $t('settings.ml_threads') }}
-        </div>
-        <v-slider
-          :model-value="performance.mlThreads"
-          :min="1"
-          :max="maxThreads"
-          :step="1"
-          hide-details
-          color="primary"
-          track-color="var(--color-bg-zinc-100)"
-          @change="onMlThreadsChange"
-        >
-          <template v-slot:append>
-            <v-chip size="small" variant="flat" class="bg-btn font-weight-bold">{{
-              performance.mlThreads
-            }}</v-chip>
-          </template>
-        </v-slider>
-        <div class="text-caption text-zinc-muted mt-1">
-          {{ $t('settings.ml_threads_desc') }}
-        </div>
-      </div>
-    </template>
   </div>
 </template>
 
@@ -438,14 +375,12 @@ const {
   activeModelSummary,
   modelRam,
   modelsLoaded,
+  modelsReloading,
   totalModelRamEstimate: totalRamEstimate,
   isMemoryFreeing,
-  performance,
-  isAnalyzingAll,
 } = storeToRefs(store);
 
 const {
-  maxThreads,
   isModelProcessing,
   isModelActive,
   isModelDownloading,
@@ -464,45 +399,7 @@ const {
   downloadModels,
   runModel,
   freeMemory,
-  setIndexingMode,
-  setMlThreads,
-  runAllModels,
 } = store;
-
-const indexingModes = [{ value: 'immediate' }, { value: 'idle' }, { value: 'manual' }];
-
-function onMlThreadsChange(value: number | [number, number]): void {
-  void setMlThreads(typeof value === 'number' ? value : value[0]);
-}
-
-function onModeKeydown(mode: string, event: KeyboardEvent): void {
-  if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault();
-    setIndexingMode(mode);
-    return;
-  }
-  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-    event.preventDefault();
-    moveModeFocus(1);
-  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-    event.preventDefault();
-    moveModeFocus(-1);
-  }
-}
-
-function moveModeFocus(delta: number): void {
-  const group = document.querySelector('[role="radiogroup"]');
-  if (!group) return;
-  const cards = Array.from(group.querySelectorAll<HTMLElement>('[role="radio"]'));
-  if (cards.length === 0) return;
-  const currentIndex = Math.max(
-    0,
-    cards.findIndex(
-      (card) => document.activeElement === card || card.getAttribute('aria-checked') === 'true',
-    ),
-  );
-  cards[(currentIndex + delta + cards.length) % cards.length].focus();
-}
 
 function hasModelProgressTotal(modelId: string): boolean {
   return getModelProgressPercent(modelId) > 0;
@@ -560,23 +457,5 @@ function toggleModelSelection(modelId: string): void {
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.preset-card {
-  border: 1px solid var(--color-border-subtle);
-  cursor: pointer;
-  transition:
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    background-color 0.18s ease;
-}
-.preset-card .v-card-text {
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.preset-card-active {
-  border-color: var(--color-text-primary) !important;
-  box-shadow: inset 0 2px 0 var(--color-text-primary);
 }
 </style>
