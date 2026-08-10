@@ -23,7 +23,7 @@ function retry(): void {
     <p class="text-body-2 text-zinc-secondary mb-6 max-w-300">
       {{ error.message || 'An unexpected error occurred.' }}
     </p>
-    <v-btn variant="flat" color="black" class="siegu-btn" @click="retry"> Try Again </v-btn>
+    <v-btn variant="flat" color="primary" class="siegu-btn" @click="retry"> Try Again </v-btn>
   </div>
   <slot v-else />
 </template>

@@ -43,6 +43,7 @@ const vuetify = createVuetify({
         colors: {
           background: '#fafafa',
           surface: '#ffffff',
+          'surface-light': '#f4f4f5',
           primary: '#18181b',
           onPrimary: '#ffffff',
           secondary: '#52525b',
@@ -68,6 +69,7 @@ const vuetify = createVuetify({
         colors: {
           background: '#09090b',
           surface: '#18181b',
+          'surface-light': '#27272a',
           primary: '#fafafa',
           onPrimary: '#09090b',
           secondary: '#a1a1aa',

@@ -86,7 +86,7 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
         <v-card variant="flat" rounded="xl" class="pa-8 border-subtle">
           <div class="text-center mb-8">
             <div class="siegu-icon-circle mx-auto mb-4">
-              <v-icon color="white">mdi-folder-plus</v-icon>
+              <v-icon color="var(--color-text-primary)">mdi-folder-plus</v-icon>
             </div>
             <h2 class="text-h4 font-weight-bold text-zinc-primary">
               {{ t('onboarding.add_media_title') }}
@@ -94,7 +94,13 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
             <p class="text-zinc-secondary">{{ t('onboarding.add_media_desc') }}</p>
           </div>
           <SettingsView :embedded="true" hide-ai-section />
-          <v-btn block color="black" height="56" class="siegu-btn mt-8" @click="goToStep('models')">
+          <v-btn
+            block
+            color="primary"
+            height="56"
+            class="siegu-btn mt-8"
+            @click="goToStep('models')"
+          >
             {{ t('onboarding.continue_ai') }}
           </v-btn>
         </v-card>
@@ -108,7 +114,7 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
         <v-card variant="flat" rounded="xl" class="pa-8 border-subtle">
           <div class="text-center mb-8">
             <div class="siegu-icon-circle-dark mx-auto mb-4">
-              <v-icon color="white">mdi-auto-fix</v-icon>
+              <v-icon color="var(--color-text-btn)">mdi-auto-fix</v-icon>
             </div>
             <h2 class="text-h4 font-weight-bold text-zinc-primary">
               {{ t('onboarding.ai_title') }}
@@ -118,7 +124,7 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
           <SettingsView :embedded="true" hide-folder-section />
           <v-btn
             block
-            color="black"
+            color="primary"
             height="56"
             class="siegu-btn mt-8"
             :loading="modelsStore.downloading"
@@ -142,7 +148,7 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
         <v-card variant="flat" rounded="xl" class="pa-8 border-subtle">
           <div class="text-center mb-8">
             <div class="siegu-icon-circle mx-auto mb-4">
-              <v-icon color="white">mdi-cellphone-link</v-icon>
+              <v-icon color="var(--color-text-primary)">mdi-cellphone-link</v-icon>
             </div>
             <h2 class="text-h4 font-weight-bold text-zinc-primary">
               {{ t('onboarding.sync_title') }}
@@ -168,7 +174,7 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
                 <v-btn
                   variant="flat"
                   size="small"
-                  color="black"
+                  color="primary"
                   class="siegu-btn-sm ml-4"
                   @click="showSyncPicker = true"
                 >
@@ -216,7 +222,7 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
                 <div class="d-flex flex-column ga-2">
                   <v-btn
                     block
-                    color="black"
+                    color="primary"
                     height="48"
                     class="siegu-btn"
                     :loading="choosingOwnFolder"
@@ -227,7 +233,7 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
                   </v-btn>
                   <v-btn
                     block
-                    color="black"
+                    color="primary"
                     variant="tonal"
                     height="48"
                     class="siegu-btn"
@@ -246,7 +252,7 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
             <v-btn
               v-if="!showConnectUI && !deviceConnected"
               block
-              color="black"
+              color="primary"
               height="56"
               class="siegu-btn"
               @click="showConnectUI = true"
@@ -257,7 +263,7 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
             <v-btn
               v-if="!showConnectUI && !deviceConnected"
               block
-              color="black"
+              color="primary"
               height="56"
               class="siegu-btn"
               @click="goToStep('finalize')"
@@ -267,7 +273,7 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
             <v-btn
               v-if="deviceConnected && connectionMode === 'host'"
               block
-              color="black"
+              color="primary"
               height="56"
               class="siegu-btn"
               @click="finishSetupAndScan"
@@ -278,7 +284,7 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
             <v-btn
               v-if="showConnectUI && !deviceConnected"
               block
-              color="black"
+              color="primary"
               height="56"
               class="siegu-btn"
               @click="goToStep('finalize')"
@@ -302,7 +308,13 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
             {{ t('onboarding.ready_title') }}
           </h2>
           <p class="text-body-1 text-zinc-secondary mb-10">{{ t('onboarding.ready_desc') }}</p>
-          <v-btn block color="black" height="64" class="siegu-btn mb-4" @click="finishSetupAndScan">
+          <v-btn
+            block
+            color="primary"
+            height="64"
+            class="siegu-btn mb-4"
+            @click="finishSetupAndScan"
+          >
             <v-icon start class="mr-2">{{
               deviceConnected ? 'mdi-sync' : 'mdi-magnify-scan'
             }}</v-icon>

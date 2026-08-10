@@ -1,6 +1,7 @@
 <template>
   <v-container :class="embedded ? 'pa-0' : 'pb-16 pt-2 bg-siegu-main'" fluid>
-    <v-row justify="center">
+    <PageLoading v-if="settingsLoading" class="py-16" />
+    <v-row v-else justify="center">
       <v-col cols="12" :md="embedded ? 12 : 8" :lg="embedded ? 12 : 6">
         <div v-if="!embedded" class="d-flex align-center justify-space-between mb-6">
           <div>
@@ -90,7 +91,7 @@
         <v-card-actions class="pa-4 bg-zinc-50 border-top-subtle ga-2">
           <v-btn
             variant="flat"
-            color="black"
+            color="primary"
             @click="cleanupDialog.show = false"
             class="siegu-btn flex-grow-1"
             height="44"
@@ -98,7 +99,7 @@
           >
           <v-btn
             variant="flat"
-            color="black"
+            color="primary"
             @click="startConfirmedCleanup"
             class="siegu-btn flex-grow-1"
             height="44"
@@ -138,7 +139,7 @@
         <v-card-actions class="pa-4 bg-zinc-50 border-top-subtle ga-2">
           <v-btn
             variant="flat"
-            color="black"
+            color="primary"
             @click="removeFolderDialog.show = false"
             class="siegu-btn flex-grow-1"
             height="44"
@@ -146,7 +147,7 @@
           >
           <v-btn
             variant="flat"
-            color="black"
+            color="primary"
             @click="startConfirmedRemoveFolder"
             class="siegu-btn flex-grow-1"
             height="44"
@@ -157,11 +158,14 @@
     </v-dialog>
 
     <FolderPicker v-model="showFolderPicker" @select="onFolderSelected" />
-    <v-snackbar v-model="snackbar.show" :timeout="3000" location="bottom" color="black">
+    <v-snackbar v-model="snackbar.show" :timeout="3000" location="bottom" color="primary">
       <div class="d-flex align-center">
-        <v-icon size="small" class="mr-3" :color="snackbar.error ? 'error' : 'white'">{{
-          snackbar.error ? 'mdi-alert-circle' : 'mdi-check-circle'
-        }}</v-icon>
+        <v-icon
+          size="small"
+          class="mr-3"
+          :color="snackbar.error ? 'error' : 'var(--color-text-btn)'"
+          >{{ snackbar.error ? 'mdi-alert-circle' : 'mdi-check-circle' }}</v-icon
+        >
         <span class="text-body-2">{{ snackbar.text }}</span>
       </div>
     </v-snackbar>
@@ -181,6 +185,7 @@ import MaintenanceSection from './settings/MaintenanceSection.vue';
 import SignallingSection from './settings/SignallingSection.vue';
 import UpdateSection from './settings/UpdateSection.vue';
 import AboutSection from './settings/AboutSection.vue';
+import PageLoading from './shared/PageLoading.vue';
 
 defineProps<{
   embedded?: boolean;
@@ -231,6 +236,8 @@ const isStoreManaged = computed(
 
 const signallingSaving = ref(false);
 
+const settingsLoading = ref(true);
+
 function onSignallingUrl(v: string): void {
   signalingUrl.value = v;
 }
@@ -253,6 +260,8 @@ onMounted(async () => {
     await init();
   } catch (e) {
     console.error('[Setting] init failed:', e);
+  } finally {
+    settingsLoading.value = false;
   }
   emit('folder-added', directories.value);
 });

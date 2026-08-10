@@ -639,7 +639,7 @@ export const useSettingsStore = defineStore('settings', () => {
     modelsToDownload.forEach((m) => {
       downloadProgress.value[m] = {
         downloaded: 0,
-        total: 1,
+        total: null,
         speedBytesPerSec: 0,
         etaMs: null,
         updatedAt: 0,

@@ -16,7 +16,7 @@ const emit = defineEmits<{
     <v-progress-circular
       v-if="!isConnected && status !== $t('connect.disconnected')"
       indeterminate
-      color="black"
+      color="var(--color-text-secondary)"
       size="16"
       width="2"
       class="mr-2 opacity-50"

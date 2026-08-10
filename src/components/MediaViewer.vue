@@ -180,7 +180,7 @@
                   indeterminate
                   size="16"
                   width="2"
-                  color="black"
+                  color="var(--color-text-secondary)"
                   class="mr-2"
                 ></v-progress-circular>
                 <span class="text-body-2 text-zinc-primary font-weight-bold">
@@ -392,11 +392,14 @@
           </v-list>
         </v-navigation-drawer>
       </v-layout>
-      <v-snackbar v-model="snackbar.show" :timeout="6000" location="bottom" color="black">
+      <v-snackbar v-model="snackbar.show" :timeout="6000" location="bottom" color="primary">
         <div class="d-flex align-center">
-          <v-icon size="small" class="mr-3" :color="snackbar.error ? 'error' : 'white'">{{
-            snackbar.error ? 'mdi-alert-circle' : 'mdi-check-circle'
-          }}</v-icon>
+          <v-icon
+            size="small"
+            class="mr-3"
+            :color="snackbar.error ? 'error' : 'var(--color-text-btn)'"
+            >{{ snackbar.error ? 'mdi-alert-circle' : 'mdi-check-circle' }}</v-icon
+          >
           <span class="text-body-2">{{ snackbar.text }}</span>
         </div>
       </v-snackbar>

@@ -26,7 +26,7 @@ defineEmits<{
         <v-card
           class="unnamed-card-reimagined overflow-hidden border-subtle"
           variant="flat"
-          color="white"
+          color="surface"
           rounded="xl"
           @click="$emit('viewCluster', group)"
         >
@@ -40,7 +40,7 @@ defineEmits<{
             <v-chip
               v-if="group.face_count > 1"
               size="x-small"
-              color="black"
+              color="primary"
               variant="flat"
               class="cluster-badge font-weight-bold"
             >

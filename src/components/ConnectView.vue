@@ -68,7 +68,7 @@
             <template v-slot:activator="{ props }">
               <v-btn
                 v-bind="props"
-                color="black"
+                color="primary"
                 variant="flat"
                 height="44"
                 class="siegu-btn px-5 text-none"
@@ -87,7 +87,7 @@
             <template v-slot:activator="{ props }">
               <v-btn
                 v-bind="props"
-                color="black"
+                color="primary"
                 variant="flat"
                 height="44"
                 class="siegu-btn px-5 text-none"
@@ -125,7 +125,7 @@
             hide-details
             density="compact"
             class="text-caption mb-4"
-            color="black"
+            color="var(--color-text-primary)"
           />
           <div class="d-flex ga-3">
             <v-btn
@@ -212,7 +212,7 @@
           <template v-slot:activator="{ props }">
             <v-btn
               v-bind="props"
-              color="black"
+              color="primary"
               variant="flat"
               height="56"
               class="siegu-btn px-6 text-none flex-1"
@@ -231,7 +231,7 @@
           <template v-slot:activator="{ props }">
             <v-btn
               v-bind="props"
-              color="black"
+              color="primary"
               variant="flat"
               height="56"
               class="siegu-btn px-6 text-none flex-1"
@@ -300,7 +300,7 @@
           <v-progress-circular
             v-if="!isConnected"
             indeterminate
-            color="black"
+            color="var(--color-text-secondary)"
             size="16"
             width="2"
             class="mr-2 opacity-50"

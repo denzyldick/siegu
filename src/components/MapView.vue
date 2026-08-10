@@ -16,7 +16,12 @@
     <!-- Loading Overlay -->
     <div v-if="loading" class="map-empty-state">
       <div class="d-flex flex-column align-center justify-center h-100">
-        <v-progress-circular indeterminate color="white" size="32" width="3"></v-progress-circular>
+        <v-progress-circular
+          indeterminate
+          color="var(--color-text-secondary)"
+          size="32"
+          width="3"
+        ></v-progress-circular>
       </div>
     </div>
 
@@ -300,7 +305,7 @@ watch(currentPhotoIndex, (idx) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.7);
+  background: color-mix(in srgb, var(--color-bg-primary) 70%, transparent);
   backdrop-filter: blur(4px);
   z-index: 1001;
   pointer-events: none;

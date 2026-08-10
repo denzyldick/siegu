@@ -79,7 +79,7 @@
         <v-btn
           size="small"
           variant="flat"
-          color="black"
+          color="primary"
           class="siegu-btn px-4"
           :loading="saving"
           :disabled="testing"

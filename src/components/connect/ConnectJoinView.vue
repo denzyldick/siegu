@@ -64,7 +64,7 @@ const syncStatusText = computed(() => {
     <v-btn
       v-if="!showSyncButton && !isConnected"
       variant="flat"
-      color="black"
+      color="primary"
       @click="emit('join', hostIp, String(hostPort))"
       class="siegu-btn py-6"
       block

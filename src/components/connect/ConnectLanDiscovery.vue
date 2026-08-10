@@ -67,7 +67,7 @@ onUnmounted(() => {
     </div>
 
     <div v-if="scanning && hosts.length === 0" class="d-flex align-center justify-center py-6 ga-3">
-      <v-progress-circular indeterminate color="black" size="20" width="2" />
+      <v-progress-circular indeterminate color="var(--color-text-secondary)" size="20" width="2" />
       <span class="text-caption text-zinc-secondary">{{ $t('connect.searching_network') }}</span>
     </div>
 
@@ -80,7 +80,7 @@ onUnmounted(() => {
         class="mb-1 border-subtle"
       >
         <template v-slot:prepend>
-          <v-icon size="20" color="black">mdi-laptop</v-icon>
+          <v-icon size="20" color="var(--color-text-secondary)">mdi-laptop</v-icon>
         </template>
         <v-list-item-title class="text-body-2 font-weight-medium">{{
           host.name

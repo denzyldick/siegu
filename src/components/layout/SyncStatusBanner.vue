@@ -51,11 +51,16 @@ async function reconnect(): Promise<void> {
           indeterminate
           size="18"
           width="2"
-          color="black"
+          color="var(--color-text-secondary)"
           class="mr-3"
         />
         <div v-else-if="!isOffline" class="mr-3 d-flex align-center">
-          <v-progress-circular :model-value="displayProgress" size="22" width="3" color="black">
+          <v-progress-circular
+            :model-value="displayProgress"
+            size="22"
+            width="3"
+            color="var(--color-text-secondary)"
+          >
             <span style="font-size: 8px; font-weight: bold">{{ displayProgress }}</span>
           </v-progress-circular>
         </div>

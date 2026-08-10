@@ -30,7 +30,7 @@ const displayEta = computed(() => {
               indeterminate
               size="16"
               width="2"
-              color="black"
+              color="var(--color-text-secondary)"
             />
             <div class="text-caption font-weight-bold text-zinc-primary text-truncate">
               <template v-if="scanStore.stoppedMessage">

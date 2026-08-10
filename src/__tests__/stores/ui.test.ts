@@ -13,11 +13,11 @@ describe('ui store', () => {
     expect(store.currentPage).toBe('home');
   });
 
-  it('sets current page and persists', () => {
+  it('sets current page', () => {
     const store = useUiStore();
     store.setPage('location');
     expect(store.currentPage).toBe('location');
-    expect(localStorage.getItem('siegu_page')).toBe('location');
+    expect(localStorage.getItem('siegu_page')).toBeNull();
   });
 
   it('sets theme and persists', () => {

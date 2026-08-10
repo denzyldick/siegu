@@ -62,7 +62,8 @@
         </v-btn>
       </div>
 
-      <template v-if="hasAnyItems">
+      <PageLoading v-if="!hasAnyItems && albumsStore.sectionsLoading" class="py-12" />
+      <template v-else-if="hasAnyItems">
         <div v-for="section in sections" :key="section.id" class="mb-8">
           <div v-if="section.items.length > 0" class="animate-fade-in">
             <div class="d-flex align-center px-2 mb-3">
@@ -133,7 +134,7 @@
       </template>
 
       <div
-        v-else-if="!albumsStore.sectionsLoading"
+        v-else
         class="empty-state-container d-flex flex-column align-center justify-center text-center"
       >
         <div class="empty-state-icon mb-6">
@@ -456,6 +457,7 @@ import PeopleManagePanel from '@/components/people/PeopleManagePanel.vue';
 import NameDialog from '@/components/people/NameDialog.vue';
 import ManageDialog from '@/components/people/ManageDialog.vue';
 import ClusterDialog from '@/components/people/ClusterDialog.vue';
+import PageLoading from '@/components/shared/PageLoading.vue';
 import { useAlbumsStore } from '@/stores/albums';
 import { useSearchStore } from '@/stores/search';
 import { useUiStore } from '@/stores/ui';

@@ -4,17 +4,17 @@
       <div v-if="selectedIds.size > 0" class="bulk-toolbar-container">
         <v-sheet
           class="bulk-toolbar d-flex align-center px-6 py-3 rounded-pill shadow-xl"
-          color="var(--color-text-primary)"
+          color="var(--color-bg-btn)"
         >
           <v-btn
             icon="mdi-close"
             variant="text"
             density="comfortable"
-            color="white"
+            color="var(--color-text-btn)"
             @click="clearSelection"
           ></v-btn>
           <div class="ml-4">
-            <div class="text-subtitle-2 font-weight-bold text-white">
+            <div class="text-subtitle-2 font-weight-bold" style="color: var(--color-text-btn)">
               {{ $t('media.items_selected', { count: selectedIds.size }) }}
             </div>
           </div>
@@ -26,8 +26,9 @@
             </v-btn>
             <v-btn
               variant="flat"
-              color="rgba(255,255,255,0.1)"
-              class="text-white px-6 rounded-xl text-none font-weight-bold"
+              color="rgba(var(--v-theme-on-primary), 0.1)"
+              class="px-6 rounded-xl text-none font-weight-bold"
+              style="color: var(--color-text-btn)"
               size="small"
               @click="addToAlbumOpen = true"
             >
@@ -36,8 +37,9 @@
             </v-btn>
             <v-btn
               variant="flat"
-              color="rgba(255,255,255,0.1)"
-              class="text-white px-6 rounded-xl text-none font-weight-bold"
+              color="rgba(var(--v-theme-on-primary), 0.1)"
+              class="px-6 rounded-xl text-none font-weight-bold"
+              style="color: var(--color-text-btn)"
               size="small"
               @click="bulkRemove"
             >

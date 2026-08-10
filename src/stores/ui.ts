@@ -4,7 +4,7 @@ import { ref } from 'vue';
 export type PageId = 'home' | 'albums' | 'location' | 'devices' | 'settings';
 
 export const useUiStore = defineStore('ui', () => {
-  const currentPage = ref<PageId>((localStorage.getItem('siegu_page') as PageId) || 'home');
+  const currentPage = ref<PageId>('home');
   const theme = ref<string>(localStorage.getItem('siegu_theme') || 'system');
   const language = ref<string>(localStorage.getItem('siegu_language') || 'en');
   const sidebarOpen = ref(false);
@@ -13,7 +13,6 @@ export const useUiStore = defineStore('ui', () => {
 
   function setPage(page: PageId): void {
     currentPage.value = page;
-    localStorage.setItem('siegu_page', page);
   }
 
   function setTheme(newTheme: string): void {

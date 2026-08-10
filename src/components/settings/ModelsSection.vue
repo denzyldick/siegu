@@ -49,7 +49,7 @@
           </div>
         </div>
       </div>
-      <v-chip size="small" color="black" variant="flat" class="ml-3 flex-shrink-0">
+      <v-chip size="small" color="primary" variant="flat" class="ml-3 flex-shrink-0">
         {{ getModelStatusLabel(visibleActivityModel.id) }}
       </v-chip>
     </v-sheet>

@@ -11,9 +11,12 @@
       <ConnectView />
     </div>
 
+    <!-- Loading State -->
+    <PageLoading v-if="loading" />
+
     <!-- Empty State -->
     <div
-      v-if="devices.length === 0"
+      v-else-if="devices.length === 0"
       class="d-flex flex-column align-center justify-center py-16 text-center animate-fade-in"
     >
       <v-icon size="64" color="var(--color-icon-empty)" class="mb-4">mdi-laptop-off</v-icon>
@@ -52,8 +55,8 @@
                 v-if="device.host"
                 size="x-small"
                 variant="flat"
-                color="black"
-                class="text-white ml-2 font-weight-bold"
+                color="primary"
+                class="ml-2 font-weight-bold"
                 style="height: 18px"
                 >{{ $t('devices.this_device') }}</v-chip
               >
@@ -145,7 +148,7 @@
               </div>
               <v-progress-linear
                 :model-value="device.progress"
-                color="black"
+                color="var(--color-text-primary)"
                 height="6"
                 rounded
                 bg-color="var(--color-bg-zinc-100)"
@@ -156,7 +159,7 @@
               <v-btn
                 v-if="!device.host && connection === 'connected'"
                 variant="flat"
-                color="black"
+                color="primary"
                 class="siegu-btn flex-grow-1"
                 size="small"
                 @click="startSync"
@@ -167,7 +170,7 @@
               <v-btn
                 v-else-if="!device.host && connection === 'offline'"
                 variant="tonal"
-                color="black"
+                color="primary"
                 class="siegu-btn flex-grow-1"
                 size="small"
                 :loading="reconnecting"
@@ -258,7 +261,7 @@
           </v-btn>
           <v-btn
             variant="flat"
-            color="black"
+            color="primary"
             class="siegu-btn flex-grow-1"
             height="44"
             @click="confirmRename"
@@ -350,6 +353,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import ConnectView from './ConnectView.vue';
+import PageLoading from './shared/PageLoading.vue';
 import { useSyncStore } from '@/stores/sync';
 import {
   listDevices,
@@ -375,6 +379,7 @@ interface DeviceWithSync {
 }
 
 const devices = ref<DeviceWithSync[]>([]);
+const loading = ref(true);
 const deleteDialog = ref(false);
 const deviceToDelete = ref('');
 const deleting = ref(false);
@@ -405,6 +410,7 @@ let unlistenRefresh: UnlistenFn | null = null;
 let unlistenSync: UnlistenFn | null = null;
 
 async function loadDevices() {
+  loading.value = true;
   try {
     const realDevices = await listDevices();
     devices.value = (realDevices || []).map((d) => ({
@@ -417,6 +423,8 @@ async function loadDevices() {
     }));
   } catch (err) {
     console.error('Failed to list devices:', err);
+  } finally {
+    loading.value = false;
   }
 }
 
