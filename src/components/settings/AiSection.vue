@@ -114,7 +114,12 @@
           </div>
 
           <div class="text-caption text-zinc-primary font-weight-bold mt-2">
-            {{ $t('settings.speed_summary', { cores: performance.mlThreads, photos: performance.scanThreads }) }}
+            {{
+              $t('settings.speed_summary', {
+                cores: performance.mlThreads,
+                photos: performance.scanThreads,
+              })
+            }}
           </div>
         </div>
 
@@ -267,13 +272,8 @@ defineProps<{
 const store = useSettingsStore();
 const { t } = useI18n();
 
-const {
-  currentPreset,
-  performance,
-  modelsReloading,
-  isAnalyzingAll,
-  isAnyModelProcessing,
-} = storeToRefs(store);
+const { currentPreset, performance, modelsReloading, isAnalyzingAll, isAnyModelProcessing } =
+  storeToRefs(store);
 
 const {
   maxThreads,
