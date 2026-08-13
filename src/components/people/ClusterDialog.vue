@@ -23,13 +23,16 @@ const emit = defineEmits<{
     scrollable
     @update:model-value="(v: boolean) => emit('update:modelValue', v)"
   >
-    <v-card class="rounded-xl border-subtle overflow-hidden" color="surface">
-      <v-card-title class="pa-6 bg-zinc-100 border-bottom-subtle d-flex align-center">
+    <v-card class="rounded-xl border overflow-hidden" color="surface">
+      <v-card-title
+        style="background: rgb(var(--v-theme-surface-light))"
+        class="pa-6 border-b d-flex align-center"
+      >
         <div>
-          <div class="text-h5 font-weight-black text-zinc-primary">
+          <div class="text-h5 font-weight-black text-high-emphasis">
             {{ $t('people.grouped_faces') }}
           </div>
-          <div class="text-caption text-zinc-secondary font-weight-bold uppercase tracking-widest">
+          <div class="text-caption text-medium-emphasis font-weight-bold uppercase tracking-widest">
             {{ $t('people.appearances_in_cluster', { count: faces.length }) }}
           </div>
         </div>
@@ -48,7 +51,7 @@ const emit = defineEmits<{
             <v-card
               variant="flat"
               border
-              class="border-subtle overflow-hidden rounded-lg pos-rel group-face-card"
+              class="border overflow-hidden rounded-lg pos-rel group-face-card"
             >
               <v-img
                 :src="getFaceImageSrc(face.crop_path, face.encoded)"
@@ -69,7 +72,7 @@ const emit = defineEmits<{
         </v-row>
       </v-card-text>
 
-      <v-card-actions class="pa-6 bg-zinc-50 border-top-subtle">
+      <v-card-actions style="background: rgb(var(--v-theme-surface))" class="pa-6 border-t">
         <v-btn
           block
           color="primary"

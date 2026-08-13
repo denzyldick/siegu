@@ -1,12 +1,12 @@
 <template>
-  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
-    <v-card-item class="bg-zinc-100 py-4">
+  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border overflow-hidden">
+    <v-card-item style="background: rgb(var(--v-theme-surface-light))" class="py-4">
       <template v-slot:prepend>
-        <div class="siegu-icon-circle-dark mr-3">
-          <v-icon color="var(--color-text-btn)" size="small">mdi-robot-outline</v-icon>
-        </div>
+        <v-avatar color="on-surface" size="32" class="mr-3">
+          <v-icon color="surface" size="small">mdi-robot-outline</v-icon>
+        </v-avatar>
       </template>
-      <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
+      <v-card-title class="text-h6 text-high-emphasis font-weight-bold">{{
         $t('settings.performance')
       }}</v-card-title>
     </v-card-item>
@@ -15,10 +15,10 @@
       <ModelsSection :embedded="embedded" />
 
       <template v-if="!embedded">
-        <v-divider class="my-6 border-subtle"></v-divider>
+        <v-divider class="my-6 border"></v-divider>
 
         <div>
-          <div class="text-caption font-weight-bold text-zinc-muted mb-4 tracking-widest uppercase">
+          <div class="text-caption font-weight-bold text-disabled mb-4 tracking-widest uppercase">
             {{ $t('settings.indexing_when') }}
           </div>
 
@@ -36,7 +36,7 @@
                 @keydown="onModeKeydown(mode.value, $event)"
               >
                 <v-card-text class="pa-2 text-center">
-                  <div class="text-caption font-weight-bold text-zinc-primary">
+                  <div class="text-caption font-weight-bold text-high-emphasis">
                     {{ $t('settings.mode_' + mode.value) }}
                   </div>
                 </v-card-text>
@@ -44,7 +44,7 @@
             </v-col>
           </v-row>
 
-          <div class="text-caption text-zinc-muted mb-4">
+          <div class="text-caption text-disabled mb-4">
             {{ $t('settings.mode_' + performance.indexingMode + '_desc') }}
           </div>
 
@@ -63,14 +63,14 @@
           </v-btn>
         </div>
 
-        <v-divider class="my-6 border-subtle"></v-divider>
+        <v-divider class="my-6 border"></v-divider>
 
         <div>
-          <div class="text-caption font-weight-bold text-zinc-muted mb-4 tracking-widest uppercase">
+          <div class="text-caption font-weight-bold text-disabled mb-4 tracking-widest uppercase">
             {{ $t('settings.speed') }}
           </div>
 
-          <div class="text-body-2 text-zinc-secondary mb-4">
+          <div class="text-body-2 text-medium-emphasis mb-4">
             {{ $t('settings.speed_hint') }}
           </div>
 
@@ -83,10 +83,10 @@
                 @click="applyPreset(preset.value)"
               >
                 <v-card-text class="pa-2 text-center">
-                  <div class="text-body-2 font-weight-bold text-zinc-primary">
+                  <div class="text-body-2 font-weight-bold text-high-emphasis">
                     {{ $t('settings.preset_' + preset.value) }}
                   </div>
-                  <div class="text-caption text-zinc-muted preset-desc">
+                  <div class="text-caption text-disabled preset-desc">
                     {{ $t('settings.preset_' + preset.value + '_desc') }}
                   </div>
                 </v-card-text>
@@ -95,7 +95,7 @@
           </v-row>
 
           <div class="d-flex align-center justify-space-between mb-1">
-            <div class="text-body-2 text-zinc-muted">
+            <div class="text-body-2 text-disabled">
               {{
                 currentPreset === 'custom'
                   ? $t('settings.preset_custom_desc')
@@ -113,7 +113,7 @@
             </v-chip>
           </div>
 
-          <div class="text-caption text-zinc-primary font-weight-bold mt-2">
+          <div class="text-caption text-high-emphasis font-weight-bold mt-2">
             {{
               $t('settings.speed_summary', {
                 cores: performance.mlThreads,
@@ -123,7 +123,7 @@
           </div>
         </div>
 
-        <v-divider class="my-6 border-subtle"></v-divider>
+        <v-divider class="my-6 border"></v-divider>
 
         <div>
           <div class="d-flex align-center justify-space-between mb-1">
@@ -147,7 +147,7 @@
                 color="primary"
                 class="mr-2"
               ></v-progress-circular>
-              <span class="text-caption font-weight-bold text-zinc-primary">{{
+              <span class="text-caption font-weight-bold text-high-emphasis">{{
                 $t('settings.models_reloading')
               }}</span>
             </div>
@@ -156,10 +156,10 @@
           <v-expand-transition>
             <div v-if="showAdvanced" class="pt-2">
               <div class="d-flex justify-space-between align-center mb-2">
-                <div class="text-caption font-weight-bold text-zinc-primary">
+                <div class="text-caption font-weight-bold text-high-emphasis">
                   {{ $t('settings.ml_threads') }}
                 </div>
-                <v-chip size="small" variant="flat" class="bg-btn font-weight-bold">{{
+                <v-chip size="small" variant="flat" color="primary" class="font-weight-bold">{{
                   performance.mlThreads
                 }}</v-chip>
               </div>
@@ -170,19 +170,19 @@
                 :step="1"
                 hide-details
                 color="primary"
-                track-color="var(--color-bg-zinc-100)"
+                track-color="rgb(var(--v-theme-surface-light))"
                 @update:model-value="onMlThreadsUpdate"
                 @change="onMlThreadsChange"
               ></v-slider>
-              <div class="text-caption text-zinc-muted mt-1">
+              <div class="text-caption text-disabled mt-1">
                 {{ $t('settings.ml_threads_desc') }}
               </div>
 
               <div class="d-flex justify-space-between align-center mb-2 mt-4">
-                <div class="text-caption font-weight-bold text-zinc-primary">
+                <div class="text-caption font-weight-bold text-high-emphasis">
                   {{ $t('settings.memory_budget') }}
                 </div>
-                <v-chip size="small" variant="flat" class="bg-btn font-weight-bold">
+                <v-chip size="small" variant="flat" color="primary" class="font-weight-bold">
                   {{
                     performance.memoryBudgetMb === 0
                       ? $t('settings.memory_budget_none')
@@ -197,19 +197,19 @@
                 :step="0.25"
                 hide-details
                 color="primary"
-                track-color="var(--color-bg-zinc-100)"
+                track-color="rgb(var(--v-theme-surface-light))"
                 @update:model-value="onMemoryBudgetUpdate"
                 @change="onMemoryBudgetChange"
               ></v-slider>
-              <div class="text-caption text-zinc-muted mt-1">
+              <div class="text-caption text-disabled mt-1">
                 {{ $t('settings.memory_budget_desc') }}
               </div>
 
               <div class="d-flex justify-space-between align-center mb-2 mt-4">
-                <div class="text-caption font-weight-bold text-zinc-primary">
+                <div class="text-caption font-weight-bold text-high-emphasis">
                   {{ $t('settings.batch_delay') }}
                 </div>
-                <v-chip size="small" variant="flat" class="bg-btn font-weight-bold">
+                <v-chip size="small" variant="flat" color="primary" class="font-weight-bold">
                   {{ gapSeconds.toFixed(1) }}s
                 </v-chip>
               </div>
@@ -220,19 +220,19 @@
                 :step="0.1"
                 hide-details
                 color="primary"
-                track-color="var(--color-bg-zinc-100)"
+                track-color="rgb(var(--v-theme-surface-light))"
                 @update:model-value="onGapUpdate"
                 @change="onGapChange"
               ></v-slider>
-              <div class="text-caption text-zinc-muted mt-1">
+              <div class="text-caption text-disabled mt-1">
                 {{ $t('settings.batch_delay_desc') }}
               </div>
 
               <div class="d-flex justify-space-between align-center mb-2 mt-4">
-                <div class="text-caption font-weight-bold text-zinc-primary">
+                <div class="text-caption font-weight-bold text-high-emphasis">
                   {{ $t('settings.scan_threads') }}
                 </div>
-                <v-chip size="small" variant="flat" class="bg-btn font-weight-bold">{{
+                <v-chip size="small" variant="flat" color="primary" class="font-weight-bold">{{
                   performance.scanThreads
                 }}</v-chip>
               </div>
@@ -243,11 +243,11 @@
                 :step="1"
                 hide-details
                 color="primary"
-                track-color="var(--color-bg-zinc-100)"
+                track-color="rgb(var(--v-theme-surface-light))"
                 @update:model-value="onScanThreadsUpdate"
                 @change="onScanThreadsChange"
               ></v-slider>
-              <div class="text-caption text-zinc-muted mt-1">
+              <div class="text-caption text-disabled mt-1">
                 {{ $t('settings.scan_threads_desc') }}
               </div>
             </div>
@@ -371,7 +371,7 @@ function moveModeFocus(delta: number): void {
 
 <style scoped>
 .preset-card {
-  border: 1px solid var(--color-border-subtle);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   cursor: pointer;
   transition:
     border-color 0.18s ease,
@@ -379,8 +379,8 @@ function moveModeFocus(delta: number): void {
     background-color 0.18s ease;
 }
 .preset-card-active {
-  border-color: var(--color-text-primary) !important;
-  box-shadow: inset 0 2px 0 var(--color-text-primary);
+  border-color: rgb(var(--v-theme-on-surface)) !important;
+  box-shadow: inset 0 2px 0 rgb(var(--v-theme-on-surface));
 }
 .preset-desc {
   line-height: 1.25;

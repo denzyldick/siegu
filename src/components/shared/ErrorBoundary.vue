@@ -18,12 +18,12 @@ function retry(): void {
     v-if="error"
     class="error-boundary pa-8 d-flex flex-column align-center justify-center text-center"
   >
-    <v-icon size="48" color="var(--color-error)" class="mb-4">mdi-alert-circle-outline</v-icon>
-    <h3 class="text-h6 font-weight-bold text-zinc-primary mb-2">Something went wrong</h3>
-    <p class="text-body-2 text-zinc-secondary mb-6 max-w-300">
+    <v-icon size="48" color="rgb(var(--v-theme-error))" class="mb-4">mdi-alert-circle-outline</v-icon>
+    <h3 class="text-h6 font-weight-bold text-high-emphasis mb-2">Something went wrong</h3>
+    <p class="text-body-2 text-medium-emphasis mb-6 max-w-300">
       {{ error.message || 'An unexpected error occurred.' }}
     </p>
-    <v-btn variant="flat" color="primary" class="siegu-btn" @click="retry"> Try Again </v-btn>
+    <v-btn variant="flat" color="primary" class="" @click="retry"> Try Again </v-btn>
   </div>
   <slot v-else />
 </template>

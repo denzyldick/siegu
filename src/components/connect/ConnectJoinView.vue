@@ -42,8 +42,8 @@ const syncStatusText = computed(() => {
 <template>
   <div v-if="hostIp" class="d-flex flex-column align-stretch mb-6 ga-4" style="width: 100%">
     <div class="text-center mb-2">
-      <div class="text-caption text-zinc-muted">Direct connection</div>
-      <div class="text-body-1 font-weight-bold text-zinc-primary">{{ hostIp }}:{{ hostPort }}</div>
+      <div class="text-caption text-disabled">Direct connection</div>
+      <div class="text-body-1 font-weight-bold text-high-emphasis">{{ hostIp }}:{{ hostPort }}</div>
     </div>
 
     <v-text-field
@@ -66,7 +66,7 @@ const syncStatusText = computed(() => {
       variant="flat"
       color="primary"
       @click="emit('join', hostIp, String(hostPort))"
-      class="siegu-btn py-6"
+      class="py-6"
       block
       :disabled="loading || !modelValue"
     >
@@ -75,15 +75,15 @@ const syncStatusText = computed(() => {
         <span>{{ t('connect.joining') }}</span>
       </div>
       <div v-else class="d-flex align-center">
-        <div class="siegu-icon-circle mr-3">
+        <v-avatar color="rgba(255,255,255,0.2)" size="28" class="mr-3">
           <v-icon size="14">mdi-link-variant</v-icon>
-        </div>
+        </v-avatar>
         <span>{{ t('connect.link_device_button') }}</span>
       </div>
     </v-btn>
 
     <div v-if="syncing" class="d-flex flex-column align-center py-4 ga-2">
-      <div v-if="deviceName" class="text-caption text-zinc-secondary">
+      <div v-if="deviceName" class="text-caption text-medium-emphasis">
         {{ t('connect.connected_to') }} <strong>{{ deviceName }}</strong>
       </div>
       <div v-if="itemsTotal > 0" class="d-flex align-center ga-2 w-100">
@@ -94,53 +94,53 @@ const syncStatusText = computed(() => {
           rounded
           class="flex-grow-1"
         />
-        <span class="text-caption text-success font-weight-bold">
+        <span class="text-caption font-weight-bold" style="color: rgb(var(--v-theme-success))">
           {{ itemsCompleted }}/{{ itemsTotal }}
         </span>
       </div>
       <v-progress-linear v-else indeterminate color="success" height="4" class="w-100" />
-      <span class="text-caption text-zinc-muted">{{ syncStatusText }}</span>
+      <span class="text-caption text-disabled">{{ syncStatusText }}</span>
     </div>
 
     <div v-else-if="isConnected" class="d-flex flex-column align-center py-4 ga-1">
       <v-icon size="16" color="success" class="mr-2">mdi-check-circle</v-icon>
-      <span class="text-caption text-success">{{ t('connect.sync_complete') }}</span>
-      <span v-if="itemsCompleted > 0" class="text-caption text-zinc-muted">
+      <span style="color: rgb(var(--v-theme-success))">{{ t('connect.sync_complete') }}</span>
+      <span v-if="itemsCompleted > 0" class="text-caption text-disabled">
         {{ itemsCompleted }} {{ t('connect.files_synced') }}
       </span>
-      <span v-else class="text-caption text-zinc-muted">{{ t('connect.all_up_to_date') }}</span>
+      <span v-else class="text-caption text-disabled">{{ t('connect.all_up_to_date') }}</span>
     </div>
   </div>
 </template>
 
 <style scoped>
 .join-passphrase :deep(.v-field) {
-  background: var(--color-bg-field) !important;
+  background: rgb(var(--v-theme-surface-light)) !important;
 }
 
 .join-passphrase :deep(.v-field__overlay) {
-  background: var(--color-bg-field) !important;
+  background: rgb(var(--v-theme-surface-light)) !important;
 }
 
 .join-passphrase :deep(.v-field--focused),
 .join-passphrase :deep(.v-field--focused .v-field__overlay) {
-  background: var(--color-bg-surface) !important;
+  background: rgb(var(--v-theme-surface)) !important;
 }
 
 .join-passphrase :deep(input) {
-  color: var(--color-text-primary) !important;
-  caret-color: var(--color-text-primary) !important;
+  color: rgb(var(--v-theme-on-surface)) !important;
+  caret-color: rgb(var(--v-theme-on-surface)) !important;
   font-size: 14px !important;
   letter-spacing: 0.02em;
 }
 
 .join-passphrase :deep(.v-field__input) {
-  color: var(--color-text-primary) !important;
+  color: rgb(var(--v-theme-on-surface)) !important;
   min-height: 40px !important;
   padding: 4px 8px !important;
 }
 
 .join-passphrase :deep(.v-label) {
-  color: var(--color-text-muted) !important;
+  color: rgba(var(--v-theme-on-surface), 0.6) !important;
 }
 </style>

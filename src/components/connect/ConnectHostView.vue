@@ -1,21 +1,21 @@
 <template>
   <div class="d-flex justify-center ga-5 mb-4">
-    <v-icon size="28" color="var(--color-text-secondary)">mdi-microsoft-windows</v-icon>
-    <v-icon size="28" color="var(--color-text-secondary)">mdi-apple</v-icon>
-    <v-icon size="28" color="var(--color-text-secondary)">mdi-linux</v-icon>
-    <v-icon size="28" color="var(--color-text-secondary)">mdi-android</v-icon>
-    <v-icon size="28" color="var(--color-text-secondary)">mdi-apple-ios</v-icon>
+    <v-icon size="28" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-microsoft-windows</v-icon>
+    <v-icon size="28" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-apple</v-icon>
+    <v-icon size="28" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-linux</v-icon>
+    <v-icon size="28" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-android</v-icon>
+    <v-icon size="28" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-apple-ios</v-icon>
   </div>
 
   <template v-if="isConnected">
     <div class="d-flex flex-column align-center py-2 ga-2" style="width: 100%">
       <div class="d-flex align-center ga-2">
         <v-icon color="success" size="18">mdi-check-circle</v-icon>
-        <span class="text-body-2 font-weight-bold text-success">{{
+        <span class="text-body-2 font-weight-bold" style="color: rgb(var(--v-theme-success))">{{
           $t('connect.device_linked')
         }}</span>
       </div>
-      <div v-if="peerName" class="text-caption text-zinc-secondary">
+      <div v-if="peerName" class="text-caption text-medium-emphasis">
         {{ $t('connect.connected_to') }} <strong>{{ peerName }}</strong>
       </div>
       <div v-if="syncing" class="w-100">
@@ -27,18 +27,18 @@
             rounded
             class="flex-grow-1"
           />
-          <span class="text-caption text-success font-weight-bold">
+          <span class="text-caption font-weight-bold" style="color: rgb(var(--v-theme-success))">
             {{ itemsCompleted }}/{{ itemsTotal }}
           </span>
         </div>
         <v-progress-linear v-else indeterminate color="success" height="4" class="w-100" />
-        <span class="text-caption text-zinc-muted">{{ $t('connect.syncing') }}</span>
+        <span class="text-caption text-disabled">{{ $t('connect.syncing') }}</span>
       </div>
     </div>
   </template>
 
   <template v-else>
-    <div class="text-caption text-zinc-muted text-center mb-4 px-2" style="max-width: 320px">
+    <div class="text-caption text-disabled text-center mb-4 px-2" style="max-width: 320px">
       {{ $t('connect.host_instructions') }}
     </div>
 
@@ -46,9 +46,9 @@
       <v-chip
         v-for="(word, index) in passphrase"
         :key="index"
-        color="var(--color-bg-zinc-100)"
+        color="rgb(var(--v-theme-surface-light))"
         variant="flat"
-        class="font-weight-medium mx-1 text-zinc-primary border-subtle"
+        class="font-weight-medium mx-1 text-high-emphasis border"
         size="small"
       >
         {{ word }}

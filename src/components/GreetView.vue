@@ -11,7 +11,7 @@ const logoUrl = ref(logo);
 </script>
 
 <template>
-  <v-container class="fill-height pb-16 bg-siegu-white" fluid>
+  <v-container class="fill-height pb-16" fluid>
     <v-row justify="center" align="center">
       <v-col cols="12" sm="10" md="8" lg="6" class="text-center">
         <div class="onboarding-card animate-fade-in">
@@ -19,34 +19,34 @@ const logoUrl = ref(logo);
             <v-img :src="logoUrl"></v-img>
           </v-avatar>
 
-          <h1 class="text-h2 font-weight-black mb-4 tracking-tighter text-zinc-primary">Siegu</h1>
-          <p class="text-subtitle-1 text-zinc-secondary mb-10 max-w-500 mx-auto">
+          <h1 class="text-h2 font-weight-black mb-4 tracking-tighter text-high-emphasis">Siegu</h1>
+          <p class="text-subtitle-1 text-medium-emphasis mb-10 max-w-500 mx-auto">
             {{ $t('onboarding.greet_desc') }}
           </p>
 
           <div class="d-flex flex-column ga-4">
-            <v-card variant="flat" class="siegu-btn py-4 px-6" @click="emit('setup-local')">
+            <v-card variant="flat" color="primary" class="py-4 px-6" style="color: rgb(var(--v-theme-on-primary))" @click="emit('setup-local')">
               <div class="d-flex align-center">
-                <div class="siegu-icon-circle mr-4">
+                <v-avatar color="rgba(255,255,255,0.2)" size="32" class="mr-4">
                   <v-icon>mdi-folder-plus</v-icon>
-                </div>
+                </v-avatar>
                 <div class="text-left">
                   <div class="font-weight-bold">{{ $t('onboarding.setup_local') }}</div>
-                  <div class="text-caption text-zinc-muted">
+                  <div class="text-caption">
                     {{ $t('onboarding.setup_local_desc') }}
                   </div>
                 </div>
               </div>
             </v-card>
 
-            <v-card variant="flat" class="siegu-btn py-4 px-6" @click="emit('setup-sync')">
+            <v-card variant="flat" color="primary" class="py-4 px-6" style="color: rgb(var(--v-theme-on-primary))" @click="emit('setup-sync')">
               <div class="d-flex align-center">
-                <div class="siegu-icon-circle mr-4">
+                <v-avatar color="rgba(255,255,255,0.2)" size="32" class="mr-4">
                   <v-icon>mdi-sync</v-icon>
-                </div>
+                </v-avatar>
                 <div class="text-left">
                   <div class="font-weight-bold">{{ $t('onboarding.join_library') }}</div>
-                  <div class="text-caption text-zinc-muted">
+                  <div class="text-caption">
                     {{ $t('onboarding.join_library_desc') }}
                   </div>
                 </div>
@@ -54,7 +54,7 @@ const logoUrl = ref(logo);
             </v-card>
           </div>
 
-          <div class="text-caption text-zinc-muted px-10 mt-10">
+          <div class="text-caption text-disabled px-10 mt-10">
             {{ $t('onboarding.ai_disclaimer') }}
           </div>
         </div>

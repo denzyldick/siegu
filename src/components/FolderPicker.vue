@@ -5,11 +5,11 @@
         <v-btn icon @click="close" color="primary">
           <v-icon>mdi-close</v-icon>
         </v-btn>
-        <v-toolbar-title class="text-zinc-primary font-weight-bold">{{
+        <v-toolbar-title class="text-high-emphasis font-weight-bold">{{
           $t('folder_picker.select_folder')
         }}</v-toolbar-title>
         <v-spacer></v-spacer>
-        <v-btn variant="flat" @click="selectCurrent" class="siegu-btn px-4 mr-2">
+        <v-btn variant="flat" @click="selectCurrent" class="px-4 mr-2" color="primary">
           {{ $t('folder_picker.select_folder') }}
         </v-btn>
       </v-toolbar>

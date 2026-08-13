@@ -1,12 +1,12 @@
 <template>
-  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
-    <v-card-item class="bg-zinc-100 py-4">
+  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border overflow-hidden">
+    <v-card-item style="background: rgb(var(--v-theme-surface-light))" class="py-4">
       <template v-slot:prepend>
-        <div class="siegu-icon-circle-dark mr-3">
-          <v-icon color="var(--color-text-btn)" size="small">mdi-wrench-outline</v-icon>
-        </div>
+        <v-avatar color="on-surface" size="32" class="mr-3">
+          <v-icon color="surface" size="small">mdi-wrench-outline</v-icon>
+        </v-avatar>
       </template>
-      <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
+      <v-card-title class="text-h6 text-high-emphasis font-weight-bold">{{
         $t('settings.maintenance')
       }}</v-card-title>
     </v-card-item>
@@ -15,10 +15,10 @@
       <v-list lines="two" class="bg-transparent">
         <v-list-item class="px-0">
           <template v-slot:title>
-            <span class="font-weight-bold text-zinc-primary">{{ $t('settings.cleanup_db') }}</span>
+            <span class="font-weight-bold text-high-emphasis">{{ $t('settings.cleanup_db') }}</span>
           </template>
           <template v-slot:subtitle>
-            <span class="text-zinc-secondary">{{ $t('settings.cleanup_db_desc') }}</span>
+            <span class="text-medium-emphasis">{{ $t('settings.cleanup_db_desc') }}</span>
           </template>
           <template v-slot:append>
             <v-btn
@@ -27,7 +27,7 @@
               color="primary"
               @click="cleanupDialog.show = true"
               :loading="isCleaning"
-              class="siegu-btn px-4"
+              class="px-4"
             >
               <v-icon start size="16">mdi-trash-can-outline</v-icon>
               <span class="font-weight-bold">{{ $t('settings.clean') }}</span>
@@ -36,27 +36,31 @@
         </v-list-item>
       </v-list>
 
-      <v-divider class="my-4 border-subtle"></v-divider>
+      <v-divider class="my-4 border"></v-divider>
 
       <div>
-        <div class="text-caption font-weight-bold text-zinc-muted mb-4 tracking-widest uppercase">
+        <div class="text-caption font-weight-bold text-disabled mb-4 tracking-widest uppercase">
           {{ $t('settings.system_logs') }}
         </div>
         <v-sheet
-          color="var(--color-bg-zinc-100)"
-          class="pa-4 rounded-lg overflow-y-auto border-subtle debug-logs-sheet mb-4"
+          color="rgb(var(--v-theme-surface-light))"
+          class="pa-4 rounded-lg overflow-y-auto border debug-logs-sheet mb-4"
           max-height="300"
         >
           <div
             v-for="(log, i) in logs"
             :key="i"
-            :class="log.type === 'error' ? 'text-error' : 'text-zinc-secondary'"
+            :style="
+              log.type === 'error'
+                ? 'color: rgb(var(--v-theme-error))'
+                : 'color: rgba(var(--v-theme-on-surface), 0.7)'
+            "
             class="mb-1"
             style="font-family: monospace; font-size: 11px"
           >
-            <span class="text-zinc-muted">[{{ log.time }}]</span> {{ log.message }}
+            <span class="text-disabled">[{{ log.time }}]</span> {{ log.message }}
           </div>
-          <div v-if="logs.length === 0" class="text-zinc-muted text-center py-4 text-caption">
+          <div v-if="logs.length === 0" class="text-disabled text-center py-4 text-caption">
             {{ $t('settings.no_logs') }}
           </div>
         </v-sheet>

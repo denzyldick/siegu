@@ -1,12 +1,12 @@
 <template>
-  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 overflow-hidden border-subtle">
-    <v-card-item class="bg-zinc-100 py-4">
+  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 overflow-hidden border">
+    <v-card-item style="background: rgb(var(--v-theme-surface-light))" class="py-4">
       <template v-slot:prepend>
-        <div class="siegu-icon-circle-dark mr-3">
-          <v-icon color="var(--color-text-btn)" size="small">mdi-folder-lock</v-icon>
-        </div>
+        <v-avatar color="on-surface" size="32" class="mr-3">
+          <v-icon color="surface" size="small">mdi-folder-lock</v-icon>
+        </v-avatar>
       </template>
-      <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
+      <v-card-title class="text-h6 text-high-emphasis font-weight-bold">{{
         $t('settings.folders')
       }}</v-card-title>
     </v-card-item>
@@ -21,12 +21,12 @@
               class="px-0"
             >
               <template v-slot:prepend>
-                <v-icon color="var(--color-text-muted)" class="mr-2">mdi-folder</v-icon>
+                <v-icon color="rgba(var(--v-theme-on-surface), 0.6)" class="mr-2">mdi-folder</v-icon>
               </template>
-              <v-list-item-title class="text-zinc-primary font-weight-medium text-truncate">{{
+              <v-list-item-title class="text-high-emphasis font-weight-medium text-truncate">{{
                 directory.title
               }}</v-list-item-title>
-              <v-list-item-subtitle class="text-zinc-muted text-caption text-truncate">{{
+              <v-list-item-subtitle class="text-disabled text-caption text-truncate">{{
                 directory.value
               }}</v-list-item-subtitle>
               <template v-slot:append>
@@ -36,11 +36,11 @@
                       icon="mdi-dots-vertical"
                       variant="text"
                       size="small"
-                      color="var(--color-text-muted)"
+                      color="rgba(var(--v-theme-on-surface), 0.6)"
                       v-bind="props"
                     ></v-btn>
                   </template>
-                  <v-list size="small" class="siegu-list">
+                  <v-list size="small">
                     <v-list-item @click="$emit('remove-directory', directory.value)">
                       <v-list-item-title>{{ $t('settings.remove_folder') }}</v-list-item-title>
                     </v-list-item>
@@ -53,32 +53,32 @@
                   </v-list>
                 </v-menu>
               </template>
-              <v-divider v-if="index < directories.length - 1" class="border-subtle"></v-divider>
+              <v-divider v-if="index < directories.length - 1" class="border"></v-divider>
             </v-list-item>
           </v-list>
         </div>
         <div
           v-else
-          class="text-center py-8 text-zinc-muted border border-dashed rounded-lg border-subtle"
+          class="text-center py-8 text-disabled border border-dashed rounded-lg border"
         >
           <div>{{ $t('settings.no_folders') }}</div>
         </div>
       </v-expand-transition>
     </v-card-text>
 
-    <v-card-actions class="pa-4 bg-zinc-50 border-top-subtle">
+    <v-card-actions style="background: rgb(var(--v-theme-surface))" class="pa-4 border-t">
       <v-btn
         variant="flat"
-        theme="dark"
+        color="primary"
         @click="$emit('select-directory')"
         block
         height="48"
-        class="siegu-btn rounded-xl"
+        class="rounded-xl"
       >
         <div class="d-flex align-center">
-          <div class="siegu-icon-circle siegu-icon-circle-sm mr-2">
-            <v-icon size="14" color="var(--color-text-btn)">mdi-folder-plus</v-icon>
-          </div>
+          <v-avatar color="rgba(255,255,255,0.2)" size="22" class="mr-2">
+            <v-icon size="14" color="rgb(var(--v-theme-on-primary))">mdi-folder-plus</v-icon>
+          </v-avatar>
           <span class="font-weight-bold">{{ $t('settings.add_folder') }}</span>
         </div>
       </v-btn>

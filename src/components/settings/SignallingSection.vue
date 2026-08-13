@@ -1,12 +1,12 @@
 <template>
-  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
-    <v-card-item class="bg-zinc-100 py-4">
+  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border overflow-hidden">
+    <v-card-item style="background: rgb(var(--v-theme-surface-light))" class="py-4">
       <template v-slot:prepend>
-        <div class="siegu-icon-circle-dark mr-3">
-          <v-icon color="var(--color-text-btn)" size="small">mdi-signal-variant</v-icon>
-        </div>
+        <v-avatar color="on-surface" size="32" class="mr-3">
+          <v-icon color="surface" size="small">mdi-signal-variant</v-icon>
+        </v-avatar>
       </template>
-      <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
+      <v-card-title class="text-h6 text-high-emphasis font-weight-bold">{{
         $t('settings.signalling')
       }}</v-card-title>
     </v-card-item>
@@ -15,12 +15,12 @@
       <v-list lines="two" class="bg-transparent">
         <v-list-item class="px-0">
           <template v-slot:title>
-            <span class="font-weight-bold text-zinc-primary">{{
+            <span class="font-weight-bold text-high-emphasis">{{
               $t('settings.signalling_url')
             }}</span>
           </template>
           <template v-slot:subtitle>
-            <span class="text-zinc-secondary">{{ $t('settings.signalling_url_desc') }}</span>
+            <span class="text-medium-emphasis">{{ $t('settings.signalling_url_desc') }}</span>
           </template>
         </v-list-item>
       </v-list>
@@ -49,15 +49,23 @@
 
       <div
         v-if="pingResult"
-        class="d-flex align-center pa-3 rounded-lg mb-4 border-subtle"
-        :class="pingResult.ok ? 'bg-green-50' : 'bg-red-50'"
+        class="d-flex align-center pa-3 rounded-lg mb-4 border"
+        :style="
+          pingResult.ok
+            ? 'background: rgba(var(--v-theme-success), 0.12)'
+            : 'background: rgba(var(--v-theme-error), 0.12)'
+        "
       >
         <v-icon size="small" class="mr-2" :color="pingResult.ok ? 'success' : 'error'">
           {{ pingResult.ok ? 'mdi-check-circle-outline' : 'mdi-alert-circle-outline' }}
         </v-icon>
         <span
           class="text-caption font-weight-bold"
-          :class="pingResult.ok ? 'text-success' : 'text-error'"
+          :style="
+            pingResult.ok
+              ? 'color: rgb(var(--v-theme-success))'
+              : 'color: rgb(var(--v-theme-error))'
+          "
         >
           {{ pingResult.message }}
         </span>
@@ -68,7 +76,7 @@
           size="small"
           variant="flat"
           color="primary"
-          class="siegu-btn px-4"
+          class="px-4"
           :loading="testing"
           :disabled="saving"
           @click="$emit('test')"
@@ -80,7 +88,7 @@
           size="small"
           variant="flat"
           color="primary"
-          class="siegu-btn px-4"
+          class="px-4"
           :loading="saving"
           :disabled="testing"
           @click="$emit('save')"
@@ -131,11 +139,4 @@ watch(url, (val) => emit('update:modelValue', val));
 watch(token, (val) => emit('update:token', val));
 </script>
 
-<style scoped>
-.bg-green-50 {
-  background-color: var(--color-success-tint);
-}
-.bg-red-50 {
-  background-color: var(--color-error-tint);
-}
-</style>
+<style scoped></style>

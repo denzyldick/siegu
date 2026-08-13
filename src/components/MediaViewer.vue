@@ -4,12 +4,12 @@
       <v-layout class="fill-height">
         <v-main
           class="fill-height position-relative d-flex flex-column align-center justify-center p-0"
-          style="background-color: var(--color-bg-primary)"
+          style="background-color: rgb(var(--v-theme-background))"
         >
           <v-btn
             icon="mdi-close"
             variant="text"
-            color="var(--color-text-primary)"
+            color="rgb(var(--v-theme-on-surface))"
             class="viewer-nav-btn top-left"
             @click="close"
           ></v-btn>
@@ -17,12 +17,12 @@
             <v-btn
               icon="mdi-dots-vertical"
               variant="text"
-              color="var(--color-text-muted)"
+              color="rgba(var(--v-theme-on-surface), 0.6)"
               class="viewer-nav-btn top-left-more"
               @click="moreMenuOpen = true"
             ></v-btn>
             <v-bottom-sheet v-model="moreMenuOpen">
-              <v-list density="compact" class="siegu-list">
+              <v-list density="compact">
                 <v-list-item
                   v-for="item in moreItems"
                   :key="item.key"
@@ -40,11 +40,11 @@
                 v-bind="menuProps"
                 icon="mdi-dots-vertical"
                 variant="text"
-                color="var(--color-text-muted)"
+                color="rgba(var(--v-theme-on-surface), 0.6)"
                 class="viewer-nav-btn top-left-more"
               ></v-btn>
             </template>
-            <v-list density="compact" class="siegu-list">
+            <v-list density="compact">
               <v-list-item
                 v-for="item in moreItems"
                 :key="item.key"
@@ -59,7 +59,7 @@
             v-if="!isVideo && !showInfo"
             icon="mdi-information-outline"
             variant="text"
-            color="var(--color-text-muted)"
+            color="rgba(var(--v-theme-on-surface), 0.6)"
             class="viewer-nav-btn top-right"
             @click="showInfo = !showInfo"
           ></v-btn>
@@ -78,7 +78,7 @@
               v-if="!isMobile"
               icon="mdi-chevron-left"
               variant="text"
-              color="var(--color-text-primary)"
+              color="rgb(var(--v-theme-on-surface))"
               size="x-large"
               @click="prev"
               class="side-nav-btn left"
@@ -106,7 +106,7 @@
               v-if="!isMobile"
               icon="mdi-chevron-right"
               variant="text"
-              color="var(--color-text-primary)"
+              color="rgb(var(--v-theme-on-surface))"
               size="x-large"
               @click="next"
               class="side-nav-btn right"
@@ -137,11 +137,11 @@
           location="right"
           width="350"
           color="surface"
-          class="border-s border-subtle info-drawer"
+          class="border-s border info-drawer"
           temporary
         >
           <v-toolbar color="transparent" density="compact">
-            <v-toolbar-title class="text-zinc-primary text-subtitle-1 font-weight-bold">{{
+            <v-toolbar-title class="text-high-emphasis text-subtitle-1 font-weight-bold">{{
               $t('media_viewer.metadata')
             }}</v-toolbar-title>
           </v-toolbar>
@@ -161,10 +161,10 @@
               >
                 {{ $t('media_viewer.analyze') }}
               </v-btn>
-              <div v-if="isAnalyzing" class="text-caption text-zinc-muted mt-2 text-center">
+              <div v-if="isAnalyzing" class="text-caption text-disabled mt-2 text-center">
                 <span class="analyzing-dots">{{ $t('media_viewer.analyzing') }}</span>
               </div>
-              <div v-else-if="globalEta" class="text-caption text-zinc-muted mt-2 text-center">
+              <div v-else-if="globalEta" class="text-caption text-disabled mt-2 text-center">
                 {{ $t('media_viewer.library_indexing', { time: formatEta(globalEta) }) }}
               </div>
             </div>
@@ -172,7 +172,7 @@
             <v-divider class="opacity-5 mb-4" v-if="modelChips.length > 0"></v-divider>
 
             <div class="mb-6" v-if="modelChips.length > 0">
-              <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">
+              <div class="text-caption text-disabled mb-3 text-uppercase tracking-widest">
                 {{ $t('media_viewer.run_model') }}
               </div>
               <div v-if="isAnalyzingModel" class="d-flex align-center mb-3">
@@ -180,16 +180,16 @@
                   indeterminate
                   size="16"
                   width="2"
-                  color="var(--color-text-secondary)"
+                  color="rgba(var(--v-theme-on-surface), 0.7)"
                   class="mr-2"
                 ></v-progress-circular>
-                <span class="text-body-2 text-zinc-primary font-weight-bold">
+                <span class="text-body-2 text-high-emphasis font-weight-bold">
                   {{
                     $t('media_viewer.running_model', {
                       model: $t('models.' + isAnalyzingModel + '.title'),
                     })
                   }}
-                  <span class="text-caption text-zinc-muted ml-1"
+                  <span class="text-caption text-disabled ml-1"
                     >({{ formatElapsed(runStartTime, runTimerTick) }})</span
                   >
                 </span>
@@ -199,7 +199,7 @@
                   v-for="m in modelChips"
                   :key="m.id"
                   :variant="m.done ? 'tonal' : 'flat'"
-                  :color="m.done ? 'success' : 'black'"
+                  :color="m.done ? 'success' : 'primary'"
                   size="small"
                   :prepend-icon="m.done ? 'mdi-check-circle-outline' : 'mdi-play-circle-outline'"
                   :disabled="m.done || (isAnalyzingModel !== null && isAnalyzingModel !== m.id)"
@@ -213,14 +213,14 @@
             </div>
 
             <div class="mb-6 pt-4">
-              <div class="text-caption text-zinc-muted mb-1 text-uppercase tracking-widest">
+              <div class="text-caption text-disabled mb-1 text-uppercase tracking-widest">
                 {{ $t('media_viewer.file_details') }}
               </div>
               <div class="d-flex align-start mb-2">
-                <v-icon size="small" color="var(--color-text-muted)" class="mr-2 mt-1"
+                <v-icon size="small" color="rgba(var(--v-theme-on-surface), 0.6)" class="mr-2 mt-1"
                   >mdi-file-document-outline</v-icon
                 >
-                <div class="text-body-2 text-zinc-secondary word-break-all">
+                <div class="text-body-2 text-medium-emphasis word-break-all">
                   {{ currentPhoto?.location }}
                 </div>
               </div>
@@ -229,10 +229,10 @@
             <v-divider class="opacity-5 mb-4"></v-divider>
 
             <div class="mb-6" v-if="currentPhoto?.caption">
-              <div class="text-caption text-zinc-muted mb-1 text-uppercase tracking-widest">
+              <div class="text-caption text-disabled mb-1 text-uppercase tracking-widest">
                 {{ $t('media_viewer.ai_caption') }}
               </div>
-              <div class="text-body-2 text-zinc-primary font-italic">
+              <div class="text-body-2 text-high-emphasis font-italic">
                 "{{ currentPhoto.caption }}"
               </div>
             </div>
@@ -240,10 +240,10 @@
             <v-divider class="opacity-5 mb-4" v-if="currentPhoto?.caption"></v-divider>
 
             <div class="mb-6" v-if="photoOcr && !ocrLoading">
-              <div class="text-caption text-zinc-muted mb-1 text-uppercase tracking-widest">
+              <div class="text-caption text-disabled mb-1 text-uppercase tracking-widest">
                 {{ $t('media_viewer.recognized_text') }}
               </div>
-              <div class="text-body-2 text-zinc-secondary ocr-text">{{ photoOcr }}</div>
+              <div class="text-body-2 text-medium-emphasis ocr-text">{{ photoOcr }}</div>
               <v-btn
                 size="x-small"
                 variant="text"
@@ -259,73 +259,73 @@
             <v-divider class="opacity-5 mb-4" v-if="photoOcr && !ocrLoading && hasExif"></v-divider>
 
             <div class="mb-6" v-if="hasExif">
-              <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">
+              <div class="text-caption text-disabled mb-3 text-uppercase tracking-widest">
                 {{ $t('media_viewer.camera_settings') }}
               </div>
 
               <div class="d-flex align-center mb-4" v-if="exifData.make || exifData.model">
-                <v-icon size="small" color="var(--color-text-muted)" class="mr-2"
+                <v-icon size="small" color="rgba(var(--v-theme-on-surface), 0.6)" class="mr-2"
                   >mdi-camera</v-icon
                 >
-                <span class="text-body-2 text-zinc-secondary"
+                <span class="text-body-2 text-medium-emphasis"
                   >{{ exifData.make }} {{ exifData.model }}</span
                 >
               </div>
 
               <v-row dense>
                 <v-col cols="6" v-if="exifData.date" class="mb-3">
-                  <div class="text-caption text-zinc-muted">
+                  <div class="text-caption text-disabled">
                     {{ $t('media_viewer.date_taken') }}
                   </div>
-                  <div class="text-body-2 text-zinc-secondary">{{ exifData.date }}</div>
+                  <div class="text-body-2 text-medium-emphasis">{{ exifData.date }}</div>
                 </v-col>
                 <v-col cols="6" v-if="exifData.dimensions" class="mb-3">
-                  <div class="text-caption text-zinc-muted">
+                  <div class="text-caption text-disabled">
                     {{ $t('media_viewer.resolution') }}
                   </div>
-                  <div class="text-body-2 text-zinc-secondary">{{ exifData.dimensions }}</div>
+                  <div class="text-body-2 text-medium-emphasis">{{ exifData.dimensions }}</div>
                 </v-col>
                 <v-col cols="6" v-if="exifData.iso" class="mb-3">
-                  <div class="text-caption text-zinc-muted">{{ $t('media_viewer.iso') }}</div>
-                  <div class="text-body-2 text-zinc-secondary">{{ exifData.iso }}</div>
+                  <div class="text-caption text-disabled">{{ $t('media_viewer.iso') }}</div>
+                  <div class="text-body-2 text-medium-emphasis">{{ exifData.iso }}</div>
                 </v-col>
                 <v-col cols="6" v-if="exifData.shutter" class="mb-3">
-                  <div class="text-caption text-zinc-muted">{{ $t('media_viewer.shutter') }}</div>
-                  <div class="text-body-2 text-zinc-secondary">{{ exifData.shutter }}</div>
+                  <div class="text-caption text-disabled">{{ $t('media_viewer.shutter') }}</div>
+                  <div class="text-body-2 text-medium-emphasis">{{ exifData.shutter }}</div>
                 </v-col>
                 <v-col cols="6" v-if="exifData.aperture" class="mb-3">
-                  <div class="text-caption text-zinc-muted">{{ $t('media_viewer.aperture') }}</div>
-                  <div class="text-body-2 text-zinc-secondary">{{ exifData.aperture }}</div>
+                  <div class="text-caption text-disabled">{{ $t('media_viewer.aperture') }}</div>
+                  <div class="text-body-2 text-medium-emphasis">{{ exifData.aperture }}</div>
                 </v-col>
                 <v-col cols="6" v-if="exifData.focalLength" class="mb-3">
-                  <div class="text-caption text-zinc-muted">
+                  <div class="text-caption text-disabled">
                     {{ $t('media_viewer.focal_length') }}
                   </div>
-                  <div class="text-body-2 text-zinc-secondary">{{ exifData.focalLength }}</div>
+                  <div class="text-body-2 text-medium-emphasis">{{ exifData.focalLength }}</div>
                 </v-col>
                 <v-col cols="6" v-if="exifData.lens" class="mb-3">
-                  <div class="text-caption text-zinc-muted">{{ $t('media_viewer.lens') }}</div>
-                  <div class="text-body-2 text-zinc-secondary">{{ exifData.lens }}</div>
+                  <div class="text-caption text-disabled">{{ $t('media_viewer.lens') }}</div>
+                  <div class="text-body-2 text-medium-emphasis">{{ exifData.lens }}</div>
                 </v-col>
                 <v-col cols="6" v-if="exifData.flash" class="mb-3">
-                  <div class="text-caption text-zinc-muted">{{ $t('media_viewer.flash') }}</div>
-                  <div class="text-body-2 text-zinc-secondary">{{ exifData.flash }}</div>
+                  <div class="text-caption text-disabled">{{ $t('media_viewer.flash') }}</div>
+                  <div class="text-body-2 text-medium-emphasis">{{ exifData.flash }}</div>
                 </v-col>
                 <v-col cols="6" v-if="exifData.whiteBalance" class="mb-3">
-                  <div class="text-caption text-zinc-muted">
+                  <div class="text-caption text-disabled">
                     {{ $t('media_viewer.white_balance') }}
                   </div>
-                  <div class="text-body-2 text-zinc-secondary">{{ exifData.whiteBalance }}</div>
+                  <div class="text-body-2 text-medium-emphasis">{{ exifData.whiteBalance }}</div>
                 </v-col>
                 <v-col cols="6" v-if="exifData.meteringMode" class="mb-3">
-                  <div class="text-caption text-zinc-muted">
+                  <div class="text-caption text-disabled">
                     {{ $t('media_viewer.metering_mode') }}
                   </div>
-                  <div class="text-body-2 text-zinc-secondary">{{ exifData.meteringMode }}</div>
+                  <div class="text-body-2 text-medium-emphasis">{{ exifData.meteringMode }}</div>
                 </v-col>
                 <v-col cols="6" v-if="exifData.software" class="mb-3">
-                  <div class="text-caption text-zinc-muted">{{ $t('media_viewer.software') }}</div>
-                  <div class="text-body-2 text-zinc-secondary">{{ exifData.software }}</div>
+                  <div class="text-caption text-disabled">{{ $t('media_viewer.software') }}</div>
+                  <div class="text-body-2 text-medium-emphasis">{{ exifData.software }}</div>
                 </v-col>
               </v-row>
             </div>
@@ -333,12 +333,12 @@
             <v-divider class="opacity-5 mb-4"></v-divider>
 
             <div class="mb-6">
-              <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">
+              <div class="text-caption text-disabled mb-3 text-uppercase tracking-widest">
                 {{ $t('media_viewer.people_in_photo') }}
               </div>
               <div
                 v-if="detectedFaces.length === 0"
-                class="text-body-2 text-zinc-muted font-italic"
+                class="text-body-2 text-disabled font-italic"
               >
                 {{ $t('media_viewer.no_faces') }}
               </div>
@@ -350,11 +350,11 @@
                   @click="goToPerson(face)"
                   style="width: 70px"
                 >
-                  <v-avatar size="56" class="border-subtle mb-1">
+                  <v-avatar size="56" class="border mb-1">
                     <v-img :src="face.encoded ?? ''" cover></v-img>
                   </v-avatar>
                   <div
-                    class="text-caption text-zinc-primary text-truncate text-center w-100 font-weight-bold"
+                    class="text-caption text-high-emphasis text-truncate text-center w-100 font-weight-bold"
                   >
                     {{ face.person_name || $t('media_viewer.unnamed') }}
                   </div>
@@ -365,24 +365,24 @@
             <v-divider class="opacity-5 mb-4"></v-divider>
 
             <div class="mb-6">
-              <div class="text-caption text-zinc-muted mb-3 text-uppercase tracking-widest">
+              <div class="text-caption text-disabled mb-3 text-uppercase tracking-widest">
                 {{ $t('media_viewer.ai_insights') }}
               </div>
 
-              <div v-if="aiTags.length === 0" class="text-body-2 text-zinc-muted font-italic">
+              <div v-if="aiTags.length === 0" class="text-body-2 text-disabled font-italic">
                 {{ $t('media_viewer.no_insights') }}
               </div>
 
               <div v-for="tag in aiTags" :key="tag.name" class="mb-4">
                 <div class="d-flex align-center justify-space-between w-100">
-                  <span class="text-body-2 text-zinc-secondary text-capitalize">{{
+                  <span class="text-body-2 text-medium-emphasis text-capitalize">{{
                     tag.name
                   }}</span>
-                  <span class="text-caption text-zinc-muted">{{ tag.percent }}%</span>
+                  <span class="text-caption text-disabled">{{ tag.percent }}%</span>
                 </div>
                 <v-progress-linear
                   :model-value="tag.percent"
-                  color="var(--color-text-primary)"
+                  color="rgb(var(--v-theme-on-surface))"
                   height="2"
                   rounded
                   class="mt-1 opacity-10"
@@ -397,7 +397,7 @@
           <v-icon
             size="small"
             class="mr-3"
-            :color="snackbar.error ? 'error' : 'var(--color-text-btn)'"
+            :color="snackbar.error ? 'error' : 'rgb(var(--v-theme-on-primary))'"
             >{{ snackbar.error ? 'mdi-alert-circle' : 'mdi-check-circle' }}</v-icon
           >
           <span class="text-body-2">{{ snackbar.text }}</span>
@@ -1051,9 +1051,9 @@ onUnmounted(() => {
 .thumbnail-rail-container {
   width: 100%;
   height: 100px;
-  background: var(--color-bg-rail);
+  background: rgb(var(--v-theme-background));
   backdrop-filter: blur(12px);
-  border-top: 1px solid var(--color-border-subtle);
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   display: flex;
   align-items: center;
   padding: 0 10px;
@@ -1078,7 +1078,7 @@ onUnmounted(() => {
 }
 
 .info-drawer {
-  border-left: 1px solid var(--color-border-subtle);
+  border-left: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   z-index: 3000;
 }
 

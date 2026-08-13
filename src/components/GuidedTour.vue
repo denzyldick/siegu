@@ -4,15 +4,15 @@
     <div class="tour-card" :class="cardPosition" @click.stop>
       <div class="tour-card-inner">
         <v-icon size="32" color="primary" class="mb-3">{{ currentStep.icon }}</v-icon>
-        <h3 class="text-h6 font-weight-bold text-zinc-primary mb-1">
+        <h3 class="text-h6 font-weight-bold text-high-emphasis mb-1">
           {{ $t(currentStep.titleKey) }}
         </h3>
-        <p class="text-body-2 text-zinc-secondary mb-6">{{ $t(currentStep.descKey) }}</p>
+        <p class="text-body-2 text-medium-emphasis mb-6">{{ $t(currentStep.descKey) }}</p>
         <div class="d-flex align-center justify-space-between">
           <v-btn
             variant="text"
             size="small"
-            class="text-zinc-muted font-weight-bold"
+            class="text-disabled font-weight-bold"
             @click="skip"
             >{{ $t('guided_tour.skip') }}</v-btn
           >
@@ -276,7 +276,7 @@ onUnmounted(() => {
   align-self: flex-end;
 }
 .tour-card-inner {
-  background: white;
+  background: rgb(var(--v-theme-surface));
   border-radius: var(--radius-2xl);
   padding: 24px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
@@ -300,11 +300,11 @@ onUnmounted(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--color-text-muted);
+  background: rgba(var(--v-theme-on-surface), 0.6);
   transition: all 0.2s ease;
 }
 .tour-dot--active {
-  background: var(--color-text-primary);
+  background: rgb(var(--v-theme-on-surface));
   transform: scale(1.3);
 }
 @keyframes tourSlideUp {

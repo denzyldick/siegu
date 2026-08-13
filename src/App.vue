@@ -137,7 +137,7 @@ function removeFilterChip(index: number): void {
 </script>
 
 <template>
-  <v-app class="bg-siegu-main">
+  <v-app>
     <template v-if="appStore.isNewInstall">
       <ErrorBoundary>
         <OnboardingFlow />
@@ -147,7 +147,7 @@ function removeFilterChip(index: number): void {
     <template v-else>
       <AppToolbar v-if="currentPage === 'home'" />
 
-      <v-main class="bg-siegu-main">
+      <v-main>
         <ErrorBoundary>
           <div data-tour="photos" class="w-100">
             <div

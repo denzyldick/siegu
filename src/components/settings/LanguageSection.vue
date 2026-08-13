@@ -1,12 +1,12 @@
 <template>
-  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
-    <v-card-item class="bg-zinc-100 py-4">
+  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border overflow-hidden">
+    <v-card-item style="background: rgb(var(--v-theme-surface-light))" class="py-4">
       <template v-slot:prepend>
-        <div class="siegu-icon-circle-dark mr-3">
-          <v-icon color="var(--color-text-btn)" size="small">mdi-translate</v-icon>
-        </div>
+        <v-avatar color="on-surface" size="32" class="mr-3">
+          <v-icon color="surface" size="small">mdi-translate</v-icon>
+        </v-avatar>
       </template>
-      <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
+      <v-card-title class="text-h6 text-high-emphasis font-weight-bold">{{
         $t('language.label')
       }}</v-card-title>
     </v-card-item>
@@ -22,7 +22,7 @@
         hide-details
         flat
         rounded="lg"
-        class="siegu-field"
+
       ></v-select>
     </v-card-text>
   </v-card>

@@ -62,13 +62,13 @@ onUnmounted(() => {
 
 <template>
   <div class="d-flex flex-column ga-3 w-100">
-    <div class="text-caption text-zinc-muted text-center uppercase tracking-widest mb-2">
+    <div class="text-caption text-disabled text-center uppercase tracking-widest mb-2">
       {{ $t('connect.select_device') }}
     </div>
 
     <div v-if="scanning && hosts.length === 0" class="d-flex align-center justify-center py-6 ga-3">
-      <v-progress-circular indeterminate color="var(--color-text-secondary)" size="20" width="2" />
-      <span class="text-caption text-zinc-secondary">{{ $t('connect.searching_network') }}</span>
+      <v-progress-circular indeterminate color="rgba(var(--v-theme-on-surface), 0.7)" size="20" width="2" />
+      <span class="text-caption text-medium-emphasis">{{ $t('connect.searching_network') }}</span>
     </div>
 
     <v-list v-if="hosts.length > 0" density="compact" class="bg-transparent pa-0 w-100">
@@ -77,10 +77,10 @@ onUnmounted(() => {
         :key="`${host.ip}:${host.port}`"
         @click="emit('select', host)"
         rounded="lg"
-        class="mb-1 border-subtle"
+        class="mb-1 border"
       >
         <template v-slot:prepend>
-          <v-icon size="20" color="var(--color-text-secondary)">mdi-laptop</v-icon>
+          <v-icon size="20" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-laptop</v-icon>
         </template>
         <v-list-item-title class="text-body-2 font-weight-medium">{{
           host.name
@@ -92,7 +92,7 @@ onUnmounted(() => {
       </v-list-item>
     </v-list>
 
-    <div v-if="noDevices" class="text-caption text-zinc-muted text-center py-4">
+    <div v-if="noDevices" class="text-caption text-disabled text-center py-4">
       {{ error || $t('connect.no_devices_found') }}
     </div>
   </div>

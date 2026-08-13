@@ -5,16 +5,15 @@
         <v-btn
           v-if="!embedded"
           v-bind="props"
-          color="#000000"
-          theme="dark"
+          color="primary"
           variant="flat"
-          class="siegu-btn px-6"
+          class="px-6"
           height="44"
         >
           <div class="d-flex align-center">
-            <div class="siegu-icon-circle siegu-icon-circle-md mr-3">
-              <v-icon size="14">mdi-plus</v-icon>
-            </div>
+            <v-avatar color="rgba(255,255,255,0.2)" size="32" class="mr-3">
+            <v-icon size="14">mdi-plus</v-icon>
+          </v-avatar>
             <span class="font-weight-bold">{{ $t('devices.add_device') }}</span>
           </div>
         </v-btn>
@@ -22,7 +21,7 @@
 
       <v-card
         v-if="!embedded"
-        class="border-subtle pa-5 text-center bg-siegu-white"
+        class="border pa-5 text-center"
         rounded="xl"
         min-width="350"
         max-width="440"
@@ -31,14 +30,14 @@
           v-if="!confirmDialog && !(started && mode === 'host' && !isConnected)"
           class="d-flex justify-center mb-3"
         >
-          <v-icon size="72" class="connect-illustration" color="var(--color-success)"
+          <v-icon size="72" class="connect-illustration" color="rgb(var(--v-theme-success))"
             >mdi-lan-connect</v-icon
           >
         </div>
 
         <div
           v-if="!confirmDialog && !(started && mode === 'host' && !isConnected)"
-          class="text-h5 font-weight-bold text-zinc-primary mb-2"
+          class="text-h5 font-weight-bold text-high-emphasis mb-2"
         >
           {{ $t('connect.link_device_title') }}
         </div>
@@ -46,7 +45,7 @@
           v-if="
             !confirmDialog && !(started && (mode === 'host' || mode === 'join') && !isConnected)
           "
-          class="text-body-2 text-zinc-secondary mb-6"
+          class="text-body-2 text-medium-emphasis mb-6"
         >
           {{ $t('connect.link_device_desc') }}
         </div>
@@ -54,7 +53,7 @@
           v-if="
             !confirmDialog && !(started && (mode === 'host' || mode === 'join') && !isConnected)
           "
-          class="text-caption text-zinc-muted mb-6 px-2"
+          class="text-caption text-disabled mb-6 px-2"
           style="line-height: 1.5"
         >
           {{ $t('connect.privacy_note') }}
@@ -71,13 +70,13 @@
                 color="primary"
                 variant="flat"
                 height="44"
-                class="siegu-btn px-5 text-none"
+                class="px-5 text-none"
                 @click="confirmStart('host')"
               >
                 <div class="d-flex align-center">
-                  <div class="siegu-icon-circle siegu-icon-circle-sm mr-2">
-                    <v-icon size="14">mdi-laptop</v-icon>
-                  </div>
+                  <v-avatar color="rgba(255,255,255,0.2)" size="28" class="mr-2">
+            <v-icon size="14">mdi-laptop</v-icon>
+          </v-avatar>
                   <span class="font-weight-bold">{{ $t('connect.host') }}</span>
                 </div>
               </v-btn>
@@ -90,13 +89,13 @@
                 color="primary"
                 variant="flat"
                 height="44"
-                class="siegu-btn px-5 text-none"
+                class="px-5 text-none"
                 @click="confirmStart('join')"
               >
                 <div class="d-flex align-center">
-                  <div class="siegu-icon-circle siegu-icon-circle-sm mr-2">
-                    <v-icon size="14">mdi-cellphone-link</v-icon>
-                  </div>
+                  <v-avatar color="rgba(255,255,255,0.2)" size="28" class="mr-2">
+            <v-icon size="14">mdi-cellphone-link</v-icon>
+          </v-avatar>
                   <span class="font-weight-bold">{{ $t('connect.join') }}</span>
                 </div>
               </v-btn>
@@ -105,17 +104,17 @@
         </div>
 
         <div v-if="!started && confirmDialog" class="text-left px-2">
-          <div class="text-body-2 font-weight-bold text-zinc-primary mb-3">
+          <div class="text-body-2 font-weight-bold text-high-emphasis mb-3">
             {{ $t('connect.network_confirm_title') }}
           </div>
-          <div class="text-caption text-zinc-secondary mb-3" style="line-height: 1.5">
+          <div class="text-caption text-medium-emphasis mb-3" style="line-height: 1.5">
             {{ $t('connect.same_network_note') }}
           </div>
           <a
             href="https://siegu.app/waitlist"
             target="_blank"
             class="text-caption font-weight-medium mb-4 d-inline-block"
-            style="color: var(--color-success); text-decoration: none"
+            style="color: rgb(var(--v-theme-success)); text-decoration: none"
           >
             {{ $t('connect.join_waitlist') }} →
           </a>
@@ -125,7 +124,7 @@
             hide-details
             density="compact"
             class="text-caption mb-4"
-            color="var(--color-text-primary)"
+            color="rgb(var(--v-theme-on-surface))"
           />
           <div class="d-flex ga-3">
             <v-btn
@@ -181,17 +180,17 @@
           />
 
           <div v-if="peerList.length > 0" class="text-left px-2 mb-2">
-            <div class="text-caption font-weight-bold text-zinc-secondary mb-1">
+            <div class="text-caption font-weight-bold text-medium-emphasis mb-1">
               {{ $t('devices.connected') }} ({{ peerList.length }})
             </div>
             <div
               v-for="peer in peerList"
               :key="peer.device_id"
-              class="d-flex align-center pa-2 mb-1 rounded bg-zinc-50"
+              style="background: rgb(var(--v-theme-surface))" class="d-flex align-center pa-2 mb-1 rounded"
             >
-              <v-icon size="14" class="mr-2 text-zinc-secondary">mdi-laptop</v-icon>
-              <span class="text-body-2 text-zinc-primary font-weight-medium">{{ peer.name }}</span>
-              <span class="text-caption text-zinc-secondary ml-2">{{ peer.os }}</span>
+              <v-icon size="14" class="mr-2 text-medium-emphasis">mdi-laptop</v-icon>
+              <span class="text-body-2 text-high-emphasis font-weight-medium">{{ peer.name }}</span>
+              <span class="text-caption text-medium-emphasis ml-2">{{ peer.os }}</span>
             </div>
           </div>
 
@@ -215,13 +214,13 @@
               color="primary"
               variant="flat"
               height="56"
-              class="siegu-btn px-6 text-none flex-1"
+              class="px-6 text-none flex-1"
               @click="start('host')"
             >
               <div class="d-flex align-center">
-                <div class="siegu-icon-circle siegu-icon-circle-md mr-2">
-                  <v-icon size="16">mdi-laptop</v-icon>
-                </div>
+                <v-avatar color="rgba(255,255,255,0.2)" size="32" class="mr-2">
+            <v-icon size="16">mdi-laptop</v-icon>
+          </v-avatar>
                 <span class="font-weight-bold">{{ $t('connect.host') }}</span>
               </div>
             </v-btn>
@@ -234,13 +233,13 @@
               color="primary"
               variant="flat"
               height="56"
-              class="siegu-btn px-6 text-none flex-1"
+              class="px-6 text-none flex-1"
               @click="start('join')"
             >
               <div class="d-flex align-center">
-                <div class="siegu-icon-circle siegu-icon-circle-md mr-2">
-                  <v-icon size="16">mdi-cellphone-link</v-icon>
-                </div>
+                <v-avatar color="rgba(255,255,255,0.2)" size="32" class="mr-2">
+            <v-icon size="16">mdi-cellphone-link</v-icon>
+          </v-avatar>
                 <span class="font-weight-bold">{{ $t('connect.join') }}</span>
               </div>
             </v-btn>
@@ -282,25 +281,25 @@
         />
 
         <div v-if="peerList.length > 0" class="text-left px-2 mb-2">
-          <div class="text-caption font-weight-bold text-zinc-secondary mb-1">
+          <div class="text-caption font-weight-bold text-medium-emphasis mb-1">
             {{ $t('devices.connected') }} ({{ peerList.length }})
           </div>
           <div
             v-for="peer in peerList"
             :key="peer.device_id"
-            class="d-flex align-center pa-2 mb-1 rounded bg-zinc-50"
+            style="background: rgb(var(--v-theme-surface))" class="d-flex align-center pa-2 mb-1 rounded"
           >
-            <v-icon size="14" class="mr-2 text-zinc-secondary">mdi-laptop</v-icon>
-            <span class="text-body-2 text-zinc-primary font-weight-medium">{{ peer.name }}</span>
-            <span class="text-caption text-zinc-secondary ml-2">{{ peer.os }}</span>
+            <v-icon size="14" class="mr-2 text-medium-emphasis">mdi-laptop</v-icon>
+            <span class="text-body-2 text-high-emphasis font-weight-medium">{{ peer.name }}</span>
+            <span class="text-caption text-medium-emphasis ml-2">{{ peer.os }}</span>
           </div>
         </div>
 
-        <div class="text-caption text-zinc-muted mb-1 text-center py-2" v-if="connectionStatus">
+        <div class="text-caption text-disabled mb-1 text-center py-2" v-if="connectionStatus">
           <v-progress-circular
             v-if="!isConnected"
             indeterminate
-            color="var(--color-text-secondary)"
+            color="rgba(var(--v-theme-on-surface), 0.7)"
             size="16"
             width="2"
             class="mr-2 opacity-50"

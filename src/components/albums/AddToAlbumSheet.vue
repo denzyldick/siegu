@@ -2,7 +2,7 @@
   <v-bottom-sheet v-model="visible">
     <v-card class="rounded-t-xl pa-4" color="surface">
       <div class="d-flex align-center px-2 mb-2">
-        <h3 class="text-h6 font-weight-bold text-zinc-primary">
+        <h3 class="text-h6 font-weight-bold text-high-emphasis">
           {{ $t('albums.add_to_album') }}
         </h3>
         <v-spacer></v-spacer>
@@ -26,7 +26,7 @@
           color="primary"
           :loading="creating"
           :disabled="!newName.trim()"
-          class="siegu-btn-modern"
+          class=""
           @click="createAndAdd"
         >
           <v-icon start size="18">mdi-plus</v-icon>
@@ -34,7 +34,7 @@
         </v-btn>
       </div>
 
-      <v-list density="compact" class="siegu-list" v-if="albums.length > 0">
+      <v-list density="compact" v-if="albums.length > 0">
         <v-list-item
           v-for="album in albums"
           :key="album.id"
@@ -43,11 +43,11 @@
         >
           <v-list-item-title>{{ album.name }}</v-list-item-title>
           <template v-slot:append>
-            <v-icon size="20" color="var(--color-text-secondary)">mdi-plus-circle-outline</v-icon>
+            <v-icon size="20" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-plus-circle-outline</v-icon>
           </template>
         </v-list-item>
       </v-list>
-      <p v-else class="text-caption text-zinc-muted px-2">{{ $t('albums.no_albums_yet') }}</p>
+      <p v-else class="text-caption text-disabled px-2">{{ $t('albums.no_albums_yet') }}</p>
     </v-card>
   </v-bottom-sheet>
 </template>

@@ -30,9 +30,9 @@ const displayEta = computed(() => {
               indeterminate
               size="16"
               width="2"
-              color="var(--color-text-secondary)"
+              color="rgba(var(--v-theme-on-surface), 0.7)"
             />
-            <div class="text-caption font-weight-bold text-zinc-primary text-truncate">
+            <div class="text-caption font-weight-bold text-high-emphasis text-truncate">
               <template v-if="scanStore.stoppedMessage">
                 <span>{{ t('sync.stopped_resume') }}</span>
               </template>
@@ -41,7 +41,7 @@ const displayEta = computed(() => {
               </template>
               <template v-else-if="scanStore.status === 'indexing' || scanStore.indexingCount > 0">
                 <span>{{ t('sync.indexing') }}: </span>
-                <span class="text-zinc-muted font-weight-regular">
+                <span class="text-disabled font-weight-regular">
                   {{
                     t('sync.jobs_left', {
                       count: normalizeIndexingCount(scanStore.indexingCount).toLocaleString(),
@@ -54,13 +54,13 @@ const displayEta = computed(() => {
           <div class="d-flex align-center ga-3 flex-shrink-0">
             <span
               v-if="displayEta && !scanStore.stoppedMessage"
-              class="text-caption text-zinc-muted"
+              class="text-caption text-disabled"
             >
               ~{{ displayEta }}
             </span>
             <span
               v-else-if="scanStore.indexingCount > 0 && !scanStore.stoppedMessage"
-              class="text-caption text-zinc-muted"
+              class="text-caption text-disabled"
             >
               {{
                 t('sync.jobs_left', {
@@ -91,8 +91,8 @@ const displayEta = computed(() => {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: var(--color-bg-primary);
-  border-bottom: 1px solid var(--color-border-subtle);
+  background: rgb(var(--v-theme-background));
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 
 .progress-banner-inner {

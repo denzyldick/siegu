@@ -32,7 +32,7 @@ const formattedCount = computed(() =>
         v-if="indexingCount === 0"
         variant="flat"
         color="primary"
-        class="siegu-btn-modern"
+        class=""
         prepend-icon="mdi-face-recognition"
         @click="emit('startIndexing')"
       >
@@ -43,9 +43,9 @@ const formattedCount = computed(() =>
           indeterminate
           size="16"
           width="2"
-          color="var(--color-text-primary)"
+          color="rgb(var(--v-theme-on-surface))"
         ></v-progress-circular>
-        <span class="text-caption text-zinc-muted">
+        <span class="text-caption text-disabled">
           {{ t('people.indexing_remaining', { count: formattedCount }) }}
         </span>
       </div>

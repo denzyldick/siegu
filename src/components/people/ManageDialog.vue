@@ -51,10 +51,10 @@ function handleMerge(): void {
     transition="scale-transition"
     @update:model-value="(v: boolean) => emit('update:modelValue', v)"
   >
-    <v-card class="rounded-xl pa-2 elevation-24 overflow-hidden border-subtle" color="surface">
+    <v-card class="rounded-xl pa-2 elevation-24 overflow-hidden border" color="surface">
       <div class="pa-6">
         <div class="d-flex align-center justify-space-between mb-6">
-          <h3 class="text-h5 font-weight-black text-zinc-primary">
+          <h3 class="text-h5 font-weight-black text-high-emphasis">
             {{ $t('people.profile_actions') }}
           </h3>
           <v-btn
@@ -67,11 +67,11 @@ function handleMerge(): void {
 
         <v-tabs
           v-model="manageTab"
-          bg-color="var(--color-bg-zinc-100)"
-          color="var(--color-text-primary)"
+          bg-color="rgb(var(--v-theme-surface-light))"
+          color="rgb(var(--v-theme-on-surface))"
           grow
           mandatory
-          class="rounded-xl mb-8 p-1 border-subtle"
+          class="rounded-xl mb-8 p-1 border"
         >
           <v-tab value="rename" class="rounded-lg text-none font-weight-bold">{{
             $t('people.rename')
@@ -83,7 +83,7 @@ function handleMerge(): void {
 
         <v-window v-model="manageTab" class="py-2">
           <v-window-item value="rename">
-            <label class="text-caption font-weight-bold text-zinc-muted mb-2 d-block px-1">{{
+            <label class="text-caption font-weight-bold text-disabled mb-2 d-block px-1">{{
               $t('people.new_name_for', { name: activePerson?.name })
             }}</label>
             <v-text-field
@@ -99,7 +99,7 @@ function handleMerge(): void {
               block
               size="x-large"
               variant="flat"
-              class="siegu-btn rounded-xl text-none font-weight-bold py-7 shadow-lg"
+              class="rounded-xl text-none font-weight-bold py-7 shadow-lg" color="primary"
               @click="handleRename"
             >
               {{ $t('people.update_name') }}
@@ -108,12 +108,16 @@ function handleMerge(): void {
 
           <v-window-item value="merge">
             <div
-              class="bg-amber-50 rounded-xl pa-4 mb-8 d-flex align-start ga-3 border-amber-subtle"
+              style="
+                background: rgba(var(--v-theme-warning), 0.12);
+                border: 1px solid rgba(var(--v-theme-warning), 0.3);
+              "
+              class="rounded-xl pa-4 mb-8 d-flex align-start ga-3"
             >
-              <v-icon color="var(--color-warning-strong)" size="20" class="mt-1"
+              <v-icon color="rgb(var(--v-theme-warning))" size="20" class="mt-1"
                 >mdi-alert-circle-outline</v-icon
               >
-              <div class="text-body-2 text-warning font-weight-medium">
+              <div style="color: rgb(var(--v-theme-warning))" class="font-weight-medium text-body-2">
                 <span>{{ $t('people.merge_desc', { name: activePerson?.name }) }}</span>
               </div>
             </div>
@@ -134,7 +138,7 @@ function handleMerge(): void {
               block
               size="x-large"
               variant="flat"
-              class="siegu-btn rounded-xl text-none font-weight-bold py-7 shadow-sm"
+              class="rounded-xl text-none font-weight-bold py-7 shadow-sm" color="primary"
               :disabled="!mergeTargetId"
               @click="handleMerge"
             >
@@ -150,15 +154,9 @@ function handleMerge(): void {
 <style scoped>
 .name-field-modern :deep(.v-field) {
   border-radius: var(--radius-md) !important;
-  background: var(--color-bg-field) !important;
+  background: rgb(var(--v-theme-surface-light)) !important;
 }
 .name-field-modern :deep(.v-field__outline) {
   --v-field-border-opacity: 0.15 !important;
-}
-.bg-amber-50 {
-  background-color: var(--color-warning-tint) !important;
-}
-.border-amber-subtle {
-  border: 1px solid var(--color-warning-border) !important;
 }
 </style>

@@ -12,11 +12,11 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="text-caption text-zinc-muted mb-1 text-center py-2" v-if="status">
+  <div class="text-caption text-disabled mb-1 text-center py-2" v-if="status">
     <v-progress-circular
       v-if="!isConnected && status !== $t('connect.disconnected')"
       indeterminate
-      color="var(--color-text-secondary)"
+      color="rgba(var(--v-theme-on-surface), 0.7)"
       size="16"
       width="2"
       class="mr-2 opacity-50"

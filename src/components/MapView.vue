@@ -5,11 +5,11 @@
       <div
         class="d-flex flex-column align-center justify-center h-100 px-6 text-center animate-fade-in"
       >
-        <v-icon size="48" color="var(--color-text-secondary)" class="mb-4"
+        <v-icon size="48" color="rgba(var(--v-theme-on-surface), 0.7)" class="mb-4"
           >mdi-map-marker-off-outline</v-icon
         >
-        <div class="text-h6 text-zinc-secondary font-weight-bold">{{ $t('map.no_photos') }}</div>
-        <p class="text-body-2 text-zinc-muted mt-1 max-w-400">{{ $t('map.no_photos_desc') }}</p>
+        <div class="text-h6 text-medium-emphasis font-weight-bold">{{ $t('map.no_photos') }}</div>
+        <p class="text-body-2 text-disabled mt-1 max-w-400">{{ $t('map.no_photos_desc') }}</p>
       </div>
     </div>
 
@@ -18,7 +18,7 @@
       <div class="d-flex flex-column align-center justify-center h-100">
         <v-progress-circular
           indeterminate
-          color="var(--color-text-secondary)"
+          color="rgba(var(--v-theme-on-surface), 0.7)"
           size="32"
           width="3"
         ></v-progress-circular>
@@ -31,7 +31,7 @@
       @ready="onMapReady"
       :minZoom="2"
       :options="{ zoomControl: false, attributionControl: false, preferCanvas: true }"
-      style="height: 100%; width: 100%; background: var(--color-bg-zinc-100)"
+      style="height: 100%; width: 100%; background: rgb(var(--v-theme-surface-light))"
       class="light-map"
     >
       <l-tile-layer
@@ -198,7 +198,7 @@ async function loadMapData() {
     for (const p of mapPoints.value) {
       const marker = L.circleMarker([p.latitude, p.longitude], {
         radius: 5,
-        fillColor: 'var(--color-info)',
+        fillColor: 'rgb(var(--v-theme-info))',
         color: '#ffffff',
         weight: 1.5,
         opacity: 0.9,
@@ -296,7 +296,7 @@ watch(currentPhotoIndex, (idx) => {
 <style scoped>
 :deep(.leaflet-container) {
   height: 100%;
-  background: var(--color-bg-zinc-100);
+  background: rgb(var(--v-theme-surface-light));
 }
 
 .map-empty-state {
@@ -305,7 +305,7 @@ watch(currentPhotoIndex, (idx) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: color-mix(in srgb, var(--color-bg-primary) 70%, transparent);
+  background: color-mix(in srgb, rgb(var(--v-theme-background)) 70%, transparent);
   backdrop-filter: blur(4px);
   z-index: 1001;
   pointer-events: none;
@@ -350,20 +350,20 @@ watch(currentPhotoIndex, (idx) => {
 :deep(.cluster-sm) {
   width: 40px;
   height: 40px;
-  background: color-mix(in srgb, var(--color-info) 70%, transparent);
+  background: color-mix(in srgb, rgb(var(--v-theme-info)) 70%, transparent);
 }
 
 :deep(.cluster-md) {
   width: 44px;
   height: 44px;
-  background: color-mix(in srgb, var(--color-info) 80%, transparent);
+  background: color-mix(in srgb, rgb(var(--v-theme-info)) 80%, transparent);
   font-size: 14px;
 }
 
 :deep(.cluster-lg) {
   width: 48px;
   height: 48px;
-  background: color-mix(in srgb, var(--color-info) 90%, transparent);
+  background: color-mix(in srgb, rgb(var(--v-theme-info)) 90%, transparent);
   font-size: 15px;
 }
 
@@ -375,7 +375,7 @@ watch(currentPhotoIndex, (idx) => {
 :deep(.thumb-loading) {
   width: 120px;
   height: 120px;
-  background: var(--color-bg-zinc-100);
+  background: rgb(var(--v-theme-surface-light));
   border-radius: var(--radius-sm);
   animation: pulse 1.5s ease-in-out infinite;
 }

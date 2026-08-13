@@ -1,12 +1,12 @@
 <template>
-  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 overflow-hidden border-subtle">
-    <v-card-item class="bg-zinc-100 py-4">
+  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 overflow-hidden border">
+    <v-card-item style="background: rgb(var(--v-theme-surface-light))" class="py-4">
       <template v-slot:prepend>
-        <div class="siegu-icon-circle-dark mr-3">
-          <v-icon color="var(--color-text-btn)" size="small">mdi-update</v-icon>
-        </div>
+        <v-avatar color="on-surface" size="32" class="mr-3">
+          <v-icon color="surface" size="small">mdi-update</v-icon>
+        </v-avatar>
       </template>
-      <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
+      <v-card-title class="text-h6 text-high-emphasis font-weight-bold">{{
         $t('update_title')
       }}</v-card-title>
     </v-card-item>
@@ -14,10 +14,10 @@
       <v-list lines="two" class="bg-transparent">
         <v-list-item class="px-0">
           <template v-slot:title>
-            <span class="font-weight-bold text-zinc-primary">{{ $t('update_desc') }}</span>
+            <span class="font-weight-bold text-high-emphasis">{{ $t('update_desc') }}</span>
           </template>
           <template v-slot:subtitle>
-            <span class="text-zinc-secondary">{{
+            <span class="text-medium-emphasis">{{
               supported ? statusText : $t('update_not_supported')
             }}</span>
           </template>
@@ -25,16 +25,16 @@
             <v-btn
               size="small"
               variant="flat"
-              theme="dark"
+              color="primary"
               :loading="status === 'checking'"
               :disabled="!supported || status === 'downloading'"
               @click="status === 'available' ? $emit('download-update') : $emit('check-update')"
-              class="siegu-btn px-4"
+              class="px-4"
             >
               <div class="d-flex align-center">
-                <div class="siegu-icon-circle siegu-icon-circle-md mr-3">
-                  <v-icon color="var(--color-text-btn)" size="small">{{ btnIcon }}</v-icon>
-                </div>
+                <v-avatar color="rgba(255,255,255,0.2)" size="32" class="mr-3">
+                  <v-icon color="surface" size="small">{{ btnIcon }}</v-icon>
+                </v-avatar>
                 <span class="font-weight-bold">{{ btnText }}</span>
               </div>
             </v-btn>

@@ -4,23 +4,23 @@
       <div v-if="selectedIds.size > 0" class="bulk-toolbar-container">
         <v-sheet
           class="bulk-toolbar d-flex align-center px-6 py-3 rounded-pill shadow-xl"
-          color="var(--color-bg-btn)"
+          color="rgb(var(--v-theme-primary))"
         >
           <v-btn
             icon="mdi-close"
             variant="text"
             density="comfortable"
-            color="var(--color-text-btn)"
+            color="rgb(var(--v-theme-on-primary))"
             @click="clearSelection"
           ></v-btn>
           <div class="ml-4">
-            <div class="text-subtitle-2 font-weight-bold" style="color: var(--color-text-btn)">
+            <div class="text-subtitle-2 font-weight-bold" style="color: rgb(var(--v-theme-on-primary))">
               {{ $t('media.items_selected', { count: selectedIds.size }) }}
             </div>
           </div>
           <v-spacer></v-spacer>
           <div class="d-flex ga-2">
-            <v-btn variant="flat" class="siegu-btn-modern px-6" size="small" @click="bulkFavorite">
+            <v-btn variant="flat" class="px-6" size="small" @click="bulkFavorite">
               <v-icon size="16" class="mr-2">mdi-heart</v-icon>
               <span>{{ $t('media.favorite') }}</span>
             </v-btn>
@@ -28,7 +28,7 @@
               variant="flat"
               color="rgba(var(--v-theme-on-primary), 0.1)"
               class="px-6 rounded-xl text-none font-weight-bold"
-              style="color: var(--color-text-btn)"
+              style="color: rgb(var(--v-theme-on-primary))"
               size="small"
               @click="addToAlbumOpen = true"
             >
@@ -39,7 +39,7 @@
               variant="flat"
               color="rgba(var(--v-theme-on-primary), 0.1)"
               class="px-6 rounded-xl text-none font-weight-bold"
-              style="color: var(--color-text-btn)"
+              style="color: rgb(var(--v-theme-on-primary))"
               size="small"
               @click="bulkRemove"
             >
@@ -62,12 +62,12 @@
       <DynamicScrollerItem :item="item" :active="active">
         <div v-if="item.type === 'header'" class="month-header mb-3">
           <div class="d-flex align-center px-2 py-3 rounded-lg header-blur">
-            <h2 class="text-h5 font-weight-bold text-zinc-primary letter-spacing-tight">
+            <h2 class="text-h5 font-weight-bold text-high-emphasis letter-spacing-tight">
               {{ item.name }}
             </h2>
             <v-spacer></v-spacer>
             <span
-              class="text-caption text-zinc-muted font-weight-medium bg-zinc-100 px-3 py-1 rounded-pill border-subtle"
+              class="text-caption text-disabled font-weight-medium px-3 py-1 rounded-pill border" style="background: rgb(var(--v-theme-surface-light))"
             >
               {{ $t('media.items_count', { count: item.count }) }}
             </span>
@@ -93,12 +93,12 @@
       <div v-for="item in virtualItems" :key="item.key">
         <div v-if="item.type === 'header'" class="month-header mb-3">
           <div class="d-flex align-center px-2 py-3 rounded-lg header-blur">
-            <h2 class="text-h5 font-weight-bold text-zinc-primary letter-spacing-tight">
+            <h2 class="text-h5 font-weight-bold text-high-emphasis letter-spacing-tight">
               {{ item.name }}
             </h2>
             <v-spacer></v-spacer>
             <span
-              class="text-caption text-zinc-muted font-weight-medium bg-zinc-100 px-3 py-1 rounded-pill border-subtle"
+              class="text-caption text-disabled font-weight-medium px-3 py-1 rounded-pill border" style="background: rgb(var(--v-theme-surface-light))"
             >
               {{ $t('media.items_count', { count: item.count }) }}
             </span>
@@ -126,17 +126,17 @@
     >
       <div class="empty-state-icon mb-6">
         <template v-if="searchQuery">
-          <v-icon size="80" color="var(--color-icon-empty)">mdi-text-search-variant</v-icon>
+          <v-icon size="80" color="rgba(var(--v-theme-on-surface), 0.25)">mdi-text-search-variant</v-icon>
         </template>
         <template v-else-if="filters.favoritesOnly">
-          <v-icon size="80" color="var(--color-error-tint)">mdi-heart-multiple</v-icon>
+          <v-icon size="80" color="rgba(var(--v-theme-error), 0.12)">mdi-heart-multiple</v-icon>
         </template>
         <template v-else>
-          <v-icon size="80" color="var(--color-icon-empty)">mdi-image-multiple-outline</v-icon>
+          <v-icon size="80" color="rgba(var(--v-theme-on-surface), 0.25)">mdi-image-multiple-outline</v-icon>
         </template>
       </div>
 
-      <h3 class="text-h5 font-weight-bold text-zinc-primary mb-2">
+      <h3 class="text-h5 font-weight-bold text-high-emphasis mb-2">
         {{
           searchQuery
             ? $t('media.no_results')
@@ -145,7 +145,7 @@
               : $t('media.your_library_empty')
         }}
       </h3>
-      <p class="text-body-1 text-zinc-secondary max-w-400 mx-auto mb-8">
+      <p class="text-body-1 text-medium-emphasis max-w-400 mx-auto mb-8">
         {{
           searchQuery
             ? $t('media.no_results_for', { query: searchQuery })
@@ -158,7 +158,7 @@
       <v-btn
         v-if="searchQuery"
         variant="flat"
-        class="siegu-btn-modern px-8 py-6"
+        class="px-8 py-6" color="primary"
         @click="$emit('clear-search')"
       >
         {{ $t('media.clear_search') }}
@@ -172,20 +172,19 @@
         <div v-if="loading" class="d-flex flex-column align-center">
           <v-progress-circular
             indeterminate
-            color="var(--color-text-primary)"
+            color="rgb(var(--v-theme-on-surface))"
             size="32"
             width="3"
           ></v-progress-circular>
           <span
-            class="mt-4 text-caption text-zinc-muted font-weight-medium tracking-widest text-uppercase"
+            class="mt-4 text-caption text-disabled font-weight-medium tracking-widest text-uppercase"
             >{{ $t('media.loading_memories') }}</span
           >
         </div>
         <v-btn
           v-else-if="!allLoaded && groups.length > 0"
           @click="loadFiles"
-          variant="flat"
-          class="siegu-btn-outline px-10 py-6"
+          variant="outlined" class="px-10 py-6"
         >
           {{ $t('media.load_more') }}
         </v-btn>
@@ -712,17 +711,13 @@ onUnmounted(() => {
 }
 
 .header-blur {
-  background: color-mix(in srgb, var(--color-bg-primary) 80%, transparent);
+  background: color-mix(in srgb, rgb(var(--v-theme-background)) 80%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
 
 .letter-spacing-tight {
   letter-spacing: -0.02em;
-}
-
-.bg-zinc-100 {
-  background-color: var(--color-bg-zinc-100);
 }
 
 .bulk-toolbar-container {
@@ -742,24 +737,6 @@ onUnmounted(() => {
   box-shadow:
     0 20px 25px -5px rgba(0, 0, 0, 0.1),
     0 10px 10px -5px rgba(0, 0, 0, 0.04);
-}
-
-.siegu-btn-modern {
-  background: var(--color-bg-btn);
-  color: var(--color-text-btn);
-  border-radius: var(--radius-md);
-  text-transform: none;
-  font-weight: 700;
-  box-shadow: var(--shadow-md);
-}
-
-.siegu-btn-outline {
-  background: var(--color-bg-surface);
-  color: var(--color-text-primary);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-md);
-  text-transform: none;
-  font-weight: 600;
 }
 
 .empty-state-container {

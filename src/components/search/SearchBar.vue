@@ -409,7 +409,7 @@ function iconForFilter(type: string): string {
 <template>
   <div ref="searchWrapRef" class="search-wrapper">
     <div class="search-field" data-tour="search" @click="openDropdown">
-      <v-icon size="20" class="search-icon" color="var(--color-text-secondary)">mdi-magnify</v-icon>
+      <v-icon size="20" class="search-icon" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-magnify</v-icon>
       <input
         v-model="searchStore.query"
         class="search-input"
@@ -420,7 +420,7 @@ function iconForFilter(type: string): string {
       <v-icon
         v-if="searchStore.query || searchStore.hasFilters"
         size="18"
-        color="var(--color-text-secondary)"
+        color="rgba(var(--v-theme-on-surface), 0.7)"
         class="cursor-pointer"
         @click.stop="clearAll"
       >
@@ -439,10 +439,10 @@ function iconForFilter(type: string): string {
           <template v-if="!q">
             <div class="discover-header">
               <div>
-                <div class="text-overline font-weight-black text-zinc-muted mb-1">
+                <div class="text-overline font-weight-black text-disabled mb-1">
                   {{ t('search.discover') }}
                 </div>
-                <div class="text-h6 font-weight-bold text-zinc-primary">
+                <div class="text-h6 font-weight-bold text-high-emphasis">
                   {{ t('search.discover_title') }}
                 </div>
               </div>
@@ -450,7 +450,7 @@ function iconForFilter(type: string): string {
 
             <!-- Magic toggles -->
             <div v-edge-scroll class="magic-grid">
-              <button
+              <v-btn
                 class="magic-card"
                 :class="{ 'magic-card--active': isMediaActive('favoritesOnly') }"
                 @click="toggleMedia('favorites')"
@@ -460,8 +460,8 @@ function iconForFilter(type: string): string {
                 </div>
                 <div class="magic-label">{{ t('search.magic.favorites') }}</div>
                 <div class="magic-count">{{ activeCount('favorites') }}</div>
-              </button>
-              <button
+              </v-btn>
+              <v-btn
                 class="magic-card"
                 :class="{ 'magic-card--active': isMediaActive('videosOnly') }"
                 @click="toggleMedia('videos')"
@@ -471,8 +471,8 @@ function iconForFilter(type: string): string {
                 </div>
                 <div class="magic-label">{{ t('search.magic.videos') }}</div>
                 <div class="magic-count">{{ activeCount('videos') }}</div>
-              </button>
-              <button
+              </v-btn>
+              <v-btn
                 class="magic-card"
                 :class="{ 'magic-card--active': isMediaActive('facesOnly') }"
                 @click="toggleMedia('faces')"
@@ -482,8 +482,8 @@ function iconForFilter(type: string): string {
                 </div>
                 <div class="magic-label">{{ t('search.magic.faces') }}</div>
                 <div class="magic-count">{{ activeCount('faces') }}</div>
-              </button>
-              <button
+              </v-btn>
+              <v-btn
                 class="magic-card"
                 :class="{ 'magic-card--active': isMediaActive('papersOnly') }"
                 @click="toggleMedia('papers')"
@@ -493,8 +493,8 @@ function iconForFilter(type: string): string {
                 </div>
                 <div class="magic-label">{{ t('search.magic.papers') }}</div>
                 <div class="magic-count">{{ activeCount('papers') }}</div>
-              </button>
-              <button
+              </v-btn>
+              <v-btn
                 v-if="activeCount('nsfw') > 0"
                 class="magic-card"
                 :class="{ 'magic-card--active': isMediaActive('nsfwOnly') }"
@@ -505,23 +505,23 @@ function iconForFilter(type: string): string {
                 </div>
                 <div class="magic-label">{{ t('search.magic.nsfw') }}</div>
                 <div class="magic-count">{{ activeCount('nsfw') }}</div>
-              </button>
-              <button class="magic-card" @click="surpriseMe">
+              </v-btn>
+              <v-btn class="magic-card" @click="surpriseMe">
                 <div class="magic-icon" style="--magic: var(--color-brand-surprise)">
                   <v-icon size="20">mdi-dice-multiple</v-icon>
                 </div>
                 <div class="magic-label">{{ t('search.magic.surprise') }}</div>
                 <div class="magic-count">?</div>
-              </button>
+              </v-btn>
             </div>
 
             <!-- Recent searches -->
             <div v-if="recentSearches.length" class="discover-section">
               <div class="section-header">
-                <span class="text-overline text-zinc-muted">{{ t('search.recent') }}</span>
+                <span class="text-overline text-disabled">{{ t('search.recent') }}</span>
               </div>
               <div class="recent-row">
-                <button
+                <v-btn
                   v-for="term in recentSearches"
                   :key="term"
                   class="recent-chip"
@@ -529,14 +529,14 @@ function iconForFilter(type: string): string {
                 >
                   <v-icon size="14" class="mr-1">mdi-history</v-icon>
                   <span class="ellipsis">{{ term }}</span>
-                </button>
+                </v-btn>
               </div>
             </div>
 
             <!-- Best shots rail -->
             <div v-if="bestPhotos.length" class="discover-section">
               <div class="section-header">
-                <span class="text-overline text-zinc-muted">{{ t('search.best_shots') }}</span>
+                <span class="text-overline text-disabled">{{ t('search.best_shots') }}</span>
                 <span class="section-count">{{ bestPhotos.length }}</span>
               </div>
               <div v-edge-scroll class="rail">
@@ -564,7 +564,7 @@ function iconForFilter(type: string): string {
             <!-- People rail -->
             <div v-if="peopleRow.length" class="discover-section">
               <div class="section-header">
-                <span class="text-overline text-zinc-muted">{{ t('search.people') }}</span>
+                <span class="text-overline text-disabled">{{ t('search.people') }}</span>
                 <span class="section-count">{{ peopleRow.length }}</span>
               </div>
               <div v-edge-scroll class="rail">
@@ -596,7 +596,7 @@ function iconForFilter(type: string): string {
             <!-- Places rail -->
             <div v-if="locations.length" class="discover-section">
               <div class="section-header">
-                <span class="text-overline text-zinc-muted">{{ t('search.locations') }}</span>
+                <span class="text-overline text-disabled">{{ t('search.locations') }}</span>
                 <span class="section-count">{{ locations.length }}</span>
               </div>
               <div v-edge-scroll class="rail">
@@ -623,11 +623,11 @@ function iconForFilter(type: string): string {
             <!-- Papers -->
             <div v-if="papers.length" class="discover-section">
               <div class="section-header">
-                <span class="text-overline text-zinc-muted">{{ t('search.papers.title') }}</span>
+                <span class="text-overline text-disabled">{{ t('search.papers.title') }}</span>
                 <span class="section-count">{{ papers.length }}</span>
               </div>
               <div v-edge-scroll class="chip-cloud">
-                <button
+                <v-btn
                   v-for="p in papers"
                   :key="p.name"
                   class="cloud-chip"
@@ -637,18 +637,18 @@ function iconForFilter(type: string): string {
                   <v-icon size="14" class="mr-1">mdi-file-document-outline</v-icon>
                   {{ labelFromPaper(p.name) }}
                   <span class="cloud-count">{{ p.count }}</span>
-                </button>
+                </v-btn>
               </div>
             </div>
 
             <!-- Tags cloud -->
             <div v-if="tags.length" class="discover-section">
               <div class="section-header">
-                <span class="text-overline text-zinc-muted">{{ t('search.tags') }}</span>
+                <span class="text-overline text-disabled">{{ t('search.tags') }}</span>
                 <span class="section-count">{{ tags.length }}</span>
               </div>
               <div v-edge-scroll class="chip-cloud">
-                <button
+                <v-btn
                   v-for="tag in tags"
                   :key="tag.name"
                   class="cloud-chip"
@@ -658,14 +658,14 @@ function iconForFilter(type: string): string {
                   <v-icon size="14" class="mr-1">mdi-tag-outline</v-icon>
                   {{ tag.name }}
                   <span class="cloud-count">{{ tag.count }}</span>
-                </button>
+                </v-btn>
               </div>
             </div>
 
             <!-- Time -->
             <div class="discover-section">
               <div class="section-header">
-                <span class="text-overline text-zinc-muted">{{ t('search.dates') }}</span>
+                <span class="text-overline text-disabled">{{ t('search.dates') }}</span>
               </div>
               <DateRangePicker :model-value="dateRange" @update:model-value="onDateRangeChange" />
             </div>
@@ -673,11 +673,11 @@ function iconForFilter(type: string): string {
             <!-- Cameras -->
             <div v-if="cameraChips.length" class="discover-section">
               <div class="section-header">
-                <span class="text-overline text-zinc-muted">{{ t('search.cameras') }}</span>
+                <span class="text-overline text-disabled">{{ t('search.cameras') }}</span>
                 <span class="section-count">{{ cameraChips.length }}</span>
               </div>
               <div v-edge-scroll class="chip-cloud">
-                <button
+                <v-btn
                   v-for="cam in cameraChips"
                   :key="cam.name"
                   class="cloud-chip cloud-chip--brand"
@@ -686,7 +686,7 @@ function iconForFilter(type: string): string {
                   @click="selectCamera(cam.name)"
                 >
                   <BrandIcon :name="cam.name" :size="20" />
-                </button>
+                </v-btn>
               </div>
             </div>
 
@@ -694,7 +694,7 @@ function iconForFilter(type: string): string {
               v-if="!peopleRow.length && !locations.length && !tags.length && !bestPhotos.length"
               class="pa-3 text-center"
             >
-              <div class="text-body-2 text-zinc-muted">{{ t('search.no_data') }}</div>
+              <div class="text-body-2 text-disabled">{{ t('search.no_data') }}</div>
             </div>
           </template>
 
@@ -702,14 +702,14 @@ function iconForFilter(type: string): string {
           <template v-else>
             <div class="discover-header">
               <div>
-                <div class="text-overline font-weight-black text-zinc-muted mb-1">
+                <div class="text-overline font-weight-black text-disabled mb-1">
                   {{ t('search.results_for', { query: searchStore.query.trim() }) }}
                 </div>
               </div>
-              <button class="see-all-btn" @click="runSearch">
+              <v-btn class="see-all-btn" @click="runSearch">
                 {{ t('search.see_all') }}
                 <v-icon size="15">mdi-arrow-right</v-icon>
-              </button>
+              </v-btn>
             </div>
 
             <div v-if="inlineLoading" class="pa-4 d-flex justify-center">
@@ -732,7 +732,7 @@ function iconForFilter(type: string): string {
 
             <div v-if="peopleRow.length" class="discover-section">
               <div class="section-header">
-                <span class="text-overline text-zinc-muted">{{ t('search.people') }}</span>
+                <span class="text-overline text-disabled">{{ t('search.people') }}</span>
               </div>
               <div v-edge-scroll class="rail">
                 <div
@@ -762,10 +762,10 @@ function iconForFilter(type: string): string {
 
             <div v-if="locations.length" class="discover-section">
               <div class="section-header">
-                <span class="text-overline text-zinc-muted">{{ t('search.locations') }}</span>
+                <span class="text-overline text-disabled">{{ t('search.locations') }}</span>
               </div>
               <div v-edge-scroll class="chip-cloud">
-                <button
+                <v-btn
                   v-for="loc in locations"
                   :key="loc.name"
                   class="cloud-chip"
@@ -774,16 +774,16 @@ function iconForFilter(type: string): string {
                   <v-icon size="14" class="mr-1">mdi-map-marker</v-icon>
                   {{ loc.name }}
                   <span class="cloud-count">{{ loc.count }}</span>
-                </button>
+                </v-btn>
               </div>
             </div>
 
             <div v-if="tags.length" class="discover-section">
               <div class="section-header">
-                <span class="text-overline text-zinc-muted">{{ t('search.tags') }}</span>
+                <span class="text-overline text-disabled">{{ t('search.tags') }}</span>
               </div>
               <div v-edge-scroll class="chip-cloud">
-                <button
+                <v-btn
                   v-for="tag in tags"
                   :key="tag.name"
                   class="cloud-chip"
@@ -792,16 +792,16 @@ function iconForFilter(type: string): string {
                   <v-icon size="14" class="mr-1">mdi-tag-outline</v-icon>
                   {{ tag.name }}
                   <span class="cloud-count">{{ tag.count }}</span>
-                </button>
+                </v-btn>
               </div>
             </div>
 
             <div v-if="cameras.length" class="discover-section">
               <div class="section-header">
-                <span class="text-overline text-zinc-muted">{{ t('search.cameras') }}</span>
+                <span class="text-overline text-disabled">{{ t('search.cameras') }}</span>
               </div>
               <div v-edge-scroll class="chip-cloud">
-                <button
+                <v-btn
                   v-for="cam in cameraChips"
                   :key="cam.name"
                   class="cloud-chip cloud-chip--brand"
@@ -810,13 +810,13 @@ function iconForFilter(type: string): string {
                   @click="selectCamera(cam.name)"
                 >
                   <BrandIcon :name="cam.name" :size="20" />
-                </button>
+                </v-btn>
               </div>
             </div>
 
             <div class="discover-section">
               <div class="section-header">
-                <span class="text-overline text-zinc-muted">{{ t('search.dates') }}</span>
+                <span class="text-overline text-disabled">{{ t('search.dates') }}</span>
               </div>
               <DateRangePicker :model-value="dateRange" @update:model-value="onDateRangeChange" />
             </div>
@@ -832,21 +832,21 @@ function iconForFilter(type: string): string {
               "
               class="pa-3 text-center"
             >
-              <div class="text-body-2 text-zinc-muted">
+              <div class="text-body-2 text-disabled">
                 {{ t('search.no_matches', { query: searchStore.query.trim() }) }}
               </div>
-              <button class="run-search-item mx-auto" @click="runSearch">
+              <v-btn class="run-search-item mx-auto" @click="runSearch">
                 <v-icon size="18" class="mr-2" color="var(--color-brand-faces)"
                   >mdi-text-search</v-icon
                 >
                 {{ t('search.enter_to_search', { query: searchStore.query.trim() }) }}
-              </button>
+              </v-btn>
             </div>
           </template>
 
           <!-- Footer -->
           <div v-if="searchStore.hasFilters" class="active-filters pa-2">
-            <span class="text-caption text-zinc-muted mr-2">{{ t('search.active') }}</span>
+            <span class="text-caption text-disabled mr-2">{{ t('search.active') }}</span>
             <div class="d-flex flex-wrap ga-1">
               <v-chip
                 v-for="f in searchStore.activeFilters"
@@ -863,15 +863,15 @@ function iconForFilter(type: string): string {
             <PersonMatchControls v-if="searchStore.personCount > 0" class="mt-1" />
           </div>
 
-          <v-divider class="border-subtle" />
+          <v-divider class="border" />
           <div v-if="searchStore.hasFilters || searchStore.hasQuery" class="footer-row pa-2">
-            <button class="save-album-btn" :disabled="!canSaveAlbum()" @click="openSaveAlbumDialog">
+            <v-btn class="save-album-btn" :disabled="!canSaveAlbum()" @click="openSaveAlbumDialog">
               <v-icon size="14" class="mr-1">mdi-content-save-outline</v-icon>
               {{ isEditingAlbum ? t('search.update_album') : t('search.save_as_album') }}
-            </button>
-            <button class="clear-btn" @click="clearAll">
+            </v-btn>
+            <v-btn class="clear-btn" @click="clearAll">
               {{ t('search.clear_all') }}
-            </button>
+            </v-btn>
           </div>
         </template>
       </div>
@@ -879,10 +879,10 @@ function iconForFilter(type: string): string {
 
     <v-dialog v-model="saveAlbumDialog" max-width="420">
       <v-card class="rounded-xl pa-6" color="surface">
-        <h3 class="text-h6 font-weight-bold text-zinc-primary mb-1">
+        <h3 class="text-h6 font-weight-bold text-high-emphasis mb-1">
           {{ isEditingAlbum ? t('search.update_album') : t('search.save_as_album') }}
         </h3>
-        <p class="text-caption text-zinc-muted mb-4">
+        <p class="text-caption text-disabled mb-4">
           {{ isEditingAlbum ? t('search.update_album_hint') : t('search.save_as_album_hint') }}
         </p>
         <v-text-field
@@ -898,7 +898,7 @@ function iconForFilter(type: string): string {
           <v-btn
             variant="flat"
             color="primary"
-            class="siegu-btn-modern px-6"
+            class="px-6"
             :disabled="!isEditingAlbum && !saveAlbumName.trim()"
             :loading="savingAlbum"
             @click="saveAsAlbum"
@@ -921,8 +921,8 @@ function iconForFilter(type: string): string {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-default);
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   border-radius: var(--radius-lg);
   padding: 0 14px;
   height: 44px;
@@ -930,7 +930,7 @@ function iconForFilter(type: string): string {
 }
 
 .search-field:focus-within {
-  border-color: var(--color-text-primary);
+  border-color: rgb(var(--v-theme-on-surface));
 }
 
 .search-icon {
@@ -943,16 +943,16 @@ function iconForFilter(type: string): string {
   border: none;
   outline: none;
   background: transparent;
-  color: var(--color-text-primary);
+  color: rgb(var(--v-theme-on-surface));
   font-size: 14px;
 }
 
 .search-input::placeholder {
-  color: var(--color-text-muted);
+  color: rgba(var(--v-theme-on-surface), 0.6);
 }
 
 .search-dropdown {
-  background: var(--color-bg-surface);
+  background: rgb(var(--v-theme-surface));
   border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-popover);
   overflow-y: auto;
@@ -1003,7 +1003,7 @@ function iconForFilter(type: string): string {
   border: none;
   -webkit-appearance: none;
   appearance: none;
-  background: var(--color-bg-hover);
+  background: rgb(var(--v-theme-surface-light));
   cursor: pointer;
   user-select: none;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1011,11 +1011,11 @@ function iconForFilter(type: string): string {
 
 .magic-card:hover {
   transform: translateY(-2px);
-  background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+  background: color-mix(in srgb, rgb(var(--v-theme-on-surface)) 6%, transparent);
 }
 
 .magic-card--active {
-  background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+  background: color-mix(in srgb, rgb(var(--v-theme-on-surface)) 8%, transparent);
 }
 
 .magic-icon {
@@ -1032,7 +1032,7 @@ function iconForFilter(type: string): string {
 .magic-label {
   font-size: 11px;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: rgb(var(--v-theme-on-surface));
   text-align: center;
   line-height: 1.2;
 }
@@ -1040,7 +1040,7 @@ function iconForFilter(type: string): string {
 .magic-count {
   font-size: 11px;
   font-weight: 700;
-  color: var(--color-text-muted);
+  color: rgba(var(--v-theme-on-surface), 0.6);
 }
 
 .discover-section {
@@ -1057,8 +1057,8 @@ function iconForFilter(type: string): string {
 .section-count {
   font-size: 11px;
   font-weight: 700;
-  color: var(--color-text-muted);
-  background: var(--color-bg-hover);
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  background: rgb(var(--v-theme-surface-light));
   border-radius: var(--radius-pill);
   padding: 2px 8px;
 }
@@ -1089,11 +1089,11 @@ function iconForFilter(type: string): string {
 }
 
 .face-card:hover {
-  background: var(--color-bg-hover);
+  background: rgb(var(--v-theme-surface-light));
 }
 
 .face-card.facet-active .face-avatar {
-  box-shadow: 0 0 0 2px var(--color-text-primary);
+  box-shadow: 0 0 0 2px rgb(var(--v-theme-on-surface));
 }
 
 .face-avatar {
@@ -1105,7 +1105,7 @@ function iconForFilter(type: string): string {
 }
 
 .face-card--unnamed .face-avatar {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-text-muted) 45%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, rgba(var(--v-theme-on-surface), 0.6) 45%, transparent);
 }
 
 .face-unnamed-badge {
@@ -1115,24 +1115,24 @@ function iconForFilter(type: string): string {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--color-text-muted);
-  color: var(--color-bg-surface);
+  background: rgba(var(--v-theme-on-surface), 0.6);
+  color: rgb(var(--v-theme-surface));
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--color-bg-surface);
+  border: 2px solid rgb(var(--v-theme-surface));
 }
 
 .face-name {
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: rgb(var(--v-theme-on-surface));
   max-width: 72px;
 }
 
 .face-count {
   font-size: 11px;
-  color: var(--color-text-muted);
+  color: rgba(var(--v-theme-on-surface), 0.6);
 }
 
 .best-card {
@@ -1194,7 +1194,7 @@ function iconForFilter(type: string): string {
 }
 
 .place-card.facet-active {
-  box-shadow: 0 0 0 2px var(--color-text-primary);
+  box-shadow: 0 0 0 2px rgb(var(--v-theme-on-surface));
 }
 
 .place-img {
@@ -1253,15 +1253,16 @@ function iconForFilter(type: string): string {
 }
 
 .cloud-chip {
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   white-space: nowrap;
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-text-secondary);
-  background: var(--color-bg-hover);
-  border: 1px solid var(--color-border-subtle);
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  background: rgb(var(--v-theme-surface-light));
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   border-radius: var(--radius-pill);
   padding: 5px 12px;
   cursor: pointer;
@@ -1270,14 +1271,14 @@ function iconForFilter(type: string): string {
 }
 
 .cloud-chip:hover {
-  border-color: var(--color-border-hover);
-  color: var(--color-text-primary);
+  border-color: rgba(var(--v-theme-on-surface), 0.4);
+  color: rgb(var(--v-theme-on-surface));
   transform: translateY(-1px);
 }
 
 .cloud-chip.chip-active {
-  border-color: var(--color-text-primary);
-  color: var(--color-text-primary);
+  border-color: rgb(var(--v-theme-on-surface));
+  color: rgb(var(--v-theme-on-surface));
 }
 
 .cloud-chip--brand {
@@ -1295,8 +1296,8 @@ function iconForFilter(type: string): string {
   font-size: 10px;
   font-weight: 700;
   white-space: nowrap;
-  color: var(--color-text-muted);
-  background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  background: color-mix(in srgb, rgb(var(--v-theme-on-surface)) 8%, transparent);
   border-radius: var(--radius-pill);
   padding: 1px 6px;
 }
@@ -1308,14 +1309,15 @@ function iconForFilter(type: string): string {
 }
 
 .recent-chip {
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   max-width: 220px;
   font-size: 12px;
   font-weight: 500;
-  color: var(--color-text-secondary);
-  background: var(--color-bg-hover);
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  background: rgb(var(--v-theme-surface-light));
   border-radius: var(--radius-pill);
   padding: 5px 12px;
   cursor: pointer;
@@ -1323,7 +1325,7 @@ function iconForFilter(type: string): string {
 }
 
 .recent-chip:hover {
-  color: var(--color-text-primary);
+  color: rgb(var(--v-theme-on-surface));
 }
 
 .inline-grid {
@@ -1346,13 +1348,14 @@ function iconForFilter(type: string): string {
 }
 
 .see-all-btn {
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   font-size: 12px;
   font-weight: 700;
   color: rgb(var(--v-theme-primary));
-  background: var(--color-bg-hover);
+  background: rgb(var(--v-theme-surface-light));
   border-radius: var(--radius-pill);
   padding: 6px 14px;
   cursor: pointer;
@@ -1364,6 +1367,7 @@ function iconForFilter(type: string): string {
 }
 
 .run-search-item {
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1373,15 +1377,15 @@ function iconForFilter(type: string): string {
   user-select: none;
   font-weight: 600;
   font-size: 13px;
-  color: var(--color-text-primary);
+  color: rgb(var(--v-theme-on-surface));
 }
 
 .run-search-item:hover {
-  background: var(--color-bg-hover);
+  background: rgb(var(--v-theme-surface-light));
 }
 
 .active-filters {
-  border-top: 1px solid var(--color-border-subtle);
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   margin-top: 6px;
 }
 
@@ -1394,11 +1398,12 @@ function iconForFilter(type: string): string {
 }
 
 .clear-btn {
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-text-muted);
+  color: rgba(var(--v-theme-on-surface), 0.6);
   padding: 8px 12px;
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -1406,11 +1411,12 @@ function iconForFilter(type: string): string {
 }
 
 .clear-btn:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text-primary);
+  background: rgb(var(--v-theme-surface-light));
+  color: rgb(var(--v-theme-on-surface));
 }
 
 .save-album-btn {
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   font-size: 12px;
@@ -1423,7 +1429,7 @@ function iconForFilter(type: string): string {
 }
 
 .save-album-btn:hover:not(:disabled) {
-  background: var(--color-bg-hover);
+  background: rgb(var(--v-theme-surface-light));
 }
 
 .save-album-btn:disabled {

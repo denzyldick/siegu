@@ -4,25 +4,25 @@
       <div v-if="isManualAlbum && selectedIds.length > 0" class="bulk-toolbar-container">
         <v-sheet
           class="bulk-toolbar d-flex align-center px-6 py-3 rounded-pill shadow-xl"
-          color="var(--color-bg-btn)"
+          color="rgb(var(--v-theme-primary))"
         >
           <v-btn
             icon="mdi-close"
             variant="text"
             density="comfortable"
-            color="var(--color-text-btn)"
+            color="rgb(var(--v-theme-on-primary))"
             @click="clearSelection"
           ></v-btn>
           <div class="ml-4">
-            <div class="text-subtitle-2 font-weight-bold text-btn">
+            <div class="text-subtitle-2 font-weight-bold" style="color: rgb(var(--v-theme-on-primary))">
               {{ $t('albums.selected', { count: selectedIds.length }) }}
             </div>
           </div>
           <v-spacer></v-spacer>
           <v-btn
             variant="flat"
-            color="var(--color-bg-surface)"
-            class="text-btn px-6 rounded-xl text-none font-weight-bold"
+            color="rgb(var(--v-theme-surface))"
+            class="px-6 rounded-xl text-none font-weight-bold"
             size="small"
             @click="bulkRemoveFromAlbum"
           >
@@ -36,10 +36,10 @@
     <template v-if="!currentSectionItem">
       <div class="d-flex align-center px-2 mb-4">
         <div>
-          <h1 class="text-h5 font-weight-bold text-zinc-primary letter-spacing-tight">
+          <h1 class="text-h5 font-weight-bold text-high-emphasis letter-spacing-tight">
             {{ $t('albums.title') }}
           </h1>
-          <p class="text-caption text-zinc-muted">{{ $t('albums.desc') }}</p>
+          <p class="text-caption text-disabled">{{ $t('albums.desc') }}</p>
         </div>
         <v-spacer></v-spacer>
         <v-btn
@@ -54,7 +54,7 @@
         <v-btn
           variant="flat"
           color="primary"
-          class="siegu-btn-modern px-6"
+          class="px-6"
           @click="openNewAlbumDialog"
         >
           <v-icon start size="18">mdi-plus</v-icon>
@@ -68,7 +68,7 @@
           <div v-if="section.items.length > 0" class="animate-fade-in">
             <div class="d-flex align-center px-2 mb-3">
               <h2
-                class="section-title text-subtitle-1 font-weight-bold text-zinc-primary flex-grow-1"
+                class="section-title text-subtitle-1 font-weight-bold text-high-emphasis flex-grow-1"
               >
                 {{ sectionTitle(section.id) }}
               </h2>
@@ -99,7 +99,7 @@
                     class="album-cover-img"
                   />
                   <div v-else class="album-cover-placeholder d-flex align-center justify-center">
-                    <v-icon size="44" color="var(--color-icon-empty)">{{
+                    <v-icon size="44" color="rgba(var(--v-theme-on-surface), 0.25)">{{
                       tileIcon(item.kind)
                     }}</v-icon>
                   </div>
@@ -108,7 +108,7 @@
                     {{ $t('albums.items_count', { count: item.count }) }}
                   </div>
                 </div>
-                <div class="album-name text-subtitle-2 font-weight-bold text-zinc-primary">
+                <div class="album-name text-subtitle-2 font-weight-bold text-high-emphasis">
                   {{ item.name }}
                 </div>
               </div>
@@ -140,15 +140,15 @@
         class="empty-state-container d-flex flex-column align-center justify-center text-center"
       >
         <div class="empty-state-icon mb-6">
-          <v-icon size="80" color="var(--color-icon-empty)">mdi-image-album</v-icon>
+          <v-icon size="80" color="rgba(var(--v-theme-on-surface), 0.25)">mdi-image-album</v-icon>
         </div>
-        <h3 class="text-h5 font-weight-bold text-zinc-primary mb-2">
+        <h3 class="text-h5 font-weight-bold text-high-emphasis mb-2">
           {{ $t('albums.no_albums') }}
         </h3>
-        <p class="text-body-1 text-zinc-secondary max-w-400 mx-auto mb-8">
+        <p class="text-body-1 text-medium-emphasis max-w-400 mx-auto mb-8">
           {{ $t('albums.no_albums_hint') }}
         </p>
-        <v-btn variant="flat" class="siegu-btn-modern px-8 py-6" @click="openNewAlbumDialog">
+        <v-btn variant="flat" class="px-8 py-6" color="primary" @click="openNewAlbumDialog">
           {{ $t('albums.new_album') }}
         </v-btn>
       </div>
@@ -160,10 +160,10 @@
           <v-icon size="20">mdi-arrow-left</v-icon>
         </v-btn>
         <div class="ml-2">
-          <h1 class="text-h6 font-weight-bold text-zinc-primary letter-spacing-tight">
+          <h1 class="text-h6 font-weight-bold text-high-emphasis letter-spacing-tight">
             {{ currentSectionItem?.name }}
           </h1>
-          <p class="text-caption text-zinc-muted">
+          <p class="text-caption text-disabled">
             <template v-if="currentSectionItem">
               {{ kindLabel(currentSectionItem.kind) }}
               <span class="mx-1">·</span>
@@ -178,7 +178,7 @@
               <v-icon size="20">mdi-dots-vertical</v-icon>
             </v-btn>
           </template>
-          <v-list density="compact" class="siegu-list">
+          <v-list density="compact">
             <v-list-item
               v-if="currentSectionItem?.kind === 'person'"
               @click="openManagePerson"
@@ -197,10 +197,8 @@
               <v-list-item @click="openRenameDialog" prepend-icon="mdi-pencil-outline">
                 <v-list-item-title>{{ $t('albums.rename_album') }}</v-list-item-title>
               </v-list-item>
-              <v-list-item @click="confirmDelete = true" prepend-icon="mdi-delete-outline">
-                <v-list-item-title class="text-error">{{
-                  $t('albums.delete_album')
-                }}</v-list-item-title>
+              <v-list-item @click="confirmDelete = true" prepend-icon="mdi-delete-outline" color="error">
+                <v-list-item-title>{{ $t('albums.delete_album') }}</v-list-item-title>
               </v-list-item>
             </template>
           </v-list>
@@ -221,7 +219,7 @@
 
       <div
         v-if="isManualAlbum && !searching && items.length > 0"
-        class="text-caption text-zinc-muted px-2 mb-2"
+        class="text-caption text-disabled px-2 mb-2"
       >
         {{ $t('albums.reorder_hint') }}
       </div>
@@ -298,12 +296,12 @@
         class="empty-state-container d-flex flex-column align-center justify-center text-center"
       >
         <div class="empty-state-icon mb-6">
-          <v-icon size="80" color="var(--color-icon-empty)">mdi-image-outline</v-icon>
+          <v-icon size="80" color="rgba(var(--v-theme-on-surface), 0.25)">mdi-image-outline</v-icon>
         </div>
-        <h3 class="text-h5 font-weight-bold text-zinc-primary mb-2">
+        <h3 class="text-h5 font-weight-bold text-high-emphasis mb-2">
           {{ $t('albums.empty_album') }}
         </h3>
-        <p class="text-body-1 text-zinc-secondary max-w-400 mx-auto mb-8">
+        <p class="text-body-1 text-medium-emphasis max-w-400 mx-auto mb-8">
           {{ $t('albums.empty_album_hint') }}
         </p>
       </div>
@@ -313,9 +311,9 @@
         class="empty-state-container d-flex flex-column align-center justify-center text-center"
       >
         <div class="empty-state-icon mb-6">
-          <v-icon size="80" color="var(--color-icon-empty)">mdi-text-search-variant</v-icon>
+          <v-icon size="80" color="rgba(var(--v-theme-on-surface), 0.25)">mdi-text-search-variant</v-icon>
         </div>
-        <h3 class="text-h5 font-weight-bold text-zinc-primary mb-2">
+        <h3 class="text-h5 font-weight-bold text-high-emphasis mb-2">
           {{ $t('albums.no_results_in_album', { query }) }}
         </h3>
       </div>
@@ -325,7 +323,7 @@
           <div v-if="loadingContents || searchLoading" class="d-flex align-center">
             <v-progress-circular
               indeterminate
-              color="var(--color-text-primary)"
+              color="rgb(var(--v-theme-on-surface))"
               size="28"
               width="3"
             ></v-progress-circular>
@@ -333,8 +331,7 @@
           <v-btn
             v-else-if="!searching && !allLoaded && items.length > 0"
             @click="loadMore"
-            variant="flat"
-            class="siegu-btn-outline px-10 py-6"
+            variant="outlined" class="px-10 py-6"
           >
             {{ $t('albums.load_more') }}
           </v-btn>
@@ -351,7 +348,7 @@
 
     <v-dialog v-model="newAlbumDialog" max-width="420">
       <v-card class="rounded-xl pa-6" color="surface">
-        <h3 class="text-h6 font-weight-bold text-zinc-primary mb-4">
+        <h3 class="text-h6 font-weight-bold text-high-emphasis mb-4">
           {{ $t('albums.new_album') }}
         </h3>
         <v-text-field
@@ -366,7 +363,7 @@
           <v-btn
             variant="flat"
             color="primary"
-            class="siegu-btn-modern px-6"
+            class="px-6"
             :disabled="!newAlbumName.trim()"
             :loading="creating"
             @click="createAlbum"
@@ -379,7 +376,7 @@
 
     <v-dialog v-model="renameDialog" max-width="420">
       <v-card class="rounded-xl pa-6" color="surface">
-        <h3 class="text-h6 font-weight-bold text-zinc-primary mb-4">
+        <h3 class="text-h6 font-weight-bold text-high-emphasis mb-4">
           {{ $t('albums.rename_album') }}
         </h3>
         <v-text-field
@@ -394,7 +391,7 @@
           <v-btn
             variant="flat"
             color="primary"
-            class="siegu-btn-modern px-6"
+            class="px-6"
             :disabled="!renameName.trim()"
             @click="renameCurrentAlbum"
           >
@@ -406,10 +403,10 @@
 
     <v-dialog v-model="confirmDelete" max-width="420">
       <v-card class="rounded-xl pa-6" color="surface">
-        <h3 class="text-h6 font-weight-bold text-zinc-primary mb-2">
+        <h3 class="text-h6 font-weight-bold text-high-emphasis mb-2">
           {{ $t('albums.delete_confirm_title') }}
         </h3>
-        <p class="text-body-2 text-zinc-secondary mb-4">{{ $t('albums.delete_confirm') }}</p>
+        <p class="text-body-2 text-medium-emphasis mb-4">{{ $t('albums.delete_confirm') }}</p>
         <div class="d-flex justify-end ga-2">
           <v-btn variant="text" @click="confirmDelete = false">{{ $t('common.cancel') }}</v-btn>
           <v-btn variant="flat" color="error" class="px-6" @click="deleteCurrentAlbum">
@@ -443,7 +440,7 @@
     />
 
     <v-snackbar v-model="snackbar" timeout="2500" color="surface" location="bottom">
-      <span class="text-body-2 text-zinc-primary">{{ snackbarText }}</span>
+      <span class="text-body-2 text-high-emphasis">{{ snackbarText }}</span>
     </v-snackbar>
   </div>
 </template>
@@ -964,7 +961,7 @@ onUnmounted(() => {
   aspect-ratio: 1;
   border-radius: var(--radius-xl);
   overflow: hidden;
-  background: var(--color-bg-field);
+  background: rgb(var(--v-theme-surface-light));
 }
 
 .album-cover-img {
@@ -1022,7 +1019,7 @@ onUnmounted(() => {
   width: 120px;
   height: 120px;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-bg-zinc-100) 60%, transparent);
+  background: color-mix(in srgb, rgb(var(--v-theme-surface-light)) 60%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;

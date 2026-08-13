@@ -43,7 +43,7 @@ async function reconnect(): Promise<void> {
   <v-fade-transition>
     <div v-if="isVisible" class="sync-banner-container">
       <v-sheet
-        class="sync-banner d-flex align-center px-4 py-2 rounded-pill shadow-xl border-subtle"
+        class="sync-banner d-flex align-center px-4 py-2 rounded-pill shadow-xl border"
         color="surface"
       >
         <v-progress-circular
@@ -51,7 +51,7 @@ async function reconnect(): Promise<void> {
           indeterminate
           size="18"
           width="2"
-          color="var(--color-text-secondary)"
+          color="rgba(var(--v-theme-on-surface), 0.7)"
           class="mr-3"
         />
         <div v-else-if="!isOffline" class="mr-3 d-flex align-center">
@@ -59,14 +59,14 @@ async function reconnect(): Promise<void> {
             :model-value="displayProgress"
             size="22"
             width="3"
-            color="var(--color-text-secondary)"
+            color="rgba(var(--v-theme-on-surface), 0.7)"
           >
             <span style="font-size: 8px; font-weight: bold">{{ displayProgress }}</span>
           </v-progress-circular>
         </div>
         <v-icon v-else color="warning" size="18" class="mr-3">mdi-pause-circle-outline</v-icon>
         <div
-          class="text-caption font-weight-bold text-zinc-primary text-truncate pr-2"
+          class="text-caption font-weight-bold text-high-emphasis text-truncate pr-2"
           style="max-width: 220px"
         >
           {{ isOffline ? t('sync.paused') : `${t('sync.status')} ${displayProgress}%` }}
@@ -77,7 +77,7 @@ async function reconnect(): Promise<void> {
             icon="mdi-refresh"
             variant="text"
             size="small"
-            class="text-zinc-primary"
+            class="text-high-emphasis"
             :title="t('sync.reconnect')"
             :aria-label="t('sync.reconnect')"
             :loading="reconnecting"
@@ -90,7 +90,7 @@ async function reconnect(): Promise<void> {
           icon="mdi-close"
           variant="text"
           size="x-small"
-          class="text-zinc-muted"
+          class="text-disabled"
           @click="dismiss"
         />
       </v-sheet>
@@ -115,6 +115,6 @@ async function reconnect(): Promise<void> {
   min-width: 240px;
   max-width: 90vw;
   box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.15) !important;
-  border: 1px solid var(--color-border-subtle) !important;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12) !important;
 }
 </style>

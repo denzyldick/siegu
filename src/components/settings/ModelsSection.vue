@@ -1,17 +1,17 @@
 <template>
   <div>
     <div class="d-flex align-center justify-space-between mb-4">
-      <div class="text-caption font-weight-bold text-zinc-muted tracking-widest uppercase">
+      <div class="text-caption font-weight-bold text-disabled tracking-widest uppercase">
         {{ $t('settings.ai_models') }}
       </div>
       <div v-if="activeModelSummary || pendingCount > 0" class="text-right">
-        <div v-if="activeModelSummary" class="text-caption font-weight-bold text-zinc-primary">
+        <div v-if="activeModelSummary" class="text-caption font-weight-bold text-high-emphasis">
           {{ activeModelSummary }}
         </div>
-        <div v-else class="text-caption font-weight-bold text-zinc-primary">
+        <div v-else class="text-caption font-weight-bold text-high-emphasis">
           {{ $t('settings.indexing_jobs', { count: formatIndexingCount(pendingCount) }) }}
         </div>
-        <div v-if="pendingCount > 0" class="text-caption text-zinc-muted" style="font-size: 10px">
+        <div v-if="pendingCount > 0" class="text-caption text-disabled" style="font-size: 10px">
           {{ $t('settings.eta_label', { time: formatEta(globalEta) }) }}
         </div>
       </div>
@@ -20,7 +20,7 @@
     <v-sheet
       v-if="visibleActivityModel"
       class="ai-activity-strip d-flex align-center justify-space-between px-4 py-3 mb-4 rounded-lg"
-      color="var(--color-bg-zinc-100)"
+      color="rgb(var(--v-theme-surface-light))"
       border
     >
       <div class="d-flex align-center min-width-0">
@@ -29,21 +29,21 @@
           indeterminate
           size="20"
           width="2"
-          color="var(--color-text-primary)"
+          color="rgb(var(--v-theme-on-surface))"
           class="mr-3 flex-shrink-0"
         ></v-progress-circular>
-        <v-icon v-else size="20" color="var(--color-text-primary)" class="mr-3 flex-shrink-0">
+        <v-icon v-else size="20" color="rgb(var(--v-theme-on-surface))" class="mr-3 flex-shrink-0">
           {{ getModelActivityIcon(visibleActivityModel.id) }}
         </v-icon>
         <div class="min-width-0">
-          <div class="text-caption text-zinc-muted font-weight-bold">
+          <div class="text-caption text-disabled font-weight-bold">
             {{
               isModelProcessing(visibleActivityModel.id)
                 ? $t('settings.current_model')
                 : $t('settings.latest_model')
             }}
           </div>
-          <div class="text-body-2 text-zinc-primary font-weight-bold text-truncate">
+          <div class="text-body-2 text-high-emphasis font-weight-bold text-truncate">
             {{ $t('models.' + visibleActivityModel.id + '.title') }} ·
             {{ getModelStatusText(visibleActivityModel.id) }}
           </div>
@@ -59,7 +59,7 @@
         <v-card
           variant="outlined"
           border
-          class="border-subtle rounded-lg fill-height d-flex flex-column ai-model-card"
+          class="border rounded-lg fill-height d-flex flex-column ai-model-card"
           :class="{
             'ai-model-card-active': isModelActive(model.id),
             'ai-model-card-blocked': isModelBlocked(model.id),
@@ -130,17 +130,17 @@
           </v-card-item>
 
           <v-card-text class="py-0 flex-grow-1">
-            <div class="text-body-2 text-zinc-primary">
+            <div class="text-body-2 text-high-emphasis">
               {{ $t('models.' + model.id + '.desc') }}
             </div>
-            <div class="text-caption text-zinc-muted mt-1 font-italic">
+            <div class="text-caption text-disabled mt-1 font-italic">
               {{ $t('models.' + model.id + '.search') }}
             </div>
             <div class="d-flex align-center justify-space-between mt-2 model-status-line">
-              <span class="text-caption text-zinc-muted">{{
+              <span class="text-caption text-disabled">{{
                 $t('settings.file_size', { size: model.size })
               }}</span>
-              <span class="text-caption text-zinc-muted">
+              <span class="text-caption text-disabled">
                 {{ $t('settings.ram_estimate', { size: modelRam[model.id] }) }}
               </span>
               <div class="d-flex align-center">
@@ -168,7 +168,7 @@
                 <span
                   v-if="getModelStatusText(model.id)"
                   class="text-caption font-weight-bold model-status-text"
-                  :class="isModelActive(model.id) ? 'text-zinc-primary' : 'text-zinc-muted'"
+                  :class="isModelActive(model.id) ? 'text-high-emphasis' : 'text-disabled'"
                   :title="getModelStatusText(model.id)"
                 >
                   {{ getModelStatusText(model.id) }}
@@ -178,7 +178,7 @@
 
             <div v-if="isModelProcessing(model.id)" class="mt-4">
               <div class="d-flex justify-space-between text-caption mb-1">
-                <span class="font-weight-bold text-zinc-primary">{{
+                <span class="font-weight-bold text-high-emphasis">{{
                   getModelStatusLabel(model.id)
                 }}</span>
                 <span>{{ getModelProgressText(model.id) }}</span>
@@ -186,8 +186,8 @@
               <v-progress-linear
                 :indeterminate="!hasModelProgressTotal(model.id)"
                 :model-value="getModelProgressPercent(model.id)"
-                color="var(--color-text-primary)"
-                bg-color="var(--color-bg-zinc-100)"
+                color="rgb(var(--v-theme-on-surface))"
+                bg-color="rgb(var(--v-theme-surface-light))"
                 height="4"
                 rounded
               ></v-progress-linear>
@@ -198,16 +198,16 @@
                 v-if="getDownloadStats(model.id).bytesText"
                 class="d-flex justify-space-between text-caption mb-1"
               >
-                <span class="font-weight-bold text-zinc-primary">{{
+                <span class="font-weight-bold text-high-emphasis">{{
                   getDownloadStats(model.id).bytesText
                 }}</span>
-                <span class="text-zinc-muted">{{ getDownloadStats(model.id).rightText }}</span>
+                <span class="text-disabled">{{ getDownloadStats(model.id).rightText }}</span>
               </div>
               <v-progress-linear
                 :indeterminate="!hasDownloadProgressTotal(model.id)"
                 :model-value="getProgress(model.id)"
-                color="var(--color-text-primary)"
-                bg-color="var(--color-bg-zinc-100)"
+                color="rgb(var(--v-theme-on-surface))"
+                bg-color="rgb(var(--v-theme-surface-light))"
                 height="4"
                 rounded
               ></v-progress-linear>
@@ -285,7 +285,7 @@
       </v-col>
     </v-row>
 
-    <div class="d-flex align-center pt-4 mt-2 border-top-subtle">
+    <div class="d-flex align-center pt-4 mt-2 border-t">
       <v-btn
         v-if="missingSelectedCount > 0"
         variant="flat"
@@ -322,8 +322,8 @@
             class="mr-2"
           ></v-progress-circular>
           <div
-            class="text-caption text-zinc-muted"
-            :class="modelsLoaded ? 'font-weight-bold text-zinc-primary' : ''"
+            class="text-caption text-disabled"
+            :class="modelsLoaded ? 'font-weight-bold text-high-emphasis' : ''"
           >
             {{
               modelsReloading
@@ -436,16 +436,16 @@ function toggleModelSelection(modelId: string): void {
     background-color 0.18s ease;
 }
 .ai-activity-strip {
-  border-color: var(--color-border-default) !important;
+  border-color: rgba(var(--v-theme-on-surface), 0.12) !important;
 }
 .ai-model-card-active {
-  border-color: var(--color-text-primary) !important;
-  background-color: var(--color-bg-primary) !important;
-  box-shadow: inset 3px 0 0 var(--color-text-primary);
+  border-color: rgb(var(--v-theme-on-surface)) !important;
+  background-color: rgb(var(--v-theme-background)) !important;
+  box-shadow: inset 3px 0 0 rgb(var(--v-theme-on-surface));
 }
 .ai-model-card-blocked {
   opacity: 0.75;
-  border-color: color-mix(in srgb, var(--color-warning) 40%, transparent) !important;
+  border-color: color-mix(in srgb, rgb(var(--v-theme-warning)) 40%, transparent) !important;
 }
 .model-status-line {
   gap: 12px;

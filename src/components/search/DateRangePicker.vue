@@ -193,22 +193,22 @@ onUnmounted(() => {
           <span class="drp-range-text">{{ displayRange[1] }}</span>
         </template>
         <template v-else>
-          <span class="drp-range-text text-muted">{{ t('search.date_picker.hint') }}</span>
+          <span class="drp-range-text" style="color: rgba(var(--v-theme-on-surface), 0.6)">{{ t('search.date_picker.hint') }}</span>
         </template>
       </div>
-      <button v-if="displayRange" class="drp-clear" @click="clear">
+      <v-btn v-if="displayRange" size="small" variant="text" class="drp-clear" @click="clear">
         {{ t('search.date_picker.clear') }}
-      </button>
+      </v-btn>
     </div>
 
     <div class="drp-nav">
-      <button class="drp-nav-btn" @click="prevMonth">
+      <v-btn icon variant="text" size="small" class="drp-nav-btn" @click="prevMonth">
         <v-icon size="18">mdi-chevron-left</v-icon>
-      </button>
+      </v-btn>
       <span class="drp-month-label">{{ monthLabel }}</span>
-      <button class="drp-nav-btn" @click="nextMonth">
+      <v-btn icon variant="text" size="small" class="drp-nav-btn" @click="nextMonth">
         <v-icon size="18">mdi-chevron-right</v-icon>
-      </button>
+      </v-btn>
     </div>
 
     <div class="drp-weekdays">
@@ -242,10 +242,10 @@ onUnmounted(() => {
     </div>
 
     <div class="drp-footer">
-      <button class="drp-today" @click="goToday">
+      <v-btn size="small" variant="text" class="drp-today" @click="goToday">
         <v-icon size="14" class="mr-1">mdi-calendar-today</v-icon>
         {{ t('search.date_picker.today') }}
-      </button>
+      </v-btn>
       <div class="drp-legend">
         <span class="drp-legend-dot drp-legend-dot--photos"></span>
         <span class="drp-legend-text">{{ t('search.date_picker.photos') }}</span>
@@ -258,7 +258,7 @@ onUnmounted(() => {
 
 <style scoped>
 .date-range-picker {
-  background: var(--color-bg-hover);
+  background: rgb(var(--v-theme-surface-light));
   border-radius: var(--radius-xl);
   padding: 12px;
 }
@@ -282,7 +282,7 @@ onUnmounted(() => {
   align-items: center;
   font-size: 12px;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: rgb(var(--v-theme-on-surface));
   overflow: hidden;
 }
 
@@ -293,7 +293,7 @@ onUnmounted(() => {
 .drp-clear {
   font-size: 11px;
   font-weight: 700;
-  color: var(--color-text-muted);
+  color: rgba(var(--v-theme-on-surface), 0.6);
   background: transparent;
   padding: 3px 8px;
   border-radius: var(--radius-pill);
@@ -302,8 +302,8 @@ onUnmounted(() => {
 }
 
 .drp-clear:hover {
-  color: var(--color-text-primary);
-  background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+  color: rgb(var(--v-theme-on-surface));
+  background: color-mix(in srgb, rgb(var(--v-theme-on-surface)) 8%, transparent);
 }
 
 .drp-nav {
@@ -321,20 +321,20 @@ onUnmounted(() => {
   justify-content: center;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--color-text-secondary);
+  color: rgba(var(--v-theme-on-surface), 0.7);
   cursor: pointer;
   user-select: none;
 }
 
 .drp-nav-btn:hover {
-  background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
-  color: var(--color-text-primary);
+  background: color-mix(in srgb, rgb(var(--v-theme-on-surface)) 8%, transparent);
+  color: rgb(var(--v-theme-on-surface));
 }
 
 .drp-month-label {
   font-size: 13px;
   font-weight: 800;
-  color: var(--color-text-primary);
+  color: rgb(var(--v-theme-on-surface));
 }
 
 .drp-weekdays {
@@ -348,7 +348,7 @@ onUnmounted(() => {
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: rgba(var(--v-theme-on-surface), 0.6);
   padding: 2px 0;
 }
 
@@ -374,14 +374,14 @@ onUnmounted(() => {
 }
 
 .drp-cell:not(:disabled):hover {
-  background: color-mix(in srgb, var(--color-text-primary) 10%, transparent);
+  background: color-mix(in srgb, rgb(var(--v-theme-on-surface)) 10%, transparent);
 }
 
 .drp-day {
   font-size: 12px;
   font-weight: 600;
   line-height: 1.1;
-  color: var(--color-text-primary);
+  color: rgb(var(--v-theme-on-surface));
 }
 
 .drp-counts {
@@ -408,19 +408,19 @@ onUnmounted(() => {
 }
 
 .drp-cell--inrange {
-  background: color-mix(in srgb, var(--color-bg-btn) 18%, transparent);
+  background: color-mix(in srgb, rgb(var(--v-theme-primary)) 18%, transparent);
   border-radius: 0;
 }
 
 .drp-cell--start,
 .drp-cell--end {
-  background: var(--color-bg-btn);
+  background: rgb(var(--v-theme-primary));
   border-radius: var(--radius-md);
 }
 
 .drp-cell--start .drp-day,
 .drp-cell--end .drp-day {
-  color: var(--color-text-btn);
+  color: rgb(var(--v-theme-on-primary));
   font-weight: 800;
 }
 
@@ -430,7 +430,7 @@ onUnmounted(() => {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--color-text-primary);
+  background: rgb(var(--v-theme-on-surface));
   margin: 1px auto 0;
 }
 
@@ -448,7 +448,7 @@ onUnmounted(() => {
   align-items: center;
   font-size: 11px;
   font-weight: 700;
-  color: var(--color-text-secondary);
+  color: rgba(var(--v-theme-on-surface), 0.7);
   background: transparent;
   cursor: pointer;
   user-select: none;
@@ -457,8 +457,8 @@ onUnmounted(() => {
 }
 
 .drp-today:hover {
-  color: var(--color-text-primary);
-  background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+  color: rgb(var(--v-theme-on-surface));
+  background: color-mix(in srgb, rgb(var(--v-theme-on-surface)) 8%, transparent);
 }
 
 .drp-legend {
@@ -484,11 +484,7 @@ onUnmounted(() => {
 .drp-legend-text {
   font-size: 10px;
   font-weight: 600;
-  color: var(--color-text-muted);
+  color: rgba(var(--v-theme-on-surface), 0.6);
   margin-right: 4px;
-}
-
-.text-muted {
-  color: var(--color-text-muted);
 }
 </style>

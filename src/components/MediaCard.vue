@@ -35,14 +35,15 @@
 
         <div class="scrim-overlay"></div>
 
-        <button
+        <v-btn
           v-if="notSynced"
+          variant="flat"
           class="action-btn not-synced-badge"
           :title="$t('media_card.not_synced')"
           @click.stop="$emit('not-synced')"
         >
           <v-icon size="14" color="white">mdi-cloud-upload-outline</v-icon>
-        </button>
+        </v-btn>
 
         <div v-if="isVideo" class="video-indicator">
           <v-icon color="white" size="20">mdi-play</v-icon>
@@ -59,16 +60,17 @@
           </div>
         </div>
 
-        <button
+        <v-btn
           v-if="!selectionMode"
+          variant="flat"
           class="action-btn favorite-action"
           :class="{ 'is-fav': path.favorite }"
           @click.stop="toggleFavorite"
         >
-          <v-icon size="18" :color="path.favorite ? 'var(--color-error)' : 'white'">
+          <v-icon size="18" :color="path.favorite ? 'rgb(var(--v-theme-error))' : 'white'">
             {{ path.favorite ? 'mdi-heart' : 'mdi-heart-outline' }}
           </v-icon>
-        </button>
+        </v-btn>
       </template>
       <div v-else class="viewport-placeholder h-100 w-100 d-flex align-center justify-center"></div>
     </div>
@@ -78,7 +80,7 @@
           <span v-for="tag in tags" :key="tag" class="info-tag">{{ tag }}</span>
         </div>
         <div class="media-card-meta" v-if="hasResults">
-          <v-icon size="12" color="var(--color-text-secondary)">mdi-auto-fix</v-icon>
+          <v-icon size="12" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-auto-fix</v-icon>
         </div>
       </div>
       <div
@@ -94,15 +96,15 @@
           class="detail-item"
           :title="$t('media_card.aesthetics_score')"
         >
-          <v-icon size="10" color="var(--color-text-secondary)">mdi-star</v-icon>
+          <v-icon size="10" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-star</v-icon>
           {{ formatScore(path.aesthetics_score) }}
         </span>
         <span v-if="faceCount > 0" class="detail-item" :title="$t('media_card.faces_detected')">
-          <v-icon size="10" color="var(--color-text-secondary)">mdi-face</v-icon>
+          <v-icon size="10" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-face</v-icon>
           {{ faceCount }}
         </span>
         <span v-if="path.indexed === 2" class="detail-item" :title="$t('media_card.fully_indexed')">
-          <v-icon size="10" color="var(--color-success)">mdi-check-circle</v-icon>
+          <v-icon size="10" color="rgb(var(--v-theme-success))">mdi-check-circle</v-icon>
         </span>
       </div>
     </div>
@@ -255,16 +257,16 @@ onUnmounted(() => {
   overflow: hidden;
   border-radius: var(--radius-xl);
   position: relative;
-  background-color: var(--color-bg-zinc-100);
-  border: 1px solid var(--color-border-subtle);
+  background-color: rgb(var(--v-theme-surface-light));
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 
 .viewport-placeholder {
-  background-color: var(--color-bg-zinc-100);
+  background-color: rgb(var(--v-theme-surface-light));
 }
 
 .img-placeholder {
-  background-color: var(--color-bg-zinc-100);
+  background-color: rgb(var(--v-theme-surface-light));
 }
 
 .media-card-img {
@@ -306,7 +308,7 @@ onUnmounted(() => {
 }
 
 .is-selected .media-card-wrapper {
-  border: 4px solid var(--color-bg-btn);
+  border: 4px solid rgb(var(--v-theme-primary));
   transform: scale(0.92);
 }
 
@@ -331,8 +333,8 @@ onUnmounted(() => {
 }
 
 .check-circle.checked {
-  background: var(--color-bg-btn);
-  border-color: var(--color-bg-btn);
+  background: rgb(var(--v-theme-primary));
+  border-color: rgb(var(--v-theme-primary));
 }
 
 .video-indicator {
@@ -361,7 +363,7 @@ onUnmounted(() => {
   font-size: 10px;
   font-weight: 700;
   color: white;
-  background: color-mix(in srgb, var(--color-error) 90%, transparent);
+  background: color-mix(in srgb, rgb(var(--v-theme-error)) 90%, transparent);
   backdrop-filter: blur(8px);
   border-radius: var(--radius-pill);
   padding: 3px 8px;
@@ -405,14 +407,14 @@ onUnmounted(() => {
   right: auto;
   width: 28px;
   height: 28px;
-  background: color-mix(in srgb, var(--color-warning) 90%, transparent);
+  background: color-mix(in srgb, rgb(var(--v-theme-warning)) 90%, transparent);
   opacity: 1;
   transform: none;
   z-index: 6;
 }
 
 .not-synced-badge:hover {
-  background: var(--color-warning-strong);
+  background: rgb(var(--v-theme-warning));
 }
 
 .shadow-sm {
@@ -442,8 +444,8 @@ onUnmounted(() => {
 .info-tag {
   font-size: 10px;
   font-weight: 600;
-  color: var(--color-text-muted);
-  background: var(--color-bg-zinc-100);
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  background: rgb(var(--v-theme-surface-light));
   padding: 1px 6px;
   border-radius: 4px;
   text-transform: capitalize;
@@ -457,7 +459,7 @@ onUnmounted(() => {
 
 .media-card-caption {
   font-size: 11px;
-  color: var(--color-text-secondary);
+  color: rgba(var(--v-theme-on-surface), 0.7);
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -469,7 +471,7 @@ onUnmounted(() => {
 }
 
 .click-caption:hover {
-  color: var(--color-text-primary);
+  color: rgb(var(--v-theme-on-surface));
   text-decoration: underline;
 }
 
@@ -482,7 +484,7 @@ onUnmounted(() => {
 
 .detail-item {
   font-size: 10px;
-  color: var(--color-text-secondary);
+  color: rgba(var(--v-theme-on-surface), 0.7);
   display: inline-flex;
   align-items: center;
   gap: 2px;

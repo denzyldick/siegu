@@ -1,12 +1,12 @@
 <template>
-  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border-subtle overflow-hidden">
-    <v-card-item class="bg-zinc-100 py-4">
+  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border overflow-hidden">
+    <v-card-item style="background: rgb(var(--v-theme-surface-light))" class="py-4">
       <template v-slot:prepend>
-        <div class="siegu-icon-circle-dark mr-3">
-          <v-icon color="var(--color-text-btn)" size="small">mdi-theme-light-dark</v-icon>
-        </div>
+        <v-avatar color="on-surface" size="32" class="mr-3">
+          <v-icon color="surface" size="small">mdi-theme-light-dark</v-icon>
+        </v-avatar>
       </template>
-      <v-card-title class="text-h6 text-zinc-primary font-weight-bold">{{
+      <v-card-title class="text-h6 text-high-emphasis font-weight-bold">{{
         $t('settings.appearance')
       }}</v-card-title>
     </v-card-item>
@@ -20,7 +20,7 @@
         <v-radio value="system">
           <template v-slot:label>
             <span class="d-flex align-center">
-              <v-icon size="small" color="var(--color-text-muted)" class="mr-2"
+              <v-icon size="small" color="rgba(var(--v-theme-on-surface), 0.6)" class="mr-2"
                 >mdi-theme-light-dark</v-icon
               >
               {{ $t('settings.theme_system') }}
@@ -40,7 +40,7 @@
         <v-radio value="dark">
           <template v-slot:label>
             <span class="d-flex align-center">
-              <v-icon size="small" color="var(--color-text-muted)" class="mr-2"
+              <v-icon size="small" color="rgba(var(--v-theme-on-surface), 0.6)" class="mr-2"
                 >mdi-weather-night</v-icon
               >
               {{ $t('settings.theme_dark') }}

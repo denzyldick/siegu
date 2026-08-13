@@ -83,11 +83,11 @@ onUnmounted(() => {
   border: 2px solid transparent;
   transition: all 0.2s ease;
   opacity: 0.6;
-  background: var(--color-bg-zinc-100);
+  background: rgb(var(--v-theme-surface-light));
 }
 
 .rail-item.active {
-  border-color: var(--color-bg-btn);
+  border-color: rgb(var(--v-theme-primary));
   opacity: 1;
   transform: scale(1.1);
 }
@@ -102,7 +102,7 @@ onUnmounted(() => {
 .rail-placeholder {
   width: 100%;
   height: 100%;
-  background: var(--color-bg-zinc-100);
+  background: rgb(var(--v-theme-surface-light));
 }
 
 .rail-video-icon {
