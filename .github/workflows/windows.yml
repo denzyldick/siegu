@@ -43,6 +43,12 @@ jobs:
         with:
           workspaces: src-tauri
 
+      # ffmpeg-sys-next's configure (features = ["build"]) needs the full MSVC
+      # dev environment (cl.exe, link.exe, INCLUDE/LIB) or it fails with
+      # "cl.exe is unable to create an executable file".
+      - name: Set up MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
+
       # FFmpeg is built from source by ffmpeg-sys-next (features = ["build"]),
       # which requires nasm for x86 assembly. vcpkg/FFMPEG_DIR is no longer used.
       - name: Install nasm
