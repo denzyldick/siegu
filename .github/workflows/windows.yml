@@ -76,6 +76,36 @@ jobs:
       - name: Security audit
         run: cargo audit
 
+      # TEMP DIAGNOSTIC: reproduce ffmpeg-sys-next's configure failure and dump
+      # ffbuild/config.log to find why "cl.exe is unable to create an executable file".
+      - name: Diagnose FFmpeg configure failure (TEMP)
+        shell: bash
+        run: |
+          set -x
+          cd "$RUNNER_TEMP"
+          git clone --depth 1 -b release/8.1 https://github.com/FFmpeg/FFmpeg.git ffmpeg-diag
+          cd ffmpeg-diag
+          echo "=== which cl/link ==="
+          command -v cl || true
+          command -v link || true
+          ./configure --toolchain=msvc --prefix="$PWD/dist" \
+            --enable-debug --disable-stripping --enable-static --disable-shared \
+            --enable-pic --disable-autodetect --disable-programs --disable-doc \
+            --enable-avcodec --enable-avdevice --enable-avfilter --enable-avformat \
+            --enable-avutil --enable-swresample --enable-swscale \
+            > configure_stdout.log 2>&1
+          echo "=== configure exit: $? ==="
+          echo "=== configure_stdout.log ==="
+          cat configure_stdout.log
+          echo "=== ffbuild/config.log ==="
+          if [ -f ffbuild/config.log ]; then cat ffbuild/config.log; else echo "no config.log"; fi
+          echo "=== direct probe: cl compile + link + run ==="
+          printf 'int main(void){return 0;}\n' > conf.c
+          cl -nologo -c -Foconf.obj conf.c 2>&1 || echo "cl compile failed: $?"
+          link -out:conf.exe conf.obj 2>&1 || echo "link failed: $?"
+          ls -la conf.* 2>/dev/null || true
+          ./conf.exe && echo "run OK" || echo "run failed: $?"
+
       - run: cargo test
         working-directory: src-tauri
 
