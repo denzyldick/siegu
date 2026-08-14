@@ -14,7 +14,10 @@
             @click="clearSelection"
           ></v-btn>
           <div class="ml-4">
-            <div class="text-subtitle-2 font-weight-bold" style="color: rgb(var(--v-theme-on-primary))">
+            <div
+              class="text-subtitle-2 font-weight-bold"
+              style="color: rgb(var(--v-theme-on-primary))"
+            >
               {{ $t('media.items_selected', { count: selectedIds.size }) }}
             </div>
           </div>
@@ -67,7 +70,8 @@
             </h2>
             <v-spacer></v-spacer>
             <span
-              class="text-caption text-disabled font-weight-medium px-3 py-1 rounded-pill border" style="background: rgb(var(--v-theme-surface-light))"
+              class="text-caption text-disabled font-weight-medium px-3 py-1 rounded-pill border"
+              style="background: rgb(var(--v-theme-surface-light))"
             >
               {{ $t('media.items_count', { count: item.count }) }}
             </span>
@@ -98,7 +102,8 @@
             </h2>
             <v-spacer></v-spacer>
             <span
-              class="text-caption text-disabled font-weight-medium px-3 py-1 rounded-pill border" style="background: rgb(var(--v-theme-surface-light))"
+              class="text-caption text-disabled font-weight-medium px-3 py-1 rounded-pill border"
+              style="background: rgb(var(--v-theme-surface-light))"
             >
               {{ $t('media.items_count', { count: item.count }) }}
             </span>
@@ -126,13 +131,17 @@
     >
       <div class="empty-state-icon mb-6">
         <template v-if="searchQuery">
-          <v-icon size="80" color="rgba(var(--v-theme-on-surface), 0.25)">mdi-text-search-variant</v-icon>
+          <v-icon size="80" color="rgba(var(--v-theme-on-surface), 0.25)"
+            >mdi-text-search-variant</v-icon
+          >
         </template>
         <template v-else-if="filters.favoritesOnly">
           <v-icon size="80" color="rgba(var(--v-theme-error), 0.12)">mdi-heart-multiple</v-icon>
         </template>
         <template v-else>
-          <v-icon size="80" color="rgba(var(--v-theme-on-surface), 0.25)">mdi-image-multiple-outline</v-icon>
+          <v-icon size="80" color="rgba(var(--v-theme-on-surface), 0.25)"
+            >mdi-image-multiple-outline</v-icon
+          >
         </template>
       </div>
 
@@ -158,7 +167,8 @@
       <v-btn
         v-if="searchQuery"
         variant="flat"
-        class="px-8 py-6" color="primary"
+        class="px-8 py-6"
+        color="primary"
         @click="$emit('clear-search')"
       >
         {{ $t('media.clear_search') }}
@@ -184,7 +194,8 @@
         <v-btn
           v-else-if="!allLoaded && groups.length > 0"
           @click="loadFiles"
-          variant="outlined" class="px-10 py-6"
+          variant="outlined"
+          class="px-10 py-6"
         >
           {{ $t('media.load_more') }}
         </v-btn>
@@ -293,6 +304,7 @@ let observer: IntersectionObserver | null = null;
 let unlistenDiscovered: UnlistenFn | null = null;
 let unlistenAnalysisResult: UnlistenFn | null = null;
 let unlistenPhotoReceived: UnlistenFn | null = null;
+let unlistenRefreshed: UnlistenFn | null = null;
 let reloadTimer: ReturnType<typeof setTimeout> | null = null;
 let discoveredTimer: ReturnType<typeof setTimeout> | null = null;
 let photoReceivedTimer: ReturnType<typeof setTimeout> | null = null;
@@ -675,6 +687,10 @@ onMounted(async () => {
     photoReceivedTimer = setTimeout(scheduleReload, 500);
   });
 
+  unlistenRefreshed = await listen('photos-refreshed', () => {
+    scheduleReload();
+  });
+
   updateColumns();
   window.addEventListener('resize', updateColumns);
   setupInfiniteScroll();
@@ -686,6 +702,7 @@ onUnmounted(() => {
   unlistenDiscovered?.();
   unlistenAnalysisResult?.();
   unlistenPhotoReceived?.();
+  unlistenRefreshed?.();
   if (reloadTimer) clearTimeout(reloadTimer);
   if (discoveredTimer) clearTimeout(discoveredTimer);
   if (photoReceivedTimer) clearTimeout(photoReceivedTimer);

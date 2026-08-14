@@ -78,10 +78,13 @@ pub async fn start_watcher(app: tauri::AppHandle) {
 pub fn scan_folder(
     app: &tauri::AppHandle,
     directory: String,
-    path: &str,
+    database: &Arc<std::sync::Mutex<database::Database>>,
     batch_tx: &Sender<database::Photo>,
 ) {
-    let existing = Arc::new(siegu_core::scanner::load_existing_paths(path));
+    let existing = {
+        let db = database.lock().unwrap_or_else(|e| e.into_inner());
+        db.existing_locations()
+    };
     emit_log(
         app,
         format!(
@@ -107,8 +110,12 @@ pub fn scan_folder(
     let total_new = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let total_new_clone = Arc::clone(&total_new);
 
+    // jwalk walks directories on its own dedicated rayon pool so its producer can
+    // never be starved by the metadata closures below saturating the shared global
+    // pool (which would deadlock the pipeline when the batch channel fills).
     let result: Result<(), ()> = jwalk::WalkDir::new(&directory)
         .follow_links(false)
+        .parallelism(jwalk::Parallelism::RayonNewPool(4))
         .into_iter()
         .par_bridge()
         .try_for_each(|entry_result| {
@@ -148,9 +155,9 @@ pub fn scan_folder(
                 properties: meta.properties,
                 latitude: meta.latitude,
                 longitude: meta.longitude,
-                favorite: false,
+                favorite: meta.favorite,
                 indexed: 0,
-                caption: None,
+                caption: meta.caption,
                 aesthetics_score: None,
                 ai_status: database::AiStatus::default(),
                 sync_needed: true,

@@ -7327,6 +7327,7 @@ dependencies = [
  "base64 0.22.1",
  "bip39",
  "bytes",
+ "chrono",
  "crossbeam-channel",
  "ffmpeg-next",
  "futures-util",

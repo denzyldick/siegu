@@ -1093,6 +1093,14 @@ impl Database {
         );
     }
 
+    /// Write a single config key-value pair, replacing any existing value.
+    pub fn set_state_value(&self, key: &str, value: &str) {
+        let _ = self.connection.execute(
+            "INSERT OR REPLACE INTO config (key, value) VALUES(?1, ?2)",
+            (key, value),
+        );
+    }
+
     /// Save a sync session for auto-reconnect on next startup.
     /// The passphrase is encrypted with AES-256-GCM using a device-derived key.
     pub fn save_session(&self, session: &SavedSession) {
@@ -2484,6 +2492,19 @@ impl Database {
         results
     }
 
+    /// All stored media locations, used to skip already-indexed files during a
+    /// scan. Uses the existing connection so a scan never opens a fresh
+    /// connection while other components are writing concurrently.
+    pub fn existing_locations(&self) -> std::collections::HashSet<String> {
+        let mut stmt = match self.connection.prepare("SELECT location FROM photo") {
+            Ok(s) => s,
+            Err(_) => return std::collections::HashSet::new(),
+        };
+        stmt.query_map([], |row| row.get::<_, String>(0))
+            .map(|iter| iter.flatten().collect())
+            .unwrap_or_default()
+    }
+
     /// Remove a monitored directory path from the config.
     pub fn remove_directory(&self, path: String) {
         if let Err(e) = self
@@ -2776,7 +2797,7 @@ impl Database {
     pub fn store_photo_batch(&mut self, photos: &[Photo]) -> Result<(), String> {
         let tx = self.connection.transaction().map_err(|e| e.to_string())?;
         {
-            let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO photo(id, location, encoded, created, latitude, longitude, indexed, sync_needed) VALUES(?1, ?2, ?3, ?4, ?5, ?6, 1, 1)").map_err(|e| e.to_string())?;
+            let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO photo(id, location, encoded, created, latitude, longitude, indexed, sync_needed, caption) VALUES(?1, ?2, ?3, ?4, ?5, ?6, 1, 1, ?7)").map_err(|e| e.to_string())?;
             for p in photos {
                 let _ = stmt.execute((
                     &p.id,
@@ -2785,6 +2806,7 @@ impl Database {
                     &p.created,
                     &p.latitude,
                     &p.longitude,
+                    &p.caption,
                 ));
             }
         }
@@ -2797,6 +2819,9 @@ impl Database {
             for p in photos {
                 for (key, value) in &p.properties {
                     let _ = prop_stmt.execute((&p.id, key, value));
+                }
+                if p.favorite {
+                    let _ = prop_stmt.execute((&p.id, "favorite", "true"));
                 }
             }
         }

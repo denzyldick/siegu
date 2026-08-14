@@ -281,6 +281,46 @@ pub fn run() {
                 }
             });
 
+            // One-time repair of photo dates and Google Takeout metadata (sidecar
+            // dates, format normalization, GPS/captions/favorites). Runs once per
+            // library on a background thread, guarded so it never overlaps a scan.
+            // Emits `photos-refreshed` so the grid reorders immediately.
+            let app_handle_for_backfill = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let cp = get_config_path(&app_handle_for_backfill);
+                if cp.is_empty() {
+                    return;
+                }
+                let session = app_handle_for_backfill
+                    .state::<ScanState>()
+                    .guard
+                    .try_start();
+                let Some(session) = session else {
+                    return;
+                };
+                let stats = tauri::async_runtime::spawn_blocking(move || {
+                    let stats = siegu_core::backfill::run_backfill(&cp);
+                    let _ = session;
+                    stats
+                })
+                .await;
+                let Ok(stats) = stats else {
+                    return;
+                };
+                if stats.created_updated > 0 || stats.metadata_updated > 0 {
+                    emit_log(
+                        &app_handle_for_backfill,
+                        format!(
+                            "[backfill] Corrected dates/metadata for {} photo(s) ({} unchanged of {} scanned)",
+                            stats.created_updated + stats.metadata_updated,
+                            stats.unchanged,
+                            stats.scanned
+                        ),
+                    );
+                    let _ = app_handle_for_backfill.emit("photos-refreshed", ());
+                }
+            });
+
             // Periodic temp file cleanup every 30 minutes
             let app_handle_for_cleanup = app.handle().clone();
             tauri::async_runtime::spawn(async move {

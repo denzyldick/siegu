@@ -121,6 +121,7 @@ pub fn scan_files(app: tauri::AppHandle) {
     let database = Arc::new(std::sync::Mutex::new(database::Database::new(
         &path_for_batch,
     )));
+    let database_for_scan = Arc::clone(&database);
     let ui_buffer = Arc::new(tokio::sync::Mutex::new(Vec::new()));
 
     {
@@ -242,7 +243,7 @@ pub fn scan_files(app: tauri::AppHandle) {
                 &app,
                 format!("[scan_files] Calling scan_folder for: {folder}"),
             );
-            file::scan_folder(&app, folder.clone(), &path, &batch_tx_shared);
+            file::scan_folder(&app, folder.clone(), &database_for_scan, &batch_tx_shared);
             emit_log(
                 &app,
                 format!("[scan_files] scan_folder completed for: {folder}"),
