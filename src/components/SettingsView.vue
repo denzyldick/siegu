@@ -9,7 +9,9 @@
               <v-icon color="rgb(var(--v-theme-on-surface))" size="28" class="mr-3"
                 >mdi-cog-outline</v-icon
               >
-              <h1 class="text-h4 font-weight-bold text-high-emphasis">{{ $t('settings.title') }}</h1>
+              <h1 class="text-h4 font-weight-bold text-high-emphasis">
+                {{ $t('settings.title') }}
+              </h1>
             </div>
             <div class="text-subtitle-1 text-medium-emphasis">{{ $t('settings.desc') }}</div>
           </div>
@@ -57,7 +59,7 @@
           @download-update="downloadUpdate"
         />
 
-        <AboutSection />
+        <AboutSection v-if="!embedded" />
       </v-col>
     </v-row>
 
