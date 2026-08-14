@@ -88,26 +88,45 @@ jobs:
           echo "=== which cl/link ==="
           command -v cl || true
           command -v link || true
-          ./configure --toolchain=msvc --prefix="$PWD/dist" \
+          # Mirror ffmpeg-sys-next build.rs args as closely as possible (incl.
+          # --extra-cflags and a Windows-style absolute --prefix).
+          ./configure --toolchain=msvc --prefix="D:\\a\\siegu\\siegu\\target\\debug\\build\\ffmpeg-sys-next-0\\out\\dist" \
+            --extra-cflags="-march=native -mtune=native" \
             --enable-debug --disable-stripping --enable-static --disable-shared \
             --enable-pic --disable-autodetect --disable-programs --disable-doc \
             --enable-avcodec --enable-avdevice --enable-avfilter --enable-avformat \
             --enable-avutil --enable-swresample --enable-swscale \
             > configure_stdout.log 2>&1
           echo "=== configure exit: $? ==="
-          echo "=== configure_stdout.log ==="
-          cat configure_stdout.log
-          echo "=== ffbuild/config.log ==="
-          if [ -f ffbuild/config.log ]; then cat ffbuild/config.log; else echo "no config.log"; fi
-          echo "=== direct probe: cl compile + link + run ==="
+          echo "=== configure_stdout.log (tail) ==="
+          tail -30 configure_stdout.log
+          echo "=== ffbuild/config.log (tail) ==="
+          if [ -f ffbuild/config.log ]; then tail -50 ffbuild/config.log; else echo "no config.log"; fi
+          echo "=== direct probe: cl compile + MSVC link (dirname cl) + run ==="
           printf 'int main(void){return 0;}\n' > conf.c
           cl -nologo -c -Foconf.obj conf.c 2>&1 || echo "cl compile failed: $?"
-          link -out:conf.exe conf.obj 2>&1 || echo "link failed: $?"
+          MSVC_LINK="$(dirname "$(command -v cl)")/link.exe"
+          echo "MSVC_LINK=$MSVC_LINK"
+          "$MSVC_LINK" -nologo -out:conf.exe conf.obj 2>&1 || echo "MSVC link failed: $?"
           ls -la conf.* 2>/dev/null || true
           ./conf.exe && echo "run OK" || echo "run failed: $?"
+          echo "=== direct probe: PATH 'link' (coreutils?) ==="
+          link -out:conf2.exe conf.obj 2>&1 || echo "PATH link failed: $?"
 
       - run: cargo test
         working-directory: src-tauri
+
+      # TEMP DIAGNOSTIC: dump the config.log left by the failed real build.
+      - name: Dump real ffbuild/config.log (TEMP)
+        if: always()
+        shell: bash
+        run: |
+          echo "=== find config.log ==="
+          find target -name config.log -path '*ffmpeg*' 2>/dev/null | head
+          for f in $(find target -name config.log -path '*ffmpeg*' 2>/dev/null); do
+            echo "===== $f (tail 80) ====="
+            tail -80 "$f"
+          done
 
       - run: cargo test -p siegu-core
         working-directory: src-tauri
