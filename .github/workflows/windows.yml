@@ -76,32 +76,41 @@ jobs:
       - name: Security audit
         run: cargo audit
 
-      # TEMP DIAGNOSTIC: reproduce ffmpeg-sys-next's configure failure and dump
-      # ffbuild/config.log to find why "cl.exe is unable to create an executable file".
+      # TEMP DIAGNOSTIC: isolate which build.rs configure arg breaks MSVC
+      # configure. Run three variants and capture every config.log.
       - name: Diagnose FFmpeg configure failure (TEMP)
         shell: bash
         run: |
           set -x
+          set +e
           cd "$RUNNER_TEMP"
+          rm -rf ffmpeg-diag
           git clone --depth 1 -b release/8.1 https://github.com/FFmpeg/FFmpeg.git ffmpeg-diag
           cd ffmpeg-diag
           echo "=== which cl/link ==="
           command -v cl || true
           command -v link || true
-          # Mirror ffmpeg-sys-next build.rs args as closely as possible (incl.
-          # --extra-cflags and a Windows-style absolute --prefix).
-          ./configure --toolchain=msvc --prefix="D:\\a\\siegu\\siegu\\target\\debug\\build\\ffmpeg-sys-next-0\\out\\dist" \
-            --extra-cflags="-march=native -mtune=native" \
-            --enable-debug --disable-stripping --enable-static --disable-shared \
-            --enable-pic --disable-autodetect --disable-programs --disable-doc \
-            --enable-avcodec --enable-avdevice --enable-avfilter --enable-avformat \
-            --enable-avutil --enable-swresample --enable-swscale \
-            > configure_stdout.log 2>&1
-          echo "=== configure exit: $? ==="
-          echo "=== configure_stdout.log (tail) ==="
-          tail -30 configure_stdout.log
-          echo "=== ffbuild/config.log (tail) ==="
-          if [ -f ffbuild/config.log ]; then tail -50 ffbuild/config.log; else echo "no config.log"; fi
+          BASE=(--toolchain=msvc --enable-debug --disable-stripping --enable-static
+            --disable-shared --enable-pic --disable-autodetect --disable-programs
+            --disable-doc --enable-avcodec --enable-avdevice --enable-avfilter
+            --enable-avformat --enable-avutil --enable-swresample --enable-swscale)
+          run_cfg() {
+            local name="$1"; shift
+            echo "########## BEGIN $name ##########"
+            ./configure "$@" 2>&1 | tee "cfg_$name.log"
+            local rc=${PIPESTATUS[0]}
+            echo "########## $name EXIT: $rc ##########"
+            echo "---- $name config.log tail (40) ----"
+            tail -40 ffbuild/config.log 2>/dev/null
+            rm -rf ffbuild config.h config.asm config.mak config.log config_components.h config_components.mak
+            echo "########## END $name ##########"
+          }
+          echo "### 1. CONTROL: MSYS prefix, no extra-cflags ###"
+          run_cfg control "${BASE[@]}" --prefix="$PWD/dist"
+          echo "### 2. EXTRA-CFLAGS: -march=native -mtune=native ###"
+          run_cfg extra "${BASE[@]}" --prefix="$PWD/dist" --extra-cflags="-march=native -mtune=native"
+          echo "### 3. BACKSLASH PREFIX: D:\\a\\... ###"
+          run_cfg backslash "${BASE[@]}" --prefix='D:\a\siegu\siegu\target\debug\build\ffmpeg-sys-next-0\out\dist'
           echo "=== direct probe: cl compile + MSVC link (dirname cl) + run ==="
           printf 'int main(void){return 0;}\n' > conf.c
           cl -nologo -c -Foconf.obj conf.c 2>&1 || echo "cl compile failed: $?"
@@ -112,6 +121,7 @@ jobs:
           ./conf.exe && echo "run OK" || echo "run failed: $?"
           echo "=== direct probe: PATH 'link' (coreutils?) ==="
           link -out:conf2.exe conf.obj 2>&1 || echo "PATH link failed: $?"
+          echo "=== DONE diagnostic step ==="
 
       - run: cargo test
         working-directory: src-tauri
@@ -122,11 +132,12 @@ jobs:
         shell: bash
         run: |
           echo "=== find config.log ==="
-          find target -name config.log -path '*ffmpeg*' 2>/dev/null | head
-          for f in $(find target -name config.log -path '*ffmpeg*' 2>/dev/null); do
+          find . -name config.log -path '*ffmpeg*' 2>/dev/null | head
+          for f in $(find . -name config.log -path '*ffmpeg*' 2>/dev/null); do
             echo "===== $f (tail 80) ====="
-            tail -80 "$f"
+            tail -80 "$f" || true
           done
+          echo "=== done dump ==="
 
       - run: cargo test -p siegu-core
         working-directory: src-tauri
