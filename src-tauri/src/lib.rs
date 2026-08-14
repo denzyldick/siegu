@@ -265,12 +265,18 @@ pub fn run() {
             let app_handle_for_interval = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
+                // `tokio::time::interval` fires its first tick immediately, which
+                // would trigger a full library rescan on every app launch and slow
+                // startup for large libraries. Consume that tick so the first scan
+                // only runs after a full hour; the file watcher and the manual
+                // "Scan" button still cover live changes.
+                interval.tick().await;
                 loop {
+                    interval.tick().await;
                     emit_log(
                         &app_handle_for_interval,
                         "Interval tick: checking for media updates...".to_string(),
                     );
-                    interval.tick().await;
                     commands::scan::scan_files(app_handle_for_interval.clone());
                 }
             });
