@@ -67,7 +67,12 @@ onUnmounted(() => {
     </div>
 
     <div v-if="scanning && hosts.length === 0" class="d-flex align-center justify-center py-6 ga-3">
-      <v-progress-circular indeterminate color="rgba(var(--v-theme-on-surface), 0.7)" size="20" width="2" />
+      <v-progress-circular
+        indeterminate
+        color="rgba(var(--v-theme-on-surface), 0.7)"
+        size="20"
+        width="2"
+      />
       <span class="text-caption text-medium-emphasis">{{ $t('connect.searching_network') }}</span>
     </div>
 

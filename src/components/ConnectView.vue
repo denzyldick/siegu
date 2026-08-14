@@ -12,8 +12,8 @@
         >
           <div class="d-flex align-center">
             <v-avatar color="rgba(255,255,255,0.2)" size="32" class="mr-3">
-            <v-icon size="14">mdi-plus</v-icon>
-          </v-avatar>
+              <v-icon size="14">mdi-plus</v-icon>
+            </v-avatar>
             <span class="font-weight-bold">{{ $t('devices.add_device') }}</span>
           </div>
         </v-btn>
@@ -75,8 +75,8 @@
               >
                 <div class="d-flex align-center">
                   <v-avatar color="rgba(255,255,255,0.2)" size="28" class="mr-2">
-            <v-icon size="14">mdi-laptop</v-icon>
-          </v-avatar>
+                    <v-icon size="14">mdi-laptop</v-icon>
+                  </v-avatar>
                   <span class="font-weight-bold">{{ $t('connect.host') }}</span>
                 </div>
               </v-btn>
@@ -94,8 +94,8 @@
               >
                 <div class="d-flex align-center">
                   <v-avatar color="rgba(255,255,255,0.2)" size="28" class="mr-2">
-            <v-icon size="14">mdi-cellphone-link</v-icon>
-          </v-avatar>
+                    <v-icon size="14">mdi-cellphone-link</v-icon>
+                  </v-avatar>
                   <span class="font-weight-bold">{{ $t('connect.join') }}</span>
                 </div>
               </v-btn>
@@ -186,7 +186,8 @@
             <div
               v-for="peer in peerList"
               :key="peer.device_id"
-              style="background: rgb(var(--v-theme-surface))" class="d-flex align-center pa-2 mb-1 rounded"
+              style="background: rgb(var(--v-theme-surface))"
+              class="d-flex align-center pa-2 mb-1 rounded"
             >
               <v-icon size="14" class="mr-2 text-medium-emphasis">mdi-laptop</v-icon>
               <span class="text-body-2 text-high-emphasis font-weight-medium">{{ peer.name }}</span>
@@ -219,8 +220,8 @@
             >
               <div class="d-flex align-center">
                 <v-avatar color="rgba(255,255,255,0.2)" size="32" class="mr-2">
-            <v-icon size="16">mdi-laptop</v-icon>
-          </v-avatar>
+                  <v-icon size="16">mdi-laptop</v-icon>
+                </v-avatar>
                 <span class="font-weight-bold">{{ $t('connect.host') }}</span>
               </div>
             </v-btn>
@@ -238,8 +239,8 @@
             >
               <div class="d-flex align-center">
                 <v-avatar color="rgba(255,255,255,0.2)" size="32" class="mr-2">
-            <v-icon size="16">mdi-cellphone-link</v-icon>
-          </v-avatar>
+                  <v-icon size="16">mdi-cellphone-link</v-icon>
+                </v-avatar>
                 <span class="font-weight-bold">{{ $t('connect.join') }}</span>
               </div>
             </v-btn>
@@ -287,7 +288,8 @@
           <div
             v-for="peer in peerList"
             :key="peer.device_id"
-            style="background: rgb(var(--v-theme-surface))" class="d-flex align-center pa-2 mb-1 rounded"
+            style="background: rgb(var(--v-theme-surface))"
+            class="d-flex align-center pa-2 mb-1 rounded"
           >
             <v-icon size="14" class="mr-2 text-medium-emphasis">mdi-laptop</v-icon>
             <span class="text-body-2 text-high-emphasis font-weight-medium">{{ peer.name }}</span>

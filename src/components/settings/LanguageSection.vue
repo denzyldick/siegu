@@ -22,7 +22,6 @@
         hide-details
         flat
         rounded="lg"
-
       ></v-select>
     </v-card-text>
   </v-card>

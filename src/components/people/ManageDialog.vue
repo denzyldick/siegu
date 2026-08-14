@@ -99,7 +99,8 @@ function handleMerge(): void {
               block
               size="x-large"
               variant="flat"
-              class="rounded-xl text-none font-weight-bold py-7 shadow-lg" color="primary"
+              class="rounded-xl text-none font-weight-bold py-7 shadow-lg"
+              color="primary"
               @click="handleRename"
             >
               {{ $t('people.update_name') }}
@@ -117,7 +118,10 @@ function handleMerge(): void {
               <v-icon color="rgb(var(--v-theme-warning))" size="20" class="mt-1"
                 >mdi-alert-circle-outline</v-icon
               >
-              <div style="color: rgb(var(--v-theme-warning))" class="font-weight-medium text-body-2">
+              <div
+                style="color: rgb(var(--v-theme-warning))"
+                class="font-weight-medium text-body-2"
+              >
                 <span>{{ $t('people.merge_desc', { name: activePerson?.name }) }}</span>
               </div>
             </div>
@@ -138,7 +142,8 @@ function handleMerge(): void {
               block
               size="x-large"
               variant="flat"
-              class="rounded-xl text-none font-weight-bold py-7 shadow-sm" color="primary"
+              class="rounded-xl text-none font-weight-bold py-7 shadow-sm"
+              color="primary"
               :disabled="!mergeTargetId"
               @click="handleMerge"
             >

@@ -193,7 +193,9 @@ onUnmounted(() => {
           <span class="drp-range-text">{{ displayRange[1] }}</span>
         </template>
         <template v-else>
-          <span class="drp-range-text" style="color: rgba(var(--v-theme-on-surface), 0.6)">{{ t('search.date_picker.hint') }}</span>
+          <span class="drp-range-text" style="color: rgba(var(--v-theme-on-surface), 0.6)">{{
+            t('search.date_picker.hint')
+          }}</span>
         </template>
       </div>
       <v-btn v-if="displayRange" size="small" variant="text" class="drp-clear" @click="clear">

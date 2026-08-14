@@ -21,7 +21,9 @@
               class="px-0"
             >
               <template v-slot:prepend>
-                <v-icon color="rgba(var(--v-theme-on-surface), 0.6)" class="mr-2">mdi-folder</v-icon>
+                <v-icon color="rgba(var(--v-theme-on-surface), 0.6)" class="mr-2"
+                  >mdi-folder</v-icon
+                >
               </template>
               <v-list-item-title class="text-high-emphasis font-weight-medium text-truncate">{{
                 directory.title
@@ -57,10 +59,7 @@
             </v-list-item>
           </v-list>
         </div>
-        <div
-          v-else
-          class="text-center py-8 text-disabled border border-dashed rounded-lg border"
-        >
+        <div v-else class="text-center py-8 text-disabled border border-dashed rounded-lg border">
           <div>{{ $t('settings.no_folders') }}</div>
         </div>
       </v-expand-transition>

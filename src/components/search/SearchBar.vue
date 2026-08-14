@@ -409,7 +409,9 @@ function iconForFilter(type: string): string {
 <template>
   <div ref="searchWrapRef" class="search-wrapper">
     <div class="search-field" data-tour="search" @click="openDropdown">
-      <v-icon size="20" class="search-icon" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-magnify</v-icon>
+      <v-icon size="20" class="search-icon" color="rgba(var(--v-theme-on-surface), 0.7)"
+        >mdi-magnify</v-icon
+      >
       <input
         v-model="searchStore.query"
         class="search-input"

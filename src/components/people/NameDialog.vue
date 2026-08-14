@@ -95,7 +95,8 @@ function handleSave(): void {
           block
           size="x-large"
           variant="flat"
-          class="rounded-xl text-none font-weight-bold shadow-lg py-7" color="primary"
+          class="rounded-xl text-none font-weight-bold shadow-lg py-7"
+          color="primary"
           :disabled="!newName"
           @click="handleSave"
         >

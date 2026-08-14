@@ -4,7 +4,12 @@
     role="status"
     aria-live="polite"
   >
-    <v-progress-circular indeterminate size="36" width="3" color="rgba(var(--v-theme-on-surface), 0.7)" />
+    <v-progress-circular
+      indeterminate
+      size="36"
+      width="3"
+      color="rgba(var(--v-theme-on-surface), 0.7)"
+    />
     <span
       v-if="label"
       class="mt-4 text-caption text-disabled font-weight-medium tracking-widest text-uppercase"

@@ -25,7 +25,13 @@ const logoUrl = ref(logo);
           </p>
 
           <div class="d-flex flex-column ga-4">
-            <v-card variant="flat" color="primary" class="py-4 px-6" style="color: rgb(var(--v-theme-on-primary))" @click="emit('setup-local')">
+            <v-card
+              variant="flat"
+              color="primary"
+              class="py-4 px-6"
+              style="color: rgb(var(--v-theme-on-primary))"
+              @click="emit('setup-local')"
+            >
               <div class="d-flex align-center">
                 <v-avatar color="rgba(255,255,255,0.2)" size="32" class="mr-4">
                   <v-icon>mdi-folder-plus</v-icon>
@@ -39,7 +45,13 @@ const logoUrl = ref(logo);
               </div>
             </v-card>
 
-            <v-card variant="flat" color="primary" class="py-4 px-6" style="color: rgb(var(--v-theme-on-primary))" @click="emit('setup-sync')">
+            <v-card
+              variant="flat"
+              color="primary"
+              class="py-4 px-6"
+              style="color: rgb(var(--v-theme-on-primary))"
+              @click="emit('setup-sync')"
+            >
               <div class="d-flex align-center">
                 <v-avatar color="rgba(255,255,255,0.2)" size="32" class="mr-4">
                   <v-icon>mdi-sync</v-icon>

@@ -9,13 +9,9 @@
         </h3>
         <p class="text-body-2 text-medium-emphasis mb-6">{{ $t(currentStep.descKey) }}</p>
         <div class="d-flex align-center justify-space-between">
-          <v-btn
-            variant="text"
-            size="small"
-            class="text-disabled font-weight-bold"
-            @click="skip"
-            >{{ $t('guided_tour.skip') }}</v-btn
-          >
+          <v-btn variant="text" size="small" class="text-disabled font-weight-bold" @click="skip">{{
+            $t('guided_tour.skip')
+          }}</v-btn>
           <div class="d-flex align-center ga-1">
             <span
               v-for="(_, i) in steps"

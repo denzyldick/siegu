@@ -14,7 +14,10 @@
             @click="clearSelection"
           ></v-btn>
           <div class="ml-4">
-            <div class="text-subtitle-2 font-weight-bold" style="color: rgb(var(--v-theme-on-primary))">
+            <div
+              class="text-subtitle-2 font-weight-bold"
+              style="color: rgb(var(--v-theme-on-primary))"
+            >
               {{ $t('albums.selected', { count: selectedIds.length }) }}
             </div>
           </div>
@@ -51,12 +54,7 @@
         >
           <v-icon size="18">mdi-undo</v-icon>
         </v-btn>
-        <v-btn
-          variant="flat"
-          color="primary"
-          class="px-6"
-          @click="openNewAlbumDialog"
-        >
+        <v-btn variant="flat" color="primary" class="px-6" @click="openNewAlbumDialog">
           <v-icon start size="18">mdi-plus</v-icon>
           {{ $t('albums.new_album') }}
         </v-btn>
@@ -197,7 +195,11 @@
               <v-list-item @click="openRenameDialog" prepend-icon="mdi-pencil-outline">
                 <v-list-item-title>{{ $t('albums.rename_album') }}</v-list-item-title>
               </v-list-item>
-              <v-list-item @click="confirmDelete = true" prepend-icon="mdi-delete-outline" color="error">
+              <v-list-item
+                @click="confirmDelete = true"
+                prepend-icon="mdi-delete-outline"
+                color="error"
+              >
                 <v-list-item-title>{{ $t('albums.delete_album') }}</v-list-item-title>
               </v-list-item>
             </template>
@@ -311,7 +313,9 @@
         class="empty-state-container d-flex flex-column align-center justify-center text-center"
       >
         <div class="empty-state-icon mb-6">
-          <v-icon size="80" color="rgba(var(--v-theme-on-surface), 0.25)">mdi-text-search-variant</v-icon>
+          <v-icon size="80" color="rgba(var(--v-theme-on-surface), 0.25)"
+            >mdi-text-search-variant</v-icon
+          >
         </div>
         <h3 class="text-h5 font-weight-bold text-high-emphasis mb-2">
           {{ $t('albums.no_results_in_album', { query }) }}
@@ -331,7 +335,8 @@
           <v-btn
             v-else-if="!searching && !allLoaded && items.length > 0"
             @click="loadMore"
-            variant="outlined" class="px-10 py-6"
+            variant="outlined"
+            class="px-10 py-6"
           >
             {{ $t('albums.load_more') }}
           </v-btn>

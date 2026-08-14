@@ -52,10 +52,7 @@ const displayEta = computed(() => {
             </div>
           </div>
           <div class="d-flex align-center ga-3 flex-shrink-0">
-            <span
-              v-if="displayEta && !scanStore.stoppedMessage"
-              class="text-caption text-disabled"
-            >
+            <span v-if="displayEta && !scanStore.stoppedMessage" class="text-caption text-disabled">
               ~{{ displayEta }}
             </span>
             <span

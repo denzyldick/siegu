@@ -336,10 +336,7 @@
               <div class="text-caption text-disabled mb-3 text-uppercase tracking-widest">
                 {{ $t('media_viewer.people_in_photo') }}
               </div>
-              <div
-                v-if="detectedFaces.length === 0"
-                class="text-body-2 text-disabled font-italic"
-              >
+              <div v-if="detectedFaces.length === 0" class="text-body-2 text-disabled font-italic">
                 {{ $t('media_viewer.no_faces') }}
               </div>
               <div class="d-flex flex-wrap ga-3">

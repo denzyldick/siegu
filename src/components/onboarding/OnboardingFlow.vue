@@ -86,21 +86,15 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
         <v-card variant="flat" rounded="xl" class="pa-8 border">
           <div class="text-center mb-8">
             <v-avatar color="rgb(var(--v-theme-surface-light))" size="48" class="mx-auto mb-4">
-            <v-icon color="rgb(var(--v-theme-on-surface))">mdi-folder-plus</v-icon>
-          </v-avatar>
+              <v-icon color="rgb(var(--v-theme-on-surface))">mdi-folder-plus</v-icon>
+            </v-avatar>
             <h2 class="text-h4 font-weight-bold text-high-emphasis">
               {{ t('onboarding.add_media_title') }}
             </h2>
             <p class="text-medium-emphasis">{{ t('onboarding.add_media_desc') }}</p>
           </div>
           <SettingsView :embedded="true" hide-ai-section />
-          <v-btn
-            block
-            color="primary"
-            height="56"
-            class="mt-8"
-            @click="goToStep('models')"
-          >
+          <v-btn block color="primary" height="56" class="mt-8" @click="goToStep('models')">
             {{ t('onboarding.continue_ai') }}
           </v-btn>
         </v-card>
@@ -114,8 +108,8 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
         <v-card variant="flat" rounded="xl" class="pa-8 border">
           <div class="text-center mb-8">
             <v-avatar color="on-surface" size="48" class="mx-auto mb-4">
-            <v-icon color="surface">mdi-auto-fix</v-icon>
-          </v-avatar>
+              <v-icon color="surface">mdi-auto-fix</v-icon>
+            </v-avatar>
             <h2 class="text-h4 font-weight-bold text-high-emphasis">
               {{ t('onboarding.ai_title') }}
             </h2>
@@ -148,8 +142,8 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
         <v-card variant="flat" rounded="xl" class="pa-8 border">
           <div class="text-center mb-8">
             <v-avatar color="rgb(var(--v-theme-surface-light))" size="48" class="mx-auto mb-4">
-            <v-icon color="rgb(var(--v-theme-on-surface))">mdi-cellphone-link</v-icon>
-          </v-avatar>
+              <v-icon color="rgb(var(--v-theme-on-surface))">mdi-cellphone-link</v-icon>
+            </v-avatar>
             <h2 class="text-h4 font-weight-bold text-high-emphasis">
               {{ t('onboarding.sync_title') }}
             </h2>
@@ -160,9 +154,12 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
             <div v-if="connectionMode === 'join' && !deviceConnected" class="mb-8">
               <v-card
                 variant="flat"
-                color="surface" class="border pa-4 rounded-xl d-flex align-center"
+                color="surface"
+                class="border pa-4 rounded-xl d-flex align-center"
               >
-                <v-icon color="rgba(var(--v-theme-on-surface), 0.7)" class="mr-3">mdi-folder-sync</v-icon>
+                <v-icon color="rgba(var(--v-theme-on-surface), 0.7)" class="mr-3"
+                  >mdi-folder-sync</v-icon
+                >
                 <div class="flex-grow-1 overflow-hidden">
                   <div class="text-caption text-medium-emphasis">
                     {{ t('onboarding.sync_storage') }}
@@ -200,7 +197,11 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
           <v-fade-transition>
             <div v-if="deviceConnected" class="mb-6">
               <div
-                style="background: rgba(var(--v-theme-success), 0.12); border: 1px solid rgba(var(--v-theme-success), 0.3)" class="pa-4 rounded-xl mb-4 text-center d-flex align-center justify-center"
+                style="
+                  background: rgba(var(--v-theme-success), 0.12);
+                  border: 1px solid rgba(var(--v-theme-success), 0.3);
+                "
+                class="pa-4 rounded-xl mb-4 text-center d-flex align-center justify-center"
               >
                 <v-icon color="success" class="mr-2">mdi-check-circle</v-icon>
                 <span class="font-weight-bold" style="color: rgb(var(--v-theme-success))">{{
@@ -308,13 +309,7 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
             {{ t('onboarding.ready_title') }}
           </h2>
           <p class="text-body-1 text-medium-emphasis mb-10">{{ t('onboarding.ready_desc') }}</p>
-          <v-btn
-            block
-            color="primary"
-            height="64"
-            class="mb-4"
-            @click="finishSetupAndScan"
-          >
+          <v-btn block color="primary" height="64" class="mb-4" @click="finishSetupAndScan">
             <v-icon start class="mr-2">{{
               deviceConnected ? 'mdi-sync' : 'mdi-magnify-scan'
             }}</v-icon>

@@ -19,7 +19,9 @@
       <v-expansion-panels flat class="bg-transparent">
         <v-expansion-panel class="bg-transparent">
           <v-expansion-panel-title class="px-0 text-body-2 font-weight-bold text-high-emphasis">
-            <v-icon size="small" color="rgba(var(--v-theme-on-surface), 0.6)" class="mr-2">mdi-xml</v-icon>
+            <v-icon size="small" color="rgba(var(--v-theme-on-surface), 0.6)" class="mr-2"
+              >mdi-xml</v-icon
+            >
             {{ $t('about_open_source_licenses') }}
           </v-expansion-panel-title>
           <v-expansion-panel-text class="text-medium-emphasis">
