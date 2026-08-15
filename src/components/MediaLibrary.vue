@@ -327,6 +327,7 @@ let unlistenPhotoReceived: UnlistenFn | null = null;
 let unlistenRefreshed: UnlistenFn | null = null;
 let reloadTimer: ReturnType<typeof setTimeout> | null = null;
 let photoReceivedTimer: ReturnType<typeof setTimeout> | null = null;
+let reloadScrollRestore: { scrollY: number; pages: number } | null = null;
 let analysisTimer: ReturnType<typeof setTimeout> | null = null;
 let analysisPendingIds = new Set<string | number>();
 
@@ -600,13 +601,28 @@ async function loadFiles(): Promise<void> {
   }
 }
 
-function scheduleReload(): void {
+function scheduleReload(options?: { preserveScroll?: boolean }): void {
   if (reloadTimer) clearTimeout(reloadTimer);
-  reloadTimer = setTimeout(() => {
+  // Background refreshes (new photos arriving mid-browse) keep the user's spot;
+  // explicit filter/search changes reset to the top.
+  reloadScrollRestore = options?.preserveScroll
+    ? { scrollY: window.scrollY, pages: paging.value.offset }
+    : null;
+  reloadTimer = setTimeout(async () => {
     loading.value = false;
     paging.value.offset = 0;
     allLoaded.value = false;
-    loadFiles();
+    await loadFiles();
+    const restore = reloadScrollRestore;
+    if (restore) {
+      // Reload page 1 through the previous page depth so the full list height
+      // is available again, then restore the physical scroll offset.
+      while (paging.value.offset < restore.pages && !allLoaded.value) {
+        await loadFiles();
+      }
+      window.scrollTo(0, restore.scrollY);
+      reloadScrollRestore = null;
+    }
   }, 200);
 }
 
@@ -692,11 +708,11 @@ onMounted(async () => {
       updateGroups([event.payload]);
     }
     if (photoReceivedTimer) clearTimeout(photoReceivedTimer);
-    photoReceivedTimer = setTimeout(scheduleReload, 500);
+    photoReceivedTimer = setTimeout(() => scheduleReload({ preserveScroll: true }), 500);
   });
 
   unlistenRefreshed = await listen('photos-refreshed', () => {
-    scheduleReload();
+    scheduleReload({ preserveScroll: true });
   });
 
   updateColumns();

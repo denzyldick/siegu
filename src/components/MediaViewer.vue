@@ -98,7 +98,7 @@
                 class="viewer-image"
                 controls
                 preload="metadata"
-                @error="onVideoError"
+                @error="onVideoError($event)"
               ></video>
             </div>
 
@@ -610,7 +610,13 @@ function clearAnalysisListener(): void {
   }
 }
 
-function onVideoError(): void {
+function onVideoError(event: Event): void {
+  const target = event.target as HTMLMediaElement | null;
+  console.error('[MediaViewer] Failed to load video:', {
+    src: target?.currentSrc || target?.src || null,
+    code: target?.error?.code ?? null,
+    location: currentPhoto.value?.location,
+  });
   snackbar.value = { show: true, text: 'Failed to load video', error: true };
 }
 

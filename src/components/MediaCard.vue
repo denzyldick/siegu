@@ -29,7 +29,7 @@
           class="media-card-img"
           muted
           preload="metadata"
-          @error="onVideoError"
+          @error="onVideoError($event)"
         ></video>
         <div v-else class="media-card-img img-placeholder"></div>
 
@@ -215,8 +215,13 @@ function onImageError(): void {
   console.error('[MediaCard] Failed to load:', props.path?.location);
 }
 
-function onVideoError(): void {
-  console.error('[MediaCard] Failed to load video:', props.path?.location);
+function onVideoError(event: Event): void {
+  const target = event.target as HTMLMediaElement | null;
+  console.error('[MediaCard] Failed to load video:', {
+    src: target?.currentSrc || target?.src || null,
+    code: target?.error?.code ?? null,
+    location: props.path?.location,
+  });
 }
 
 function onPosterError(): void {

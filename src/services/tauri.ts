@@ -322,7 +322,16 @@ export async function startLanHost(
   return call<{ ip: string; port: number }>('start_lan_host', { roomId, isInitiator });
 }
 
-export const isAndroid = platform() === 'android';
+function currentPlatform(): string | null {
+  try {
+    return platform();
+  } catch {
+    // Not running with the Tauri OS plugin available (e.g. plain browser preview).
+    return null;
+  }
+}
+
+export const isAndroid = currentPlatform() === 'android';
 
 export async function pingMdnsPlugin(): Promise<boolean> {
   if (!isAndroid) return false;
