@@ -17,6 +17,7 @@ export interface AlbumSectionItem {
   name: string;
   count: number;
   cover_encoded: string | null;
+  cover_location: string | null;
   cover_crop: string | null;
   kind: string;
   album: Album | null;

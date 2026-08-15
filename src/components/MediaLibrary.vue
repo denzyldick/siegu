@@ -53,6 +53,41 @@
       </div>
     </v-fade-transition>
 
+    <div v-if="showTrips" class="px-2 mb-6 animate-fade-in">
+      <div class="d-flex align-center px-2 mb-3">
+        <h2 class="section-title text-subtitle-1 font-weight-bold text-high-emphasis flex-grow-1">
+          {{ $t('media.trips_title') }}
+        </h2>
+        <v-btn size="small" variant="text" class="ml-1" @click="goToTrips">
+          <v-icon start size="13">mdi-airplane</v-icon>
+          {{ $t('media.trips_view_all') }}
+        </v-btn>
+      </div>
+      <div class="trips-scroll">
+        <div v-for="trip in trips" :key="trip.id" class="trip-card" @click="openTrip(trip)">
+          <div class="trip-cover">
+            <img
+              v-if="tripCoverSrc(trip)"
+              :src="tripCoverSrc(trip)"
+              :alt="trip.name"
+              loading="lazy"
+              class="trip-cover-img"
+            />
+            <div v-else class="trip-cover-placeholder d-flex align-center justify-center">
+              <v-icon size="40" color="rgba(var(--v-theme-on-surface), 0.25)">mdi-airplane</v-icon>
+            </div>
+            <div class="trip-count">
+              <v-icon size="12">mdi-image</v-icon>
+              {{ $t('media.items_count', { count: trip.count }) }}
+            </div>
+          </div>
+          <div class="trip-name text-subtitle-2 font-weight-bold text-high-emphasis">
+            {{ trip.name }}
+          </div>
+        </div>
+      </div>
+    </div>
+
     <DynamicScroller
       v-if="groups.length > 0 && useVirtualScroller"
       class="animate-fade-in"
@@ -245,16 +280,23 @@ import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
 import MediaCard from './MediaCard.vue';
 import MediaViewer from './MediaViewer.vue';
 import AddToAlbumSheet from '@/components/albums/AddToAlbumSheet.vue';
+import { useAlbumsStore } from '@/stores/albums';
+import { useUiStore } from '@/stores/ui';
 import { useSyncStore } from '@/stores/sync';
 import { useScanStore } from '@/stores/scan';
 import { getPhotosByIds, setFavorites } from '@/services/tauri';
 import { useI18n } from 'vue-i18n';
+import { useMediaUrl } from '@/composables/useMediaUrl';
 import type { MediaItem } from '@/types/media';
 import type { FacetType } from '@/types/search';
+import type { AlbumSectionItem } from '@/types/albums';
 
 const { t } = useI18n();
 const syncStore = useSyncStore();
 const scanStore = useScanStore();
+const albumsStore = useAlbumsStore();
+const uiStore = useUiStore();
+const { thumbUrl: buildThumbUrl } = useMediaUrl();
 
 const props = withDefaults(
   defineProps<{
@@ -332,6 +374,45 @@ let analysisTimer: ReturnType<typeof setTimeout> | null = null;
 let analysisPendingIds = new Set<string | number>();
 
 const isScanning = computed(() => scanStore.isActive);
+
+const trips = computed(() => {
+  const section = albumsStore.sections.find((s) => s.id === 'trips');
+  return section?.items ?? [];
+});
+
+const hasActiveFilters = computed(() => {
+  const f = props.filters;
+  return (
+    !!props.searchQuery ||
+    (props.facets?.length ?? 0) > 0 ||
+    !!f?.favoritesOnly ||
+    !!f?.videosOnly ||
+    !!f?.facesOnly ||
+    !!f?.papersOnly ||
+    !!f?.nsfwOnly ||
+    !!f?.camera ||
+    f?.aestheticsMin != null ||
+    !!f?.surprise ||
+    (f?.dateRange ?? 'all') !== 'all' ||
+    !!f?.folder
+  );
+});
+
+const showTrips = computed(() => trips.value.length > 0 && !hasActiveFilters.value);
+
+function tripCoverSrc(trip: AlbumSectionItem): string {
+  if (trip.cover_location) return buildThumbUrl(trip.cover_location) ?? '';
+  return trip.cover_encoded ?? '';
+}
+
+function openTrip(trip: AlbumSectionItem): void {
+  void trip;
+  uiStore.setPage('albums');
+}
+
+function goToTrips(): void {
+  uiStore.setPage('albums');
+}
 
 const useVirtualScroller = computed(() => {
   return typeof IntersectionObserver !== 'undefined' && virtualItems.value.length > 12;
@@ -713,8 +794,10 @@ onMounted(async () => {
 
   unlistenRefreshed = await listen('photos-refreshed', () => {
     scheduleReload({ preserveScroll: true });
+    void albumsStore.loadSections();
   });
 
+  void albumsStore.loadSections();
   updateColumns();
   window.addEventListener('resize', updateColumns);
   setupInfiniteScroll();
@@ -803,5 +886,72 @@ onUnmounted(() => {
 
 .scroll-sentinel {
   height: 20px;
+}
+
+.section-title {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 12px;
+}
+
+.trips-scroll {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+}
+
+.trip-card {
+  flex: 0 0 200px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.trip-card:hover {
+  transform: translateY(-2px);
+}
+
+.trip-cover {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 20px;
+  overflow: hidden;
+  background: rgb(var(--v-theme-surface-light));
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+}
+
+.trip-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.trip-cover-placeholder {
+  width: 100%;
+  height: 100%;
+}
+
+.trip-count {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  backdrop-filter: blur(4px);
+}
+
+.trip-name {
+  margin-top: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

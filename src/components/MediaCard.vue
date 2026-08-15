@@ -25,9 +25,11 @@
         />
         <video
           v-else-if="isVideo && !path.encoded && computedVideoUrl"
-          :src="computedVideoUrl + '#t=0.5'"
+          :src="computedVideoUrl"
+          :type="videoType"
           class="media-card-img"
           muted
+          playsinline
           preload="metadata"
           @error="onVideoError($event)"
         ></video>
@@ -144,6 +146,16 @@ const isVideo = computed(() => {
 const computedVideoUrl = computed(() => {
   if (!props.path?.location || !isVideo.value) return '';
   return buildVideoUrl(props.path.location);
+});
+
+const videoType = computed(() => {
+  const ext = props.path?.location?.split('.').pop()?.toLowerCase();
+  if (ext === 'mp4') return 'video/mp4';
+  if (ext === 'webm') return 'video/webm';
+  if (ext === 'mov') return 'video/mp4';
+  if (ext === 'mkv') return 'video/x-matroska';
+  if (ext === 'm4v') return 'video/mp4';
+  return undefined;
 });
 
 const posterFailed = ref(false);

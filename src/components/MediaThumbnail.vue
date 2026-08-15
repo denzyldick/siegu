@@ -4,9 +4,11 @@
       <img v-if="thumbSrc" :src="thumbSrc" :alt="$t('media_thumbnail.alt_thumb')" />
       <video
         v-else-if="isVideo && !photo.encoded"
-        :src="videoUrl + '#t=0.5'"
+        :src="videoUrl"
+        :type="videoType"
         :alt="$t('media_thumbnail.alt_thumb')"
         muted
+        playsinline
         preload="metadata"
       />
       <div v-if="isVideo" class="rail-video-icon">
@@ -44,7 +46,17 @@ const isVideo = computed(() => {
 
 const videoUrl = computed(() => {
   if (!props.photo?.location || !isVideo.value) return '';
-  return buildVideoUrl(props.photo.location);
+  return buildVideoUrl(props.photo.location) ?? '';
+});
+
+const videoType = computed(() => {
+  const ext = props.photo?.location?.split('.').pop()?.toLowerCase();
+  if (ext === 'mp4') return 'video/mp4';
+  if (ext === 'webm') return 'video/webm';
+  if (ext === 'mov') return 'video/mp4';
+  if (ext === 'mkv') return 'video/x-matroska';
+  if (ext === 'm4v') return 'video/mp4';
+  return undefined;
 });
 
 const thumbSrc = computed(() => {

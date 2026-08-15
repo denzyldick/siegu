@@ -468,6 +468,7 @@ import { useUiStore } from '@/stores/ui';
 import { usePeople } from '@/composables/usePeople';
 import { toggleFavorite, listFiles } from '@/services/tauri';
 import { getFaceImageSrc } from '@/composables/useMediaUtils';
+import { useMediaUrl } from '@/composables/useMediaUrl';
 import type { Album, AlbumSectionItem } from '@/types/albums';
 import type { MediaItem } from '@/types/media';
 import type { ListFilesOptions } from '@/types/media';
@@ -477,6 +478,7 @@ const { t } = useI18n();
 const albumsStore = useAlbumsStore();
 const searchStore = useSearchStore();
 const uiStore = useUiStore();
+const { thumbUrl: buildThumbUrl } = useMediaUrl();
 const {
   people,
   unnamedFaces,
@@ -568,6 +570,7 @@ function sectionTitle(sectionId: string): string {
 
 function tileSrc(item: AlbumSectionItem): string {
   if (item.kind === 'person') return getFaceImageSrc(item.cover_crop, item.cover_encoded);
+  if (item.cover_location) return buildThumbUrl(item.cover_location) ?? '';
   return item.cover_encoded ?? '';
 }
 
@@ -613,6 +616,7 @@ function openAlbum(album: Album): void {
     name: album.name,
     count: album.item_count,
     cover_encoded: null,
+    cover_location: null,
     cover_crop: null,
     kind: album.kind,
     album,

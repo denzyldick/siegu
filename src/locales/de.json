@@ -185,7 +185,9 @@
     "label_photos": "Fotos:",
     "label_videos": "Videos:",
     "all_photos": "Alle Fotos",
-    "add_to_album": "Zum Album hinzufügen"
+    "add_to_album": "Zum Album hinzufügen",
+    "trips_title": "Reisen",
+    "trips_view_all": "Alle anzeigen"
   },
   "people": {
     "title": "Personen & Gesichter",

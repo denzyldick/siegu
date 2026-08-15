@@ -167,7 +167,9 @@
     "recent": "Recent",
     "label_photos": "Photos:",
     "label_videos": "Videos:",
-    "all_photos": "All photos"
+    "all_photos": "All photos",
+    "trips_title": "Trips",
+    "trips_view_all": "View all"
   },
   "map": {
     "title": "Map View",

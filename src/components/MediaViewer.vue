@@ -95,8 +95,10 @@
                 v-if="currentPhoto && isVideo && computedVideoUrl"
                 ref="videoPlayer"
                 :src="computedVideoUrl"
+                :type="videoType"
                 class="viewer-image"
                 controls
+                playsinline
                 preload="metadata"
                 @error="onVideoError($event)"
               ></video>
@@ -501,6 +503,16 @@ const isVideo = computed(() => {
 const computedVideoUrl = computed(() => {
   if (!currentPhoto.value || !isVideo.value) return '';
   return buildVideoUrl(currentPhoto.value.location) ?? '';
+});
+
+const videoType = computed(() => {
+  const ext = currentPhoto.value?.location?.split('.').pop()?.toLowerCase();
+  if (ext === 'mp4') return 'video/mp4';
+  if (ext === 'webm') return 'video/webm';
+  if (ext === 'mov') return 'video/mp4';
+  if (ext === 'mkv') return 'video/x-matroska';
+  if (ext === 'm4v') return 'video/mp4';
+  return undefined;
 });
 
 const currentPhotoSrc = computed(() => {

@@ -204,6 +204,9 @@ pub struct AlbumSectionItem {
     pub count: i64,
     /// Data-URL thumbnail for the tile (null when no preview is available).
     pub cover_encoded: Option<String>,
+    /// Filesystem path of the cover photo, used by the frontend to request a
+    /// fresh thumbnail from the media server (falls back to `cover_encoded`).
+    pub cover_location: Option<String>,
     /// Face crop path (people section only).
     pub cover_crop: Option<String>,
     /// Section-level type: "person", "location", "trip", "smart", "manual".
@@ -3493,16 +3496,24 @@ impl Database {
         albums
     }
 
-    /// Data-URL thumbnail for an album's cover photo, if any.
-    fn album_cover_encoded(&self, album: &Album) -> Option<String> {
-        let cover = album.cover_photo_id.as_deref()?;
+    /// Cover preview for an album: the persisted data-URL thumbnail plus the
+    /// cover photo's filesystem location (so the frontend can request a fresh
+    /// thumbnail from the media server).
+    fn album_cover_encoded(&self, album: &Album) -> (Option<String>, Option<String>) {
+        let Some(cover) = album.cover_photo_id.as_deref() else {
+            return (None, None);
+        };
         self.connection
             .query_row(
-                "SELECT encoded FROM photo WHERE id = ?1",
+                "SELECT encoded, location FROM photo WHERE id = ?1",
                 rusqlite::params![cover],
-                |r| r.get::<_, String>(0),
+                |r| {
+                    let encoded = r.get::<_, String>(0).ok();
+                    let location = r.get::<_, String>(1).ok();
+                    Ok((encoded, location))
+                },
             )
-            .ok()
+            .unwrap_or((None, None))
     }
 
     /// Turn one time-clustered group of photos into a trip: a display name, a
@@ -3656,6 +3667,7 @@ impl Database {
                 name: p.name,
                 count: p.photo_count,
                 cover_encoded: p.encoded,
+                cover_location: None,
                 cover_crop: p.representative_crop,
                 kind: "person".to_string(),
                 album: None,
@@ -3672,14 +3684,18 @@ impl Database {
         let mut trips: Vec<AlbumSectionItem> = self
             .list_albums_by_kind(AlbumKind::Trip)
             .into_iter()
-            .map(|album| AlbumSectionItem {
-                id: album.id.clone(),
-                name: album.name.clone(),
-                count: album.item_count,
-                cover_encoded: self.album_cover_encoded(&album),
-                cover_crop: None,
-                kind: "trip".to_string(),
-                album: Some(album),
+            .map(|album| {
+                let (cover_encoded, cover_location) = self.album_cover_encoded(&album);
+                AlbumSectionItem {
+                    id: album.id.clone(),
+                    name: album.name.clone(),
+                    count: album.item_count,
+                    cover_encoded,
+                    cover_location,
+                    cover_crop: None,
+                    kind: "trip".to_string(),
+                    album: Some(album),
+                }
             })
             .collect();
         // Surface trips that fall around this time of year (newest first on
@@ -3695,14 +3711,18 @@ impl Database {
         let smart: Vec<AlbumSectionItem> = self
             .list_albums_by_kind(AlbumKind::Smart)
             .into_iter()
-            .map(|album| AlbumSectionItem {
-                id: album.id.clone(),
-                name: album.name.clone(),
-                count: album.item_count,
-                cover_encoded: self.album_cover_encoded(&album),
-                cover_crop: None,
-                kind: "smart".to_string(),
-                album: Some(album),
+            .map(|album| {
+                let (cover_encoded, cover_location) = self.album_cover_encoded(&album);
+                AlbumSectionItem {
+                    id: album.id.clone(),
+                    name: album.name.clone(),
+                    count: album.item_count,
+                    cover_encoded,
+                    cover_location,
+                    cover_crop: None,
+                    kind: "smart".to_string(),
+                    album: Some(album),
+                }
             })
             .collect();
         if !smart.is_empty() {
@@ -3715,14 +3735,18 @@ impl Database {
         let manual: Vec<AlbumSectionItem> = self
             .list_albums_by_kind(AlbumKind::Manual)
             .into_iter()
-            .map(|album| AlbumSectionItem {
-                id: album.id.clone(),
-                name: album.name.clone(),
-                count: album.item_count,
-                cover_encoded: self.album_cover_encoded(&album),
-                cover_crop: None,
-                kind: "manual".to_string(),
-                album: Some(album),
+            .map(|album| {
+                let (cover_encoded, cover_location) = self.album_cover_encoded(&album);
+                AlbumSectionItem {
+                    id: album.id.clone(),
+                    name: album.name.clone(),
+                    count: album.item_count,
+                    cover_encoded,
+                    cover_location,
+                    cover_crop: None,
+                    kind: "manual".to_string(),
+                    album: Some(album),
+                }
             })
             .collect();
         if !manual.is_empty() {

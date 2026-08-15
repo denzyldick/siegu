@@ -185,7 +185,9 @@
     "label_photos": "Foto's:",
     "label_videos": "Video's:",
     "all_photos": "Alle foto's",
-    "add_to_album": "Toevoegen aan album"
+    "add_to_album": "Toevoegen aan album",
+    "trips_title": "Reizen",
+    "trips_view_all": "Alles bekijken"
   },
   "people": {
     "title": "Personen & Gezichten",
