@@ -55,6 +55,25 @@ jobs:
         shell: pwsh
         run: choco install nasm -y --no-progress
 
+      # ffmpeg-sys-next's generated makefile uses awk for dependency-file
+      # generation (common.mak), but a stock Windows runner has no awk. Chocolatey's
+      # gawk ships a standalone awk.exe; it must precede any other awk on PATH.
+      - name: Install gawk
+        shell: pwsh
+        run: choco install gawk -y --no-progress
+
+      - name: Add gawk to PATH
+        shell: pwsh
+        run: |
+          $gawk = Join-Path $env:ProgramData 'chocolatey\lib\gawk\tools\bin'
+          if (Test-Path (Join-Path $gawk 'awk.exe')) {
+            Write-Host "Found gawk at $gawk"
+            Write-Host $gawk | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          } else {
+            Write-Host "::error::gawk installed but awk.exe not found at $gawk"
+            exit 1
+          }
+
       - run: npm ci
 
       - run: npm run check:translations

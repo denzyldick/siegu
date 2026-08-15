@@ -51,7 +51,7 @@ defineEmits<{
             <v-btn
               block
               variant="flat"
-              color="rgb(var(--v-theme-surface-light))"
+              color="primary"
               size="small"
               class="text-none font-weight-bold rounded-lg py-4 text-high-emphasis border"
               @click.stop="$emit('promptName', group)"
@@ -72,7 +72,9 @@ defineEmits<{
 }
 .unnamed-card-reimagined:hover {
   transform: scale(1.02);
-  box-shadow: var(--shadow-lg) !important;
+  box-shadow:
+    0px 1px 3px 0px rgba(var(--v-shadow-color), 0.3),
+    0px 4px 8px 3px rgba(var(--v-shadow-color), 0.15) !important;
 }
 .image-wrapper {
   background: rgb(var(--v-theme-surface-light));

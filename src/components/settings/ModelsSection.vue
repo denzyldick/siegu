@@ -20,7 +20,6 @@
     <v-sheet
       v-if="visibleActivityModel"
       class="ai-activity-strip d-flex align-center justify-space-between px-4 py-3 mb-4 rounded-lg"
-      color="rgb(var(--v-theme-surface-light))"
       border
     >
       <div class="d-flex align-center min-width-0">
@@ -187,7 +186,6 @@
                 :indeterminate="!hasModelProgressTotal(model.id)"
                 :model-value="getModelProgressPercent(model.id)"
                 color="rgb(var(--v-theme-on-surface))"
-                bg-color="rgb(var(--v-theme-surface-light))"
                 height="4"
                 rounded
               ></v-progress-linear>
@@ -207,7 +205,6 @@
                 :indeterminate="!hasDownloadProgressTotal(model.id)"
                 :model-value="getProgress(model.id)"
                 color="rgb(var(--v-theme-on-surface))"
-                bg-color="rgb(var(--v-theme-surface-light))"
                 height="4"
                 rounded
               ></v-progress-linear>

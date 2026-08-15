@@ -43,7 +43,7 @@ async function reconnect(): Promise<void> {
   <v-fade-transition>
     <div v-if="isVisible" class="sync-banner-container">
       <v-sheet
-        class="sync-banner d-flex align-center px-4 py-2 rounded-pill shadow-xl border"
+        class="sync-banner d-flex align-center px-4 py-2 rounded-pill elevation-1 border"
         color="surface"
       >
         <v-progress-circular

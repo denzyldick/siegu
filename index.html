@@ -5,55 +5,10 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Siegu</title>
-    <script>
-      (function () {
-        try {
-          var pref = localStorage.getItem('siegu_theme') || 'system';
-          var dark =
-            pref === 'dark' ||
-            (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-          var theme = dark ? 'dark' : 'light';
-          document.documentElement.dataset.theme = theme;
-          document.documentElement.style.colorScheme = theme;
-        } catch (e) {}
-      })();
-    </script>
   </head>
 
   <body>
-    <div id="app">
-      <style>
-        .splash {
-          position: fixed; inset: 0; z-index: 9999;
-          display: flex; flex-direction: column;
-          align-items: center; justify-content: center;
-          background: #fafafa; font-family: 'Outfit', sans-serif;
-        }
-        html[data-theme='dark'] .splash {
-          background: #09090b;
-        }
-        .splash-logo {
-          width: 96px; height: 96px; border-radius: 20px;
-          margin-bottom: 20px;
-          animation: splash-pulse 1.8s ease-in-out infinite;
-        }
-        .splash-text {
-          font-size: 15px; font-weight: 600;
-          color: #a1a1aa; letter-spacing: 0.04em;
-        }
-        html[data-theme='dark'] .splash-text {
-          color: #71717a;
-        }
-        @keyframes splash-pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.7; transform: scale(0.96); }
-        }
-      </style>
-      <div class="splash">
-        <img class="splash-logo" src="/src/assets/logo.png" alt="Siegu" width="96" height="96" />
-        <div class="splash-text">Siegu</div>
-      </div>
-    </div>
+    <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -133,7 +133,7 @@ function navigate(page: 'home' | 'albums' | 'location' | 'devices' | 'settings')
 }
 
 .siegu-dock-btn:hover {
-  background: rgb(var(--v-theme-surface-light)) !important;
+  background: color-mix(in srgb, rgb(var(--v-theme-on-surface)) 6%, transparent) !important;
   color: rgb(var(--v-theme-on-surface)) !important;
   transform: translateY(-2px);
 }
@@ -170,7 +170,7 @@ function navigate(page: 'home' | 'albums' | 'location' | 'devices' | 'settings')
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
-  border-radius: var(--radius-pill);
+  border-radius: 9999px;
   background: rgb(var(--v-theme-error));
   color: #fff;
   font-size: 9px;

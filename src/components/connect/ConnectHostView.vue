@@ -46,9 +46,8 @@
       <v-chip
         v-for="(word, index) in passphrase"
         :key="index"
-        color="rgb(var(--v-theme-surface-light))"
-        variant="flat"
-        class="font-weight-medium mx-1 text-high-emphasis border"
+        variant="outlined"
+        class="font-weight-medium mx-1 text-high-emphasis"
         size="small"
       >
         {{ word }}

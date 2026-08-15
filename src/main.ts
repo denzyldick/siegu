@@ -4,7 +4,6 @@ import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
 import App from './App.vue';
 import 'vuetify/styles';
 import '@mdi/font/css/materialdesignicons.css';
-import '@fontsource-variable/outfit';
 
 import * as components from 'vuetify/components';
 import { createVuetify } from 'vuetify/dist/vuetify.js';
@@ -18,7 +17,6 @@ import de from './locales/de.json';
 import it from './locales/it.json';
 import pt from './locales/pt.json';
 
-import './styles/variables.css';
 import './styles/animations.css';
 
 import { getThemePreference, initSystemTheme, resolveTheme, syncTheme } from './services/theme';
@@ -36,20 +34,6 @@ const vuetify = createVuetify({
   components,
   theme: {
     defaultTheme: resolveTheme(),
-  },
-  defaults: {
-    global: {
-      fontFamily: "'Outfit', sans-serif",
-    },
-    VBtn: {
-      rounded: 'md',
-      variant: 'flat',
-      class: 'text-none font-weight-medium',
-    },
-    VTextField: {
-      variant: 'solo-filled',
-      rounded: 'lg',
-    },
   },
 });
 

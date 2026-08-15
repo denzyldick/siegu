@@ -55,7 +55,7 @@ const syncStatusText = computed(() => {
       hide-details
       flat
       rounded="lg"
-      class="text-center join-passphrase"
+      class="text-center"
       style="width: 100%; min-width: 280px"
       @keyup.enter="emit('join', hostIp, String(hostPort))"
       :disabled="loading"
@@ -112,35 +112,3 @@ const syncStatusText = computed(() => {
     </div>
   </div>
 </template>
-
-<style scoped>
-.join-passphrase :deep(.v-field) {
-  background: rgb(var(--v-theme-surface-light)) !important;
-}
-
-.join-passphrase :deep(.v-field__overlay) {
-  background: rgb(var(--v-theme-surface-light)) !important;
-}
-
-.join-passphrase :deep(.v-field--focused),
-.join-passphrase :deep(.v-field--focused .v-field__overlay) {
-  background: rgb(var(--v-theme-surface)) !important;
-}
-
-.join-passphrase :deep(input) {
-  color: rgb(var(--v-theme-on-surface)) !important;
-  caret-color: rgb(var(--v-theme-on-surface)) !important;
-  font-size: 14px !important;
-  letter-spacing: 0.02em;
-}
-
-.join-passphrase :deep(.v-field__input) {
-  color: rgb(var(--v-theme-on-surface)) !important;
-  min-height: 40px !important;
-  padding: 4px 8px !important;
-}
-
-.join-passphrase :deep(.v-label) {
-  color: rgba(var(--v-theme-on-surface), 0.6) !important;
-}
-</style>

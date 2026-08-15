@@ -5,7 +5,7 @@
     :class="{ 'is-selected': selected, 'selection-active': selectionMode }"
     @click="handleClick"
   >
-    <div class="media-card-wrapper shadow-sm">
+    <div class="media-card-wrapper elevation-1">
       <template v-if="isVisible">
         <img
           v-if="imageSrc"
@@ -255,7 +255,7 @@ onUnmounted(() => {
   width: 100%;
   aspect-ratio: 1;
   overflow: hidden;
-  border-radius: var(--radius-xl);
+  border-radius: 24px;
   position: relative;
   background-color: rgb(var(--v-theme-surface-light));
   border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
@@ -365,7 +365,7 @@ onUnmounted(() => {
   color: white;
   background: color-mix(in srgb, rgb(var(--v-theme-error)) 90%, transparent);
   backdrop-filter: blur(8px);
-  border-radius: var(--radius-pill);
+  border-radius: 9999px;
   padding: 3px 8px;
   z-index: 5;
 }
@@ -376,7 +376,7 @@ onUnmounted(() => {
   right: 12px;
   width: 32px;
   height: 32px;
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(8px);
   display: flex;
@@ -417,10 +417,6 @@ onUnmounted(() => {
   background: rgb(var(--v-theme-warning));
 }
 
-.shadow-sm {
-  box-shadow: var(--shadow-sm);
-}
-
 .media-card-info {
   margin-top: 6px;
   padding: 0 2px;
@@ -445,7 +441,8 @@ onUnmounted(() => {
   font-size: 10px;
   font-weight: 600;
   color: rgba(var(--v-theme-on-surface), 0.6);
-  background: rgb(var(--v-theme-surface-light));
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   padding: 1px 6px;
   border-radius: 4px;
   text-transform: capitalize;

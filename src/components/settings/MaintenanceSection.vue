@@ -1,6 +1,6 @@
 <template>
   <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border overflow-hidden">
-    <v-card-item style="background: rgb(var(--v-theme-surface-light))" class="py-4">
+    <v-card-item class="py-4">
       <template v-slot:prepend>
         <v-avatar color="on-surface" size="32" class="mr-3">
           <v-icon color="surface" size="small">mdi-wrench-outline</v-icon>
@@ -43,7 +43,6 @@
           {{ $t('settings.system_logs') }}
         </div>
         <v-sheet
-          color="rgb(var(--v-theme-surface-light))"
           class="pa-4 rounded-lg overflow-y-auto border debug-logs-sheet mb-4"
           max-height="300"
         >

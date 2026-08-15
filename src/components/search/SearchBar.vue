@@ -457,7 +457,7 @@ function iconForFilter(type: string): string {
                 :class="{ 'magic-card--active': isMediaActive('favoritesOnly') }"
                 @click="toggleMedia('favorites')"
               >
-                <div class="magic-icon" style="--magic: var(--color-brand-favorite)">
+                <div class="magic-icon" style="--magic: rgb(var(--v-theme-primary))">
                   <v-icon size="20">mdi-heart</v-icon>
                 </div>
                 <div class="magic-label">{{ t('search.magic.favorites') }}</div>
@@ -468,7 +468,7 @@ function iconForFilter(type: string): string {
                 :class="{ 'magic-card--active': isMediaActive('videosOnly') }"
                 @click="toggleMedia('videos')"
               >
-                <div class="magic-icon" style="--magic: var(--color-brand-videos)">
+                <div class="magic-icon" style="--magic: rgb(var(--v-theme-primary))">
                   <v-icon size="20">mdi-video</v-icon>
                 </div>
                 <div class="magic-label">{{ t('search.magic.videos') }}</div>
@@ -479,7 +479,7 @@ function iconForFilter(type: string): string {
                 :class="{ 'magic-card--active': isMediaActive('facesOnly') }"
                 @click="toggleMedia('faces')"
               >
-                <div class="magic-icon" style="--magic: var(--color-brand-faces)">
+                <div class="magic-icon" style="--magic: rgb(var(--v-theme-primary))">
                   <v-icon size="20">mdi-face-man</v-icon>
                 </div>
                 <div class="magic-label">{{ t('search.magic.faces') }}</div>
@@ -490,7 +490,7 @@ function iconForFilter(type: string): string {
                 :class="{ 'magic-card--active': isMediaActive('papersOnly') }"
                 @click="toggleMedia('papers')"
               >
-                <div class="magic-icon" style="--magic: var(--color-brand-papers)">
+                <div class="magic-icon" style="--magic: rgb(var(--v-theme-primary))">
                   <v-icon size="20">mdi-file-document-outline</v-icon>
                 </div>
                 <div class="magic-label">{{ t('search.magic.papers') }}</div>
@@ -502,14 +502,14 @@ function iconForFilter(type: string): string {
                 :class="{ 'magic-card--active': isMediaActive('nsfwOnly') }"
                 @click="toggleMedia('nsfw')"
               >
-                <div class="magic-icon" style="--magic: var(--color-brand-nsfw)">
+                <div class="magic-icon" style="--magic: rgb(var(--v-theme-primary))">
                   <v-icon size="20">mdi-alert-octagon</v-icon>
                 </div>
                 <div class="magic-label">{{ t('search.magic.nsfw') }}</div>
                 <div class="magic-count">{{ activeCount('nsfw') }}</div>
               </v-btn>
               <v-btn class="magic-card" @click="surpriseMe">
-                <div class="magic-icon" style="--magic: var(--color-brand-surprise)">
+                <div class="magic-icon" style="--magic: rgb(var(--v-theme-primary))">
                   <v-icon size="20">mdi-dice-multiple</v-icon>
                 </div>
                 <div class="magic-label">{{ t('search.magic.surprise') }}</div>
@@ -555,7 +555,7 @@ function iconForFilter(type: string): string {
                   <v-icon
                     v-if="photo.favorite"
                     size="14"
-                    color="var(--color-brand-favorite)"
+                    color="rgb(var(--v-theme-primary))"
                     class="best-fav"
                     >mdi-heart</v-icon
                   >
@@ -838,7 +838,7 @@ function iconForFilter(type: string): string {
                 {{ t('search.no_matches', { query: searchStore.query.trim() }) }}
               </div>
               <v-btn class="run-search-item mx-auto" @click="runSearch">
-                <v-icon size="18" class="mr-2" color="var(--color-brand-faces)"
+                <v-icon size="18" class="mr-2" color="rgb(var(--v-theme-primary))"
                   >mdi-text-search</v-icon
                 >
                 {{ t('search.enter_to_search', { query: searchStore.query.trim() }) }}
@@ -925,7 +925,7 @@ function iconForFilter(type: string): string {
   gap: 8px;
   background: rgb(var(--v-theme-surface));
   border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
-  border-radius: var(--radius-lg);
+  border-radius: 8px;
   padding: 0 14px;
   height: 44px;
   cursor: text;
@@ -955,8 +955,10 @@ function iconForFilter(type: string): string {
 
 .search-dropdown {
   background: rgb(var(--v-theme-surface));
-  border-radius: var(--radius-2xl);
-  box-shadow: var(--shadow-popover);
+  border-radius: 24px;
+  box-shadow:
+    0px 4px 4px 0px rgba(var(--v-shadow-color), 0.3),
+    0px 8px 12px 6px rgba(var(--v-shadow-color), 0.15);
   overflow-y: auto;
   max-height: min(76vh, 640px);
   padding: 10px 0;
@@ -1001,11 +1003,11 @@ function iconForFilter(type: string): string {
   width: 88px;
   height: 88px;
   padding: 12px;
-  border-radius: var(--radius-lg);
-  border: none;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   -webkit-appearance: none;
   appearance: none;
-  background: rgb(var(--v-theme-surface-light));
+  background: rgb(var(--v-theme-surface));
   cursor: pointer;
   user-select: none;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1023,7 +1025,7 @@ function iconForFilter(type: string): string {
 .magic-icon {
   width: 32px;
   height: 32px;
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1060,8 +1062,9 @@ function iconForFilter(type: string): string {
   font-size: 11px;
   font-weight: 700;
   color: rgba(var(--v-theme-on-surface), 0.6);
-  background: rgb(var(--v-theme-surface-light));
-  border-radius: var(--radius-pill);
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  border-radius: 9999px;
   padding: 2px 8px;
 }
 
@@ -1084,14 +1087,14 @@ function iconForFilter(type: string): string {
   gap: 4px;
   min-width: 72px;
   padding: 6px 4px;
-  border-radius: var(--radius-lg);
+  border-radius: 8px;
   cursor: pointer;
   user-select: none;
   transition: background 0.15s ease;
 }
 
 .face-card:hover {
-  background: rgb(var(--v-theme-surface-light));
+  background: color-mix(in srgb, rgb(var(--v-theme-on-surface)) 6%, transparent);
 }
 
 .face-card.facet-active .face-avatar {
@@ -1141,7 +1144,7 @@ function iconForFilter(type: string): string {
   position: relative;
   width: 92px;
   height: 122px;
-  border-radius: var(--radius-lg);
+  border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
   flex-shrink: 0;
@@ -1169,7 +1172,7 @@ function iconForFilter(type: string): string {
   color: #fff;
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(6px);
-  border-radius: var(--radius-pill);
+  border-radius: 9999px;
   padding: 2px 7px;
 }
 
@@ -1184,7 +1187,7 @@ function iconForFilter(type: string): string {
   position: relative;
   width: 150px;
   height: 96px;
-  border-radius: var(--radius-lg);
+  border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
   flex-shrink: 0;
@@ -1208,7 +1211,11 @@ function iconForFilter(type: string): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #3f3f46, #18181b);
+  background: linear-gradient(
+    135deg,
+    rgb(var(--v-theme-surface-light)),
+    rgb(var(--v-theme-surface))
+  );
 }
 
 .place-scrim {
@@ -1232,7 +1239,7 @@ function iconForFilter(type: string): string {
   font-size: 10px;
   font-weight: 700;
   background: rgba(255, 255, 255, 0.22);
-  border-radius: var(--radius-pill);
+  border-radius: 9999px;
   padding: 1px 6px;
 }
 
@@ -1263,9 +1270,9 @@ function iconForFilter(type: string): string {
   font-size: 12px;
   font-weight: 600;
   color: rgba(var(--v-theme-on-surface), 0.7);
-  background: rgb(var(--v-theme-surface-light));
+  background: rgb(var(--v-theme-surface));
   border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
-  border-radius: var(--radius-pill);
+  border-radius: 9999px;
   padding: 5px 12px;
   cursor: pointer;
   user-select: none;
@@ -1300,7 +1307,7 @@ function iconForFilter(type: string): string {
   white-space: nowrap;
   color: rgba(var(--v-theme-on-surface), 0.6);
   background: color-mix(in srgb, rgb(var(--v-theme-on-surface)) 8%, transparent);
-  border-radius: var(--radius-pill);
+  border-radius: 9999px;
   padding: 1px 6px;
 }
 
@@ -1319,8 +1326,9 @@ function iconForFilter(type: string): string {
   font-size: 12px;
   font-weight: 500;
   color: rgba(var(--v-theme-on-surface), 0.7);
-  background: rgb(var(--v-theme-surface-light));
-  border-radius: var(--radius-pill);
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  border-radius: 9999px;
   padding: 5px 12px;
   cursor: pointer;
   user-select: none;
@@ -1339,7 +1347,7 @@ function iconForFilter(type: string): string {
 
 .inline-thumb {
   aspect-ratio: 1;
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
 }
@@ -1357,8 +1365,9 @@ function iconForFilter(type: string): string {
   font-size: 12px;
   font-weight: 700;
   color: rgb(var(--v-theme-primary));
-  background: rgb(var(--v-theme-surface-light));
-  border-radius: var(--radius-pill);
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  border-radius: 9999px;
   padding: 6px 14px;
   cursor: pointer;
   user-select: none;
@@ -1374,7 +1383,7 @@ function iconForFilter(type: string): string {
   align-items: center;
   justify-content: center;
   padding: 10px 12px;
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   cursor: pointer;
   user-select: none;
   font-weight: 600;
@@ -1383,7 +1392,7 @@ function iconForFilter(type: string): string {
 }
 
 .run-search-item:hover {
-  background: rgb(var(--v-theme-surface-light));
+  background: color-mix(in srgb, rgb(var(--v-theme-on-surface)) 6%, transparent);
 }
 
 .active-filters {
@@ -1407,13 +1416,13 @@ function iconForFilter(type: string): string {
   font-weight: 600;
   color: rgba(var(--v-theme-on-surface), 0.6);
   padding: 8px 12px;
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   cursor: pointer;
   user-select: none;
 }
 
 .clear-btn:hover {
-  background: rgb(var(--v-theme-surface-light));
+  background: color-mix(in srgb, rgb(var(--v-theme-on-surface)) 6%, transparent);
   color: rgb(var(--v-theme-on-surface));
 }
 
@@ -1425,13 +1434,13 @@ function iconForFilter(type: string): string {
   font-weight: 600;
   color: rgb(var(--v-theme-primary));
   padding: 8px 12px;
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   cursor: pointer;
   user-select: none;
 }
 
 .save-album-btn:hover:not(:disabled) {
-  background: rgb(var(--v-theme-surface-light));
+  background: color-mix(in srgb, rgb(var(--v-theme-on-surface)) 6%, transparent);
 }
 
 .save-album-btn:disabled {

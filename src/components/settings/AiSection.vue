@@ -1,6 +1,6 @@
 <template>
   <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border overflow-hidden">
-    <v-card-item style="background: rgb(var(--v-theme-surface-light))" class="py-4">
+    <v-card-item class="py-4">
       <template v-slot:prepend>
         <v-avatar color="on-surface" size="32" class="mr-3">
           <v-icon color="surface" size="small">mdi-robot-outline</v-icon>
@@ -170,7 +170,6 @@
                 :step="1"
                 hide-details
                 color="primary"
-                track-color="rgb(var(--v-theme-surface-light))"
                 @update:model-value="onMlThreadsUpdate"
                 @change="onMlThreadsChange"
               ></v-slider>
@@ -197,7 +196,6 @@
                 :step="0.25"
                 hide-details
                 color="primary"
-                track-color="rgb(var(--v-theme-surface-light))"
                 @update:model-value="onMemoryBudgetUpdate"
                 @change="onMemoryBudgetChange"
               ></v-slider>
@@ -220,7 +218,6 @@
                 :step="0.1"
                 hide-details
                 color="primary"
-                track-color="rgb(var(--v-theme-surface-light))"
                 @update:model-value="onGapUpdate"
                 @change="onGapChange"
               ></v-slider>
@@ -243,7 +240,6 @@
                 :step="1"
                 hide-details
                 color="primary"
-                track-color="rgb(var(--v-theme-surface-light))"
                 @update:model-value="onScanThreadsUpdate"
                 @change="onScanThreadsChange"
               ></v-slider>

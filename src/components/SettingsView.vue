@@ -65,7 +65,7 @@
 
     <v-dialog v-model="cleanupDialog.show" max-width="400" rounded="xl">
       <v-card color="surface" border class="border overflow-hidden">
-        <v-card-item style="background: rgb(var(--v-theme-surface-light))" class="py-4">
+        <v-card-item class="py-4">
           <template v-slot:prepend>
             <v-avatar color="on-surface" size="32" class="mr-3">
               <v-icon color="surface" size="small">mdi-wrench-outline</v-icon>
@@ -113,7 +113,7 @@
 
     <v-dialog v-model="removeFolderDialog.show" max-width="400" rounded="xl">
       <v-card color="surface" border class="border overflow-hidden">
-        <v-card-item style="background: rgb(var(--v-theme-surface-light))" class="py-4">
+        <v-card-item class="py-4">
           <template v-slot:prepend>
             <v-avatar color="on-surface" size="32" class="mr-3">
               <v-icon color="surface" size="small">mdi-folder-remove-outline</v-icon>

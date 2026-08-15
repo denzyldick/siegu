@@ -3,7 +3,7 @@
     <v-fade-transition>
       <div v-if="isManualAlbum && selectedIds.length > 0" class="bulk-toolbar-container">
         <v-sheet
-          class="bulk-toolbar d-flex align-center px-6 py-3 rounded-pill shadow-xl"
+          class="bulk-toolbar d-flex align-center px-6 py-3 rounded-pill elevation-3"
           color="rgb(var(--v-theme-primary))"
         >
           <v-btn
@@ -964,7 +964,7 @@ onUnmounted(() => {
 .album-cover {
   position: relative;
   aspect-ratio: 1;
-  border-radius: var(--radius-xl);
+  border-radius: 24px;
   overflow: hidden;
   background: rgb(var(--v-theme-surface-light));
 }
@@ -988,7 +988,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border-radius: var(--radius-pill);
+  border-radius: 9999px;
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
   font-size: 11px;
@@ -1009,7 +1009,7 @@ onUnmounted(() => {
 }
 
 .drag-item {
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   transition:
     opacity 0.2s ease,
     transform 0.2s ease;
@@ -1023,8 +1023,8 @@ onUnmounted(() => {
 .empty-state-icon {
   width: 120px;
   height: 120px;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, rgb(var(--v-theme-surface-light)) 60%, transparent);
+  border-radius: 9999px;
+  background: rgb(var(--v-theme-surface-light));
   display: flex;
   align-items: center;
   justify-content: center;

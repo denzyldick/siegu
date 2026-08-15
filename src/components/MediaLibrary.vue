@@ -3,7 +3,7 @@
     <v-fade-transition>
       <div v-if="selectedIds.size > 0" class="bulk-toolbar-container">
         <v-sheet
-          class="bulk-toolbar d-flex align-center px-6 py-3 rounded-pill shadow-xl"
+          class="bulk-toolbar d-flex align-center px-6 py-3 rounded-pill elevation-3"
           color="rgb(var(--v-theme-primary))"
         >
           <v-btn
@@ -71,7 +71,6 @@
             <v-spacer></v-spacer>
             <span
               class="text-caption text-disabled font-weight-medium px-3 py-1 rounded-pill border"
-              style="background: rgb(var(--v-theme-surface-light))"
             >
               {{ $t('media.items_count', { count: item.count }) }}
             </span>
@@ -103,7 +102,6 @@
             <v-spacer></v-spacer>
             <span
               class="text-caption text-disabled font-weight-medium px-3 py-1 rounded-pill border"
-              style="background: rgb(var(--v-theme-surface-light))"
             >
               {{ $t('media.items_count', { count: item.count }) }}
             </span>

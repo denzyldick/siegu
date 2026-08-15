@@ -168,8 +168,6 @@
                 color="rgb(var(--v-theme-on-surface))"
                 height="6"
                 rounded
-                bg-color="rgb(var(--v-theme-surface-light))"
-                bg-opacity="1"
               ></v-progress-linear>
             </div>
             <div v-else class="d-flex align-center mt-2">
@@ -225,8 +223,7 @@
         </v-card-text>
         <v-card-actions class="px-0 ga-3">
           <v-btn
-            variant="flat"
-            color="rgb(var(--v-theme-surface-light))"
+            variant="text"
             class="flex-grow-1 text-high-emphasis"
             height="44"
             @click="deleteDialog = false"
@@ -268,8 +265,7 @@
         </v-card-text>
         <v-card-actions class="px-0 ga-3">
           <v-btn
-            variant="flat"
-            color="rgb(var(--v-theme-surface-light))"
+            variant="text"
             class="flex-grow-1 text-high-emphasis"
             height="44"
             @click="renameDialog = false"
@@ -320,7 +316,7 @@
 }
 
 .device-card:hover {
-  background: rgb(var(--v-theme-surface-light)) !important;
+  background: color-mix(in srgb, rgb(var(--v-theme-on-surface)) 6%, transparent) !important;
   transform: translateY(-2px);
   border-color: rgba(var(--v-theme-on-surface), 0.12) !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;

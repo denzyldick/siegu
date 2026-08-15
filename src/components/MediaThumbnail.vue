@@ -76,7 +76,7 @@ onUnmounted(() => {
 .rail-item {
   width: 60px;
   height: 60px;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
   position: relative;

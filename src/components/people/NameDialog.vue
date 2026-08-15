@@ -56,7 +56,7 @@ function handleSave(): void {
         </div>
 
         <div class="d-flex justify-center mb-8">
-          <v-avatar size="160" color="surface-light" class="border shadow-xl elevation-2">
+          <v-avatar size="160" color="surface-light" class="border elevation-2">
             <v-img
               v-if="activeFace"
               :src="getFaceImageSrc(activeFace.representative_crop, activeFace.encoded)"
@@ -74,7 +74,7 @@ function handleSave(): void {
           :placeholder="$t('people.name_placeholder')"
           variant="outlined"
           density="comfortable"
-          class="name-field-modern mb-6"
+          class="mb-6"
           persistent-placeholder
           autofocus
           hide-details
@@ -95,7 +95,7 @@ function handleSave(): void {
           block
           size="x-large"
           variant="flat"
-          class="rounded-xl text-none font-weight-bold shadow-lg py-7"
+          class="rounded-xl text-none font-weight-bold elevation-2 py-7"
           color="primary"
           :disabled="!newName"
           @click="handleSave"
@@ -106,13 +106,3 @@ function handleSave(): void {
     </v-card>
   </v-dialog>
 </template>
-
-<style scoped>
-.name-field-modern :deep(.v-field) {
-  border-radius: var(--radius-md) !important;
-  background: rgb(var(--v-theme-surface-light)) !important;
-}
-.name-field-modern :deep(.v-field__outline) {
-  --v-field-border-opacity: 0.15 !important;
-}
-</style>

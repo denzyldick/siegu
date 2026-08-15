@@ -25,7 +25,7 @@ const emit = defineEmits<{
   >
     <v-card class="rounded-xl border overflow-hidden" color="surface">
       <v-card-title
-        style="background: rgb(var(--v-theme-surface-light))"
+        style="background: rgb(var(--v-theme-surface))"
         class="pa-6 border-b d-flex align-center"
       >
         <div>

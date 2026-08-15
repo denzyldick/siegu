@@ -31,7 +31,7 @@
       @ready="onMapReady"
       :minZoom="2"
       :options="{ zoomControl: false, attributionControl: false, preferCanvas: true }"
-      style="height: 100%; width: 100%; background: rgb(var(--v-theme-surface-light))"
+      style="height: 100%; width: 100%; background: rgb(var(--v-theme-surface))"
       class="light-map"
     >
       <l-tile-layer
@@ -296,7 +296,7 @@ watch(currentPhotoIndex, (idx) => {
 <style scoped>
 :deep(.leaflet-container) {
   height: 100%;
-  background: rgb(var(--v-theme-surface-light));
+  background: rgb(var(--v-theme-surface));
 }
 
 .map-empty-state {
@@ -376,7 +376,7 @@ watch(currentPhotoIndex, (idx) => {
   width: 120px;
   height: 120px;
   background: rgb(var(--v-theme-surface-light));
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -384,7 +384,7 @@ watch(currentPhotoIndex, (idx) => {
   width: 120px;
   height: 120px;
   object-fit: cover;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
@@ -401,7 +401,7 @@ watch(currentPhotoIndex, (idx) => {
 :deep(.leaflet-popup-content-wrapper) {
   padding: 0;
   overflow: hidden;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 

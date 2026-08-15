@@ -1,6 +1,6 @@
 <template>
   <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border overflow-hidden">
-    <v-card-item style="background: rgb(var(--v-theme-surface-light))" class="py-4">
+    <v-card-item class="py-4">
       <template v-slot:prepend>
         <v-avatar color="on-surface" size="32" class="mr-3">
           <v-icon color="surface" size="small">mdi-theme-light-dark</v-icon>
@@ -30,7 +30,7 @@
         <v-radio value="light">
           <template v-slot:label>
             <span class="d-flex align-center">
-              <v-icon size="small" color="var(--color-brand-favorite)" class="mr-2"
+              <v-icon size="small" color="rgba(var(--v-theme-on-surface), 0.6)" class="mr-2"
                 >mdi-white-balance-sunny</v-icon
               >
               {{ $t('settings.theme_light') }}

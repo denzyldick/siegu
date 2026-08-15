@@ -260,9 +260,10 @@ onUnmounted(() => {
 
 <style scoped>
 .date-range-picker {
-  background: rgb(var(--v-theme-surface-light));
-  border-radius: var(--radius-xl);
+  background: rgb(var(--v-theme-surface));
+  border-radius: 24px;
   padding: 12px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 
 .date-range-picker button {
@@ -298,7 +299,7 @@ onUnmounted(() => {
   color: rgba(var(--v-theme-on-surface), 0.6);
   background: transparent;
   padding: 3px 8px;
-  border-radius: var(--radius-pill);
+  border-radius: 9999px;
   cursor: pointer;
   user-select: none;
 }
@@ -321,7 +322,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   background: transparent;
   color: rgba(var(--v-theme-on-surface), 0.7);
   cursor: pointer;
@@ -367,7 +368,7 @@ onUnmounted(() => {
   justify-content: center;
   gap: 1px;
   height: 38px;
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   background: transparent;
   cursor: pointer;
   user-select: none;
@@ -402,11 +403,11 @@ onUnmounted(() => {
 }
 
 .drp-count--photos {
-  background: color-mix(in srgb, var(--color-brand-faces) 85%, transparent);
+  background: color-mix(in srgb, rgb(var(--v-theme-primary)) 85%, transparent);
 }
 
 .drp-count--videos {
-  background: color-mix(in srgb, var(--color-brand-videos) 85%, transparent);
+  background: color-mix(in srgb, rgb(var(--v-theme-primary)) 85%, transparent);
 }
 
 .drp-cell--inrange {
@@ -417,7 +418,7 @@ onUnmounted(() => {
 .drp-cell--start,
 .drp-cell--end {
   background: rgb(var(--v-theme-primary));
-  border-radius: var(--radius-md);
+  border-radius: 8px;
 }
 
 .drp-cell--start .drp-day,
@@ -455,7 +456,7 @@ onUnmounted(() => {
   cursor: pointer;
   user-select: none;
   padding: 3px 8px;
-  border-radius: var(--radius-pill);
+  border-radius: 9999px;
 }
 
 .drp-today:hover {
@@ -476,11 +477,11 @@ onUnmounted(() => {
 }
 
 .drp-legend-dot--photos {
-  background: color-mix(in srgb, var(--color-brand-faces) 85%, transparent);
+  background: color-mix(in srgb, rgb(var(--v-theme-primary)) 85%, transparent);
 }
 
 .drp-legend-dot--videos {
-  background: color-mix(in srgb, var(--color-brand-videos) 85%, transparent);
+  background: color-mix(in srgb, rgb(var(--v-theme-primary)) 85%, transparent);
 }
 
 .drp-legend-text {

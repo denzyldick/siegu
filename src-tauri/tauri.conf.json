@@ -14,9 +14,7 @@
       {
         "title": "Siegu",
         "width": 800,
-        "height": 600,
-        "devtools": true,
-        "backgroundColor": "#fafafa"
+        "height": 600
       }
     ],
     "security": {

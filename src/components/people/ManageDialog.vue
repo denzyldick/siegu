@@ -67,7 +67,7 @@ function handleMerge(): void {
 
         <v-tabs
           v-model="manageTab"
-          bg-color="rgb(var(--v-theme-surface-light))"
+          bg-color="rgb(var(--v-theme-surface))"
           color="rgb(var(--v-theme-on-surface))"
           grow
           mandatory
@@ -90,7 +90,7 @@ function handleMerge(): void {
               v-model="newName"
               variant="outlined"
               density="comfortable"
-              class="name-field-modern mb-8"
+              class="mb-8"
               hide-details
               @keyup.enter="handleRename"
             ></v-text-field>
@@ -99,7 +99,7 @@ function handleMerge(): void {
               block
               size="x-large"
               variant="flat"
-              class="rounded-xl text-none font-weight-bold py-7 shadow-lg"
+              class="rounded-xl text-none font-weight-bold py-7 elevation-2"
               color="primary"
               @click="handleRename"
             >
@@ -134,7 +134,7 @@ function handleMerge(): void {
               :label="$t('people.target_profile')"
               variant="outlined"
               density="comfortable"
-              class="name-field-modern mb-8"
+              class="mb-8"
               hide-details
             ></v-select>
 
@@ -142,7 +142,7 @@ function handleMerge(): void {
               block
               size="x-large"
               variant="flat"
-              class="rounded-xl text-none font-weight-bold py-7 shadow-sm"
+              class="rounded-xl text-none font-weight-bold py-7 elevation-1"
               color="primary"
               :disabled="!mergeTargetId"
               @click="handleMerge"
@@ -155,13 +155,3 @@ function handleMerge(): void {
     </v-card>
   </v-dialog>
 </template>
-
-<style scoped>
-.name-field-modern :deep(.v-field) {
-  border-radius: var(--radius-md) !important;
-  background: rgb(var(--v-theme-surface-light)) !important;
-}
-.name-field-modern :deep(.v-field__outline) {
-  --v-field-border-opacity: 0.15 !important;
-}
-</style>
