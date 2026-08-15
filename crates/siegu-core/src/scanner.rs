@@ -113,15 +113,36 @@ pub fn normalize_created(raw: &str) -> String {
 }
 
 /// Extract a `YYYY-MM-DD HH:MM:SS` capture time from conventional camera
-/// filenames (`IMG_20230815_142536.jpg`, `VID_...`, `PXL_...`, and Apple
-/// `Screenshot_2023-08-15-14-25-36.png`). Returns `None` when no plausible
-/// timestamp is found.
+/// filenames. Recognized conventions (checked in order):
+///
+/// 1. Compact `YYYYMMDD_HHMMSS[millis]` embedded anywhere — Pixel
+///    (`PXL_...`), Samsung (`IMG_`/`VID_`/`MVID_`/`MVIMG_`/burst), `DJI_...`.
+/// 2. WhatsApp `(IMG|VID|GIF)-YYYYMMDD-WA####[-edited]` (date only).
+/// 3. ISO-like `YYYY-MM-DD[ at HH.MM.SS]` — Apple/iCloud exports, macOS/GNOME
+///    screenshots, `signal-` screenshots, `Photo/Image/Camera Roll ... at ...`.
+/// 4. Social-downloader epochs: `FB_IMG_<ms>`, `FB_VID_<ms>`, `Snapchat-<ms>`.
+/// 5. Bare 14-digit dashcam timestamps `YYYYMMDDHHMMSS`.
+/// 6. Bare 8-digit date `YYYYMMDD` (time unknown → `00:00:00`).
+///
+/// Returns `None` when no plausible timestamp is found.
 pub fn created_from_filename(path: &Path) -> Option<String> {
     let name = path.file_name()?.to_str()?;
     if let Some((date, time)) = find_compact_timestamp(name) {
         return Some(format!("{date} {time}"));
     }
-    find_dashed_timestamp(name).map(|(date, time)| format!("{date} {time}"))
+    if let Some((date, time)) = find_whatsapp_timestamp(name) {
+        return Some(format!("{date} {time}"));
+    }
+    if let Some((date, time)) = find_iso_timestamp(name) {
+        return Some(format!("{date} {time}"));
+    }
+    if let Some((date, time)) = find_epoch_timestamp(name) {
+        return Some(format!("{date} {time}"));
+    }
+    if let Some((date, time)) = find_bare_compact_timestamp(name) {
+        return Some(format!("{date} {time}"));
+    }
+    find_bare_date_timestamp(name).map(|date| format!("{date} 00:00:00"))
 }
 
 /// `YYYYMMDD_HHMMSS[millis]` embedded anywhere in the filename.
@@ -152,50 +173,203 @@ fn find_compact_timestamp(name: &str) -> Option<(String, String)> {
     None
 }
 
-/// `Screenshot_YYYY-MM-DD-HH-MM-SS.ext` (Apple convention).
-fn find_dashed_timestamp(name: &str) -> Option<(String, String)> {
-    let upper = name.to_uppercase();
-    let marker = upper.find("SCREENSHOT")?;
+/// `(IMG|VID|GIF)-YYYYMMDD-...` WhatsApp names, e.g.
+/// `IMG-20180704-WA0051-edited.jpg` or `IMG_20180704_WA0051.jpg` (date only).
+fn find_whatsapp_timestamp(name: &str) -> Option<(String, String)> {
     let bytes = name.as_bytes();
-    let mut i = marker + "SCREENSHOT".len();
-    while i < bytes.len() && matches!(bytes[i], b'_' | b'-' | b' ') {
+    for prefix in [b"IMG", b"VID", b"GIF"] {
+        let mut i = 0;
+        while let Some(pos) = find_bytes(&bytes[i..], prefix) {
+            let start = i + pos + prefix.len();
+            if !matches!(bytes.get(start), Some(b'_' | b'-')) {
+                i = start;
+                continue;
+            }
+            let date_start = start + 1;
+            if date_start + 8 > bytes.len()
+                || !bytes[date_start..date_start + 8]
+                    .iter()
+                    .all(u8::is_ascii_digit)
+            {
+                i = start;
+                continue;
+            }
+            let after = date_start + 8;
+            if matches!(bytes.get(after), Some(b'_' | b'-'))
+                && bytes
+                    .get(after + 1)
+                    .map(u8::is_ascii_alphabetic)
+                    .unwrap_or(false)
+            {
+                let date = std::str::from_utf8(&bytes[date_start..after]).ok()?;
+                let date_str = format!("{}-{}-{}", &date[0..4], &date[4..6], &date[6..8]);
+                if is_valid_date_time(&date_str, "00:00:00") {
+                    return Some((date_str, "00:00:00".to_string()));
+                }
+            }
+            i = after;
+        }
+    }
+    None
+}
+
+/// Case-insensitive byte search for a fixed ASCII prefix.
+fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() || haystack.len() < needle.len() {
+        return None;
+    }
+    for i in 0..=(haystack.len() - needle.len()) {
+        if haystack[i..i + needle.len()].eq_ignore_ascii_case(needle) {
+            return Some(i);
+        }
+    }
+    None
+}
+
+/// ISO-like `YYYY-MM-DD[-_ ]HH[.:-]MM[.:-]SS` (Apple/iCloud exports, macOS and
+/// GNOME screenshots, `signal-` screenshots) and bare `YYYY-MM-DD` dates.
+fn find_iso_timestamp(name: &str) -> Option<(String, String)> {
+    let bytes = name.as_bytes();
+    let mut i = 0;
+    while i + 10 <= bytes.len() {
+        let is_digit = |b: u8| b.is_ascii_digit();
+        if !(is_digit(bytes[i])
+            && is_digit(bytes[i + 1])
+            && is_digit(bytes[i + 2])
+            && is_digit(bytes[i + 3])
+            && bytes[i + 4] == b'-'
+            && is_digit(bytes[i + 5])
+            && is_digit(bytes[i + 6])
+            && bytes[i + 7] == b'-'
+            && is_digit(bytes[i + 8])
+            && is_digit(bytes[i + 9]))
+        {
+            i += 1;
+            continue;
+        }
+        let y = std::str::from_utf8(&bytes[i..i + 4]).ok()?;
+        let m = std::str::from_utf8(&bytes[i + 5..i + 7]).ok()?;
+        let d = std::str::from_utf8(&bytes[i + 8..i + 10]).ok()?;
+        let date_str = format!("{y}-{m}-{d}");
+
+        let after = i + 10;
+        let search_end = bytes.len().min(after + 16);
+        let mut k = after;
+        while k + 8 <= search_end {
+            let t = &bytes[k..k + 8];
+            let is_time = t[0].is_ascii_digit()
+                && t[1].is_ascii_digit()
+                && matches!(t[2], b':' | b'.' | b'-')
+                && t[3].is_ascii_digit()
+                && t[4].is_ascii_digit()
+                && matches!(t[5], b':' | b'.' | b'-')
+                && t[6].is_ascii_digit()
+                && t[7].is_ascii_digit();
+            if is_time {
+                let time_str = format!(
+                    "{}{}:{}{}:{}{}",
+                    t[0] as char,
+                    t[1] as char,
+                    t[3] as char,
+                    t[4] as char,
+                    t[6] as char,
+                    t[7] as char
+                );
+                if is_valid_date_time(&date_str, &time_str) {
+                    return Some((date_str, time_str));
+                }
+            }
+            k += 1;
+        }
+        if is_valid_date_time(&date_str, "00:00:00") {
+            return Some((date_str, "00:00:00".to_string()));
+        }
+        i = after;
+    }
+    None
+}
+
+/// Social-downloader epoch timestamps in **milliseconds**:
+/// `FB_IMG_<ms>`, `FB_VID_<ms>`, `Snapchat-<ms>`. Only 13-digit values are
+/// accepted: shorter values are downloader counters, not timestamps, and
+/// treating them as seconds produces bogus future dates.
+fn find_epoch_timestamp(name: &str) -> Option<(String, String)> {
+    let bytes = name.as_bytes();
+    for prefix in [
+        &b"FB_IMG_"[..],
+        &b"FB_VID_"[..],
+        &b"Snapchat-"[..],
+        &b"snapchat-"[..],
+        &b"Snapchat_"[..],
+        &b"snapchat_"[..],
+    ] {
+        let mut i = 0;
+        while let Some(pos) = find_bytes(&bytes[i..], prefix) {
+            let start = i + pos + prefix.len();
+            let mut j = start;
+            while j < bytes.len() && bytes[j].is_ascii_digit() {
+                j += 1;
+            }
+            let digits = &bytes[start..j];
+            if digits.len() != 13 {
+                i = start;
+                continue;
+            }
+            let secs: i64 = std::str::from_utf8(&digits[..10]).ok()?.parse().ok()?;
+            return unix_to_created_string(secs).map(|c| split_created(&c));
+        }
+    }
+    None
+}
+
+/// Bare 14-digit `YYYYMMDDHHMMSS` dashcam timestamps.
+fn find_bare_compact_timestamp(name: &str) -> Option<(String, String)> {
+    let bytes = name.as_bytes();
+    let mut i = 0;
+    while i + 14 <= bytes.len() {
+        if bytes[i..i + 14].iter().all(u8::is_ascii_digit) {
+            let seg = std::str::from_utf8(&bytes[i..i + 14]).ok()?;
+            let date_str = format!("{}-{}-{}", &seg[0..4], &seg[4..6], &seg[6..8]);
+            let time_str = format!("{}:{}:{}", &seg[8..10], &seg[10..12], &seg[12..14]);
+            if is_valid_date_time(&date_str, &time_str) {
+                return Some((date_str, time_str));
+            }
+        }
         i += 1;
     }
-    if i + 19 > bytes.len() {
-        return None;
+    None
+}
+
+/// Bare 8-digit `YYYYMMDD` date, as a whole number token.
+fn find_bare_date_timestamp(name: &str) -> Option<String> {
+    let bytes = name.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if !bytes[i].is_ascii_digit() {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < bytes.len() && bytes[i].is_ascii_digit() {
+            i += 1;
+        }
+        let len = i - start;
+        if len == 8 {
+            let date = std::str::from_utf8(&bytes[start..i]).ok()?;
+            let date_str = format!("{}-{}-{}", &date[0..4], &date[4..6], &date[6..8]);
+            if is_valid_date_time(&date_str, "00:00:00") {
+                return Some(date_str);
+            }
+        }
     }
-    let seg = &bytes[i..i + 19];
-    let is_digit = |b: &[u8]| b.iter().all(u8::is_ascii_digit);
-    if !(seg[4] == b'-'
-        && seg[7] == b'-'
-        && seg[10] == b'-'
-        && seg[13] == b'-'
-        && seg[16] == b'-'
-        && is_digit(&seg[0..4])
-        && is_digit(&seg[5..7])
-        && is_digit(&seg[8..10])
-        && is_digit(&seg[11..13])
-        && is_digit(&seg[14..16])
-        && is_digit(&seg[17..19]))
-    {
-        return None;
-    }
-    let date = format!(
-        "{}-{}-{}",
-        std::str::from_utf8(&seg[0..4]).ok()?,
-        std::str::from_utf8(&seg[5..7]).ok()?,
-        std::str::from_utf8(&seg[8..10]).ok()?
-    );
-    let time = format!(
-        "{}:{}:{}",
-        std::str::from_utf8(&seg[11..13]).ok()?,
-        std::str::from_utf8(&seg[14..16]).ok()?,
-        std::str::from_utf8(&seg[17..19]).ok()?
-    );
-    if is_valid_date_time(&date, &time) {
-        Some((date, time))
-    } else {
-        None
+    None
+}
+
+/// Split a `YYYY-MM-DD HH:MM:SS` string into `(date, time)`.
+fn split_created(created: &str) -> (String, String) {
+    match created.split_once(' ') {
+        Some((d, t)) => (d.to_string(), t.to_string()),
+        None => (created.to_string(), String::new()),
     }
 }
 
@@ -835,6 +1009,112 @@ mod tests {
             created_from_filename(Path::new("IMG_99999999_999999.mp4")),
             None
         );
+        assert_eq!(
+            created_from_filename(Path::new("IMG_0001.jpg")),
+            None,
+            "DSLR sequence numbers carry no date"
+        );
+    }
+
+    #[test]
+    fn test_created_from_filename_whatsapp() {
+        assert_eq!(
+            created_from_filename(Path::new("IMG-20180704-WA0051-edited.jpg")),
+            Some("2018-07-04 00:00:00".to_string())
+        );
+        assert_eq!(
+            created_from_filename(Path::new("VID-20191010-WA0002.mp4")),
+            Some("2019-10-10 00:00:00".to_string())
+        );
+        assert_eq!(
+            created_from_filename(Path::new("GIF-20180704-WA0000.gif")),
+            Some("2018-07-04 00:00:00".to_string())
+        );
+        assert_eq!(
+            created_from_filename(Path::new("IMG_20180704_WA0051.jpg")),
+            Some("2018-07-04 00:00:00".to_string())
+        );
+        assert_eq!(
+            created_from_filename(Path::new("IMG-20200101.jpg")),
+            Some("2020-01-01 00:00:00".to_string())
+        );
+    }
+
+    #[test]
+    fn test_created_from_filename_epoch() {
+        let secs = 1422832569;
+        let expected = unix_to_created_string(secs).unwrap();
+        assert_eq!(
+            created_from_filename(Path::new("FB_IMG_1422832569731.jpg")),
+            Some(expected.clone())
+        );
+        assert_eq!(
+            created_from_filename(Path::new("FB_VID_1422832569731.mp4")),
+            Some(expected.clone())
+        );
+        assert_eq!(
+            created_from_filename(Path::new("Snapchat-1422832569731.jpg")),
+            Some(expected.clone())
+        );
+        assert_eq!(
+            created_from_filename(Path::new("Snapchat_1422832569731.jpg")),
+            Some(expected)
+        );
+        assert_eq!(
+            created_from_filename(Path::new("Snapchat-1928846550.jpg")),
+            None,
+            "10-digit downloader counters are not timestamps"
+        );
+    }
+
+    #[test]
+    fn test_created_from_filename_iso() {
+        assert_eq!(
+            created_from_filename(Path::new("2016-10-01 12.04.05.jpg")),
+            Some("2016-10-01 12:04:05".to_string())
+        );
+        assert_eq!(
+            created_from_filename(Path::new("Photo 2019-05-01 at 18.30.22.jpg")),
+            Some("2019-05-01 18:30:22".to_string())
+        );
+        assert_eq!(
+            created_from_filename(Path::new("Image 2020-01-15 at 10.20.30.jpg")),
+            Some("2020-01-15 10:20:30".to_string())
+        );
+        assert_eq!(
+            created_from_filename(Path::new("Camera Roll 2018-03-04 at 09.08.07.jpg")),
+            Some("2018-03-04 09:08:07".to_string())
+        );
+        assert_eq!(
+            created_from_filename(Path::new("Screenshot from 2023-01-15 14-23-01.png")),
+            Some("2023-01-15 14:23:01".to_string())
+        );
+        assert_eq!(
+            created_from_filename(Path::new("signal-2020-02-03_10-20-30.png")),
+            Some("2020-02-03 10:20:30".to_string())
+        );
+        assert_eq!(
+            created_from_filename(Path::new("photo-2020-01-15.jpg")),
+            Some("2020-01-15 00:00:00".to_string())
+        );
+    }
+
+    #[test]
+    fn test_created_from_filename_bare() {
+        assert_eq!(
+            created_from_filename(Path::new("20161001120405.mp4")),
+            Some("2016-10-01 12:04:05".to_string())
+        );
+        assert_eq!(
+            created_from_filename(Path::new("REC_20161001120405.mp4")),
+            Some("2016-10-01 12:04:05".to_string())
+        );
+        assert_eq!(
+            created_from_filename(Path::new("20160327.jpg")),
+            Some("2016-03-27 00:00:00".to_string())
+        );
+        assert_eq!(created_from_filename(Path::new("DSC_0001.jpg")), None);
+        assert_eq!(created_from_filename(Path::new("IMG_12345.jpg")), None);
     }
 
     #[test]
