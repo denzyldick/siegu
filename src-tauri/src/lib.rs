@@ -7,6 +7,7 @@ mod log;
 mod mdns_plugin;
 mod ml;
 mod permission_plugin;
+mod startup;
 mod tauri_sync_event;
 #[cfg(test)]
 mod test;
@@ -207,26 +208,10 @@ pub fn run() {
                 app.handle(),
                 "App is setting up background tasks...".to_string(),
             );
-            use tauri_plugin_notification::NotificationExt;
-            let app_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                let _ = app_handle
-                    .notification()
-                    .builder()
-                    .title("Siegu")
-                    .body("Siegu is running in the background")
-                    .show();
-            });
+            startup::spawn_background_notification(app.handle());
+            startup::spawn_startup_temp_cleanup(app.handle());
 
             let config_path = get_config_path(app.handle());
-
-            // Clean up stale temp files on startup
-            {
-                let cp = config_path.clone();
-                tauri::async_runtime::spawn(async move {
-                    siegu_core::mesh::MeshManager::cleanup_temp_files(&cp).await;
-                });
-            }
 
             let sync_tx = Arc::new(tokio::sync::Mutex::new(None));
             let ml_context = ml::start_background_worker(
@@ -262,82 +247,9 @@ pub fn run() {
                 notify_opened_file(app.handle(), &path);
             }
 
-            let app_handle_for_interval = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
-                // `tokio::time::interval` fires its first tick immediately, which
-                // would trigger a full library rescan on every app launch and slow
-                // startup for large libraries. Consume that tick so the first scan
-                // only runs after a full hour; the file watcher and the manual
-                // "Scan" button still cover live changes.
-                interval.tick().await;
-                loop {
-                    interval.tick().await;
-                    emit_log(
-                        &app_handle_for_interval,
-                        "Interval tick: checking for media updates...".to_string(),
-                    );
-                    commands::scan::scan_files(app_handle_for_interval.clone());
-                }
-            });
-
-            // One-time repair of photo dates and Google Takeout metadata (sidecar
-            // dates, format normalization, GPS/captions/favorites). Runs once per
-            // library on a background thread, guarded so it never overlaps a scan.
-            // Emits `photos-refreshed` so the grid reorders immediately.
-            let app_handle_for_backfill = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                let cp = get_config_path(&app_handle_for_backfill);
-                if cp.is_empty() {
-                    return;
-                }
-                let session = app_handle_for_backfill
-                    .state::<ScanState>()
-                    .guard
-                    .try_start();
-                let Some(session) = session else {
-                    return;
-                };
-                let stats = tauri::async_runtime::spawn_blocking(move || {
-                    let stats = siegu_core::backfill::run_backfill(&cp);
-                    let _ = session;
-                    stats
-                })
-                .await;
-                let Ok(stats) = stats else {
-                    return;
-                };
-                if stats.created_updated > 0 || stats.metadata_updated > 0 {
-                    emit_log(
-                        &app_handle_for_backfill,
-                        format!(
-                            "[backfill] Corrected dates/metadata for {} photo(s) ({} unchanged of {} scanned)",
-                            stats.created_updated + stats.metadata_updated,
-                            stats.unchanged,
-                            stats.scanned
-                        ),
-                    );
-                    let _ = app_handle_for_backfill.emit("photos-refreshed", ());
-                }
-            });
-
-            // Periodic temp file cleanup every 30 minutes
-            let app_handle_for_cleanup = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                let mut interval = tokio::time::interval(std::time::Duration::from_secs(1800));
-                loop {
-                    interval.tick().await;
-                    let cp = get_config_path(&app_handle_for_cleanup);
-                    if !cp.is_empty() {
-                        siegu_core::mesh::MeshManager::cleanup_temp_files(&cp).await;
-                    }
-                }
-            });
-
-            let app_handle_for_watcher = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                file::start_watcher(app_handle_for_watcher).await;
-            });
+            startup::spawn_interval_rescan(app.handle());
+            startup::spawn_periodic_temp_cleanup(app.handle());
+            startup::spawn_file_watcher(app.handle());
 
             Ok(())
         })

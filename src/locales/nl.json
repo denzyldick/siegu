@@ -168,6 +168,8 @@
   "media": {
     "items_count": "{count} items",
     "your_library_empty": "Je bibliotheek is leeg",
+    "scanning_in_progress": "Bibliotheek wordt gescand",
+    "scanning_hint": "Foto's verschijnen hier zodra de scan klaar is. Nieuwe items laden terwijl je scrolt.",
     "add_folder_hint": "Voeg een map toe in instellingen om je herinneringen te indexeren",
     "no_favorites": "Nog geen favorieten",
     "tap_heart_hint": "Tik op het hartje bij een foto om deze aan favorieten toe te voegen",

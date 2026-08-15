@@ -423,7 +423,7 @@ import { useI18n } from 'vue-i18n';
 import type { MediaItem } from '@/types/media';
 
 const { t } = useI18n();
-const { ensurePort, videoUrl: buildVideoUrl } = useMediaUrl();
+const { ensurePort, videoUrl: buildVideoUrl, thumbUrl: buildThumbUrl } = useMediaUrl();
 
 interface DetectedFace {
   photo_id: string;
@@ -507,7 +507,15 @@ const currentPhotoSrc = computed(() => {
   if (!currentPhoto.value || isVideo.value) return '';
   const ext = currentPhoto.value.location.split('.').pop()?.toLowerCase();
   if (['heic', 'heif'].includes(ext ?? '')) {
-    return currentPhoto.value.encoded || convertFileSrc(currentPhoto.value.location);
+    // Prefer the generated thumbnail; while it's still being produced, fall
+    // back to the media server's on-demand thumb (raw HEIC won't decode in
+    // the webview). The thumbnail-drain `photos-refreshed` upgrades this to
+    // the full generated image in a single reload.
+    return (
+      currentPhoto.value.encoded ||
+      buildThumbUrl(currentPhoto.value.location) ||
+      convertFileSrc(currentPhoto.value.location)
+    );
   }
   return convertFileSrc(currentPhoto.value.location);
 });

@@ -124,6 +124,27 @@
     </div>
 
     <div
+      v-else-if="!loading && isScanning"
+      class="empty-state-container d-flex flex-column align-center justify-center text-center"
+    >
+      <div class="empty-state-icon mb-6">
+        <v-progress-circular
+          size="64"
+          width="4"
+          indeterminate
+          color="rgba(var(--v-theme-on-surface), 0.45)"
+        ></v-progress-circular>
+      </div>
+
+      <h3 class="text-h5 font-weight-bold text-high-emphasis mb-2">
+        {{ $t('media.scanning_in_progress') }}
+      </h3>
+      <p class="text-body-1 text-medium-emphasis max-w-400 mx-auto">
+        {{ $t('media.scanning_hint') }}
+      </p>
+    </div>
+
+    <div
       v-else-if="!loading"
       class="empty-state-container d-flex flex-column align-center justify-center text-center"
     >
@@ -225,6 +246,7 @@ import MediaCard from './MediaCard.vue';
 import MediaViewer from './MediaViewer.vue';
 import AddToAlbumSheet from '@/components/albums/AddToAlbumSheet.vue';
 import { useSyncStore } from '@/stores/sync';
+import { useScanStore } from '@/stores/scan';
 import { getPhotosByIds, setFavorites } from '@/services/tauri';
 import { useI18n } from 'vue-i18n';
 import type { MediaItem } from '@/types/media';
@@ -232,6 +254,7 @@ import type { FacetType } from '@/types/search';
 
 const { t } = useI18n();
 const syncStore = useSyncStore();
+const scanStore = useScanStore();
 
 const props = withDefaults(
   defineProps<{
@@ -299,16 +322,15 @@ async function handleNotSynced(): Promise<void> {
 }
 
 let observer: IntersectionObserver | null = null;
-let unlistenDiscovered: UnlistenFn | null = null;
 let unlistenAnalysisResult: UnlistenFn | null = null;
 let unlistenPhotoReceived: UnlistenFn | null = null;
 let unlistenRefreshed: UnlistenFn | null = null;
 let reloadTimer: ReturnType<typeof setTimeout> | null = null;
-let discoveredTimer: ReturnType<typeof setTimeout> | null = null;
 let photoReceivedTimer: ReturnType<typeof setTimeout> | null = null;
-let discoveredBuffer: MediaItem[] = [];
 let analysisTimer: ReturnType<typeof setTimeout> | null = null;
 let analysisPendingIds = new Set<string | number>();
+
+const isScanning = computed(() => scanStore.isActive);
 
 const useVirtualScroller = computed(() => {
   return typeof IntersectionObserver !== 'undefined' && virtualItems.value.length > 12;
@@ -651,28 +673,16 @@ watch(
 onMounted(async () => {
   loadFiles();
 
-  function flushDiscovered(): void {
-    if (discoveredBuffer.length > 0) {
-      updateGroups(discoveredBuffer);
-      discoveredBuffer = [];
-    }
-    discoveredTimer = null;
-  }
-
-  unlistenDiscovered = await listen<MediaItem[]>('photos-discovered', (event) => {
-    if (Array.isArray(event.payload)) {
-      discoveredBuffer.push(...event.payload);
-      if (!discoveredTimer) {
-        discoveredTimer = setTimeout(flushDiscovered, 50);
-      }
-    }
-  });
-
+  // During a bulk index the backend throttles per-photo results, but a stray
+  // result (e.g. a late thumbnail) must not start a `getPhotosByIds` storm
+  // while indexing is still churning. Single-photo manual analysis keeps
+  // flowing because it only ever produces one event at a time.
   unlistenAnalysisResult = await listen<{ id: string | number }>(
     'photo-analysis-result',
     (event) => {
       const id = event.payload.id;
       if (!id) return;
+      if (scanStore.status === 'indexing' || scanStore.indexingCount > 0) return;
       queueAnalysisResult(id);
     },
   );
@@ -697,12 +707,10 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('resize', updateColumns);
   observer?.disconnect();
-  unlistenDiscovered?.();
   unlistenAnalysisResult?.();
   unlistenPhotoReceived?.();
   unlistenRefreshed?.();
   if (reloadTimer) clearTimeout(reloadTimer);
-  if (discoveredTimer) clearTimeout(discoveredTimer);
   if (photoReceivedTimer) clearTimeout(photoReceivedTimer);
   if (analysisTimer) clearTimeout(analysisTimer);
 });

@@ -12,11 +12,6 @@ export interface ScanProgress {
   current_file?: string | null;
 }
 
-export interface FileScanProgress {
-  file: string;
-  status: 'pending' | 'scanning' | 'completed';
-}
-
 export interface IndexingProgress {
   remaining: number;
 }

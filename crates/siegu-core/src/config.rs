@@ -54,7 +54,6 @@ pub const ALLOWED_CONFIG_KEYS: &[&str] = &[
     "model_enabled_sam",
     "model_enabled_superres",
     "last_scan_completed",
-    "date_backfill_done",
     "auto_scan",
     "sync_enabled",
     "max_storage_mb",

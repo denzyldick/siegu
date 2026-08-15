@@ -150,6 +150,8 @@
   "media": {
     "items_count": "{count} items",
     "your_library_empty": "Your library is empty",
+    "scanning_in_progress": "Scanning your library",
+    "scanning_hint": "Photos will appear here when the scan finishes. New items load as you scroll.",
     "add_folder_hint": "Add a folder in settings to start indexing your memories",
     "no_favorites": "No favorites yet",
     "tap_heart_hint": "Tap the heart on any photo to add it to your favorites",

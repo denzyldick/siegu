@@ -168,6 +168,8 @@
   "media": {
     "items_count": "{count} éléments",
     "your_library_empty": "Votre bibliothèque est vide",
+    "scanning_in_progress": "Analyse de votre bibliothèque",
+    "scanning_hint": "Les photos apparaîtront ici une fois l'analyse terminée. Les nouveaux éléments se chargent au défilement.",
     "add_folder_hint": "Ajoutez un dossier dans les paramètres pour commencer à indexer vos souvenirs",
     "no_favorites": "Aucun favori pour l'instant",
     "tap_heart_hint": "Appuyez sur le cœur d'une photo pour l'ajouter à vos favoris",

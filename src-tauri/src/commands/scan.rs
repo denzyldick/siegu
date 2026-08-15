@@ -31,11 +31,16 @@ fn should_dispatch_thumbnail(location: &str) -> bool {
 /// Queue thumbnail generation for a batch in the background with bounded
 /// concurrency. Rows are already committed by the time this runs, so thumbnail
 /// work can never block the library from showing newly discovered photos.
+/// Thumbnails are written to the DB only; when the last dispatched thumbnail
+/// finishes the grid is nudged with a single `photos-refreshed` (one event per
+/// scan, not one per photo) so HEIC tiles and the full-screen viewer get the
+/// generated thumbnail in a single reload.
 fn dispatch_thumbnails(
-    app: tauri::AppHandle,
     config_path: String,
     batch: Vec<database::Photo>,
     semaphore: Arc<tokio::sync::Semaphore>,
+    pending_thumbs: Arc<std::sync::atomic::AtomicUsize>,
+    app: tauri::AppHandle,
 ) {
     for photo in batch {
         if !siegu_core::thumbnail::needs_thumbnail(&photo.encoded)
@@ -43,25 +48,26 @@ fn dispatch_thumbnails(
         {
             continue;
         }
-        let app = app.clone();
+        pending_thumbs.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let path = config_path.clone();
         let id = photo.id.clone();
         let location = photo.location.clone();
         let permit = Arc::clone(&semaphore);
+        let pending = Arc::clone(&pending_thumbs);
+        let app_for_thumb = app.clone();
         tauri::async_runtime::spawn(async move {
             let _permit = permit.acquire_owned().await;
             tauri::async_runtime::spawn_blocking(move || {
                 let db = database::Database::new(&path);
-                if db.has_thumbnail(&id) {
-                    return;
+                if !db.has_thumbnail(&id) {
+                    if let Some(data_url) = siegu_core::thumbnail::generate_thumbnail(&location) {
+                        let _ = db.update_photo_thumbnail(&id, &data_url);
+                    }
                 }
-                let Some(data_url) = siegu_core::thumbnail::generate_thumbnail(&location) else {
-                    return;
-                };
-                if db.update_photo_thumbnail(&id, &data_url)
-                    && siegu_core::thumbnail::is_heic_file(&location)
-                {
-                    let _ = app.emit("photo-analysis-result", serde_json::json!({ "id": id }));
+                // fetch_sub returns the previous value: ==1 means this was the
+                // last pending thumbnail, so refresh the library exactly once.
+                if pending.fetch_sub(1, std::sync::atomic::Ordering::SeqCst) == 1 {
+                    let _ = app_for_thumb.emit("photos-refreshed", ());
                 }
             });
         });
@@ -122,96 +128,88 @@ pub fn scan_files(app: tauri::AppHandle) {
         &path_for_batch,
     )));
     let database_for_scan = Arc::clone(&database);
-    let ui_buffer = Arc::new(tokio::sync::Mutex::new(Vec::new()));
 
-    {
-        let app = app_handle_for_batch.clone();
-        let ui = Arc::clone(&ui_buffer);
-        tauri::async_runtime::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_millis(2000));
-            loop {
-                interval.tick().await;
-                let batch = {
-                    let mut buf = ui.lock().await;
-                    std::mem::take(&mut *buf)
-                };
-                if !batch.is_empty() {
-                    emit_log(&app, format!("[ui-buffer] emitting {} photos", batch.len()));
-                    if let Err(e) = app.emit("photos-discovered", &batch) {
-                        emit_log(&app, format!("[ui-buffer] ERROR emitting photos: {e}"));
-                    }
-                }
-            }
-        });
-    }
-
-    async fn flush_batch_to_db_and_ui(
+    async fn flush_batch_to_db(
         database: &Arc<std::sync::Mutex<database::Database>>,
         app_handle: &tauri::AppHandle,
-        ui_buffer: &Arc<tokio::sync::Mutex<Vec<database::Photo>>>,
         batch: &[database::Photo],
-    ) {
+    ) -> usize {
         let db_clone = Arc::clone(database);
         let batch_for_blocking = batch.to_vec();
         let app_for_blocking = app_handle.clone();
-        let _ = tauri::async_runtime::spawn_blocking(move || {
-            if let Ok(mut db) = db_clone.lock() {
-                if let Err(e) = store_batch_to_db(&mut db, &batch_for_blocking) {
-                    emit_log(
-                        &app_for_blocking,
-                        format!("[batch] ERROR storing photo batch: {e}"),
-                    );
-                }
-            } else {
+        tauri::async_runtime::spawn_blocking(move || {
+            let Ok(mut db) = db_clone.lock() else {
                 emit_log(
                     &app_for_blocking,
                     "[batch] ERROR: could not lock DB mutex".to_string(),
                 );
+                return 0;
+            };
+            match store_batch_to_db(&mut db, &batch_for_blocking) {
+                Ok(stored) => stored,
+                Err(e) => {
+                    emit_log(
+                        &app_for_blocking,
+                        format!("[batch] ERROR storing photo batch: {e}"),
+                    );
+                    0
+                }
             }
         })
-        .await;
-
-        {
-            let mut buf = ui_buffer.lock().await;
-            buf.extend_from_slice(batch);
-        }
+        .await
+        .unwrap_or(0)
     }
 
     let thumb_semaphore = Arc::new(tokio::sync::Semaphore::new(2));
+    let pending_thumbs = Arc::new(std::sync::atomic::AtomicUsize::new(0));
 
     tauri::async_runtime::spawn(async move {
         let mut batch_accum: Vec<database::Photo> = Vec::new();
+        let mut total_stored: usize = 0;
         while let Some(photo) = batch_rx.recv().await {
             batch_accum.push(photo);
 
             if batch_accum.len() >= 500 {
                 let batch = std::mem::take(&mut batch_accum);
-                flush_batch_to_db_and_ui(&database, &app_handle_for_batch, &ui_buffer, &batch)
-                    .await;
+                total_stored += flush_batch_to_db(&database, &app_handle_for_batch, &batch).await;
                 dispatch_thumbnails(
-                    app_handle_for_batch.clone(),
                     path_for_batch.clone(),
                     batch,
                     Arc::clone(&thumb_semaphore),
+                    Arc::clone(&pending_thumbs),
+                    app_handle_for_batch.clone(),
                 );
             }
         }
 
         if !batch_accum.is_empty() {
             let batch = std::mem::take(&mut batch_accum);
-            flush_batch_to_db_and_ui(&database, &app_handle_for_batch, &ui_buffer, &batch).await;
+            total_stored += flush_batch_to_db(&database, &app_handle_for_batch, &batch).await;
             dispatch_thumbnails(
-                app_handle_for_batch.clone(),
                 path_for_batch.clone(),
                 batch,
                 Arc::clone(&thumb_semaphore),
+                Arc::clone(&pending_thumbs),
+                app_handle_for_batch.clone(),
             );
         }
 
-        emit_log(
-            &app_handle_for_batch,
-            "[batch] receiver exited (all senders dropped)".to_string(),
-        );
+        if total_stored > 0 {
+            emit_log(
+                &app_handle_for_batch,
+                format!(
+                    "[batch] scan finished; {total_stored} photo(s) stored, refreshing library"
+                ),
+            );
+            // Single event for the whole scan: the grid reloads page one and
+            // infinite scroll pulls the rest. No per-photo streaming.
+            let _ = app_handle_for_batch.emit("photos-refreshed", ());
+        } else {
+            emit_log(
+                &app_handle_for_batch,
+                "[batch] receiver exited (all senders dropped)".to_string(),
+            );
+        }
     });
 
     let abort_flag = Arc::clone(&state.abort);

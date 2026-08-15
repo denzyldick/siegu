@@ -66,6 +66,7 @@ pub trait AnalysisCallbacks: Send + Sync {
         result: &PhotoResult,
         remaining: usize,
         progress_model: Option<&str>,
+        is_bulk: bool,
     );
     fn on_metadata_updated(
         &self,
@@ -104,6 +105,7 @@ impl AnalysisCallbacks for NoopCallbacks {
         _result: &PhotoResult,
         _remaining: usize,
         _progress_model: Option<&str>,
+        _is_bulk: bool,
     ) {
     }
     fn on_metadata_updated(
@@ -349,6 +351,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                 avg_photo_time_ms,
             );
 
+            let is_bulk = !job.is_single();
             let batch_delay_ms = batch_delay_ms_from_config(&config);
 
             let abort_flag = Arc::clone(&abort_clone);
@@ -523,6 +526,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                                 &result,
                                 remaining,
                                 progress_model_ref.as_deref(),
+                                is_bulk,
                             );
 
                             pending_flush.push((photo_entry.id.clone(), result));

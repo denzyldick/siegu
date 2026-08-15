@@ -168,6 +168,8 @@
   "media": {
     "items_count": "{count} Elemente",
     "your_library_empty": "Deine Bibliothek ist leer",
+    "scanning_in_progress": "Bibliothek wird gescannt",
+    "scanning_hint": "Fotos erscheinen hier, sobald der Scan abgeschlossen ist. Neue Elemente werden beim Scrollen geladen.",
     "add_folder_hint": "Füge in den Einstellungen einen Ordner hinzu, um deine Erinnerungen zu indizieren",
     "no_favorites": "Noch keine Favoriten",
     "tap_heart_hint": "Tippe auf das Herz bei einem Foto, um es zu deinen Favoriten hinzuzufügen",

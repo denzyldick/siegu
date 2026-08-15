@@ -10,7 +10,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::ml::MlContext;
-use tauri::{Emitter, Manager};
+use tauri::Manager;
 use tokio::sync::mpsc::Sender;
 
 pub async fn start_watcher(app: tauri::AppHandle) {
@@ -100,10 +100,7 @@ pub fn scan_folder(
         .map(|s| s.abort.clone())
         .unwrap_or_else(|| Arc::new(std::sync::atomic::AtomicBool::new(false)));
 
-    let app_handle = Arc::new(app.clone());
     let abort_flag_task = Arc::clone(&abort_flag);
-    let files_processed = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    let scan_start = Arc::new(std::time::Instant::now());
 
     use rayon::prelude::*;
 
@@ -164,33 +161,6 @@ pub fn scan_folder(
                 received: false,
             };
 
-            let processed = files_processed.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-            if processed.is_multiple_of(500) {
-                let filename = file_path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("")
-                    .to_string();
-                let elapsed = scan_start.elapsed().as_secs_f64();
-                let total_sofar = total_new.load(std::sync::atomic::Ordering::SeqCst);
-                let rate = processed as f64 / elapsed.max(0.001);
-                let eta_secs = if rate > 0.0 {
-                    let remaining = total_sofar.saturating_sub(processed) as f64;
-                    (remaining / rate) as u64
-                } else {
-                    0
-                };
-                let _ = app_handle.emit(
-                    "file-scan-progress",
-                    serde_json::json!({
-                        "current": processed,
-                        "total": total_sofar,
-                        "filename": filename,
-                        "eta_secs": eta_secs,
-                    }),
-                );
-            }
-
             if batch_tx.blocking_send(photo).is_err() {
                 return Err(());
             }
@@ -207,15 +177,6 @@ pub fn scan_folder(
         emit_log(app, "No new photos found.".to_string());
         return;
     }
-    let _ = app_handle.emit(
-        "file-scan-progress",
-        serde_json::json!({
-            "current": total,
-            "total": total,
-            "filename": "",
-            "eta_secs": 0,
-        }),
-    );
     emit_log(
         app,
         format!(

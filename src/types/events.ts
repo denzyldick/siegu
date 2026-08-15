@@ -1,14 +1,10 @@
 import type { MediaItem } from './media';
-import type { ScanProgress, FileScanProgress, IndexingProgress } from './scan';
+import type { ScanProgress, IndexingProgress } from './scan';
 import type { SyncProgress, PeerDevice } from './sync';
 import type { ModelProgress, DownloadProgress } from './models';
 
 export interface ScanProgressEvent {
   payload: ScanProgress;
-}
-
-export interface FileScanProgressEvent {
-  payload: FileScanProgress;
 }
 
 export interface IndexingProgressEvent {
@@ -84,7 +80,6 @@ export interface RoomCodeEvent {
 
 export type TauriEventMap = {
   'scan-progress': ScanProgressEvent;
-  'file-scan-progress': FileScanProgressEvent;
   'indexing-progress': IndexingProgressEvent;
   'indexing-eta': IndexingEtaEvent;
   'indexing-job': IndexingJobEvent;

@@ -1,4 +1,5 @@
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use crate::common::emit_log;
 use tauri::AppHandle;
@@ -15,6 +16,7 @@ struct TauriCallbacks {
     app: AppHandle,
     db: Mutex<Database>,
     sync_tx: Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<SyncMessage>>>>,
+    last_progress_emit: Mutex<Instant>,
 }
 
 impl AnalysisCallbacks for TauriCallbacks {
@@ -25,51 +27,81 @@ impl AnalysisCallbacks for TauriCallbacks {
         result: &PhotoResult,
         remaining: usize,
         progress_model: Option<&str>,
+        is_bulk: bool,
     ) {
-        let db = self.db.lock().unwrap_or_else(|e| e.into_inner());
-        let has_caption: bool = db
-            .connection
-            .query_row("SELECT caption FROM photo WHERE id = ?1", [photo_id], |r| {
-                r.get::<_, Option<String>>(0)
-            })
-            .unwrap_or(None)
-            .is_some();
+        let now = Instant::now();
 
-        let _ = self.app.emit(
-            "photo-analysis-result",
-            serde_json::json!({
-                "id": photo_id,
-                "object_count": result.objects.len(),
-                "face_count": result.face_count,
-                "has_caption": has_caption,
-                "indexed": true,
-                "model_timings": result.model_timings,
-            }),
-        );
-        let _ = self.app.emit(
-            "indexing-progress",
-            serde_json::json!({ "remaining": remaining }),
-        );
-        let _ = self.app.emit(
-            "indexing-eta",
-            serde_json::json!({ "eta": (remaining as f64) * 1000.0 }),
-        );
+        if is_bulk {
+            // Bulk indexing (ProcessAll / ProcessModel): never stream a
+            // per-photo result. Throttle progress to ~1/sec and emit one
+            // `photos-refreshed` when the job drains so the grid picks up the
+            // analyzed rows in a single reload.
+            let mut last = self
+                .last_progress_emit
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            if now.duration_since(*last) >= Duration::from_secs(1) || remaining == 0 {
+                *last = now;
+                let _ = self.app.emit(
+                    "indexing-progress",
+                    serde_json::json!({ "remaining": remaining }),
+                );
+                let _ = self.app.emit(
+                    "indexing-eta",
+                    serde_json::json!({ "eta": (remaining as f64) * 1000.0 }),
+                );
+            }
+        } else {
+            let db = self.db.lock().unwrap_or_else(|e| e.into_inner());
+            let has_caption: bool = db
+                .connection
+                .query_row("SELECT caption FROM photo WHERE id = ?1", [photo_id], |r| {
+                    r.get::<_, Option<String>>(0)
+                })
+                .unwrap_or(None)
+                .is_some();
 
-        if let Some(model) = progress_model {
             let _ = self.app.emit(
-                "model-progress",
+                "photo-analysis-result",
                 serde_json::json!({
-                    "model": model,
-                    "pending": remaining,
-                    "status": if remaining == 0 { "completed" } else { "running" },
+                    "id": photo_id,
+                    "object_count": result.objects.len(),
+                    "face_count": result.face_count,
+                    "has_caption": has_caption,
+                    "indexed": true,
+                    "model_timings": result.model_timings,
                 }),
             );
+            let _ = self.app.emit(
+                "indexing-progress",
+                serde_json::json!({ "remaining": remaining }),
+            );
+            let _ = self.app.emit(
+                "indexing-eta",
+                serde_json::json!({ "eta": (remaining as f64) * 1000.0 }),
+            );
+        }
+
+        if let Some(model) = progress_model {
+            if !is_bulk || remaining == 0 {
+                let _ = self.app.emit(
+                    "model-progress",
+                    serde_json::json!({
+                        "model": model,
+                        "pending": remaining,
+                        "status": if remaining == 0 { "completed" } else { "running" },
+                    }),
+                );
+            }
         }
 
         if remaining == 0 {
             let _ = self
                 .app
                 .emit("indexing-job", serde_json::json!({ "status": "idle" }));
+            if is_bulk {
+                let _ = self.app.emit("photos-refreshed", ());
+            }
         }
     }
 
@@ -194,6 +226,7 @@ pub fn start_background_worker(
         app: app.clone(),
         db: Mutex::new(Database::new(&config_path)),
         sync_tx,
+        last_progress_emit: Mutex::new(Instant::now()),
     };
     siegu_core::ml_engine::worker::start_worker(callbacks, config_path, 32)
 }

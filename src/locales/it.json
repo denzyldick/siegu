@@ -168,6 +168,8 @@
   "media": {
     "items_count": "{count} elementi",
     "your_library_empty": "La tua libreria è vuota",
+    "scanning_in_progress": "Scansione della libreria in corso",
+    "scanning_hint": "Le foto appariranno qui al termine della scansione. I nuovi elementi vengono caricati scorrendo.",
     "add_folder_hint": "Aggiungi una cartella nelle impostazioni per iniziare a indicizzare i tuoi ricordi",
     "no_favorites": "Nessun preferito ancora",
     "tap_heart_hint": "Tocca il cuore su qualsiasi foto per aggiungerla ai preferiti",

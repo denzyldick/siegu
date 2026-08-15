@@ -168,6 +168,8 @@
   "media": {
     "items_count": "{count} artíkulo",
     "your_library_empty": "Bo biblioteka ta bashí",
+    "scanning_in_progress": "Ta skené bo biblioteka",
+    "scanning_hint": "Foto nan lo aparesé akinan ora e sken ta terminá. Item nobo ta kargá ora bo skrol.",
     "add_folder_hint": "Añadí un karpeta den ajustenan pa inisiá indeksashon di bo memorianan",
     "no_favorites": "No tin faborito ainda",
     "tap_heart_hint": "Dun clic na e kurasón riba cualkier foto pa añadí esaki na bo faboritonan",

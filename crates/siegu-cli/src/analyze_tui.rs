@@ -55,6 +55,7 @@ impl AnalysisCallbacks for TuiCallbacks {
         result: &PhotoResult,
         remaining: usize,
         _progress_model: Option<&str>,
+        _is_bulk: bool,
     ) {
         let _ = self.tx.send(TuiEvent::PhotoComplete {
             photo_id: photo_id.to_string(),
@@ -792,6 +793,7 @@ impl AnalysisCallbacks for HeadlessCallbacks {
         result: &PhotoResult,
         remaining: usize,
         _progress_model: Option<&str>,
+        _is_bulk: bool,
     ) {
         let _ = self.tx.send(TuiEvent::PhotoComplete {
             photo_id: photo_id.to_string(),
