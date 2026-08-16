@@ -23,6 +23,10 @@ pub const FILE_CHUNK_PAYLOAD: usize = 14000;
 /// default), so anything that could grow past that — like a photo manifest for a
 /// large library — must be split into chunks below this budget.
 pub const SYNC_MESSAGE_BUDGET: usize = 48000;
+/// Hard ceiling for a single message on the wire. The receiver's read buffer is
+/// `u16::MAX` bytes; a message at or above that makes the peer error out and
+/// close the data channel, aborting the whole sync. Keep well below it.
+pub const MAX_DATA_CHANNEL_MSG_SIZE: usize = 60000;
 pub const MAX_BUFFERED_BYTES: usize = 1_000_000;
 pub const MAX_RETRY_ATTEMPTS: u32 = 3;
 pub const RETRY_BACKOFF_MS: u64 = 500;
@@ -252,6 +256,82 @@ impl MeshManager {
         Ok(())
     }
 
+    /// Serialized size of a message, or `usize::MAX` if serialization fails.
+    fn serialized_len(msg: &SyncMessage) -> usize {
+        serde_json::to_string(msg)
+            .map(|s| s.len())
+            .unwrap_or(usize::MAX)
+    }
+
+    /// Build a `FileHeader` message whose serialized size stays under the data
+    /// channel ceiling. Face crops (`faces` entries carry base64 JPEGs that can
+    /// exceed 64KiB on their own) are trimmed first, then the thumbnail, so a
+    /// single oversized header can never take the whole channel down. Returns
+    /// the message and whether anything was trimmed.
+    #[allow(clippy::too_many_arguments)]
+    fn fit_file_header(
+        id: String,
+        filename: String,
+        relative_path: String,
+        size: u64,
+        checksum: String,
+        created: String,
+        latitude: Option<f64>,
+        longitude: Option<f64>,
+        objects: String,
+        mut faces: String,
+        caption: Option<String>,
+        aesthetics_score: Option<f64>,
+        encoded: String,
+    ) -> (SyncMessage, bool) {
+        let build = |faces: &str, encoded: &str| SyncMessage::FileHeader {
+            id: id.clone(),
+            filename: filename.clone(),
+            relative_path: relative_path.clone(),
+            size,
+            checksum: checksum.clone(),
+            created: created.clone(),
+            latitude,
+            longitude,
+            objects: objects.clone(),
+            faces: faces.to_string(),
+            caption: caption.clone(),
+            aesthetics_score,
+            encoded: encoded.to_string(),
+        };
+
+        let msg = build(&faces, &encoded);
+        if Self::serialized_len(&msg) < MAX_DATA_CHANNEL_MSG_SIZE {
+            return (msg, false);
+        }
+
+        // Trim the bulky face crops first (they are the largest field).
+        faces = Self::strip_face_crops(&faces);
+        let msg = build(&faces, &encoded);
+        if Self::serialized_len(&msg) < MAX_DATA_CHANNEL_MSG_SIZE {
+            return (msg, true);
+        }
+
+        // Still too big (e.g. a large thumbnail): drop it too.
+        (build(&faces, ""), true)
+    }
+
+    /// Re-serialize a `faces` JSON array, blanking the `encoded` field (the
+    /// base64 face crop) while keeping face ids, crop paths and person ids.
+    fn strip_face_crops(faces_json: &str) -> String {
+        let trimmed: Vec<serde_json::Value> = serde_json::from_str(faces_json)
+            .ok()
+            .and_then(|v: serde_json::Value| v.as_array().cloned())
+            .unwrap_or_default()
+            .into_iter()
+            .map(|mut face| {
+                face["encoded"] = serde_json::Value::String(String::new());
+                face
+            })
+            .collect();
+        serde_json::to_string(&trimmed).unwrap_or_else(|_| "[]".to_string())
+    }
+
     /// Split a manifest into chunks, each serializing to less than the data
     /// channel's max message size. Returns (chunk, more).
     pub fn split_manifest_chunks(photos: Vec<PhotoSyncInfo>) -> Vec<(Vec<PhotoSyncInfo>, bool)> {
@@ -387,25 +467,27 @@ impl MeshManager {
 
         let checksum = Self::compute_file_checksum(path).await?;
 
-        Self::send_sync_message(
-            dc,
-            &SyncMessage::FileHeader {
-                id: photo_id.clone(),
-                filename: filename.clone(),
-                relative_path: outgoing.relative_path.clone(),
-                size,
-                checksum: checksum.clone(),
-                created: outgoing.created.clone(),
-                latitude: outgoing.latitude,
-                longitude: outgoing.longitude,
-                objects: outgoing.objects.clone(),
-                faces: outgoing.faces.clone(),
-                caption: outgoing.caption.clone(),
-                aesthetics_score: outgoing.aesthetics_score,
-                encoded: encoded.clone(),
-            },
-        )
-        .await?;
+        let (header, trimmed) = Self::fit_file_header(
+            photo_id.clone(),
+            filename.clone(),
+            outgoing.relative_path.clone(),
+            size,
+            checksum.clone(),
+            outgoing.created.clone(),
+            outgoing.latitude,
+            outgoing.longitude,
+            outgoing.objects.clone(),
+            outgoing.faces.clone(),
+            outgoing.caption.clone(),
+            outgoing.aesthetics_score,
+            encoded.clone(),
+        );
+        if trimmed {
+            event.on_log(&format!(
+                "WARN trimmed oversized FileHeader for {filename} (face crops/thumbnail dropped)"
+            ));
+        }
+        Self::send_sync_message(dc, &header).await?;
 
         let mut buffer = vec![0u8; FILE_CHUNK_PAYLOAD];
         let mut total_sent = 0u64;
@@ -502,7 +584,9 @@ impl MeshManager {
                 event.on_log("DEBUG handle ManifestRequest");
                 let db = Database::new(config_path);
                 let photos = db.get_photo_sync_info();
-                let _ = Self::send_manifest_response(dc, photos).await;
+                if let Err(e) = Self::send_manifest_response(dc, photos).await {
+                    event.on_log(&format!("ERROR sending manifest response: {e}"));
+                }
                 event.on_log("DEBUG sent ManifestResponse (chunked)");
             }
             SyncMessage::ManifestResponse { photos, more } => {
@@ -1121,6 +1205,90 @@ mod tests {
         let chunks = MeshManager::split_manifest_chunks(photos);
         assert_eq!(chunks.len(), 1);
         assert!(!chunks[0].1, "single chunk must be the final chunk");
+    }
+
+    #[test]
+    fn test_strip_face_crops_keeps_ids_drops_encoded() {
+        let faces =
+            r#"[{"face_id":"f1","crop_path":"crop.jpg","encoded":"AAAA","person_id":"p1"}]"#;
+        let stripped = MeshManager::strip_face_crops(faces);
+        assert!(stripped.contains("f1"), "face id must survive: {stripped}");
+        assert!(
+            stripped.contains("crop.jpg"),
+            "crop path must survive: {stripped}"
+        );
+        assert!(
+            !stripped.contains("AAAA"),
+            "encoded crop must be dropped: {stripped}"
+        );
+    }
+
+    #[test]
+    fn test_fit_file_header_trims_oversized_face_crops() {
+        // A single face crop can exceed the data channel message limit; the
+        // header must be trimmed so the receiver never errors and closes the
+        // channel (which would abort the whole sync session).
+        let big = "data:image/jpeg;base64,".to_string() + &"A".repeat(120_000);
+        let faces = format!(
+            r#"[{{"face_id":"f1","crop_path":"crop.jpg","encoded":"{big}","person_id":"p1"}}]"#
+        );
+
+        let (msg, trimmed) = MeshManager::fit_file_header(
+            "id-1".into(),
+            "photo.jpg".into(),
+            String::new(),
+            100,
+            "checksum".into(),
+            "2024-01-01".into(),
+            None,
+            None,
+            "[]".into(),
+            faces,
+            None,
+            None,
+            String::new(),
+        );
+
+        assert!(trimmed, "oversized header must be flagged as trimmed");
+        match &msg {
+            SyncMessage::FileHeader { faces, .. } => {
+                assert!(!faces.contains("AAAA"), "face crops must be trimmed");
+            }
+            _ => panic!("expected FileHeader"),
+        }
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(
+            json.len() < MAX_DATA_CHANNEL_MSG_SIZE,
+            "trimmed header must fit in the channel, got {} bytes",
+            json.len()
+        );
+    }
+
+    #[test]
+    fn test_fit_file_header_keeps_small_headers_untouched() {
+        let (msg, trimmed) = MeshManager::fit_file_header(
+            "id-1".into(),
+            "photo.jpg".into(),
+            String::new(),
+            100,
+            "checksum".into(),
+            "2024-01-01".into(),
+            None,
+            None,
+            "[]".into(),
+            "[]".into(),
+            None,
+            None,
+            String::new(),
+        );
+        assert!(!trimmed, "small header must not be trimmed");
+        match &msg {
+            SyncMessage::FileHeader { faces, encoded, .. } => {
+                assert_eq!(faces, "[]");
+                assert_eq!(encoded, "");
+            }
+            _ => panic!("expected FileHeader"),
+        }
     }
 
     #[test]

@@ -641,6 +641,13 @@ impl Database {
     /// "what this device has", so it must include received files: otherwise a
     /// sync-only device reports an empty library and re-requests everything it
     /// already received on every reconnect.
+    ///
+    /// The manifest is used purely to compare photo ids, so the bulky face-crop
+    /// images (`faces.encoded`, base64 JPEGs up to 100KB+) are dropped here.
+    /// They travel with the per-file `FileHeader` at transfer time instead;
+    /// keeping them out of the manifest keeps every manifest chunk below the
+    /// data channel's ~64KiB message limit (an oversized message makes the
+    /// receiver close the channel, which aborts the whole sync).
     pub fn get_photo_sync_info(&self) -> Vec<PhotoSyncInfo> {
         let mut results = Vec::new();
         let sql = "SELECT id, location, created, latitude, longitude, caption, aesthetics_score FROM photo p";
@@ -679,7 +686,10 @@ impl Database {
                             person_id: r.get(3)?,
                         })
                     }) {
-                        for face in face_rows.flatten() {
+                        for mut face in face_rows.flatten() {
+                            // See the doc comment above: the manifest is
+                            // id-comparison only, so drop the face crop bytes.
+                            face.encoded = String::new();
                             faces.push(face);
                         }
                     }
@@ -5202,6 +5212,36 @@ mod tests {
         assert!(
             ids.contains(&"sync_siegu"),
             "received files under /siegu/ are part of this device's library and must be in the manifest"
+        );
+    }
+
+    #[test]
+    fn test_get_photo_sync_info_drops_face_crops_so_entries_fit_the_channel() {
+        let mut db = test_db();
+        let _ = db.store_photo_batch(&[make_photo("face_photo", "/home/test/face.jpg")]);
+        db.connection
+            .execute(
+                "INSERT INTO faces (photo_id, face_id, crop_path, encoded, person_id) \
+                 VALUES ('face_photo', 'f1', 'crop.jpg', ?1, 'person-1')",
+                ["data:image/jpeg;base64,".to_string() + &"A".repeat(120_000)],
+            )
+            .unwrap();
+
+        let info = db.get_photo_sync_info();
+        let photo = info
+            .iter()
+            .find(|p| p.id == "face_photo")
+            .expect("photo must be in the manifest");
+
+        assert!(
+            !photo.faces.contains('A'),
+            "manifest must not carry the bulky face crop bytes"
+        );
+        let serialized = serde_json::to_string(photo).unwrap();
+        assert!(
+            serialized.len() < 60_000,
+            "manifest entry must fit in a single data channel message, got {} bytes",
+            serialized.len()
         );
     }
 

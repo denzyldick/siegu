@@ -421,6 +421,97 @@ async fn mesh_delta_sync_transfers_only_new_photos() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn mesh_large_face_crop_does_not_stall_sync() {
+    // Regression for the real deployment (joiner is the WebRTC initiator with
+    // an empty library, desktop host is the answerer). A photo whose face crop
+    // (base64 JPEG) exceeds the data channel's ~64KiB message limit used to:
+    //   1. blow up a manifest chunk, so the peer never saw `more:false`,
+    //      never compared manifests and reported "all up to date"; and
+    //   2. blow up the FileHeader once a transfer finally started.
+    // Both make the receiver close the channel, stalling sync forever. The
+    // manifest must drop crop bytes and the FileHeader must trim them.
+    let _ = tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::ERROR)
+        .try_init();
+
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let config_joiner = tmp.path().join("joiner").display().to_string();
+    let config_host = tmp.path().join("host").display().to_string();
+    std::fs::create_dir_all(&config_joiner).unwrap();
+    std::fs::create_dir_all(&config_host).unwrap();
+
+    let photo = std::path::Path::new(FIXTURES).join("einstein_1.jpg");
+    assert!(photo.exists(), "fixture missing: {photo:?}");
+    import_photo(&config_host, "photo-face", &photo);
+
+    // Seed a huge face crop on the host, matching the real DB shape.
+    let db = Database::new(&config_host);
+    db.connection
+        .execute(
+            "INSERT INTO faces (photo_id, face_id, crop_path, encoded, person_id) \
+             VALUES (?1, ?2, '', ?3, NULL)",
+            (
+                "photo-face",
+                "f1",
+                "data:image/jpeg;base64,".to_string() + &"A".repeat(120_000),
+            ),
+        )
+        .unwrap();
+
+    let url = start_lan_signal().await;
+    let room_id = "large-face-crop-room";
+
+    let event_joiner = Arc::new(TestEvent::default());
+    let event_host = Arc::new(TestEvent::default());
+
+    // Joiner = initiator, empty library; host = answerer, has the photo.
+    let joiner = new_peer(
+        room_id,
+        true,
+        &url,
+        &config_joiner,
+        "joiner",
+        Arc::clone(&event_joiner),
+    );
+    let host = new_peer(
+        room_id,
+        false,
+        &url,
+        &config_host,
+        "host",
+        Arc::clone(&event_host),
+    );
+
+    let handle_joiner = {
+        let peer = joiner.clone();
+        tokio::spawn(async move { peer.start().await })
+    };
+    let handle_host = {
+        let peer = host.clone();
+        tokio::spawn(async move { peer.start().await })
+    };
+
+    let timeout = Duration::from_secs(90);
+    wait_for(
+        timeout,
+        "joiner to receive the photo with the huge face crop",
+        || {
+            event_joiner
+                .received_ids()
+                .contains(&"photo-face".to_string())
+        },
+    )
+    .await;
+    wait_for(timeout, "joiner DB to import the photo", || {
+        joiner_has_photo(&config_joiner, "photo-face")
+    })
+    .await;
+
+    handle_joiner.abort();
+    handle_host.abort();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn mdns_discovers_lan_host() {
     let _ = tracing_subscriber::fmt()
         .with_max_level(tracing::Level::ERROR)
