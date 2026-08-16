@@ -219,13 +219,20 @@ impl MeshManager {
             .unwrap_or_else(|| "unknown".to_string())
     }
 
-    pub fn compute_file_checksum(
+    pub async fn compute_file_checksum(
         path: &Path,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         use sha2::{Digest, Sha256};
-        let bytes = std::fs::read(path)?;
+        let mut file = tokio::fs::File::open(path).await?;
         let mut hasher = Sha256::new();
-        hasher.update(&bytes);
+        let mut buf = vec![0u8; 1024 * 1024];
+        loop {
+            let n = file.read(&mut buf).await?;
+            if n == 0 {
+                break;
+            }
+            hasher.update(&buf[..n]);
+        }
         Ok(format!("{:x}", hasher.finalize()))
     }
 
@@ -339,8 +346,14 @@ impl MeshManager {
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| "unknown".to_string());
 
-        let checksum = Self::compute_file_checksum(path)?;
+        let encoded = if outgoing.encoded.is_empty() {
+            crate::thumbnail::generate_thumbnail(&outgoing.path).unwrap_or_default()
+        } else {
+            outgoing.encoded.clone()
+        };
 
+        // Surface the per-file start event immediately (before the checksum
+        // pass) so the UI shows the filename + thumbnail without waiting.
         event.on_sync_progress(SyncProgress {
             device_id: "peer".to_string(),
             status: format!("Sending {filename}"),
@@ -350,8 +363,10 @@ impl MeshManager {
             items_completed: 0,
             items_total: 0,
             filename: Some(filename.clone()),
-            thumbnail: Some(outgoing.encoded.clone()),
+            thumbnail: Some(encoded.clone()),
         });
+
+        let checksum = Self::compute_file_checksum(path).await?;
 
         Self::send_sync_message(
             dc,
@@ -368,7 +383,7 @@ impl MeshManager {
                 faces: outgoing.faces.clone(),
                 caption: outgoing.caption.clone(),
                 aesthetics_score: outgoing.aesthetics_score,
-                encoded: outgoing.encoded.clone(),
+                encoded: encoded.clone(),
             },
         )
         .await?;
@@ -711,8 +726,8 @@ impl MeshManager {
                     let temp_path =
                         sync_temp_dir(config_path).join(sanitize_filename(&file_state.id));
 
-                    let received_checksum = match std::fs::read(&temp_path) {
-                        Ok(data) => Self::compute_data_checksum(&data),
+                    let received_checksum = match Self::compute_file_checksum(&temp_path).await {
+                        Ok(cs) => cs,
                         Err(_) => String::new(),
                     };
 

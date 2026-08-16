@@ -288,8 +288,12 @@ async fn mesh_delta_sync_transfers_only_new_photos() {
     let photo_b = std::path::Path::new(FIXTURES).join("einstein_2.jpg");
     assert!(photo_a.exists(), "fixture missing: {photo_a:?}");
     assert!(photo_b.exists(), "fixture missing: {photo_b:?}");
-    let sha_a = siegu_core::mesh::MeshManager::compute_file_checksum(&photo_a).unwrap();
-    let sha_b = siegu_core::mesh::MeshManager::compute_file_checksum(&photo_b).unwrap();
+    let sha_a = siegu_core::mesh::MeshManager::compute_file_checksum(&photo_a)
+        .await
+        .unwrap();
+    let sha_b = siegu_core::mesh::MeshManager::compute_file_checksum(&photo_b)
+        .await
+        .unwrap();
 
     // Host starts with one photo; the joiner starts empty.
     import_photo(&config_a, "photo-a", &photo_a);
@@ -364,8 +368,9 @@ async fn mesh_delta_sync_transfers_only_new_photos() {
         received_a_path.exists(),
         "received file missing: {received_b}"
     );
-    let received_sha =
-        siegu_core::mesh::MeshManager::compute_file_checksum(received_a_path).unwrap();
+    let received_sha = siegu_core::mesh::MeshManager::compute_file_checksum(received_a_path)
+        .await
+        .unwrap();
     assert_eq!(
         received_sha, sha_a,
         "round 1 file must match source byte-for-byte"
@@ -406,8 +411,9 @@ async fn mesh_delta_sync_transfers_only_new_photos() {
         .join("siegu")
         .join("einstein_2.jpg");
     assert!(received_b_path.exists(), "received photo-b missing");
-    let received_b_sha =
-        siegu_core::mesh::MeshManager::compute_file_checksum(&received_b_path).unwrap();
+    let received_b_sha = siegu_core::mesh::MeshManager::compute_file_checksum(&received_b_path)
+        .await
+        .unwrap();
     assert_eq!(
         received_b_sha, sha_b,
         "round 2 file must match source byte-for-byte"
