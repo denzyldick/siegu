@@ -88,9 +88,8 @@ onUnmounted(() => {
           <v-icon size="20" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-laptop</v-icon>
         </template>
         <v-list-item-title class="text-body-2 font-weight-medium">{{
-          host.name
+          host.name || host.ip
         }}</v-list-item-title>
-        <v-list-item-subtitle class="text-caption">{{ host.ip }}</v-list-item-subtitle>
         <template v-slot:append>
           <v-icon size="16" color="grey">mdi-chevron-right</v-icon>
         </template>

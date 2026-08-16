@@ -8,6 +8,7 @@ export const useSyncStore = defineStore('sync', () => {
   const status = ref<SyncStatus>('idle');
   const progress = ref({ items_completed: 0, items_total: 0, status: '' });
   const error = ref<string | null>(null);
+  const currentFile = ref<{ filename: string; thumbnail: string } | null>(null);
   const devices = ref<Device[]>([]);
   const connected = ref(false);
   const connection = ref<'idle' | 'connected' | 'offline'>('idle');
@@ -43,12 +44,20 @@ export const useSyncStore = defineStore('sync', () => {
       items_completed: number;
       items_total: number;
       phase?: 'idle' | 'syncing' | 'completed';
+      filename?: string;
+      thumbnail?: string;
     }) => {
       progress.value = {
         items_completed: payload.items_completed ?? 0,
         items_total: payload.items_total ?? 0,
         status: payload.status,
       };
+      if (payload.filename && payload.thumbnail) {
+        currentFile.value = { filename: payload.filename, thumbnail: payload.thumbnail };
+      }
+      if (payload.phase === 'completed') {
+        currentFile.value = null;
+      }
       if (payload.phase === 'syncing') {
         status.value = 'syncing';
       } else if (payload.phase === 'completed') {
@@ -115,6 +124,7 @@ export const useSyncStore = defineStore('sync', () => {
     status,
     progress,
     error,
+    currentFile,
     devices,
     connected,
     connection,

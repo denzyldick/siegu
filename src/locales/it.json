@@ -488,7 +488,20 @@
     "device_on_network": "On your network",
     "connect_fromAnywhere": "Connect from anywhere with Internet Sync — coming soon",
     "host_desc": "Let other devices discover and connect to your library",
-    "join_desc": "Pick a device on your network to connect"
+    "join_desc": "Pick a device on your network to connect",
+    "selected_device": "Dispositivo",
+    "status_connecting_signaling": "Connessione...",
+    "status_waiting_peer": "In attesa dell'altro dispositivo...",
+    "status_secure_ready": "Connessione sicura pronta",
+    "status_peer_joined": "Il tuo dispositivo è connesso",
+    "status_peer_connected": "Dispositivo connesso",
+    "status_peer_disconnected": "Dispositivo disconnesso",
+    "status_room_closed": "Sessione chiusa",
+    "status_sync_started": "Sincronizzazione avviata",
+    "status_connected": "Connesso",
+    "status_connecting_webrtc": "Connessione sicura in corso...",
+    "status_connection_failed": "Connessione non riuscita",
+    "status_awaiting_connection": "In attesa dell'altro dispositivo..."
   },
   "media_viewer": {
     "metadata": "Metadati",

@@ -1,10 +1,21 @@
 <script setup lang="ts">
-defineProps<{
+import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { connectionStatusKey } from '@/utils/connectStatus';
+
+const { t } = useI18n();
+
+const props = defineProps<{
   status: string;
   isConnected: boolean;
   showDisconnect: boolean;
   disconnecting: boolean;
 }>();
+
+const displayStatus = computed(() => {
+  const key = connectionStatusKey(props.status);
+  return key ? t(key) : props.status;
+});
 
 const emit = defineEmits<{
   disconnect: [];
@@ -24,7 +35,7 @@ const emit = defineEmits<{
     <v-icon v-else-if="isConnected" color="success" size="16" class="mr-2"
       >mdi-check-circle-outline</v-icon
     >
-    {{ status }}
+    {{ displayStatus }}
   </div>
 
   <div v-if="showDisconnect" class="text-center mt-4">

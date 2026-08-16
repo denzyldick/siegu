@@ -281,7 +281,20 @@
     "no_devices_found": "No devices found nearby. Open the app on your other device in Share mode.",
     "select_device": "Select a device to connect to",
     "device_on_network": "On your network",
-    "connect_fromAnywhere": "Connect from anywhere with Internet Sync — coming soon"
+    "connect_fromAnywhere": "Connect from anywhere with Internet Sync — coming soon",
+    "selected_device": "Device",
+    "status_connecting_signaling": "Connecting...",
+    "status_waiting_peer": "Waiting for the other device...",
+    "status_secure_ready": "Secure connection ready",
+    "status_peer_joined": "Your device is connected",
+    "status_peer_connected": "Device connected",
+    "status_peer_disconnected": "Device disconnected",
+    "status_room_closed": "Session closed",
+    "status_sync_started": "Sync started",
+    "status_connected": "Connected",
+    "status_connecting_webrtc": "Establishing secure connection...",
+    "status_connection_failed": "Connection failed",
+    "status_awaiting_connection": "Waiting for the other device..."
   },
   "media_viewer": {
     "metadata": "Metadata",

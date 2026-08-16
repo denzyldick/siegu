@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import SyncNowCard from '@/components/connect/SyncNowCard.vue';
 
 const { t } = useI18n();
 
@@ -15,6 +16,7 @@ const props = defineProps<{
   deviceName: string;
   itemsCompleted: number;
   itemsTotal: number;
+  progress: number;
 }>();
 
 const emit = defineEmits<{
@@ -27,23 +29,13 @@ const localValue = computed({
   get: () => props.modelValue,
   set: (val: string) => emit('update:modelValue', val),
 });
-
-const syncStatusText = computed(() => {
-  if (props.itemsTotal > 0) {
-    return t('connect.syncing_files', {
-      completed: props.itemsCompleted,
-      total: props.itemsTotal,
-    });
-  }
-  return t('connect.syncing');
-});
 </script>
 
 <template>
   <div v-if="hostIp" class="d-flex flex-column align-stretch mb-6 ga-4" style="width: 100%">
-    <div class="text-center mb-2">
-      <div class="text-caption text-disabled">Direct connection</div>
-      <div class="text-body-1 font-weight-bold text-high-emphasis">{{ hostIp }}:{{ hostPort }}</div>
+    <div v-if="deviceName" class="text-center mb-2">
+      <div class="text-caption text-disabled">{{ t('connect.selected_device') }}</div>
+      <div class="text-body-1 font-weight-bold text-high-emphasis">{{ deviceName }}</div>
     </div>
 
     <v-text-field
@@ -82,24 +74,15 @@ const syncStatusText = computed(() => {
       </div>
     </v-btn>
 
-    <div v-if="syncing" class="d-flex flex-column align-center py-4 ga-2">
+    <div v-if="syncing" class="d-flex flex-column align-center py-4 ga-3">
       <div v-if="deviceName" class="text-caption text-medium-emphasis">
         {{ t('connect.connected_to') }} <strong>{{ deviceName }}</strong>
       </div>
-      <div v-if="itemsTotal > 0" class="d-flex align-center ga-2 w-100">
-        <v-progress-linear
-          :model-value="(itemsCompleted / itemsTotal) * 100"
-          color="success"
-          height="6"
-          rounded
-          class="flex-grow-1"
-        />
-        <span class="text-caption font-weight-bold" style="color: rgb(var(--v-theme-success))">
-          {{ itemsCompleted }}/{{ itemsTotal }}
-        </span>
-      </div>
-      <v-progress-linear v-else indeterminate color="success" height="4" class="w-100" />
-      <span class="text-caption text-disabled">{{ syncStatusText }}</span>
+      <SyncNowCard
+        :progress="progress"
+        :items-completed="itemsCompleted"
+        :items-total="itemsTotal"
+      />
     </div>
 
     <div v-else-if="isConnected" class="d-flex flex-column align-center py-4 ga-1">

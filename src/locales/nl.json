@@ -488,7 +488,20 @@
     "device_on_network": "On your network",
     "connect_fromAnywhere": "Connect from anywhere with Internet Sync — coming soon",
     "host_desc": "Let other devices discover and connect to your library",
-    "join_desc": "Pick a device on your network to connect"
+    "join_desc": "Pick a device on your network to connect",
+    "selected_device": "Apparaat",
+    "status_connecting_signaling": "Verbinden...",
+    "status_waiting_peer": "Wachten op het andere apparaat...",
+    "status_secure_ready": "Beveiligde verbinding gereed",
+    "status_peer_joined": "Je apparaat is verbonden",
+    "status_peer_connected": "Apparaat verbonden",
+    "status_peer_disconnected": "Apparaat verbroken",
+    "status_room_closed": "Sessie gesloten",
+    "status_sync_started": "Sync gestart",
+    "status_connected": "Verbonden",
+    "status_connecting_webrtc": "Beveiligde verbinding wordt tot stand gebracht...",
+    "status_connection_failed": "Verbinding mislukt",
+    "status_awaiting_connection": "Wachten op het andere apparaat..."
   },
   "media_viewer": {
     "metadata": "Metadata",

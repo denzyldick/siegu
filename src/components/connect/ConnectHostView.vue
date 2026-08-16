@@ -19,20 +19,11 @@
         {{ $t('connect.connected_to') }} <strong>{{ peerName }}</strong>
       </div>
       <div v-if="syncing" class="w-100">
-        <div v-if="itemsTotal > 0" class="d-flex align-center ga-2 w-100">
-          <v-progress-linear
-            :model-value="(itemsCompleted / itemsTotal) * 100"
-            color="success"
-            height="6"
-            rounded
-            class="flex-grow-1"
-          />
-          <span class="text-caption font-weight-bold" style="color: rgb(var(--v-theme-success))">
-            {{ itemsCompleted }}/{{ itemsTotal }}
-          </span>
-        </div>
-        <v-progress-linear v-else indeterminate color="success" height="4" class="w-100" />
-        <span class="text-caption text-disabled">{{ $t('connect.syncing') }}</span>
+        <SyncNowCard
+          :progress="progress"
+          :items-completed="itemsCompleted"
+          :items-total="itemsTotal"
+        />
       </div>
     </div>
   </template>
@@ -80,12 +71,14 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import SyncNowCard from '@/components/connect/SyncNowCard.vue';
 
 const props = withDefaults(
   defineProps<{
     passphrase: string[];
     isConnected?: boolean;
     syncing?: boolean;
+    progress?: number;
     itemsCompleted?: number;
     itemsTotal?: number;
     peerName?: string;
@@ -93,6 +86,7 @@ const props = withDefaults(
   {
     isConnected: false,
     syncing: false,
+    progress: 0,
     itemsCompleted: 0,
     itemsTotal: 0,
     peerName: '',

@@ -488,7 +488,20 @@
     "device_on_network": "On your network",
     "connect_fromAnywhere": "Connect from anywhere with Internet Sync — coming soon",
     "host_desc": "Let other devices discover and connect to your library",
-    "join_desc": "Pick a device on your network to connect"
+    "join_desc": "Pick a device on your network to connect",
+    "selected_device": "Aparato",
+    "status_connecting_signaling": "Konektando...",
+    "status_waiting_peer": "Ta warda riba e otro aparato...",
+    "status_secure_ready": "Konekshon segurá kla",
+    "status_peer_joined": "Bo aparato ta konektá",
+    "status_peer_connected": "Aparato konektá",
+    "status_peer_disconnected": "Aparato deskonektá",
+    "status_room_closed": "Sesion sera",
+    "status_sync_started": "Sync a kuminsá",
+    "status_connected": "Konektá",
+    "status_connecting_webrtc": "Ta establisé un konekshon segurá...",
+    "status_connection_failed": "Konekshon a faya",
+    "status_awaiting_connection": "Ta warda riba e otro aparato..."
   },
   "media_viewer": {
     "metadata": "Metadato",

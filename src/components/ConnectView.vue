@@ -152,6 +152,7 @@
             :passphrase="passphrase"
             :is-connected="isConnected"
             :syncing="syncing"
+            :progress="syncProgress.progress"
             :items-completed="syncProgress.items_completed"
             :items-total="syncProgress.items_total"
             :peer-name="peerList[0]?.name ?? ''"
@@ -169,6 +170,7 @@
             :device-name="selectedLanHost?.name ?? ''"
             :items-completed="syncProgress.items_completed"
             :items-total="syncProgress.items_total"
+            :progress="syncProgress.progress"
             :connection-status="connectionStatus"
             @join="(ip: string, port: string) => joinWebRTC(ip, port)"
             @sync="triggerSync"
@@ -254,6 +256,7 @@
           :passphrase="passphrase"
           :is-connected="isConnected"
           :syncing="syncing"
+          :progress="syncProgress.progress"
           :items-completed="syncProgress.items_completed"
           :items-total="syncProgress.items_total"
           :peer-name="peerList[0]?.name ?? ''"
@@ -271,6 +274,7 @@
           :device-name="selectedLanHost?.name ?? ''"
           :items-completed="syncProgress.items_completed"
           :items-total="syncProgress.items_total"
+          :progress="syncProgress.progress"
           :connection-status="connectionStatus"
           @join="(ip: string, port: string) => joinWebRTC(ip, port)"
           @sync="triggerSync"
@@ -307,7 +311,7 @@
             class="mr-2 opacity-50"
           ></v-progress-circular>
           <v-icon v-else color="success" size="16" class="mr-2">mdi-check-circle-outline</v-icon>
-          {{ connectionStatus }}
+          {{ displayStatus }}
         </div>
       </template>
     </div>
@@ -316,11 +320,15 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useConnect } from '@/composables/useConnect';
+import { connectionStatusKey } from '@/utils/connectStatus';
 import ConnectHostView from '@/components/connect/ConnectHostView.vue';
 import ConnectJoinView from '@/components/connect/ConnectJoinView.vue';
 import ConnectLanDiscovery from '@/components/connect/ConnectLanDiscovery.vue';
 import ConnectStatusBar from '@/components/connect/ConnectStatusBar.vue';
+
+const { t } = useI18n();
 
 const props = withDefaults(
   defineProps<{
@@ -395,6 +403,11 @@ const showDisconnect = computed(() => {
     (isConnected.value ||
       (connectionStatus.value.length > 0 && connectionStatus.value !== 'Disconnected'))
   );
+});
+
+const displayStatus = computed(() => {
+  const key = connectionStatusKey(connectionStatus.value);
+  return key ? t(key) : connectionStatus.value;
 });
 
 async function handleDisconnect() {
