@@ -27,7 +27,7 @@ pub use database::{
 };
 pub use error::{Result, SieguError};
 pub use event_bus::{ArcEventBus, CallbackEventBus, EventBus, Level, LogCollector, NullEventBus};
-pub use mesh::{MeshManager, SyncEvent, SyncMessage, SyncProgress};
+pub use mesh::{MeshManager, SyncEvent, SyncMessage, SyncPhase, SyncProgress};
 #[cfg(feature = "ml")]
 pub use ml_worker::MlContext;
 pub use scanner::{extract_photo_metadata, is_media_file, ScanGuard};

@@ -1,8 +1,13 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tauri::Emitter;
 
-use siegu_core::{Database, PeerDevice, SyncEvent, SyncMessage, SyncProgress};
+use siegu_core::{Database, PeerDevice, SyncEvent, SyncMessage, SyncPhase, SyncProgress};
+
+/// Minimum interval between "sync-progress" IPC emissions. Per-chunk progress
+/// updates arrive several hundred times per second; this caps the JS side.
+const PROGRESS_EMIT_INTERVAL: Duration = Duration::from_millis(250);
 
 pub struct TauriSyncEvent {
     pub app: tauri::AppHandle,
@@ -14,6 +19,8 @@ pub struct TauriSyncEvent {
     pub connected: Arc<AtomicBool>,
     /// The device_id of the currently connected peer, used to attribute received files.
     pub active_peer: Arc<tokio::sync::Mutex<Option<String>>>,
+    /// Timestamp of the last emitted "sync-progress" event, for rate limiting.
+    pub last_sync_progress: std::sync::Mutex<Option<Instant>>,
 }
 
 impl SyncEvent for TauriSyncEvent {
@@ -26,7 +33,28 @@ impl SyncEvent for TauriSyncEvent {
     }
 
     fn on_sync_progress(&self, progress: SyncProgress) {
-        let _ = self.app.emit("sync-progress", progress);
+        // Per-file start events (carry filename + thumbnail) and completion
+        // events always pass through; plain per-chunk updates are rate limited.
+        let always_emit = progress.filename.is_some()
+            || progress.phase == SyncPhase::Completed
+            || progress.progress >= 100.0;
+        let emit = match self.last_sync_progress.lock() {
+            Ok(mut last) => {
+                let now = Instant::now();
+                let ok = last
+                    .as_ref()
+                    .map(|t| now.duration_since(*t) >= PROGRESS_EMIT_INTERVAL)
+                    .unwrap_or(true);
+                if ok {
+                    *last = Some(now);
+                }
+                ok
+            }
+            Err(_) => true,
+        };
+        if always_emit || emit {
+            let _ = self.app.emit("sync-progress", progress);
+        }
     }
 
     fn on_photo_received(&self, photo_id: String, path: String) {

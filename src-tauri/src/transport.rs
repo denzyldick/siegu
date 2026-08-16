@@ -356,6 +356,7 @@ pub fn create_transport(
         offline_notified: std::sync::atomic::AtomicBool::new(false),
         connected: connected.unwrap_or_default(),
         active_peer: Arc::new(tokio::sync::Mutex::new(None)),
+        last_sync_progress: std::sync::Mutex::new(None),
     });
 
     let mut transport = MeshTransport::new(

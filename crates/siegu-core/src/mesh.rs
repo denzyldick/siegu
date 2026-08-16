@@ -47,6 +47,10 @@ pub struct SyncProgress {
     pub bytes_per_second: u64,
     pub items_completed: usize,
     pub items_total: usize,
+    #[serde(default)]
+    pub filename: Option<String>,
+    #[serde(default)]
+    pub thumbnail: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -337,6 +341,18 @@ impl MeshManager {
 
         let checksum = Self::compute_file_checksum(path)?;
 
+        event.on_sync_progress(SyncProgress {
+            device_id: "peer".to_string(),
+            status: format!("Sending {filename}"),
+            phase: SyncPhase::Syncing,
+            progress: 0.0,
+            bytes_per_second: 0,
+            items_completed: 0,
+            items_total: 0,
+            filename: Some(filename.clone()),
+            thumbnail: Some(outgoing.encoded.clone()),
+        });
+
         Self::send_sync_message(
             dc,
             &SyncMessage::FileHeader {
@@ -388,6 +404,8 @@ impl MeshManager {
                 bytes_per_second: 0,
                 items_completed: 0,
                 items_total: 0,
+                filename: None,
+                thumbnail: None,
             });
 
             let buffer_wait_start = std::time::Instant::now();
@@ -424,6 +442,8 @@ impl MeshManager {
             bytes_per_second: 0,
             items_completed: 1,
             items_total: 1,
+            filename: None,
+            thumbnail: None,
         });
 
         event.on_log(&format!("File {filename} sent over"));
@@ -491,6 +511,8 @@ impl MeshManager {
                         bytes_per_second: 0,
                         items_completed: 0,
                         items_total: total,
+                        filename: None,
+                        thumbnail: None,
                     });
 
                     let _ = Self::send_sync_message(
@@ -517,6 +539,8 @@ impl MeshManager {
                         bytes_per_second: 0,
                         items_completed: 0,
                         items_total: 0,
+                        filename: None,
+                        thumbnail: None,
                     });
                 }
             }
@@ -633,10 +657,21 @@ impl MeshManager {
                                 faces,
                                 caption,
                                 aesthetics_score,
-                                encoded,
+                                encoded: encoded.clone(),
                                 file,
                             },
                         );
+                        event.on_sync_progress(SyncProgress {
+                            device_id: "peer".to_string(),
+                            status: format!("Receiving {sanitized}"),
+                            phase: SyncPhase::Syncing,
+                            progress: 0.0,
+                            bytes_per_second: 0,
+                            items_completed: 0,
+                            items_total: 0,
+                            filename: Some(sanitized.clone()),
+                            thumbnail: Some(encoded),
+                        });
                     }
                     Err(e) => {
                         event.on_log(&format!(
@@ -662,6 +697,8 @@ impl MeshManager {
                         bytes_per_second: 0,
                         items_completed: 0,
                         items_total: 0,
+                        filename: None,
+                        thumbnail: None,
                     });
                 }
             }
@@ -768,7 +805,23 @@ impl MeshManager {
                             bytes_per_second: 0,
                             items_completed: completed,
                             items_total: total,
+                            filename: None,
+                            thumbnail: None,
                         });
+
+                        if total > 0 && completed >= total {
+                            event.on_sync_progress(SyncProgress {
+                                device_id: "peer".to_string(),
+                                status: "All files received".to_string(),
+                                phase: SyncPhase::Completed,
+                                progress: 100.0,
+                                bytes_per_second: 0,
+                                items_completed: completed,
+                                items_total: total,
+                                filename: None,
+                                thumbnail: None,
+                            });
+                        }
 
                         let _ = Self::send_sync_message(
                             dc,
@@ -830,6 +883,8 @@ impl MeshManager {
                     bytes_per_second: 0,
                     items_completed,
                     items_total,
+                    filename: None,
+                    thumbnail: None,
                 });
             }
             SyncMessage::MetadataUpdate {
@@ -1120,6 +1175,7 @@ mod tests {
             faces: "[]".to_string(),
             caption: None,
             aesthetics_score: None,
+            encoded: String::new(),
         };
         let json = serde_json::to_string(&msg).unwrap();
         let decoded: SyncMessage = serde_json::from_str(&json).unwrap();
@@ -1207,10 +1263,15 @@ mod tests {
             bytes_per_second: 1024,
             items_completed: 5,
             items_total: 10,
+            filename: None,
+            thumbnail: None,
         };
         let json = serde_json::to_string(&progress).unwrap();
         assert!(json.contains("50.0"));
         assert!(json.contains("Syncing"));
         assert!(json.contains("\"phase\":\"syncing\""));
+        let parsed: SyncProgress = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.filename, None);
+        assert_eq!(parsed.thumbnail, None);
     }
 }

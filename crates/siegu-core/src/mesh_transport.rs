@@ -188,7 +188,7 @@ impl MeshTransport {
             Arc::new(Mutex::new(HashMap::new()));
         let pending_manifest: Arc<Mutex<Vec<PhotoSyncInfo>>> = Arc::new(Mutex::new(Vec::new()));
         let transfer_semaphore: Arc<tokio::sync::Semaphore> =
-            Arc::new(tokio::sync::Semaphore::new(4));
+            Arc::new(tokio::sync::Semaphore::new(1));
         let items_completed = Arc::new(AtomicUsize::new(0));
         let items_total = Arc::new(AtomicUsize::new(0));
         let pending_ice: Arc<Mutex<Vec<RTCIceCandidateInit>>> = Arc::new(Mutex::new(Vec::new()));
@@ -240,15 +240,38 @@ impl MeshTransport {
             })
         }));
 
+        let event_ice = Arc::clone(&self.event);
+        pc.on_ice_connection_state_change(Box::new(
+            move |s: webrtc::ice_transport::ice_connection_state::RTCIceConnectionState| {
+                let event = Arc::clone(&event_ice);
+                Box::pin(async move {
+                    event.on_log(&format!("ICE Connection State changed to: {s:?}"));
+                })
+            },
+        ));
+
+        let event_gather = Arc::clone(&self.event);
+        pc.on_ice_gathering_state_change(Box::new(
+            move |s: webrtc::ice_transport::ice_gatherer_state::RTCIceGathererState| {
+                let event = Arc::clone(&event_gather);
+                Box::pin(async move {
+                    event.on_log(&format!("ICE Gathering State changed to: {s:?}"));
+                })
+            },
+        ));
+
         let ws_ice = Arc::clone(&ws_write);
         let is_remote_ice = is_remote;
+        let event_send_ice = Arc::clone(&self.event);
 
         pc.on_ice_candidate(Box::new(move |c: Option<webrtc::ice_transport::ice_candidate::RTCIceCandidate>| {
             if let Some(c) = c {
                 let ws = Arc::clone(&ws_ice);
                 let remote = is_remote_ice;
+                let event = Arc::clone(&event_send_ice);
                 tokio::spawn(async move {
                     if let Ok(json) = c.to_json() {
+                        event.on_log(&format!("ICE candidate (send): {}", json.candidate));
                         if let Ok(payload) = serde_json::to_string(&json) {
                             let msg = if remote {
                                 SignalMessage::Relay {
@@ -613,6 +636,10 @@ impl MeshTransport {
                             if let Ok(candidate) =
                                 serde_json::from_str::<RTCIceCandidateInit>(&payload)
                             {
+                                self.event.on_log(&format!(
+                                    "ICE candidate (recv): {}",
+                                    candidate.candidate
+                                ));
                                 if pc.remote_description().await.is_none() {
                                     pending_ice.lock().await.push(candidate);
                                 } else {
@@ -672,6 +699,25 @@ impl MeshTransport {
                                                 let mut ice = pending_ice.lock().await;
                                                 for c in ice.drain(..) {
                                                     let _ = pc.add_ice_candidate(c).await;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    "ice_candidate" => {
+                                        if let Some(c_str) =
+                                            payload.get("payload").and_then(|v| v.as_str())
+                                        {
+                                            if let Ok(candidate) =
+                                                serde_json::from_str::<RTCIceCandidateInit>(c_str)
+                                            {
+                                                self.event.on_log(&format!(
+                                                    "ICE candidate (recv/remote): {}",
+                                                    candidate.candidate
+                                                ));
+                                                if pc.remote_description().await.is_none() {
+                                                    pending_ice.lock().await.push(candidate);
+                                                } else {
+                                                    let _ = pc.add_ice_candidate(candidate).await;
                                                 }
                                             }
                                         }
