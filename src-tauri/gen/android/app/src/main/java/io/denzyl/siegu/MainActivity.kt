@@ -1,10 +1,15 @@
 package io.denzyl.siegu
 
 import android.Manifest
+import android.app.AlertDialog
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.Settings
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -17,6 +22,42 @@ class MainActivity : TauriActivity() {
         super.onCreate(savedInstanceState)
         acquireMulticastLock()
         checkAndRequestPermissions()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        try {
+            SyncForegroundService.start(this)
+        } catch (e: Exception) {
+            android.util.Log.w("siegu", "Failed to start sync foreground service", e)
+        }
+        requestAllFilesAccessIfNeeded()
+    }
+
+    private fun requestAllFilesAccessIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        if (Environment.isExternalStorageManager()) return
+        if (allFilesAccessPromptShown) return
+        allFilesAccessPromptShown = true
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.all_files_title))
+            .setMessage(getString(R.string.all_files_message))
+            .setCancelable(true)
+            .setPositiveButton(getString(R.string.all_files_open_settings)) { _, _ ->
+                try {
+                    startActivity(
+                        Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:$packageName"))
+                    )
+                } catch (e: Exception) {
+                    startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+                }
+            }
+            .setNegativeButton(getString(R.string.all_files_later), null)
+            .show()
+    }
+
+    companion object {
+        private var allFilesAccessPromptShown = false
     }
 
     private fun acquireMulticastLock() {
@@ -32,6 +73,7 @@ class MainActivity : TauriActivity() {
 
     override fun onDestroy() {
         multicastLock?.release()
+        SyncForegroundService.stop(this)
         super.onDestroy()
     }
 
@@ -45,6 +87,9 @@ class MainActivity : TauriActivity() {
             }
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED) {
                 permissions.add(Manifest.permission.READ_MEDIA_VIDEO)
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
             }
         } else {
             // Android 12 and below

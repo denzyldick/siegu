@@ -1,0 +1,8 @@
+<resources>
+    <string name="sync_notification_text">Fotos werden synchronisiert</string>
+    <string name="sync_notification_channel_name">Foto-Sync</string>
+    <string name="all_files_title">Speicherzugriff</string>
+    <string name="all_files_message">Synchronisierte Fotos werden in einem Ordner wie DCIM oder Pictures gespeichert. Android benötigt dafür den Zugriff auf alle Dateien. Gewähre ihn in den Einstellungen.</string>
+    <string name="all_files_open_settings">Einstellungen öffnen</string>
+    <string name="all_files_later">Später</string>
+</resources>
