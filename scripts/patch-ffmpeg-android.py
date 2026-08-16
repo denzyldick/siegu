@@ -14,7 +14,11 @@ path = sys.argv[1]
 with open(path) as f:
     content = f.read()
 
-# ffmpeg-sys-next 8.1.0 resolves llvm-nm / llvm-strip relative to the CC path
+if "android_cc_dir" in content:
+    print("ffmpeg-sys-next build.rs already patched, skipping")
+    sys.exit(0)
+
+# ffmpeg-sys-next 8.1.0 / 9.0.0 resolves llvm-nm / llvm-strip relative to the CC path
 # using `android_cc_path.join("..")`, which appends `..` to the clang FILE path
 # instead of its parent directory. `canonicalize()` then fails and the build
 # panics with "failed to resolve a path to android nm". Resolve tools next to

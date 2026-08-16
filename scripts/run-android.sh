@@ -31,6 +31,18 @@ cd "$PROJECT_DIR"
 echo "=== Building frontend ==="
 yarn build
 
+# ffmpeg-sys-next resolves llvm-nm / llvm-strip via `clang/../llvm-nm`, which
+# fails on the clang FILE path. Patch its build.rs (idempotent) so the tools
+# resolve next to clang, falling back to PATH. See patch-ffmpeg-android.py.
+echo "=== Patching ffmpeg-sys-next build.rs (Android llvm-nm fix) ==="
+cargo fetch --manifest-path src-tauri/Cargo.toml
+FFMPEG_BUILD_RS="$(find "$HOME/.cargo/registry/src" -path "*/ffmpeg-sys-next-*/build.rs" 2>/dev/null | xargs -r ls -t | head -1)"
+if [ -n "$FFMPEG_BUILD_RS" ]; then
+  python3 scripts/patch-ffmpeg-android.py "$FFMPEG_BUILD_RS"
+else
+  echo "WARNING: ffmpeg-sys-next build.rs not found in cargo registry"
+fi
+
 echo "=== Building Rust lib for aarch64-linux-android ==="
 cargo ndk -t aarch64-linux-android -P 24 \
   --manifest-path src-tauri/Cargo.toml \
