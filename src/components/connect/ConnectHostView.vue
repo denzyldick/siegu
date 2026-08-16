@@ -9,14 +9,11 @@
 
   <template v-if="isConnected">
     <div class="d-flex flex-column align-center py-2 ga-2" style="width: 100%">
-      <div class="d-flex align-center ga-2">
+      <div v-if="peerName" class="d-flex align-center ga-2">
         <v-icon color="success" size="18">mdi-check-circle</v-icon>
-        <span class="text-body-2 font-weight-bold" style="color: rgb(var(--v-theme-success))">{{
-          $t('connect.device_linked')
-        }}</span>
-      </div>
-      <div v-if="peerName" class="text-caption text-medium-emphasis">
-        {{ $t('connect.connected_to') }} <strong>{{ peerName }}</strong>
+        <span class="text-body-2 font-weight-bold" style="color: rgb(var(--v-theme-success))">
+          {{ $t('connect.connected_to') }} {{ peerName }}
+        </span>
       </div>
       <div v-if="syncing" class="w-100">
         <SyncNowCard

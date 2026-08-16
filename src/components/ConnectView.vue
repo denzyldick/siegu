@@ -181,7 +181,7 @@
             @select="selectLanHost"
           />
 
-          <div v-if="peerList.length > 0" class="text-left px-2 mb-2">
+          <div v-if="peerList.length > 1" class="text-left px-2 mb-2">
             <div class="text-caption font-weight-bold text-medium-emphasis mb-1">
               {{ $t('devices.connected') }} ({{ peerList.length }})
             </div>
@@ -285,7 +285,7 @@
           @select="selectLanHost"
         />
 
-        <div v-if="peerList.length > 0" class="text-left px-2 mb-2">
+        <div v-if="peerList.length > 1" class="text-left px-2 mb-2">
           <div class="text-caption font-weight-bold text-medium-emphasis mb-1">
             {{ $t('devices.connected') }} ({{ peerList.length }})
           </div>
@@ -301,7 +301,10 @@
           </div>
         </div>
 
-        <div class="text-caption text-disabled mb-1 text-center py-2" v-if="connectionStatus">
+        <div
+          class="text-caption text-disabled mb-1 text-center py-2"
+          v-if="connectionStatus && !isConnected"
+        >
           <v-progress-circular
             v-if="!isConnected"
             indeterminate

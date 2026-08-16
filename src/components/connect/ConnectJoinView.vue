@@ -75,9 +75,6 @@ const localValue = computed({
     </v-btn>
 
     <div v-if="syncing" class="d-flex flex-column align-center py-4 ga-3">
-      <div v-if="deviceName" class="text-caption text-medium-emphasis">
-        {{ t('connect.connected_to') }} <strong>{{ deviceName }}</strong>
-      </div>
       <SyncNowCard
         :progress="progress"
         :items-completed="itemsCompleted"

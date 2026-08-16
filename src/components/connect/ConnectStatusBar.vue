@@ -23,7 +23,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="text-caption text-disabled mb-1 text-center py-2" v-if="status">
+  <div class="text-caption text-disabled mb-1 text-center py-2" v-if="status && !isConnected">
     <v-progress-circular
       v-if="!isConnected && status !== $t('connect.disconnected')"
       indeterminate
