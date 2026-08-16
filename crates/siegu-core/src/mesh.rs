@@ -346,14 +346,8 @@ impl MeshManager {
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| "unknown".to_string());
 
-        let encoded = if outgoing.encoded.is_empty() {
-            crate::thumbnail::generate_thumbnail(&outgoing.path).unwrap_or_default()
-        } else {
-            outgoing.encoded.clone()
-        };
-
-        // Surface the per-file start event immediately (before the checksum
-        // pass) so the UI shows the filename + thumbnail without waiting.
+        // Surface the per-file start event immediately (before the thumbnail
+        // pass) so the UI shows the next file without waiting on a decode.
         event.on_sync_progress(SyncProgress {
             device_id: "peer".to_string(),
             status: format!("Sending {filename}"),
@@ -363,8 +357,33 @@ impl MeshManager {
             items_completed: 0,
             items_total: 0,
             filename: Some(filename.clone()),
-            thumbnail: Some(encoded.clone()),
+            thumbnail: None,
         });
+
+        // Generate a missing thumbnail here (on the send path) so the peer's
+        // FileHeader always carries one, then surface it to the local UI and
+        // cache it in the DB so later transfers of the same photo are instant.
+        let encoded = if outgoing.encoded.is_empty() {
+            let thumb = crate::thumbnail::generate_thumbnail(&outgoing.path).unwrap_or_default();
+            if !thumb.is_empty() {
+                event.on_sync_progress(SyncProgress {
+                    device_id: "peer".to_string(),
+                    status: format!("Sending {filename}"),
+                    phase: SyncPhase::Syncing,
+                    progress: 0.0,
+                    bytes_per_second: 0,
+                    items_completed: 0,
+                    items_total: 0,
+                    filename: Some(filename.clone()),
+                    thumbnail: Some(thumb.clone()),
+                });
+                let db = Database::new(&event.get_config_path());
+                db.update_photo_thumbnail(&photo_id, &thumb);
+            }
+            thumb
+        } else {
+            outgoing.encoded.clone()
+        };
 
         let checksum = Self::compute_file_checksum(path).await?;
 
@@ -452,13 +471,13 @@ impl MeshManager {
         event.on_sync_progress(SyncProgress {
             device_id: "peer".to_string(),
             status: format!("Finished sending {filename}"),
-            phase: SyncPhase::Completed,
+            phase: SyncPhase::Syncing,
             progress: 100.0,
             bytes_per_second: 0,
             items_completed: 1,
             items_total: 1,
-            filename: None,
-            thumbnail: None,
+            filename: Some(filename.clone()),
+            thumbnail: Some(encoded.clone()),
         });
 
         event.on_log(&format!("File {filename} sent over"));
@@ -866,22 +885,14 @@ impl MeshManager {
                 let _ = Self::send_sync_message(dc, &SyncMessage::ManifestRequest).await;
             }
             SyncMessage::CatchUp => {
-                event.on_log("DEBUG handle CatchUp");
-                let db = Database::new(config_path);
-                let ids: Vec<String> = {
-                    let sql = "SELECT id FROM photo WHERE sync_needed = 1 AND received = 0";
-                    if let Ok(mut stmt) = db.connection.prepare(sql) {
-                        stmt.query_map([], |row| row.get::<_, String>(0))
-                            .map(|rows| rows.flatten().collect())
-                            .unwrap_or_default()
-                    } else {
-                        Vec::new()
-                    }
-                };
-
-                for id in ids {
-                    let _ = Self::send_sync_message(dc, &SyncMessage::FileRequest { id }).await;
-                }
+                // No-op. Both peers already send `ManifestRequest` immediately
+                // before `CatchUp` when the data channel opens, and that
+                // comparison pulls anything this side is missing. Re-triggering
+                // the comparison here duplicated requests (files transferred
+                // twice), and the earlier "request my local `sync_needed`
+                // photos" implementation flooded the joiner with FileRequests
+                // for files it can't have.
+                event.on_log("DEBUG handle CatchUp (no-op; manifest compare already runs)");
             }
             SyncMessage::PeerProgress {
                 status,

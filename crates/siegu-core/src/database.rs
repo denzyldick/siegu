@@ -2851,6 +2851,24 @@ impl Database {
             .unwrap_or(false)
     }
 
+    /// IDs and file locations of photos that have no stored thumbnail yet, up to
+    /// `limit` rows. Used by the background thumbnail warm-up; processed rows are
+    /// excluded on the next call because `update_photo_thumbnail` fills `encoded`.
+    pub fn photos_missing_thumbnails(&self, limit: i64) -> Vec<(String, String)> {
+        self.connection
+            .prepare(
+                "SELECT id, location FROM photo WHERE encoded IS NULL OR encoded = '' LIMIT ?1",
+            )
+            .map(|mut stmt| {
+                stmt.query_map([limit], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                })
+                .map(|rows| rows.flatten().collect())
+                .unwrap_or_default()
+            })
+            .unwrap_or_default()
+    }
+
     /// Store a generated thumbnail for a photo. Only writes when the photo has no
     /// thumbnail yet. Returns true if the thumbnail was actually stored.
     pub fn update_photo_thumbnail(&self, id: &str, encoded: &str) -> bool {

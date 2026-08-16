@@ -3,7 +3,6 @@ use crate::database;
 use crate::transport;
 
 use crate::common::emit_log;
-use siegu_core::mesh_transport::MeshTransport;
 use siegu_core::{PeerDevice, SavedSession};
 use std::sync::Arc;
 use tauri::Manager;
@@ -216,9 +215,8 @@ async fn start_host_internal(
         }
     }
 
-    let server = MeshTransport::start_lan_server(0)
-        .await
-        .map_err(|e| e.to_string())?;
+    let server =
+        siegu_core::lan_server::start(siegu_core::lan_server::DEFAULT_LAN_SIGNALING_PORT).await;
     let port = server.port;
     if let Ok(mut ls) = state.lan_server.lock() {
         *ls = Some(server);

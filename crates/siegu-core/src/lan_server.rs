@@ -13,6 +13,10 @@ use warp::reply::Reply;
 use warp::Filter;
 
 use crate::mesh::MAX_MESH_DEVICES;
+
+/// Default port for the local LAN signaling server. Kept stable across app
+/// restarts so peer devices can reconnect with their saved join URL.
+pub const DEFAULT_LAN_SIGNALING_PORT: u16 = 34801;
 use crate::server::hash_pairing_code;
 use crate::signal::SignalMessage;
 
@@ -127,11 +131,25 @@ pub async fn start_with_config(config: ServerConfig) -> LanServer {
     let routes = remote_route.or(lan_route).or(health).boxed();
 
     let addr: SocketAddr = ([0, 0, 0, 0], config.port).into();
-    // Fatal: the server must return a bound listener, and the signature cannot signal failure.
+    // Prefer the configured (stable) port; if it is unavailable, fall back to an
+    // ephemeral port so a leftover listener or other occupancy never blocks startup.
     #[allow(clippy::expect_used)]
-    let listener = TcpListener::bind(addr).await.expect(
-        "failed to bind the LAN signalling server listener; the server cannot start without it",
-    );
+    let listener = match TcpListener::bind(addr).await {
+        Ok(l) => l,
+        Err(_) if config.port != 0 => {
+            eprintln!(
+                "[lan-server] port {} unavailable, falling back to an ephemeral port",
+                config.port
+            );
+            TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], 0u16)))
+                .await
+                .expect("failed to bind the LAN signalling server listener")
+        }
+        Err(e) => {
+            // Fatal: the server must return a bound listener, and the signature cannot signal failure.
+            panic!("failed to bind the LAN signalling server listener: {e}");
+        }
+    };
     // Fatal: a successfully bound listener must expose its address; without it the port is unknowable.
     #[allow(clippy::expect_used)]
     let actual_addr = listener

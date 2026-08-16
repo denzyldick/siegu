@@ -55,7 +55,7 @@ export const useSyncStore = defineStore('sync', () => {
       if (payload.filename && payload.thumbnail) {
         currentFile.value = { filename: payload.filename, thumbnail: payload.thumbnail };
       }
-      if (payload.phase === 'completed') {
+      if (payload.phase === 'completed' && !payload.filename) {
         currentFile.value = null;
       }
       if (payload.phase === 'syncing') {

@@ -250,6 +250,7 @@ pub fn run() {
             startup::spawn_interval_rescan(app.handle());
             startup::spawn_periodic_temp_cleanup(app.handle());
             startup::spawn_file_watcher(app.handle());
+            startup::spawn_background_thumbnail_warmup(app.handle());
 
             Ok(())
         })

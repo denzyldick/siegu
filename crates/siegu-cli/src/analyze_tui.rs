@@ -718,7 +718,7 @@ pub fn run_analyze_all(config_dir: &Path) {
 
     let _ = ml_context
         .tx
-        .blocking_send(siegu_core::ml_worker::Job::ProcessAll);
+        .try_send(siegu_core::ml_worker::Job::ProcessAll);
 
     run_tui(ml_context, rx, total);
 }
@@ -743,7 +743,7 @@ pub fn run_analyze_photo(config_dir: &Path, photo_id: &str) {
 
     let _ = ml_context
         .tx
-        .blocking_send(siegu_core::ml_worker::Job::AnalyzeSingle(
+        .try_send(siegu_core::ml_worker::Job::AnalyzeSingle(
             photo_id.to_string(),
         ));
 
@@ -774,7 +774,7 @@ pub fn run_analyze_model(config_dir: &Path, model_id: &str) {
 
     let _ = ml_context
         .tx
-        .blocking_send(siegu_core::ml_worker::Job::ProcessModel(
+        .try_send(siegu_core::ml_worker::Job::ProcessModel(
             model_id.to_string(),
         ));
 
@@ -937,7 +937,7 @@ pub fn run_analyze_all_headless(config_dir: &Path) {
 
     let _ = ml_context
         .tx
-        .blocking_send(siegu_core::ml_worker::Job::ProcessAll);
+        .try_send(siegu_core::ml_worker::Job::ProcessAll);
 
     run_headless_loop(ml_context, rx, config_dir);
 }
@@ -962,7 +962,7 @@ pub fn run_analyze_photo_headless(config_dir: &Path, photo_id: &str) {
 
     let _ = ml_context
         .tx
-        .blocking_send(siegu_core::ml_worker::Job::AnalyzeSingle(
+        .try_send(siegu_core::ml_worker::Job::AnalyzeSingle(
             photo_id.to_string(),
         ));
 
@@ -992,7 +992,7 @@ pub fn run_analyze_model_headless(config_dir: &Path, model_id: &str) {
 
     let _ = ml_context
         .tx
-        .blocking_send(siegu_core::ml_worker::Job::ProcessModel(
+        .try_send(siegu_core::ml_worker::Job::ProcessModel(
             model_id.to_string(),
         ));
 
