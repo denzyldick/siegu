@@ -71,6 +71,7 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { readDir } from '@tauri-apps/plugin-fs';
+import { homeDir } from '@tauri-apps/api/path';
 import type { DirEntry } from '@tauri-apps/plugin-fs';
 
 const { t } = useI18n();
@@ -85,9 +86,10 @@ const emit = defineEmits<{
   select: [path: string];
 }>();
 
-const DEFAULT_PATH = '/storage/emulated/0';
+const FALLBACK_PATH = '/storage/emulated/0';
 
-const currentPath = ref(props.initialPath ?? DEFAULT_PATH);
+const root = ref(FALLBACK_PATH);
+const currentPath = ref(FALLBACK_PATH);
 const folders = ref<DirEntry[]>([]);
 const loading = ref(false);
 
@@ -96,9 +98,7 @@ const show = computed({
   set: (val: boolean) => emit('update:modelValue', val),
 });
 
-const canGoUp = computed(() => {
-  return currentPath.value !== '/' && currentPath.value !== DEFAULT_PATH;
-});
+const canGoUp = computed(() => currentPath.value !== root.value);
 
 watch(show, (val) => {
   if (val) {
@@ -106,10 +106,9 @@ watch(show, (val) => {
   }
 });
 
-onMounted(() => {
-  if (props.initialPath) {
-    currentPath.value = props.initialPath;
-  }
+onMounted(async () => {
+  root.value = props.initialPath ?? (await homeDir().catch(() => FALLBACK_PATH));
+  currentPath.value = root.value;
 });
 
 async function loadDirectory(path: string) {
