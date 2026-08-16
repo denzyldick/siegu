@@ -349,7 +349,6 @@ impl MeshTransport {
                 let total = Arc::clone(&total_msg);
                 Box::pin(async move {
                     let text = String::from_utf8_lossy(&msg.data);
-                    event.on_log("DEBUG [initiator] received message over data channel");
                     if let Ok(sync_msg) = serde_json::from_str::<SyncMessage>(&text) {
                         MeshManager::handle_sync_message(
                             sync_msg, &dc, &incoming, &pending, &transfer, &config, event,
@@ -403,7 +402,6 @@ impl MeshTransport {
                     let total = Arc::clone(&total_msg);
                     Box::pin(async move {
                         let text = String::from_utf8_lossy(&msg.data);
-                        event.on_log("DEBUG [receiver] received message over data channel");
                         if let Ok(sync_msg) = serde_json::from_str::<SyncMessage>(&text) {
                             MeshManager::handle_sync_message(
                                 sync_msg, &dc, &incoming, &pending, &transfer, &config, event,

@@ -74,6 +74,8 @@ pub enum SyncMessage {
         faces: String,
         caption: Option<String>,
         aesthetics_score: Option<f64>,
+        #[serde(default)]
+        encoded: String,
     },
     FileChunk {
         id: String,
@@ -127,6 +129,7 @@ pub struct OutgoingFile {
     pub faces: String,
     pub caption: Option<String>,
     pub aesthetics_score: Option<f64>,
+    pub encoded: String,
 }
 
 pub struct IncomingFile {
@@ -143,6 +146,7 @@ pub struct IncomingFile {
     pub faces: String,
     pub caption: Option<String>,
     pub aesthetics_score: Option<f64>,
+    pub encoded: String,
     pub file: tokio::fs::File,
 }
 
@@ -348,6 +352,7 @@ impl MeshManager {
                 faces: outgoing.faces.clone(),
                 caption: outgoing.caption.clone(),
                 aesthetics_score: outgoing.aesthetics_score,
+                encoded: outgoing.encoded.clone(),
             },
         )
         .await?;
@@ -420,6 +425,8 @@ impl MeshManager {
             items_completed: 1,
             items_total: 1,
         });
+
+        event.on_log(&format!("File {filename} sent over"));
 
         Ok(())
     }
@@ -514,56 +521,61 @@ impl MeshManager {
                 }
             }
             SyncMessage::FileRequest { id } => {
-                event.on_log(&format!("DEBUG handle FileRequest for {id}"));
                 let db = Database::new(config_path);
-                if let Ok((path, created, lat, lon, objects, faces, caption, aesthetics_score)) = db.connection.query_row(
+                match db.connection.query_row(
                     "SELECT p.location, p.created, p.latitude, p.longitude,
                      (SELECT json_group_array(json_object('class', class, 'probability', probability)) FROM object WHERE photo_id = p.id),
                      (SELECT json_group_array(json_object('face_id', face_id, 'crop_path', crop_path, 'encoded', encoded, 'person_id', person_id)) FROM faces WHERE photo_id = p.id),
-                     p.caption, p.aesthetics_score
+                     p.caption, p.aesthetics_score, p.encoded
                      FROM photo p WHERE p.id = ?1",
                     [&id],
-                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<f64>>(2)?, row.get::<_, Option<f64>>(3)?, row.get::<_, String>(4).unwrap_or("[]".to_string()), row.get::<_, String>(5).unwrap_or("[]".to_string()), row.get::<_, Option<String>>(6)?, row.get::<_, Option<f64>>(7)?)),
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<f64>>(2)?, row.get::<_, Option<f64>>(3)?, row.get::<_, String>(4).unwrap_or("[]".to_string()), row.get::<_, String>(5).unwrap_or("[]".to_string()), row.get::<_, Option<String>>(6)?, row.get::<_, Option<f64>>(7)?, row.get::<_, String>(8).unwrap_or_default())),
                 ) {
-                    let dirs = event.get_directories();
-                    let relative_path = Self::compute_relative_path(&path, &dirs);
-                    let dc_send = Arc::clone(dc);
-                    let event_arc = Arc::clone(&event);
-                    let config_path_clone = config_path.to_string();
-                    let id_clone = id.clone();
-                    let semaphore = Arc::clone(transfer_semaphore);
-                    tokio::spawn(async move {
-                        let _permit = match semaphore.acquire_owned().await {
-                            Ok(p) => p,
-                            Err(e) => {
-                                event_arc.on_log(&format!(
-                                    "DEBUG transfer semaphore closed, skipping {id_clone}: {e}"
-                                ));
-                                return;
+                    Ok((path, created, lat, lon, objects, faces, caption, aesthetics_score, encoded)) => {
+                        let dirs = event.get_directories();
+                        let relative_path = Self::compute_relative_path(&path, &dirs);
+                        let dc_send = Arc::clone(dc);
+                        let event_arc = Arc::clone(&event);
+                        let config_path_clone = config_path.to_string();
+                        let id_clone = id.clone();
+                        let semaphore = Arc::clone(transfer_semaphore);
+                        tokio::spawn(async move {
+                            let _permit = match semaphore.acquire_owned().await {
+                                Ok(p) => p,
+                                Err(e) => {
+                                    event_arc.on_log(&format!(
+                                        "DEBUG transfer semaphore closed, skipping {id_clone}: {e}"
+                                    ));
+                                    return;
+                                }
+                            };
+                            let result = Self::send_file_with_retry(
+                                dc_send,
+                                OutgoingFile {
+                                    id: id_clone.clone(),
+                                    path,
+                                    relative_path,
+                                    created,
+                                    latitude: lat,
+                                    longitude: lon,
+                                    objects,
+                                    faces,
+                                    caption,
+                                    aesthetics_score,
+                                    encoded,
+                                },
+                                event_arc,
+                            )
+                            .await;
+                            if result.is_ok() {
+                                let db = Database::new(&config_path_clone);
+                                db.clear_sync_needed(&id_clone);
                             }
-                        };
-                        let result = Self::send_file_with_retry(
-                            dc_send,
-                            OutgoingFile {
-                                id: id_clone.clone(),
-                                path,
-                                relative_path,
-                                created,
-                                latitude: lat,
-                                longitude: lon,
-                                objects,
-                                faces,
-                                caption,
-                                aesthetics_score,
-                            },
-                            event_arc,
-                        )
-                        .await;
-                        if result.is_ok() {
-                            let db = Database::new(&config_path_clone);
-                            db.clear_sync_needed(&id_clone);
-                        }
-                    });
+                        });
+                    }
+                    Err(e) => {
+                        event.on_log(&format!("ERROR FileRequest {id}: photo lookup failed: {e}"));
+                    }
                 }
             }
             SyncMessage::FileHeader {
@@ -579,6 +591,7 @@ impl MeshManager {
                 faces,
                 caption,
                 aesthetics_score,
+                encoded,
             } => {
                 if Self::check_storage_quota(config_path, size) {
                     event.on_sync_error(format!(
@@ -595,35 +608,49 @@ impl MeshManager {
                 // shared temp path would interleave chunks and fail checksums.
                 let save_path = temp_dir.join(sanitize_filename(&id));
                 if let Some(parent) = save_path.parent() {
-                    let _ = tokio::fs::create_dir_all(parent).await;
+                    if let Err(e) = tokio::fs::create_dir_all(parent).await {
+                        event.on_log(&format!(
+                            "ERROR could not create sync_temp dir {parent:?} for {filename}: {e}"
+                        ));
+                    }
                 }
-                if let Ok(file) = tokio::fs::File::create(&save_path).await {
-                    let mut incoming = incoming_files.lock().await;
-                    incoming.insert(
-                        id.clone(),
-                        IncomingFile {
-                            id,
-                            filename: sanitized.clone(),
-                            relative_path,
-                            size,
-                            received: 0,
-                            checksum,
-                            created,
-                            latitude,
-                            longitude,
-                            objects,
-                            faces,
-                            caption,
-                            aesthetics_score,
-                            file,
-                        },
-                    );
+                match tokio::fs::File::create(&save_path).await {
+                    Ok(file) => {
+                        let mut incoming = incoming_files.lock().await;
+                        incoming.insert(
+                            id.clone(),
+                            IncomingFile {
+                                id,
+                                filename: sanitized.clone(),
+                                relative_path,
+                                size,
+                                received: 0,
+                                checksum,
+                                created,
+                                latitude,
+                                longitude,
+                                objects,
+                                faces,
+                                caption,
+                                aesthetics_score,
+                                encoded,
+                                file,
+                            },
+                        );
+                    }
+                    Err(e) => {
+                        event.on_log(&format!(
+                            "ERROR could not create temp file for {id} ({filename}) at {save_path:?}: {e}"
+                        ));
+                    }
                 }
             }
             SyncMessage::FileChunk { id, index: _, data } => {
                 let mut incoming = incoming_files.lock().await;
                 if let Some(file_state) = incoming.get_mut(&id) {
-                    let _ = file_state.file.write_all(&data).await;
+                    if let Err(e) = file_state.file.write_all(&data).await {
+                        event.on_log(&format!("ERROR write to temp file failed for {id}: {e}"));
+                    }
                     file_state.received += data.len() as u64;
 
                     let progress = (file_state.received as f32 / file_state.size as f32) * 100.0;
@@ -704,9 +731,13 @@ impl MeshManager {
 
                         let caption_clone = file_state.caption.clone();
                         let aesthetics_clone = file_state.aesthetics_score;
+                        let encoded_clone = file_state.encoded.clone();
                         tokio::task::spawn_blocking(move || {
-                            let thumb =
-                                crate::thumbnail::generate_thumbnail(&path_str).unwrap_or_default();
+                            let thumb = if encoded_clone.is_empty() {
+                                crate::thumbnail::generate_thumbnail(&path_str).unwrap_or_default()
+                            } else {
+                                encoded_clone
+                            };
                             let mut db = Database::new(&config_clone);
                             db.import_photo(ImportedPhoto {
                                 id: &id_clone,
@@ -751,6 +782,10 @@ impl MeshManager {
                         )
                         .await;
                     }
+                } else {
+                    event.on_log(&format!(
+                        "ERROR FileEnd for {id}: no matching incoming file (FileHeader was never received or temp file creation failed)"
+                    ));
                 }
             }
             SyncMessage::SyncFile { photo } => {

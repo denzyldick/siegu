@@ -70,6 +70,7 @@ impl SyncEvent for TauriSyncEvent {
     }
 
     fn on_sync_error(&self, error: String) {
+        crate::log::persist_log("error", &error);
         let _ = self.app.emit("sync-error", error);
     }
 
