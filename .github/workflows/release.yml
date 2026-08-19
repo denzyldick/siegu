@@ -9,8 +9,52 @@ permissions:
   contents: read
 
 jobs:
+  # ── Gate: only release if CI already passed for this commit ────────────
+  # Avoids duplicating toolchain setup that CI already validates.
+  # If CI hasn't run or failed, the release is blocked.
+  ci-gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify CI passed for HEAD
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HEAD_SHA=$(git rev-parse HEAD)
+          echo "Checking CI status for $HEAD_SHA"
+
+          # Find the most recent completed CI run for this commit
+          # Check each CI workflow (Ubuntu, Windows, macOS, Android, iOS)
+          FAILED=0
+          for wf in Ubuntu Windows macOS Android; do
+            echo "--- Checking $wf CI ---"
+            # Get the latest run for this workflow + commit
+            RUN_ID=$(gh run list --workflow="${wf,,}.yml" --commit="$HEAD_SHA" \
+              --status=completed --limit=1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || true)
+            if [ -z "$RUN_ID" ]; then
+              echo "::warning::No completed $wf CI run found for $HEAD_SHA — skipping check"
+              continue
+            fi
+            CONCLUSION=$(gh run view "$RUN_ID" --json conclusion --jq '.conclusion')
+            echo "$wf CI run $RUN_ID concluded: $CONCLUSION"
+            if [ "$CONCLUSION" != "success" ]; then
+              echo "::error::$wf CI did not pass for $HEAD_SHA (conclusion: $CONCLUSION)"
+              FAILED=1
+            fi
+          done
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo "::error::CI has not passed for this commit. Fix CI before releasing."
+            exit 1
+          fi
+          echo "All CI checks passed for $HEAD_SHA"
+
   # ── Desktop installers (macOS, Ubuntu, Windows) ────────────────────────
   desktop:
+    needs: [ci-gate]
     permissions:
       contents: write
     strategy:
@@ -51,6 +95,14 @@ jobs:
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: choco install nasm -y --no-progress
+
+      - name: Install gawk (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          choco install gawk -y --no-progress
+          $dir = Split-Path (Get-Command awk.exe -ErrorAction Stop).Source -Parent
+          Write-Host $dir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
       - run: npm ci
 
@@ -105,6 +157,7 @@ jobs:
 
   # ── Android APK ─────────────────────────────────────────────────────────
   android:
+    needs: [ci-gate]
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -205,6 +258,7 @@ jobs:
 
   # ── Arch Linux AppImage ─────────────────────────────────────────────────
   arch:
+    needs: [ci-gate]
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -245,6 +299,7 @@ jobs:
 
   # ── iOS ─────────────────────────────────────────────────────────────────
   ios:
+    needs: [ci-gate]
     permissions:
       contents: write
     runs-on: macos-latest

@@ -65,12 +65,24 @@ jobs:
       - name: Add gawk to PATH
         shell: pwsh
         run: |
-          $gawk = Join-Path $env:ProgramData 'chocolatey\lib\gawk\tools\bin'
-          if (Test-Path (Join-Path $gawk 'awk.exe')) {
-            Write-Host "Found gawk at $gawk"
-            Write-Host $gawk | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          $awk = (Get-Command awk.exe -ErrorAction SilentlyContinue).Source
+          if (-not $awk) {
+            # Fallback: search the chocolatey install tree
+            $candidates = @(
+              Join-Path $env:ProgramData 'chocolatey\lib\gawk\tools\bin\awk.exe'
+              Join-Path $env:ProgramData 'chocolatey\bin\awk.exe'
+              'C:\ProgramData\chocolatey\tools\awk.exe'
+            )
+            foreach ($c in $candidates) {
+              if (Test-Path $c) { $awk = $c; break }
+            }
+          }
+          if ($awk) {
+            $dir = Split-Path $awk -Parent
+            Write-Host "Found awk at $awk"
+            Write-Host $dir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
           } else {
-            Write-Host "::error::gawk installed but awk.exe not found at $gawk"
+            Write-Host "::error::awk.exe not found after installing gawk"
             exit 1
           }
 

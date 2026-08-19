@@ -811,6 +811,7 @@ fn aggregate_frame_results(frame_results: &[PhotoResult], _frame_count: usize) -
         merged.completed_models.push("aesthetics");
         if merged.face_count > 0 {
             merged.completed_models.push("face");
+            merged.completed_models.push("arcface");
         }
     }
 
