@@ -254,7 +254,6 @@ import { useI18n } from 'vue-i18n';
 import type { MediaItem } from '@/types/media';
 import type { FacetType } from '@/types/search';
 
-
 const { t } = useI18n();
 const syncStore = useSyncStore();
 const scanStore = useScanStore();
@@ -816,5 +815,4 @@ onUnmounted(() => {
   letter-spacing: 0.06em;
   font-size: 12px;
 }
-
 </style>

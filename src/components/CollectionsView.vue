@@ -104,7 +104,9 @@
                       class="mosaic-img"
                     />
                     <div v-else class="mosaic-placeholder d-flex align-center justify-center">
-                      <v-icon size="24" color="rgba(var(--v-theme-on-surface), 0.25)">{{ tileIcon(section.id) }}</v-icon>
+                      <v-icon size="24" color="rgba(var(--v-theme-on-surface), 0.25)">{{
+                        tileIcon(section.id)
+                      }}</v-icon>
                     </div>
                   </template>
                 </div>
@@ -118,16 +120,29 @@
                   class="tile-cover-img"
                 />
                 <div v-else class="tile-cover-placeholder d-flex align-center justify-center">
-                  <v-icon size="44" color="rgba(var(--v-theme-on-surface), 0.25)">{{ tileIcon(section.id) }}</v-icon>
+                  <v-icon size="44" color="rgba(var(--v-theme-on-surface), 0.25)">{{
+                    tileIcon(section.id)
+                  }}</v-icon>
                 </div>
               </template>
               <div v-else class="tile-cover-placeholder d-flex align-center justify-center">
-                <v-icon size="44" color="rgba(var(--v-theme-on-surface), 0.25)">{{ tileIcon(section.id) }}</v-icon>
+                <v-icon size="44" color="rgba(var(--v-theme-on-surface), 0.25)">{{
+                  tileIcon(section.id)
+                }}</v-icon>
               </div>
             </div>
             <div class="tile-label d-flex align-center justify-space-between">
-              <span class="text-subtitle-2 font-weight-bold text-high-emphasis">{{ sectionTitle(section.id) }}</span>
-              <span class="text-caption text-disabled">{{ section.items.length }} {{ section.id === 'people' || section.id === 'places' || section.id === 'trips' ? '' : '' }}</span>
+              <span class="text-subtitle-2 font-weight-bold text-high-emphasis">{{
+                sectionTitle(section.id)
+              }}</span>
+              <span class="text-caption text-disabled"
+                >{{ section.items.length }}
+                {{
+                  section.id === 'people' || section.id === 'places' || section.id === 'trips'
+                    ? ''
+                    : ''
+                }}</span
+              >
             </div>
           </div>
         </div>
@@ -209,21 +224,40 @@
         </v-btn>
       </div>
       <PageLoading v-if="trashLoading" class="py-12" />
-      <div v-else-if="trashPhotos.length > 0" class="photo-row" :style="{ gridTemplateColumns: `repeat(${columns}, 1fr)` }">
+      <div
+        v-else-if="trashPhotos.length > 0"
+        class="photo-row"
+        :style="{ gridTemplateColumns: `repeat(${columns}, 1fr)` }"
+      >
         <div v-for="photo in trashPhotos" :key="photo.id" class="trash-photo-wrapper">
           <MediaCard :path="photo" :selected="false" :selection-mode="false" @click="() => {}" />
           <div class="trash-actions d-flex ga-1">
-            <v-btn size="x-small" variant="flat" color="primary" @click="handleRestorePhoto(String(photo.id))">
+            <v-btn
+              size="x-small"
+              variant="flat"
+              color="primary"
+              @click="handleRestorePhoto(String(photo.id))"
+            >
               <v-icon size="14">mdi-restore</v-icon>
             </v-btn>
-            <v-btn size="x-small" variant="flat" color="error" @click="handleDeleteForever(String(photo.id))">
+            <v-btn
+              size="x-small"
+              variant="flat"
+              color="error"
+              @click="handleDeleteForever(String(photo.id))"
+            >
               <v-icon size="14">mdi-delete</v-icon>
             </v-btn>
           </div>
         </div>
       </div>
-      <div v-else class="empty-state-container d-flex flex-column align-center justify-center text-center py-12">
-        <v-icon size="80" color="rgba(var(--v-theme-on-surface), 0.25)">mdi-delete-empty-outline</v-icon>
+      <div
+        v-else
+        class="empty-state-container d-flex flex-column align-center justify-center text-center py-12"
+      >
+        <v-icon size="80" color="rgba(var(--v-theme-on-surface), 0.25)"
+          >mdi-delete-empty-outline</v-icon
+        >
         <h3 class="text-h5 font-weight-bold text-high-emphasis mb-2 mt-4">
           {{ $t('albums.trash_empty') }}
         </h3>
@@ -602,7 +636,20 @@ const tripDateRange = computed(() => {
     if (!from && !to) return null;
     const fmtDate = (s: string) => {
       const d = s.slice(0, 10);
-      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
       const m = parseInt(d.slice(5, 7), 10) - 1;
       const day = parseInt(d.slice(8, 10), 10);
       const year = d.slice(0, 4);
@@ -614,7 +661,20 @@ const tripDateRange = computed(() => {
       if (fromShort === toShort) return fmtDate(from);
       if (fromShort.slice(0, 7) === toShort.slice(0, 7)) {
         const m = parseInt(fromShort.slice(5, 7), 10) - 1;
-        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const months = [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec',
+        ];
         return `${months[m]} ${parseInt(fromShort.slice(8, 10), 10)} – ${parseInt(toShort.slice(8, 10), 10)}, ${fromShort.slice(0, 4)}`;
       }
       return `${fmtDate(from)} – ${fmtDate(to)}`;
@@ -673,8 +733,8 @@ const albumBenefits = computed(() => [
 
 // Grid sections for the 2x2 tile layout (favorites, trash, people, places, trips, albums, documents)
 const gridSections = computed(() => {
-  return sections.value.filter(s =>
-    ['favorites', 'trash', 'people', 'places', 'trips', 'albums', 'documents'].includes(s.id)
+  return sections.value.filter((s) =>
+    ['favorites', 'trash', 'people', 'places', 'trips', 'albums', 'documents'].includes(s.id),
   );
 });
 
@@ -683,11 +743,11 @@ const trashView = ref(false);
 const trashPhotos = ref<MediaItem[]>([]);
 const trashLoading = ref(false);
 const trashCount = computed(() => {
-  const trashSection = sections.value.find(s => s.id === 'trash');
+  const trashSection = sections.value.find((s) => s.id === 'trash');
   return trashSection?.items[0]?.count ?? 0;
 });
 const favoritesCount = computed(() => {
-  const favSection = sections.value.find(s => s.id === 'favorites');
+  const favSection = sections.value.find((s) => s.id === 'favorites');
   return favSection?.items.length ?? 0;
 });
 
@@ -712,14 +772,14 @@ function closeTrash(): void {
 async function handleRestorePhoto(id: string): Promise<void> {
   const { restorePhoto } = await import('@/services/tauri');
   await restorePhoto(id);
-  trashPhotos.value = trashPhotos.value.filter(p => String(p.id) !== id);
+  trashPhotos.value = trashPhotos.value.filter((p) => String(p.id) !== id);
   await albumsStore.loadSections();
 }
 
 async function handleDeleteForever(id: string): Promise<void> {
   const { invoke } = await import('@tauri-apps/api/core');
   await invoke('delete_photo_permanently', { id });
-  trashPhotos.value = trashPhotos.value.filter(p => String(p.id) !== id);
+  trashPhotos.value = trashPhotos.value.filter((p) => String(p.id) !== id);
   await albumsStore.loadSections();
 }
 
@@ -856,7 +916,7 @@ function openTripMap(): void {
 }
 
 function openFavorites(): void {
-  const favSection = sections.value.find(s => s.id === 'favorites');
+  const favSection = sections.value.find((s) => s.id === 'favorites');
   if (favSection && favSection.items.length > 0) {
     openSectionItem(favSection.items[0]);
   }
@@ -959,7 +1019,12 @@ async function loadContents(): Promise<void> {
   loadingContents.value = true;
   try {
     let photos: MediaItem[];
-    if (item.kind === 'person' || item.kind === 'favorites' || item.kind === 'location' || item.kind === 'document') {
+    if (
+      item.kind === 'person' ||
+      item.kind === 'favorites' ||
+      item.kind === 'location' ||
+      item.kind === 'document'
+    ) {
       photos = await listFiles({
         offset: offset.value,
         limit: PAGE_SIZE,
@@ -1184,7 +1249,9 @@ onUnmounted(() => {
   border-radius: 20px;
   overflow: hidden;
   background: rgb(var(--v-theme-surface-light));
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
 }
 

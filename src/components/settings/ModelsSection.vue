@@ -53,10 +53,7 @@
       </v-chip>
     </v-sheet>
 
-    <v-sheet
-      class="d-flex align-center justify-space-between px-4 py-3 mb-4 rounded-lg"
-      border
-    >
+    <v-sheet class="d-flex align-center justify-space-between px-4 py-3 mb-4 rounded-lg" border>
       <div class="min-width-0 mr-4">
         <div class="text-body-2 font-weight-bold text-high-emphasis">
           {{ $t('settings.analyze_existing') }}

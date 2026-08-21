@@ -22,7 +22,9 @@ function handleShow(): void {
 <template>
   <v-slide-y-reverse-transition>
     <div
-      v-if="(scanStore.showCollapsedBanner || scanStore.stoppedMessage) && !scanStore.showFullScreen"
+      v-if="
+        (scanStore.showCollapsedBanner || scanStore.stoppedMessage) && !scanStore.showFullScreen
+      "
       class="progress-banner"
       data-tour="scan-progress"
     >
@@ -42,7 +44,10 @@ function handleShow(): void {
               </template>
               <template v-else-if="scanStore.phase === 'discovering'">
                 <span>{{ t('scan.discovering') }}</span>
-                <span v-if="scanStore.filesFound > 0" class="text-disabled font-weight-regular ml-1">
+                <span
+                  v-if="scanStore.filesFound > 0"
+                  class="text-disabled font-weight-regular ml-1"
+                >
                   {{ scanStore.filesFound.toLocaleString() }} {{ t('scan.photos_found') }}
                 </span>
               </template>

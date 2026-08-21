@@ -53,9 +53,7 @@ function handleScanClick(): void {
                 <v-icon v-else size="16">mdi-magnify-scan</v-icon>
               </v-btn>
             </template>
-            <span>{{
-              scanStore.isActive ? t('scan.view_progress') : t('scan.scan_button')
-            }}</span>
+            <span>{{ scanStore.isActive ? t('scan.view_progress') : t('scan.scan_button') }}</span>
           </v-tooltip>
           <v-tooltip v-for="opt in sortOptions" :key="opt.value" location="top">
             <template #activator="{ props: tipProps }">

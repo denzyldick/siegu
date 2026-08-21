@@ -298,15 +298,18 @@ function filterByDateRange(points: MapPoint[]): MapPoint[] {
   });
 }
 
-watch(() => [mapFilterStore.dateFrom, mapFilterStore.dateTo], () => {
-  if (leafletMap && !loading.value) {
-    loading.value = true;
-    if (clusterGroup) {
-      leafletMap.removeLayer(clusterGroup);
+watch(
+  () => [mapFilterStore.dateFrom, mapFilterStore.dateTo],
+  () => {
+    if (leafletMap && !loading.value) {
+      loading.value = true;
+      if (clusterGroup) {
+        leafletMap.removeLayer(clusterGroup);
+      }
+      void loadMapData();
     }
-    void loadMapData();
-  }
-});
+  },
+);
 
 function clearFilter(): void {
   mapFilterStore.clearDateRange();
