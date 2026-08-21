@@ -813,6 +813,26 @@ fn aggregate_frame_results(frame_results: &[PhotoResult], _frame_count: usize) -
             merged.completed_models.push("face");
             merged.completed_models.push("arcface");
         }
+        // Per-frame models whose outputs are carried into the merge but whose
+        // completion markers were previously dropped here.
+        let ran = |m: &'static str| {
+            frame_results
+                .iter()
+                .any(|fr| fr.completed_models.contains(&m))
+        };
+        if ran("blip") {
+            merged.caption = frame_results
+                .iter()
+                .find_map(|fr| fr.caption.as_ref().filter(|c| !c.trim().is_empty()))
+                .cloned();
+            merged.completed_models.push("blip");
+        }
+        if ran("ocr") {
+            merged.completed_models.push("ocr");
+        }
+        if ran("midas") {
+            merged.completed_models.push("midas");
+        }
     }
 
     merged
@@ -1316,6 +1336,26 @@ mod tests {
         assert!(merged.completed_models.contains(&"yolo"));
         assert!(merged.completed_models.contains(&"nsfw"));
         assert!(merged.completed_models.contains(&"aesthetics"));
+    }
+
+    #[test]
+    fn test_aggregate_carries_caption_blip_ocr_midas() {
+        let f1 = PhotoResult {
+            completed_models: vec!["clip", "blip", "ocr", "midas"],
+            caption: Some("a portrait of a man".into()),
+            ..Default::default()
+        };
+        // Later frame with an empty caption must not override the real one.
+        let f2 = PhotoResult {
+            completed_models: vec!["clip", "blip"],
+            caption: Some("   ".into()),
+            ..Default::default()
+        };
+        let merged = aggregate_frame_results(&[f1, f2], 2);
+        assert_eq!(merged.caption.as_deref(), Some("a portrait of a man"));
+        assert!(merged.completed_models.contains(&"blip"));
+        assert!(merged.completed_models.contains(&"ocr"));
+        assert!(merged.completed_models.contains(&"midas"));
     }
 
     // ── analyze_video with no models (graceful no-op) ───────────

@@ -55,44 +55,26 @@ jobs:
         shell: pwsh
         run: choco install nasm -y --no-progress
 
-      # ffmpeg-sys-next's generated makefile uses awk for dependency-file
-      # generation (common.mak), but a stock Windows runner has no awk. Chocolatey's
-      # gawk ships a standalone awk.exe; it must precede any other awk on PATH.
-      - name: Install gawk
-        shell: pwsh
-        run: choco install gawk -y --no-progress
+      # ffmpeg-sys-next builds FFmpeg from source by driving `sh configure
+      # --toolchain=msvc` + GNU make. Mixing the runner's Git-Bash sh/gawk with a
+      # standalone make corrupts common.mak's awk dep-generation snippet
+      # (gsub(/\\/, "/") loses its backslash -> "awk: syntax error" on every .o).
+      # A coherent MSYS2 toolchain (sh + make + gawk from one distribution)
+      # avoids that; it must precede Git for Windows on PATH.
+      - name: Set up MSYS2 (make + gawk for the ffmpeg source build)
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          release: false # reuse the preinstalled C:\msys64
+          update: false
+          install: make gawk
 
-      - name: Add gawk to PATH
+      - name: Prepend MSYS2 tools to PATH
         shell: pwsh
         run: |
-          # Find gawk.exe (from chocolatey) — not the Git for Windows awk
-          $candidates = @(
-            Join-Path $env:ProgramData 'chocolatey\lib\gawk\tools\bin\gawk.exe'
-            Join-Path $env:ProgramData 'chocolatey\bin\gawk.exe'
-            'C:\ProgramData\chocolatey\tools\gawk.exe'
-          )
-          $gawk = $null
-          foreach ($c in $candidates) {
-            if (Test-Path $c) { $gawk = $c; break }
-          }
-          if (-not $gawk) {
-            $gawk = (Get-Command gawk.exe -ErrorAction SilentlyContinue).Source
-          }
-          if ($gawk) {
-            $dir = Split-Path $gawk -Parent
-            Write-Host "Found gawk at $gawk"
-            # Create a shim: copy gawk.exe as awk.exe so ffmpeg's makefile picks it up
-            $shim = Join-Path $dir 'awk.exe'
-            if (-not (Test-Path $shim)) {
-              Copy-Item $gawk $shim -Force
-              Write-Host "Created awk.exe shim at $shim"
-            }
-            # Prepend (not append) so it shadows Git for Windows's awk
-            echo $dir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
-          } else {
-            Write-Host "::error::gawk.exe not found after installing gawk"
-            exit 1
-          }
+          $bin = Join-Path '${{ steps.msys2.outputs.msys2-location }}' 'usr\bin'
+          Write-Host "Prepending $bin to PATH"
+          Add-Content $env:GITHUB_PATH $bin
 
       - run: npm ci
 
