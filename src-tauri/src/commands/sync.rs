@@ -461,6 +461,7 @@ pub async fn auto_reconnect(
     app: tauri::AppHandle,
     state: tauri::State<'_, crate::WebRtcState>,
     mdns_state: tauri::State<'_, crate::MdnsState>,
+    discovered_url: Option<String>,
 ) -> Result<bool, String> {
     use std::sync::atomic::Ordering;
     let config_path = get_config_path(&app);
@@ -508,22 +509,31 @@ pub async fn auto_reconnect(
         return Ok(true);
     }
 
-    // Joiner session: prefer the room the host currently advertises over mDNS so a restarted
-    // host (new LAN port) is still found; fall back to the saved URL.
-    let mut target_url = session.signaling_url.clone();
+    // Joiner session: try candidate signaling URLs in order until one connects.
+    // 1. A host URL discovered by the frontend — on Android that comes from the
+    //    NsdManager plugin, because raw UDP multicast (the Rust mDNS path below)
+    //    is unreliable there without a multicast lock, which would otherwise
+    //    strand the joiner on the saved URL of a dead port.
+    // 2. The room the host currently advertises over mDNS (host may have
+    //    restarted on a fresh LAN port).
+    // 3. The saved session URL as a last resort.
+    let mut candidates: Vec<String> = Vec::new();
+    if let Some(url) = discovered_url.filter(|u| !u.is_empty()) {
+        candidates.push(url);
+    }
     if let Ok(daemon) = siegu_core::mdns::create_daemon() {
         let discovered = siegu_core::mdns::discover_hosts(&daemon, 3);
         daemon.shutdown();
         if let Ok(hosts) = discovered {
             if let Some(matched) = hosts.iter().find(|h| h.room_id == session.room_id) {
-                target_url = format!("ws://{}:{}", matched.ip, matched.port);
-                emit_log(
-                    &app,
-                    format!("Rediscovered host {} at {target_url}", matched.name),
-                );
+                let url = format!("ws://{}:{}", matched.ip, matched.port);
+                emit_log(&app, format!("Rediscovered host {} at {url}", matched.name));
+                candidates.push(url);
             }
         }
     }
+    candidates.push(session.signaling_url.clone());
+    candidates.dedup();
 
     let app_handle = app.clone();
     let sync_tx = Arc::clone(&state.sync_tx);
@@ -531,25 +541,39 @@ pub async fn auto_reconnect(
     let config_path_for_session = config_path.clone();
     let room_id_for_session = session.room_id.clone();
     let room_id_for_save = room_id_for_session.clone();
-    let signaling_url_for_session = target_url.clone();
+    let signaling_url_for_session = candidates[0].clone();
     let is_initiator = session.is_initiator;
 
     if let Ok(mut active) = state.active_session.lock() {
         if let Some(handle) = active.take() {
             handle.abort();
         }
+        let config_path_for_task = config_path_for_session.clone();
         let handle = tauri::async_runtime::spawn(async move {
-            let transport = transport::create_transport(
-                room_id_for_session.clone(),
-                is_initiator,
-                target_url,
-                config_path,
-                app_handle.clone(),
-                Some(sync_tx),
-                Some(connected),
-            );
-            if let Err(e) = transport.start().await {
-                emit_log(&app_handle, format!("WebRTC session failed: {e}"));
+            'candidates: for url in candidates {
+                for attempt in 0..2 {
+                    use std::sync::atomic::Ordering;
+                    if connected.load(Ordering::SeqCst) {
+                        break 'candidates;
+                    }
+                    let transport = transport::create_transport(
+                        room_id_for_session.clone(),
+                        is_initiator,
+                        url.clone(),
+                        config_path_for_task.clone(),
+                        app_handle.clone(),
+                        Some(sync_tx.clone()),
+                        Some(connected.clone()),
+                    );
+                    match transport.start().await {
+                        Ok(()) => break 'candidates,
+                        Err(e) => emit_log(
+                            &app_handle,
+                            format!("Reconnect attempt {attempt} to {url} failed: {e}"),
+                        ),
+                    }
+                    tokio::time::sleep(std::time::Duration::from_secs(8)).await;
+                }
             }
         });
         *active = Some(handle);

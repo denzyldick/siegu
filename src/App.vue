@@ -8,7 +8,7 @@ import { useModelsStore } from '@/stores/models';
 import { useUiStore } from '@/stores/ui';
 import { useSyncStore } from '@/stores/sync';
 import { useSearchStore } from '@/stores/search';
-import { autoReconnect } from '@/services/tauri';
+import { autoReconnect, discoverLanDevices } from '@/services/tauri';
 import AppDock from '@/components/layout/AppDock.vue';
 import AppToolbar from '@/components/layout/AppToolbar.vue';
 import SyncStatusBanner from '@/components/layout/SyncStatusBanner.vue';
@@ -113,7 +113,19 @@ async function tryAutoReconnect(): Promise<void> {
   const syncStore = useSyncStore();
   try {
     if (syncStore.connection === 'connected') return;
-    await autoReconnect();
+    // Discover the host first: on Android this goes through NsdManager (raw
+    // multicast in Rust is unreliable there), elsewhere through the Rust mDNS
+    // path. The result is only a preferred URL — auto_reconnect still falls
+    // back to mDNS and the saved session address.
+    let hint: string | null = null;
+    try {
+      const hosts = await discoverLanDevices(2);
+      const host = hosts[0];
+      if (host?.ip && host.port) hint = `ws://${host.ip}:${host.port}`;
+    } catch {
+      // discovery is best-effort; saved/mDNS candidates still apply
+    }
+    await autoReconnect(hint);
   } catch (e) {
     console.error('[App] autoReconnect failed:', e);
   }
