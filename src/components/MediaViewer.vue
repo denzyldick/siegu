@@ -84,7 +84,7 @@
               class="side-nav-btn left"
             ></v-btn>
 
-            <div class="media-wrapper">
+            <div class="media-wrapper" :class="{ interactive: isVideo }">
               <img
                 v-if="currentPhoto && !isVideo"
                 :src="currentPhotoSrc"
@@ -1018,6 +1018,14 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   z-index: 1;
+}
+
+/* Videos need the native controls clickable, which means stacking above the
+   swipe-gesture touch-overlay (z-index: 5). Images stay below it so swiping
+   between photos keeps working. */
+.media-wrapper.interactive {
+  position: relative;
+  z-index: 6;
 }
 
 .viewer-image {
