@@ -17,13 +17,14 @@ struct TauriCallbacks {
     db: Mutex<Database>,
     sync_tx: Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<SyncMessage>>>>,
     last_progress_emit: Mutex<Instant>,
+    last_activity_emit: Mutex<Instant>,
 }
 
 impl AnalysisCallbacks for TauriCallbacks {
     fn on_photo_complete(
         &self,
         photo_id: &str,
-        _location: &str,
+        location: &str,
         result: &PhotoResult,
         remaining: usize,
         progress_model: Option<&str>,
@@ -50,6 +51,27 @@ impl AnalysisCallbacks for TauriCallbacks {
                     "indexing-eta",
                     serde_json::json!({ "eta": (remaining as f64) * 1000.0 }),
                 );
+            }
+            drop(last);
+            // Live "what is being analyzed right now" feed for the scan UI,
+            // throttled to ~10 Hz so a 50k-photo backlog can't flood the IPC.
+            {
+                let mut last_act = self
+                    .last_activity_emit
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
+                if now.duration_since(*last_act) >= Duration::from_millis(100) || remaining == 0 {
+                    *last_act = now;
+                    let _ = self.app.emit(
+                        "analysis-activity",
+                        serde_json::json!({
+                            "id": photo_id,
+                            "location": location,
+                            "models": result.completed_models,
+                            "remaining": remaining,
+                        }),
+                    );
+                }
             }
         } else {
             let db = self.db.lock().unwrap_or_else(|e| e.into_inner());
@@ -111,7 +133,7 @@ impl AnalysisCallbacks for TauriCallbacks {
         caption: Option<&str>,
         aesthetics_score: Option<f64>,
     ) {
-        emit_log(&self.app, format!("Metadata updated for {photo_id}"));
+        crate::common::debug_log(format!("Metadata updated for {photo_id}"));
         if let Ok(g) = self.sync_tx.try_lock() {
             if let Some(tx) = g.as_ref() {
                 let _ = tx.send(SyncMessage::MetadataUpdate {
@@ -119,6 +141,7 @@ impl AnalysisCallbacks for TauriCallbacks {
                     caption: caption.map(|c| c.to_string()),
                     aesthetics_score,
                     indexed: 2,
+                    deleted_at: None,
                 });
             }
         }
@@ -136,10 +159,7 @@ impl AnalysisCallbacks for TauriCallbacks {
             .unwrap_or(0);
 
         if pending == 0 {
-            emit_log(
-                &self.app,
-                "Scan complete: no photos pending sync".to_string(),
-            );
+            crate::common::debug_log("Scan complete: no photos pending sync".to_string());
             return;
         }
 
@@ -153,14 +173,15 @@ impl AnalysisCallbacks for TauriCallbacks {
         if pushed {
             emit_log(
                 &self.app,
-                format!("Scan complete: pushed StartSync to peer ({pending} photos pending sync)"),
+                format!("Syncing {pending} photos with your other device…"),
             );
         } else {
+            crate::common::debug_log(format!(
+                "Scan complete with {pending} photos pending sync, but no active peer session"
+            ));
             emit_log(
                 &self.app,
-                format!(
-                    "Scan complete with {pending} photos pending sync, but no active peer session"
-                ),
+                format!("{pending} photos will sync next time your device connects."),
             );
             crate::tauri_sync_event::notify_photos_ready(&self.app, pending);
         }
@@ -202,14 +223,11 @@ impl AnalysisCallbacks for TauriCallbacks {
     }
 
     fn on_ep_selected(&self, ep: &str) {
-        emit_log(
-            &self.app,
-            format!("ML Worker: Using {ep} execution provider"),
-        );
+        crate::common::debug_log(format!("ML Worker: Using {ep} execution provider"));
     }
 
     fn on_log(&self, msg: &str) {
-        emit_log(&self.app, format!("ML Worker: {msg}"));
+        crate::common::debug_log(format!("ML Worker: {msg}"));
     }
 
     fn should_abort(&self) -> bool {
@@ -227,6 +245,7 @@ pub fn start_background_worker(
         db: Mutex::new(Database::new(&config_path)),
         sync_tx,
         last_progress_emit: Mutex::new(Instant::now()),
+        last_activity_emit: Mutex::new(Instant::now()),
     };
     siegu_core::ml_engine::worker::start_worker(callbacks, config_path, 32)
 }

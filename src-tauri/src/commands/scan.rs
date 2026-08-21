@@ -83,27 +83,28 @@ pub fn scan_files(app: tauri::AppHandle) {
     let session = match session {
         Some(s) => s,
         None => {
-            emit_log(&app, "Scan already in progress, skipping.".to_string());
+            emit_log(&app, "A scan is already running.".to_string());
             return;
         }
     };
 
-    emit_log(&app, "Starting media scan...".to_string());
+    emit_log(&app, "Starting scan…".to_string());
     let path = get_config_path(&app);
 
     if path.is_empty() {
+        crate::common::debug_log("Error: Config path is empty, cannot scan.".to_string());
         emit_log(
             &app,
-            "Error: Config path is empty, cannot scan.".to_string(),
+            "Couldn't start the scan: storage location not found.".to_string(),
         );
         return;
     }
     let database = database::Database::new(&path);
     let folders = database.list_directories();
-    emit_log(
-        &app,
-        format!("Found {} folders to scan in database.", folders.len()),
-    );
+    crate::common::debug_log(format!(
+        "Found {} folders to scan in database.",
+        folders.len()
+    ));
 
     if !folders.is_empty() {
         use tauri_plugin_notification::NotificationExt;
@@ -111,7 +112,7 @@ pub fn scan_files(app: tauri::AppHandle) {
             .notification()
             .builder()
             .title("Siegu")
-            .body(format!("Started scanning {} folder(s)...", folders.len()))
+            .body(format!("Scanning {} folders…", folders.len()))
             .show();
     }
 
@@ -139,19 +140,18 @@ pub fn scan_files(app: tauri::AppHandle) {
         let app_for_blocking = app_handle.clone();
         tauri::async_runtime::spawn_blocking(move || {
             let Ok(mut db) = db_clone.lock() else {
+                crate::common::debug_log("[batch] ERROR: could not lock DB mutex".to_string());
                 emit_log(
                     &app_for_blocking,
-                    "[batch] ERROR: could not lock DB mutex".to_string(),
+                    "Couldn't save new photos right now.".to_string(),
                 );
                 return 0;
             };
             match store_batch_to_db(&mut db, &batch_for_blocking) {
                 Ok(stored) => stored,
                 Err(e) => {
-                    emit_log(
-                        &app_for_blocking,
-                        format!("[batch] ERROR storing photo batch: {e}"),
-                    );
+                    crate::common::debug_log(format!("[batch] ERROR storing photo batch: {e}"));
+                    emit_log(&app_for_blocking, format!("Couldn't save some photos: {e}"));
                     0
                 }
             }
@@ -197,55 +197,63 @@ pub fn scan_files(app: tauri::AppHandle) {
         if total_stored > 0 {
             emit_log(
                 &app_handle_for_batch,
-                format!(
-                    "[batch] scan finished; {total_stored} photo(s) stored, refreshing library"
-                ),
+                format!("Added {total_stored} new photos to your library."),
             );
             // Single event for the whole scan: the grid reloads page one and
             // infinite scroll pulls the rest. No per-photo streaming.
             let _ = app_handle_for_batch.emit("photos-refreshed", ());
-        } else {
-            emit_log(
-                &app_handle_for_batch,
-                "[batch] receiver exited (all senders dropped)".to_string(),
+
+            // Trip albums are rebuilt only after a scan that actually added
+            // rows, and only once every batch has been committed (this task
+            // exits when all senders drop), so it never runs on partial data.
+            let t0 = std::time::Instant::now();
+            let trip_count = {
+                let db = database.lock().unwrap_or_else(|e| e.into_inner());
+                db.sync_trips()
+            };
+            tracing::info!(
+                "[perf] sync_trips after scan: {trip_count} trips in {:?}",
+                t0.elapsed()
             );
+        } else {
+            crate::common::debug_log("[batch] receiver exited (all senders dropped)".to_string());
         }
     });
 
     let abort_flag = Arc::clone(&state.abort);
+    let paused_flag = Arc::clone(&state.paused);
     let batch_tx_shared = Arc::new(batch_tx);
 
     std::thread::spawn(move || {
         let _session = session;
         let total = folders.len();
         if total == 0 {
-            emit_log(
-                &app,
-                "No folders to scan. Skipping scan thread.".to_string(),
-            );
+            emit_log(&app, "No folders to scan yet.".to_string());
             return;
         }
 
         for (i, folder) in folders.iter().enumerate() {
             if abort_flag.load(std::sync::atomic::Ordering::SeqCst) {
-                emit_log(&app, "Scan aborted by user.".to_string());
+                emit_log(&app, "Scan stopped.".to_string());
                 return;
             }
             let progress = (i as f32 / total as f32 * 100.0) as u32;
+            while paused_flag.load(std::sync::atomic::Ordering::SeqCst)
+                && !abort_flag.load(std::sync::atomic::Ordering::SeqCst)
+            {
+                let _ = app.emit(
+                    "scan-progress",
+                    serde_json::json!({ "status": "paused", "progress": progress, "current": i + 1, "total": total }),
+                );
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
+            if abort_flag.load(std::sync::atomic::Ordering::SeqCst) {
+                emit_log(&app, "Scan stopped.".to_string());
+                return;
+            }
             let _ = app.emit("scan-progress", serde_json::json!({ "status": "discovering", "progress": progress, "current": i + 1, "total": total, "current_directory": folder }));
-            emit_log(
-                &app,
-                format!("Scanning folder {} of {}: {}", i + 1, total, folder),
-            );
-            emit_log(
-                &app,
-                format!("[scan_files] Calling scan_folder for: {folder}"),
-            );
+            emit_log(&app, format!("Scanning folder {} of {}…", i + 1, total));
             file::scan_folder(&app, folder.clone(), &database_for_scan, &batch_tx_shared);
-            emit_log(
-                &app,
-                format!("[scan_files] scan_folder completed for: {folder}"),
-            );
 
             // Immediate prune: drop rows whose media file no longer exists on
             // disk. Once removed from the manifest, the next manifest exchange
@@ -253,39 +261,37 @@ pub fn scan_files(app: tauri::AppHandle) {
             let mut db_prune = database::Database::new(&path);
             let pruned = db_prune.prune_missing_files(folder);
             if pruned > 0 {
-                emit_log(
-                    &app,
-                    format!("[scan_files] Pruned {pruned} missing files from: {folder}"),
-                );
+                crate::common::debug_log(format!(
+                    "[scan_files] Pruned {pruned} missing files from: {folder}"
+                ));
+                emit_log(&app, format!("Removed {pruned} missing photos."));
             }
         }
 
-        emit_log(
-            &app,
-            "Finished scanning all folders. Updating last scan time...".to_string(),
-        );
+        emit_log(&app, "Finished scanning your folders.".to_string());
         let db_check = database::Database::new(&path);
         let config = db_check.get_state();
-        let any_model_enabled = [
-            "clip",
-            "face",
-            "ocr",
-            "nsfw",
-            "aesthetics",
-            "yolo",
-            "blip",
-            "arcface",
-            "midas",
-            "whisper",
-        ]
-        .iter()
-        .any(|m| {
+        // Must mirror the ML worker's default (missing key => enabled,
+        // siegu_core::ml_worker::any_model_enabled): if this check disagreed
+        // with the worker, the UI would be told "complete" while ProcessAll
+        // started analyzing a large backlog in the background.
+        let any_model_enabled = siegu_core::ml_worker::any_model_enabled(&config);
+        // Mirror the ML worker's ProcessAll filter: when "skip existing
+        // library" is on, only photos above the cutoff rowid are analyzed.
+        let cutoff_rowid = if config
+            .get("analysis_skip_existing")
+            .is_some_and(|v| v == "true")
+        {
             config
-                .get(&format!("model_enabled_{}", m))
-                .is_some_and(|v| v == "true")
-        });
+                .get("analysis_cutoff_rowid")
+                .and_then(|v| v.parse::<i64>().ok())
+                .unwrap_or(0)
+        } else {
+            0
+        };
+        let pending_analysis = db_check.count_unindexed_after(cutoff_rowid) as usize;
 
-        if any_model_enabled {
+        if any_model_enabled && pending_analysis > 0 {
             let _ = app.emit(
                 "scan-progress",
                 serde_json::json!({ "status": "indexing", "progress": 100, "message": "Analyzing photos with AI..." }),

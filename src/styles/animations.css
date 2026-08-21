@@ -1,3 +1,14 @@
+:root {
+  --v-font-body: 'Outfit', sans-serif;
+  --v-font-heading: 'Outfit', sans-serif;
+}
+
+body {
+  font-family: 'Outfit', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

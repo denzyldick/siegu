@@ -20,6 +20,7 @@ pub fn mock_ml_context() -> (MlContext, mpsc::Receiver<Job>) {
         tx,
         pending_count: Arc::new(AtomicUsize::new(0)),
         abort: Arc::new(AtomicBool::new(false)),
+        paused: Arc::new(AtomicBool::new(false)),
         models: Arc::new(Mutex::new(None)),
     };
     (ctx, rx)

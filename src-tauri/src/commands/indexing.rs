@@ -79,9 +79,26 @@ pub async fn do_analyze_model(
 }
 
 /// Pure business logic — sets abort flag and resets pending count to 0.
-pub fn do_abort_indexing(abort: &AtomicBool, pending_count: &AtomicUsize) -> Result<(), String> {
+pub fn do_abort_indexing(
+    abort: &AtomicBool,
+    pending_count: &AtomicUsize,
+    paused: &AtomicBool,
+) -> Result<(), String> {
     abort.store(true, std::sync::atomic::Ordering::SeqCst);
     pending_count.store(0, std::sync::atomic::Ordering::SeqCst);
+    paused.store(false, std::sync::atomic::Ordering::SeqCst);
+    Ok(())
+}
+
+/// Pure business logic — pauses indexing without aborting.
+pub fn do_pause_indexing(paused: &AtomicBool) -> Result<(), String> {
+    paused.store(true, std::sync::atomic::Ordering::SeqCst);
+    Ok(())
+}
+
+/// Pure business logic — resumes paused indexing.
+pub fn do_resume_indexing(paused: &AtomicBool) -> Result<(), String> {
+    paused.store(false, std::sync::atomic::Ordering::SeqCst);
     Ok(())
 }
 
@@ -100,13 +117,25 @@ pub fn get_unindexed_count(app: tauri::AppHandle) -> usize {
     do_get_unindexed_count(&db)
 }
 
+/// Snapshot of the photo table's highest rowid, stored as the cutoff when the
+/// user enables "skip existing library": photos at or below it are never
+/// auto-analyzed until the option is turned off.
+#[tauri::command]
+pub fn get_max_photo_rowid(app: tauri::AppHandle) -> i64 {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return 0;
+    }
+    database::Database::new(&path).max_photo_rowid()
+}
+
 #[tauri::command]
 pub async fn index_faces(
     app: tauri::AppHandle,
     state: tauri::State<'_, ml::MlContext>,
 ) -> Result<(), String> {
     use crate::common::emit_log;
-    emit_log(&app, "Face indexing requested...".to_string());
+    emit_log(&app, "Looking for faces in your photos…".to_string());
     let path = get_config_path(&app);
     if path.is_empty() {
         return Err("Config error".to_string());
@@ -143,7 +172,17 @@ pub async fn analyze_model(
 
 #[tauri::command]
 pub async fn abort_indexing(state: tauri::State<'_, ml::MlContext>) -> Result<(), String> {
-    do_abort_indexing(&state.abort, &state.pending_count)
+    do_abort_indexing(&state.abort, &state.pending_count, &state.paused)
+}
+
+#[tauri::command]
+pub async fn pause_indexing(state: tauri::State<'_, ml::MlContext>) -> Result<(), String> {
+    do_pause_indexing(&state.paused)
+}
+
+#[tauri::command]
+pub async fn resume_indexing(state: tauri::State<'_, ml::MlContext>) -> Result<(), String> {
+    do_resume_indexing(&state.paused)
 }
 
 /// Pure business logic — clears the loaded-models cache so the worker drops
@@ -168,7 +207,7 @@ pub async fn unload_models(
     do_unload_models(&state.models)?;
     emit_log(
         &app,
-        "Unloaded AI models from memory. They will reload before the next analysis.".to_string(),
+        "AI features paused. They'll start again with your next analysis.".to_string(),
     );
     Ok(())
 }
@@ -190,7 +229,7 @@ pub async fn reload_models(
     do_reload_models(&state.tx).await?;
     emit_log(
         &app,
-        "Reloading AI models with the new settings...".to_string(),
+        "Updating AI features with your new settings…".to_string(),
     );
     Ok(())
 }
@@ -308,16 +347,19 @@ mod tests {
     fn abort_indexing_sets_flags() {
         let abort = AtomicBool::new(false);
         let pending = AtomicUsize::new(100);
-        do_abort_indexing(&abort, &pending).unwrap();
+        let paused = AtomicBool::new(true);
+        do_abort_indexing(&abort, &pending, &paused).unwrap();
         assert!(abort.load(std::sync::atomic::Ordering::SeqCst));
         assert_eq!(pending.load(std::sync::atomic::Ordering::SeqCst), 0);
+        assert!(!paused.load(std::sync::atomic::Ordering::SeqCst));
     }
 
     #[test]
     fn abort_indexing_when_already_zero() {
         let abort = AtomicBool::new(true);
         let pending = AtomicUsize::new(0);
-        do_abort_indexing(&abort, &pending).unwrap();
+        let paused = AtomicBool::new(false);
+        do_abort_indexing(&abort, &pending, &paused).unwrap();
         assert!(abort.load(std::sync::atomic::Ordering::SeqCst));
         assert_eq!(pending.load(std::sync::atomic::Ordering::SeqCst), 0);
     }

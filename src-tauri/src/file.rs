@@ -6,12 +6,37 @@ use rand::{distributions::Alphanumeric, Rng};
 use notify::event::{CreateKind, ModifyKind};
 use notify::{EventKind, RecursiveMode, Watcher};
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::ml::MlContext;
+use tauri::Emitter;
 use tauri::Manager;
 use tokio::sync::mpsc::Sender;
+
+/// Watcher-triggered rescans wait at least this long after the previous one so
+/// bulk imports (thousands of files landing over minutes) don't restart a full
+/// walk after every 10-second lull.
+const WATCHER_RESCAN_MIN_INTERVAL_MS: u64 = 60_000;
+
+/// Entries are extracted and handed to the batch writer in bounded chunks so
+/// peak memory stays flat regardless of library size.
+const SCAN_CHUNK_SIZE: usize = 2048;
+
+/// Minimum interval between discovery progress events.
+const DISCOVERY_PROGRESS_INTERVAL_MS: u64 = 500;
+
+fn unix_now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Timestamp (unix ms) of the last watcher-initiated rescan.
+static LAST_WATCHER_SCAN_MS: AtomicU64 = AtomicU64::new(0);
 
 pub async fn start_watcher(app: tauri::AppHandle) {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -40,7 +65,6 @@ pub async fn start_watcher(app: tauri::AppHandle) {
     tokio::spawn(async move {
         // Keep watcher alive in this task
         let _watcher = watcher;
-        let mut last_scan = tokio::time::Instant::now();
 
         while let Some(event) = rx.recv().await {
             match event.kind {
@@ -51,8 +75,18 @@ pub async fn start_watcher(app: tauri::AppHandle) {
                         .paths
                         .iter()
                         .any(|p| siegu_core::scanner::is_media_file(p));
-                    if needs_scan && last_scan.elapsed().as_secs() > 10 {
-                        last_scan = tokio::time::Instant::now();
+                    if needs_scan {
+                        let now_ms = unix_now_ms();
+                        let last = LAST_WATCHER_SCAN_MS.load(Ordering::Relaxed);
+                        if now_ms.saturating_sub(last) < WATCHER_RESCAN_MIN_INTERVAL_MS {
+                            continue;
+                        }
+                        if LAST_WATCHER_SCAN_MS
+                            .compare_exchange(last, now_ms, Ordering::SeqCst, Ordering::Relaxed)
+                            .is_err()
+                        {
+                            continue;
+                        }
 
                         use tauri_plugin_notification::NotificationExt;
                         let _ = app_clone
@@ -71,10 +105,46 @@ pub async fn start_watcher(app: tauri::AppHandle) {
     });
 }
 
+/// Emit a discovery progress event, throttled so a fast scan doesn't flood the
+/// webview. Uses CAS on the last-emitted timestamp so concurrent extraction
+/// threads can't emit more than one event per window.
+fn emit_discovery_progress(
+    app: &tauri::AppHandle,
+    last_emit_ms: &AtomicU64,
+    directory: &str,
+    found: usize,
+    force: bool,
+) {
+    let now_ms = unix_now_ms();
+    let last = last_emit_ms.load(Ordering::Relaxed);
+    if !force && now_ms.saturating_sub(last) < DISCOVERY_PROGRESS_INTERVAL_MS {
+        return;
+    }
+    if last_emit_ms
+        .compare_exchange(last, now_ms, Ordering::SeqCst, Ordering::Relaxed)
+        .is_ok()
+    {
+        let _ = app.emit(
+            "scan-progress",
+            serde_json::json!({
+                "status": "discovering",
+                "files_found": found,
+                "current_directory": directory,
+            }),
+        );
+    }
+}
+
 /// Recursively discovers supported media files, stores new rows in batches, and queues AI work.
 ///
 /// Discovery intentionally records metadata first. The heavier model inference and thumbnail
 /// generation run on the ML worker so folder scans stay responsive and progress events remain regular.
+///
+/// The walk runs in two phases: jwalk collects media paths on its own dedicated rayon pool (so
+/// directory traversal is never starved by extraction saturating the shared global pool), then
+/// metadata extraction proceeds over bounded chunks of that list. Chunking keeps peak memory flat
+/// and avoids the old streaming design where `par_bridge` + `blocking_send` could park every
+/// worker when the batch channel filled, stalling the whole scan.
 pub fn scan_folder(
     app: &tauri::AppHandle,
     directory: String,
@@ -85,15 +155,12 @@ pub fn scan_folder(
         let db = database.lock().unwrap_or_else(|e| e.into_inner());
         db.existing_locations()
     };
-    emit_log(
-        app,
-        format!(
-            "[scan_folder] Loaded {} existing paths from DB",
-            existing.len()
-        ),
-    );
+    crate::common::debug_log(format!(
+        "[scan_folder] Loaded {} existing paths from DB",
+        existing.len()
+    ));
 
-    emit_log(app, format!("Starting Discovery Pass in: {directory}"));
+    emit_log(app, "Looking for new photos…".to_string());
 
     let abort_flag = app
         .try_state::<MlContext>()
@@ -106,85 +173,95 @@ pub fn scan_folder(
 
     let total_new = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let total_new_clone = Arc::clone(&total_new);
+    let last_emit_ms = AtomicU64::new(0);
 
-    // jwalk walks directories on its own dedicated rayon pool so its producer can
-    // never be starved by the metadata closures below saturating the shared global
-    // pool (which would deadlock the pipeline when the batch channel fills).
-    let result: Result<(), ()> = jwalk::WalkDir::new(&directory)
+    // Phase 1 — collect media paths on jwalk's dedicated pool.
+    let media_paths: Vec<PathBuf> = jwalk::WalkDir::new(&directory)
         .follow_links(false)
         .parallelism(jwalk::Parallelism::RayonNewPool(4))
         .into_iter()
-        .par_bridge()
-        .try_for_each(|entry_result| {
-            if abort_flag_task.load(std::sync::atomic::Ordering::SeqCst) {
-                return Err(());
-            }
-            let entry = match entry_result {
-                Ok(e) => e,
-                Err(_) => return Ok(()),
-            };
-            let file_path = entry.path();
-            if !siegu_core::scanner::is_media_file(&file_path) {
-                return Ok(());
-            }
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| siegu_core::scanner::is_media_file(p))
+        .collect();
 
-            let path_str = file_path.display().to_string();
+    // Phase 2 — extract metadata chunk by chunk on the global pool, handing each
+    // finished chunk to the batch writer before moving on.
+    let mut result: Result<(), ()> = Ok(());
+    for chunk in media_paths.chunks(SCAN_CHUNK_SIZE) {
+        if abort_flag_task.load(Ordering::SeqCst) {
+            result = Err(());
+            break;
+        }
+        let extracted: Vec<Option<database::Photo>> = chunk
+            .par_iter()
+            .map(|file_path| {
+                if abort_flag_task.load(Ordering::SeqCst) {
+                    return None;
+                }
+                let path_str = file_path.display().to_string();
+                if existing.contains(&path_str) {
+                    return None;
+                }
 
-            if existing.contains(&path_str) {
-                return Ok(());
-            }
+                let found = total_new_clone.fetch_add(1, Ordering::SeqCst) + 1;
+                emit_discovery_progress(app, &last_emit_ms, &directory, found, false);
 
-            total_new_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let meta = siegu_core::scanner::extract_photo_metadata(file_path);
+                let id: String = rand::thread_rng()
+                    .sample_iter(&Alphanumeric)
+                    .take(7)
+                    .map(char::from)
+                    .collect();
 
-            let meta = siegu_core::scanner::extract_photo_metadata(&file_path);
-            let id: String = rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(7)
-                .map(char::from)
-                .collect();
+                Some(database::Photo {
+                    id,
+                    encoded: String::new(),
+                    location: path_str,
+                    created: meta.created,
+                    objects: std::collections::HashMap::new(),
+                    properties: meta.properties,
+                    latitude: meta.latitude,
+                    longitude: meta.longitude,
+                    favorite: meta.favorite,
+                    indexed: 0,
+                    caption: meta.caption,
+                    aesthetics_score: None,
+                    ai_status: database::AiStatus::default(),
+                    sync_needed: true,
+                    received: false,
+                })
+            })
+            .collect();
 
-            let photo = database::Photo {
-                id,
-                encoded: String::new(),
-                location: path_str,
-                created: meta.created,
-                objects: std::collections::HashMap::new(),
-                properties: meta.properties,
-                latitude: meta.latitude,
-                longitude: meta.longitude,
-                favorite: meta.favorite,
-                indexed: 0,
-                caption: meta.caption,
-                aesthetics_score: None,
-                ai_status: database::AiStatus::default(),
-                sync_needed: true,
-                received: false,
-            };
-
+        for photo in extracted.into_iter().flatten() {
             if batch_tx.blocking_send(photo).is_err() {
-                return Err(());
+                result = Err(());
+                break;
             }
-
-            Ok(())
-        });
+        }
+        if result.is_err() {
+            break;
+        }
+    }
 
     let total = total_new.load(std::sync::atomic::Ordering::SeqCst);
     if result.is_err() {
-        emit_log(app, format!("[scan_folder] Scan aborted for: {directory}"));
+        emit_log(app, "Scan stopped.".to_string());
+        crate::common::debug_log(format!("[scan_folder] Scan aborted for: {directory}"));
         return;
     }
     if total == 0 {
         emit_log(app, "No new photos found.".to_string());
         return;
     }
-    emit_log(
-        app,
-        format!(
-            "[scan_folder] Sent {} photos to batch channel for: {directory}",
-            total
-        ),
-    );
-    emit_log(app, "Done with Discovery Pass".to_string());
+    // Final exact count so the UI counter never lags behind the throttled events.
+    emit_discovery_progress(app, &last_emit_ms, &directory, total, true);
+    emit_log(app, format!("Found {total} new photos."));
+    crate::common::debug_log(format!(
+        "[scan_folder] Sent {} photos to batch channel for: {directory}",
+        total
+    ));
 }
 
 #[tauri::command]
@@ -207,18 +284,18 @@ fn read_file_base64_inner(app: &tauri::AppHandle, path: String) -> String {
             .iter()
             .any(|dir| !dir.is_empty() && canonical.starts_with(dir));
     if !is_allowed {
-        emit_log(
-            app,
-            format!("Access denied: {path} is outside allowed directories"),
-        );
+        crate::common::debug_log(format!(
+            "Access denied: {path} is outside allowed directories"
+        ));
         return String::new();
     }
     match std::fs::read(&path) {
         Ok(bytes) => {
-            emit_log(
-                app,
-                format!("Reading original file: {} ({} bytes)", path, bytes.len()),
-            );
+            crate::common::debug_log(format!(
+                "Reading original file: {} ({} bytes)",
+                path,
+                bytes.len()
+            ));
             let encoded = general_purpose::STANDARD.encode(bytes);
             let ext = Path::new(&path)
                 .extension()
@@ -238,7 +315,7 @@ fn read_file_base64_inner(app: &tauri::AppHandle, path: String) -> String {
             format!("data:{mime};base64,{encoded}")
         }
         Err(e) => {
-            emit_log(app, format!("Failed to read file {path}: {e}"));
+            emit_log(app, format!("Couldn't read file {path}: {e}"));
             String::new()
         }
     }

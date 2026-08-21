@@ -97,7 +97,7 @@ fn notify_opened_file(app: &tauri::AppHandle, path: &str) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.emit("file-opened", path);
     }
-    emit_log(app, format!("Opened file: {path}"));
+    crate::common::debug_log(format!("Opened file: {path}"));
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -142,10 +142,9 @@ pub fn run() {
         .setup(|app| {
             crate::log::set_app_handle(app.handle().clone());
             if let Err(e) = ffmpeg_next::init() {
-                emit_log(
-                    app.handle(),
-                    format!("WARNING: ffmpeg init failed (thumbnails for videos disabled): {e}"),
-                );
+                crate::common::debug_log(format!(
+                    "WARNING: ffmpeg init failed (thumbnails for videos disabled): {e}"
+                ));
             }
 
             #[cfg(desktop)]
@@ -204,10 +203,7 @@ pub fn run() {
                 }
             }
 
-            emit_log(
-                app.handle(),
-                "App is setting up background tasks...".to_string(),
-            );
+            crate::common::debug_log("App is setting up background tasks...".to_string());
             startup::spawn_background_notification(app.handle());
             startup::spawn_startup_temp_cleanup(app.handle());
 
@@ -280,6 +276,11 @@ pub fn run() {
             commands::photos::get_photo_encoded_batch,
             commands::photos::get_photos_by_ids,
             commands::photos::get_heatmap_data,
+            commands::photos::trash_photo,
+            commands::photos::restore_photo,
+            commands::photos::empty_trash,
+            commands::photos::count_trash,
+            commands::photos::list_trash,
             // Albums
             commands::albums::create_album,
             commands::albums::create_smart_album,
@@ -288,12 +289,14 @@ pub fn run() {
             commands::albums::rename_album,
             commands::albums::delete_album,
             commands::albums::clear_dismissed_trips,
+            commands::albums::sync_trips,
             commands::albums::list_albums,
             commands::albums::get_album,
             commands::albums::add_album_items,
             commands::albums::remove_album_items,
             commands::albums::reorder_album,
             commands::albums::get_album_contents,
+            commands::albums::get_clip_categories,
             // Directories
             commands::directories::add_directory,
             commands::directories::list_directories,
@@ -338,11 +341,14 @@ pub fn run() {
             // Indexing
             commands::indexing::get_indexing_status,
             commands::indexing::get_unindexed_count,
+            commands::indexing::get_max_photo_rowid,
             commands::indexing::index_faces,
             commands::indexing::analyze_photo,
             commands::indexing::analyze_photo_model,
             commands::indexing::analyze_model,
             commands::indexing::abort_indexing,
+            commands::indexing::pause_indexing,
+            commands::indexing::resume_indexing,
             commands::indexing::unload_models,
             commands::indexing::reload_models,
             commands::indexing::get_models_loaded,

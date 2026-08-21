@@ -179,7 +179,16 @@ where
 }
 
 pub fn init_tracing() {
+    // Default filter keeps the persisted log readable: info everywhere, with
+    // whisper's per-token decode logs and zbus/dbus traffic capped. Set
+    // RUST_LOG (e.g. RUST_LOG=debug) to override.
+    let filter = std::env::var("RUST_LOG").unwrap_or_else(|_| {
+        "info,dbus=warn,zbus=warn,siegu_core::ml_engine::whisper=warn".to_string()
+    });
+    let env_filter = tracing_subscriber::EnvFilter::try_new(filter)
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
     let subscriber = tracing_subscriber::registry()
+        .with(env_filter)
         .with(LogLayer)
         .with(tracing_subscriber::fmt::layer().with_ansi(false));
     if let Err(e) = tracing::subscriber::set_global_default(subscriber) {

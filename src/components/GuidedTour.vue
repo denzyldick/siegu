@@ -100,13 +100,6 @@ const steps: Step[] = [
     position: 'bottom',
   },
   {
-    icon: 'mdi-magnify-scan',
-    titleKey: 'guided_tour.scan_button_title',
-    descKey: 'guided_tour.scan_button_desc',
-    target: "[data-tour='scan-button']",
-    position: 'bottom',
-  },
-  {
     icon: 'mdi-progress-check',
     titleKey: 'guided_tour.scan_progress_title',
     descKey: 'guided_tour.scan_progress_desc',

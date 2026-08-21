@@ -78,6 +78,11 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const modelEnabled = ref<Record<string, boolean>>({});
 
+  // "Skip existing library": when on, only photos added after the cutoff
+  // (captured at enable time) are auto-analyzed; the pre-existing backlog
+  // is left untouched.
+  const analyzeExisting = ref(false);
+
   const performance = reactive<PerformanceConfig>({
     scanThreads: 4,
     mlThreads: 2,
@@ -254,6 +259,7 @@ export const useSettingsStore = defineStore('settings', () => {
     await loadModelCapabilities();
     await loadPerformanceConfig();
     await loadModelEnabledStates();
+    await loadAnalyzeExisting();
     await loadModelsLoaded();
     await loadSignallingConfig();
     await fetchLogs();
@@ -429,6 +435,31 @@ export const useSettingsStore = defineStore('settings', () => {
     for (const key of keys) {
       await invoke('save_config', { key, value: modelEnabled.value[modelId] ? 'true' : 'false' });
     }
+  }
+
+  async function loadAnalyzeExisting(): Promise<void> {
+    try {
+      const configStr = await invoke<string>('get_config');
+      const config = JSON.parse(configStr) as Record<string, string>;
+      // Missing key = analyze everything (the historical default); only an
+      // explicit 'false' means the backlog is being skipped.
+      analyzeExisting.value = config.analysis_skip_existing !== 'false';
+    } catch {
+      // silent
+    }
+  }
+
+  async function setAnalyzeExisting(enabled: boolean): Promise<void> {
+    analyzeExisting.value = enabled;
+    await invoke('save_config', {
+      key: 'analysis_skip_existing',
+      value: enabled ? 'true' : 'false',
+    });
+    if (enabled) {
+      const maxRowid = await invoke<number>('get_max_photo_rowid');
+      await invoke('save_config', { key: 'analysis_cutoff_rowid', value: String(maxRowid) });
+    }
+    showSnackbar(t('settings.analyze_existing_set'));
   }
 
   async function loadPerformanceConfig(): Promise<void> {
@@ -1048,6 +1079,8 @@ export const useSettingsStore = defineStore('settings', () => {
     loadPerformanceConfig,
     savePerformanceConfig,
     setIndexingMode,
+    analyzeExisting,
+    setAnalyzeExisting,
     setMlThreads,
     setMemoryBudget,
     setScanThreads,

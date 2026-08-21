@@ -272,6 +272,57 @@ pub async fn get_heatmap_data(app: tauri::AppHandle) -> String {
     serde_json::to_string(&points).unwrap_or("[]".to_string())
 }
 
+#[tauri::command]
+pub async fn trash_photo(app: tauri::AppHandle, id: String) -> bool {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return false;
+    }
+    let database = database::Database::new(&path);
+    database.trash_photo(&id).is_ok()
+}
+
+#[tauri::command]
+pub async fn restore_photo(app: tauri::AppHandle, id: String) -> bool {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return false;
+    }
+    let database = database::Database::new(&path);
+    database.restore_photo(&id).is_ok()
+}
+
+#[tauri::command]
+pub async fn empty_trash(app: tauri::AppHandle) -> i64 {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return 0;
+    }
+    let database = database::Database::new(&path);
+    database.empty_trash()
+}
+
+#[tauri::command]
+pub async fn count_trash(app: tauri::AppHandle) -> i64 {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return 0;
+    }
+    let database = database::Database::new(&path);
+    database.count_trash()
+}
+
+#[tauri::command]
+pub async fn list_trash(app: tauri::AppHandle, limit: i64) -> String {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return "[]".to_string();
+    }
+    let database = database::Database::new(&path);
+    let photos = database.list_trash(limit);
+    serde_json::to_string(&photos).unwrap_or("[]".to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

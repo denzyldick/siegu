@@ -25,6 +25,19 @@
       </div>
     </div>
 
+    <!-- Date Range Filter Chip -->
+    <v-chip
+      v-if="hasFilter"
+      class="filter-chip"
+      closable
+      color="primary"
+      variant="tonal"
+      @click:close="clearFilter"
+    >
+      <v-icon start size="16">mdi-calendar-outline</v-icon>
+      {{ filterLabel }}
+    </v-chip>
+
     <l-map
       v-model:zoom="zoom"
       :center="initialCenter"
@@ -64,11 +77,12 @@ if (typeof window !== 'undefined') {
   window.L = L;
 }
 import 'leaflet.markercluster';
-import { ref, nextTick, watch, onUnmounted } from 'vue';
+import { ref, computed, nextTick, watch, onUnmounted } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import type { Map as LeafletMap } from 'leaflet';
 import MediaViewer from './MediaViewer.vue';
 import { useMediaUrl } from '@/composables/useMediaUrl';
+import { useMapFilterStore } from '@/stores/mapFilter';
 import type { MediaItem } from '@/types/media';
 
 interface MapPoint {
@@ -76,6 +90,7 @@ interface MapPoint {
   latitude: number;
   longitude: number;
   location: string;
+  created?: string;
 }
 
 const zoom = ref(2);
@@ -87,6 +102,7 @@ const viewerPhotos = ref<MediaItem[]>([]);
 const currentPhotoIndex = ref(0);
 
 const { thumbUrl } = useMediaUrl();
+const mapFilterStore = useMapFilterStore();
 
 let leafletMap: LeafletMap | null = null;
 let clusterGroup: L.MarkerClusterGroup | null = null;
@@ -160,7 +176,8 @@ async function loadMapData() {
 
   try {
     const pointsJson = await invoke<string>('get_heatmap_data');
-    mapPoints.value = JSON.parse(pointsJson);
+    const allPoints: MapPoint[] = JSON.parse(pointsJson);
+    mapPoints.value = filterByDateRange(allPoints);
     buildPointGrid(mapPoints.value);
 
     if (mapPoints.value.length === 0) {
@@ -255,6 +272,44 @@ function handlePhotoUpdated(updatedPhoto: MediaItem) {
   if (idx !== -1) {
     viewerPhotos.value[idx] = updatedPhoto;
   }
+}
+
+const hasFilter = computed(() => !!mapFilterStore.dateFrom || !!mapFilterStore.dateTo);
+const filterLabel = computed(() => {
+  if (!hasFilter.value) return '';
+  const fmt = (s: string) => s.slice(0, 10);
+  if (mapFilterStore.dateFrom && mapFilterStore.dateTo) {
+    return `${fmt(mapFilterStore.dateFrom)} – ${fmt(mapFilterStore.dateTo)}`;
+  }
+  if (mapFilterStore.dateFrom) return `From ${fmt(mapFilterStore.dateFrom)}`;
+  return `Until ${fmt(mapFilterStore.dateTo!)}`;
+});
+
+function filterByDateRange(points: MapPoint[]): MapPoint[] {
+  const from = mapFilterStore.dateFrom;
+  const to = mapFilterStore.dateTo;
+  if (!from && !to) return points;
+  return points.filter((p) => {
+    if (!p.created) return false;
+    const d = p.created.slice(0, 10);
+    if (from && d < from.slice(0, 10)) return false;
+    if (to && d > to.slice(0, 10)) return false;
+    return true;
+  });
+}
+
+watch(() => [mapFilterStore.dateFrom, mapFilterStore.dateTo], () => {
+  if (leafletMap && !loading.value) {
+    loading.value = true;
+    if (clusterGroup) {
+      leafletMap.removeLayer(clusterGroup);
+    }
+    void loadMapData();
+  }
+});
+
+function clearFilter(): void {
+  mapFilterStore.clearDateRange();
 }
 
 async function onMapReady(map: LeafletMap) {
@@ -411,5 +466,14 @@ watch(currentPhotoIndex, (idx) => {
 
 :deep(.leaflet-popup-tip-container) {
   display: none;
+}
+
+.filter-chip {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  backdrop-filter: blur(8px);
 }
 </style>

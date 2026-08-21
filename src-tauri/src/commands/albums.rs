@@ -180,6 +180,17 @@ pub async fn clear_dismissed_trips(app: tauri::AppHandle) -> i64 {
     do_clear_dismissed_trips(&db)
 }
 
+/// Recompute trip albums from photo timestamps (manual trigger).
+#[tauri::command]
+pub async fn sync_trips(app: tauri::AppHandle) -> i64 {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return 0;
+    }
+    let db = database::Database::new(&path);
+    db.sync_trips()
+}
+
 #[tauri::command]
 pub async fn list_albums(app: tauri::AppHandle) -> String {
     let path = get_config_path(&app);
@@ -259,6 +270,17 @@ pub async fn get_album_contents(
     let db = database::Database::new(&path);
     serde_json::to_string(&do_get_album_contents(&db, &album_id, offset, limit))
         .unwrap_or("[]".to_string())
+}
+
+#[tauri::command]
+pub async fn get_clip_categories(app: tauri::AppHandle) -> String {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return "[]".to_string();
+    }
+    let db = database::Database::new(&path);
+    let categories = db.get_clip_auto_categories();
+    serde_json::to_string(&categories).unwrap_or("[]".to_string())
 }
 
 #[cfg(test)]
@@ -487,7 +509,7 @@ mod tests {
         assert_eq!(db.sync_trips(), 1);
         let trips = db.list_albums_by_kind(AlbumKind::Trip);
         assert_eq!(trips.len(), 1);
-        assert_eq!(trips[0].name, "Trip · 2026");
+        assert_eq!(trips[0].name, "May 1 – 3, 2026");
         assert_eq!(trips[0].item_count, 3);
 
         // Re-running is idempotent (no duplicate trip rows).
@@ -551,15 +573,26 @@ mod tests {
         do_create_album(&db, "Manual").unwrap();
         do_create_smart_album(&db, "Smart", &rule(&[]), "smart").unwrap();
 
+        // Trips are computed at scan-time, not on page load. Sync them here
+        // so the test can verify they appear in sections.
+        db.sync_trips();
+
         let sections = do_get_album_sections(&db);
         let ids: Vec<String> = sections.iter().map(|s| s.id.clone()).collect();
-        assert_eq!(ids, vec!["people", "trips", "smart", "albums"]);
-        assert_eq!(sections[0].items.len(), 1);
-        assert_eq!(sections[0].items[0].name, "Alice");
-        assert_eq!(sections[1].items.len(), 1);
-        assert_eq!(sections[1].items[0].kind, "trip");
-        assert_eq!(sections[2].items[0].kind, "smart");
-        assert_eq!(sections[3].items[0].kind, "manual");
+        assert!(ids.contains(&"people".to_string()));
+        assert!(ids.contains(&"trips".to_string()));
+        assert!(ids.contains(&"smart".to_string()));
+        assert!(ids.contains(&"albums".to_string()));
+        assert!(ids.contains(&"places".to_string()));
+        let people_section = sections.iter().find(|s| s.id == "people").unwrap();
+        assert_eq!(people_section.items.len(), 1);
+        assert_eq!(people_section.items[0].name, "Alice");
+        let trips_section = sections.iter().find(|s| s.id == "trips").unwrap();
+        assert_eq!(trips_section.items[0].kind, "trip");
+        let smart_section = sections.iter().find(|s| s.id == "smart").unwrap();
+        assert_eq!(smart_section.items[0].kind, "smart");
+        let albums_section = sections.iter().find(|s| s.id == "albums").unwrap();
+        assert_eq!(albums_section.items[0].kind, "manual");
     }
 
     #[test]

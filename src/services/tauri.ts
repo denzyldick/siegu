@@ -105,6 +105,27 @@ export async function setFavorites(
   return call<number>('set_favorites', { ids, favorite });
 }
 
+export async function trashPhoto(id: string): Promise<boolean> {
+  return call<boolean>('trash_photo', { id });
+}
+
+export async function restorePhoto(id: string): Promise<boolean> {
+  return call<boolean>('restore_photo', { id });
+}
+
+export async function emptyTrash(): Promise<number> {
+  return call<number>('empty_trash');
+}
+
+export async function countTrash(): Promise<number> {
+  return call<number>('count_trash');
+}
+
+export async function listTrash(limit: number = 100): Promise<MediaItem[]> {
+  const json = await call<string>('list_trash', { limit });
+  return JSON.parse(json) as MediaItem[];
+}
+
 export async function setWallpaper(path: string): Promise<void> {
   await call<unknown>('set_wallpaper', { path });
 }
@@ -146,6 +167,14 @@ export async function analyzeModel(modelId: string): Promise<void> {
 
 export async function abortIndexing(): Promise<void> {
   await call<unknown>('abort_indexing');
+}
+
+export async function pauseIndexing(): Promise<void> {
+  await call<unknown>('pause_indexing');
+}
+
+export async function resumeIndexing(): Promise<void> {
+  await call<unknown>('resume_indexing');
 }
 
 export async function addDirectory(path: string): Promise<void> {
@@ -373,6 +402,10 @@ export async function clearDismissedTrips(): Promise<number> {
   return call<number>('clear_dismissed_trips');
 }
 
+export async function syncTrips(): Promise<number> {
+  return call<number>('sync_trips');
+}
+
 export async function getAlbum(albumId: string): Promise<Album | null> {
   const raw = await call<string>('get_album', { albumId });
   if (raw === 'null') return null;
@@ -382,6 +415,17 @@ export async function getAlbum(albumId: string): Promise<Album | null> {
 export async function getAlbumSections(): Promise<AlbumSection[]> {
   const raw = await call<string>('get_album_sections');
   return parseJsonArray<AlbumSection>(raw);
+}
+
+export interface ClipCategory {
+  name: string;
+  count: number;
+  previews: string[];
+}
+
+export async function getClipCategories(): Promise<ClipCategory[]> {
+  const raw = await call<string>('get_clip_categories');
+  return parseJsonArray<ClipCategory>(raw);
 }
 
 export async function createSmartAlbum(

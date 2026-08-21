@@ -1,7 +1,8 @@
 export type ScanStatus = 'idle' | 'scanning' | 'indexing' | 'completed' | 'error';
+export type ScanPhase = 'idle' | 'discovering' | 'processing' | 'indexing' | 'paused' | 'complete';
 
 export interface ScanProgress {
-  status: 'discovering' | 'indexing' | 'complete';
+  status: 'discovering' | 'indexing' | 'complete' | 'paused';
   progress?: number;
   current?: number;
   total?: number;
@@ -14,6 +15,20 @@ export interface ScanProgress {
 
 export interface IndexingProgress {
   remaining: number;
+}
+
+export interface AnalysisActivity {
+  id: string;
+  location: string;
+  models: string[];
+  remaining: number;
+}
+
+export interface ModelState {
+  pending: number;
+  total: number;
+  status: string;
+  message?: string;
 }
 
 export interface ScanFile {

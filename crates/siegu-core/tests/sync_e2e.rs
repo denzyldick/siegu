@@ -224,6 +224,7 @@ async fn lan_mesh_peers_connect_and_exchange_messages() {
             caption: Some("e2e caption".to_string()),
             aesthetics_score: Some(0.5),
             indexed: 2,
+            deleted_at: None,
         })
         .await
         .expect("send_message should succeed once channel is open");

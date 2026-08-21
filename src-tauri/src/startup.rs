@@ -82,17 +82,13 @@ pub fn spawn_background_thumbnail_warmup(app: &AppHandle) {
             processed_total += 1;
             if processed_total - last_logged_total >= 5 {
                 last_logged_total = processed_total;
-                emit_log(
-                    &app_handle,
-                    format!("Thumbnail warm-up: processed {processed_total} batches..."),
-                );
+                crate::common::debug_log(format!(
+                    "Thumbnail warm-up: processed {processed_total} batches..."
+                ));
             }
         }
         if processed_total > 0 {
-            emit_log(
-                &app_handle,
-                "Thumbnail warm-up complete — all media now has stored thumbnails.".to_string(),
-            );
+            emit_log(&app_handle, "Getting your photos ready…".to_string());
             let _ = app_handle.emit("photos-refreshed", ());
         }
     });
@@ -112,10 +108,7 @@ pub fn spawn_interval_rescan(app: &AppHandle) {
         interval.tick().await;
         loop {
             interval.tick().await;
-            emit_log(
-                &app_handle_for_interval,
-                "Interval tick: checking for media updates...".to_string(),
-            );
+            crate::common::debug_log("Interval tick: checking for media updates...".to_string());
             commands::scan::scan_files(app_handle_for_interval.clone());
         }
     });

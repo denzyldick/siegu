@@ -60,6 +60,14 @@ pub struct LocationGroup {
     pub encoded: Option<String>,
 }
 
+/// An auto-generated category from CLIP label grouping.
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+pub struct ClipCategory {
+    pub name: String,
+    pub count: i64,
+    pub previews: Vec<String>,
+}
+
 /// Photo/video counts for a single calendar day (`YYYY-MM-DD`), powering the
 /// date-range picker in the search dropdown.
 #[derive(Debug, Clone, Default, Serialize)]
@@ -468,7 +476,7 @@ pub struct FaceWithPerson {
 
 /// Maximum gap (days) between consecutive photos that keeps them in one trip
 /// cluster. Larger gaps start a new cluster.
-const TRIP_GAP_DAYS: i64 = 3;
+const TRIP_GAP_DAYS: i64 = 1;
 
 /// Minimum photos a trip must contain to be shown.
 const TRIP_MIN_PHOTOS: usize = 3;
@@ -619,7 +627,7 @@ impl TripAcc {
             .collect();
         ranked.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
         if ranked.is_empty() {
-            return "Trip".to_string();
+            return String::new();
         }
         let countries = self.countries();
         if countries.len() == 1 && ranked.len() > 1 {
@@ -631,6 +639,57 @@ impl TripAcc {
             .map(|(name, _)| name.to_string())
             .collect::<Vec<_>>()
             .join(", ")
+    }
+
+    /// Generate a human-readable date-range name for a trip (e.g. "May 2024",
+    /// "May – Jun 2024", "May 3 – 12, 2024").
+    fn date_range_name(&self) -> String {
+        const MONTHS: &[&str] = &[
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        ];
+        let from = day_index_to_date(self.first_day).unwrap_or_default();
+        let to = day_index_to_date(self.last_day).unwrap_or_default();
+        // Parse "YYYY-MM-DD"
+        let parse_month = |s: &str| -> usize {
+            s.get(5..7)
+                .and_then(|m| m.parse::<usize>().ok())
+                .unwrap_or(1)
+                .saturating_sub(1)
+        };
+        let parse_day = |s: &str| -> usize {
+            s.get(8..10)
+                .and_then(|d| d.parse::<usize>().ok())
+                .unwrap_or(1)
+        };
+        let from_month = parse_month(&from);
+        let from_day = parse_day(&from);
+        let to_month = parse_month(&to);
+        let to_day = parse_day(&to);
+        let from_year: i64 = from.get(..4).and_then(|y| y.parse().ok()).unwrap_or(0);
+        let to_year: i64 = to.get(..4).and_then(|y| y.parse().ok()).unwrap_or(0);
+
+        if from == to {
+            // Single day
+            format!("{} {}, {}", MONTHS[from_month], from_day, from_year)
+        } else if from_month == to_month && from_year == to_year {
+            // Same month, same year
+            format!(
+                "{} {} – {}, {}",
+                MONTHS[from_month], from_day, to_day, from_year
+            )
+        } else if from_year == to_year {
+            // Different months, same year
+            format!(
+                "{} – {} {}",
+                MONTHS[from_month], MONTHS[to_month], from_year
+            )
+        } else {
+            // Cross-year
+            format!(
+                "{} {} – {} {}",
+                MONTHS[from_month], from_year, MONTHS[to_month], to_year
+            )
+        }
     }
 }
 
@@ -787,11 +846,14 @@ impl Database {
         // Enable WAL mode for better concurrency and set a busy timeout
         let _ = conn.execute("PRAGMA journal_mode=WAL;", ());
         let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
-        // Write/read tuning: with WAL, NORMAL only fsyncs on checkpoint, and a
-        // larger page cache plus mmap avoids re-reading thumbnails/embeddings.
+        // Write/read tuning: with WAL, NORMAL only fsyncs on checkpoint. The page
+        // cache helps repeated queries; mmap is capped at 64 MiB per connection —
+        // the app opens many short-lived connections and each mapping counts
+        // toward RSS once touched, which showed up as multi-GB bloat on large
+        // libraries.
         let _ = conn.execute("PRAGMA synchronous=NORMAL;", ());
         let _ = conn.execute("PRAGMA cache_size=-32768;", ());
-        let _ = conn.execute("PRAGMA mmap_size=268435456;", ());
+        let _ = conn.execute("PRAGMA mmap_size=67108864;", ());
 
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS photo (id STRING PRIMARY KEY, location STRING, encoded STRING, created DATE_TIME, latitude REAL, longitude REAL, indexed INTEGER DEFAULT 0, caption TEXT, aesthetics_score REAL);", ());
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS ai_status (photo_id STRING PRIMARY KEY, clip INTEGER DEFAULT 0, face INTEGER DEFAULT 0, ocr INTEGER DEFAULT 0, nsfw INTEGER DEFAULT 0, aesthetics INTEGER DEFAULT 0, yolo INTEGER DEFAULT 0, blip INTEGER DEFAULT 0, arcface INTEGER DEFAULT 0, midas INTEGER DEFAULT 0, whisper INTEGER DEFAULT 0, sam INTEGER DEFAULT 0, superres INTEGER DEFAULT 0);", ());
@@ -841,6 +903,14 @@ impl Database {
         );
         let _ = conn.execute(
             "ALTER TABLE photo ADD COLUMN received INTEGER DEFAULT 0;",
+            (),
+        );
+        let _ = conn.execute(
+            "ALTER TABLE photo ADD COLUMN deleted_at TEXT DEFAULT NULL;",
+            (),
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_photo_deleted_at ON photo(deleted_at) WHERE deleted_at IS NOT NULL;",
             (),
         );
 
@@ -1479,7 +1549,7 @@ impl Database {
         }
 
         let where_clause =
-            format!("WHERE 1=1 {fav_filter} {video_filter} {q_filter} {facet_filters}");
+            format!("WHERE 1=1 AND p.deleted_at IS NULL {fav_filter} {video_filter} {q_filter} {facet_filters}");
         let q_param = if is_uuid {
             query.to_string()
         } else {
@@ -1807,6 +1877,93 @@ impl Database {
         counts
     }
 
+    /// CLIP category buckets: maps a human-readable category name to the
+    /// CLIP classes that belong to it.
+    pub fn clip_category_buckets() -> Vec<(&'static str, Vec<&'static str>)> {
+        vec![
+            ("Animals", vec!["cat", "dog", "pet", "animal"]),
+            ("Vehicles", vec!["car", "vehicle", "motorcycle", "bicycle"]),
+            ("Food", vec!["food", "meal", "drink", "coffee"]),
+            (
+                "Nature",
+                vec!["landscape", "nature", "mountain", "beach", "water"],
+            ),
+            (
+                "Architecture",
+                vec!["building", "house", "architecture", "city"],
+            ),
+            ("Selfies", vec!["selfie"]),
+            ("Screenshots", vec!["screenshot", "meme", "text message"]),
+            (
+                "Electronics",
+                vec!["laptop", "computer", "phone", "screen", "electronics"],
+            ),
+            ("Art", vec!["art", "drawing", "painting"]),
+            ("Indoors", vec!["room interior", "piece of furniture"]),
+            ("People", vec!["person", "group of people", "crowd"]),
+            ("Sky", vec!["sunset", "sky", "clouds"]),
+        ]
+    }
+
+    /// CLIP auto-categories: groups photos by CLIP label buckets with counts
+    /// and preview photo thumbnails. Returns categories sorted by count descending.
+    pub fn get_clip_auto_categories(&self) -> Vec<ClipCategory> {
+        let buckets = Self::clip_category_buckets();
+        let mut categories: Vec<ClipCategory> = Vec::new();
+
+        for (name, classes) in buckets {
+            let class_in: String = classes
+                .iter()
+                .map(|c| format!("'{}'", c.replace('\'', "''")))
+                .collect::<Vec<_>>()
+                .join(",");
+
+            let sql = format!(
+                "SELECT COUNT(DISTINCT photo_id) FROM object WHERE class IN ({classes})",
+                classes = class_in
+            );
+            let count: i64 = self
+                .connection
+                .query_row(&sql, (), |row| row.get(0))
+                .unwrap_or(0);
+
+            if count == 0 {
+                continue;
+            }
+
+            // Get 4 preview photos (highest aesthetics first)
+            let preview_sql = format!(
+                "SELECT DISTINCT p.id, p.encoded FROM photo p \
+                 INNER JOIN object o ON o.photo_id = p.id \
+                 WHERE o.class IN ({classes}) AND p.deleted_at IS NULL \
+                 ORDER BY p.aesthetics_score DESC NULLS LAST \
+                 LIMIT 4",
+                classes = class_in
+            );
+            let mut previews: Vec<String> = Vec::new();
+            if let Ok(mut stmt) = self.connection.prepare(&preview_sql) {
+                if let Ok(iter) =
+                    stmt.query_map([], |row| Ok(row.get::<_, String>(1).unwrap_or_default()))
+                {
+                    for enc in iter.flatten() {
+                        if !enc.is_empty() {
+                            previews.push(enc);
+                        }
+                    }
+                }
+            }
+
+            categories.push(ClipCategory {
+                name: name.to_string(),
+                count,
+                previews,
+            });
+        }
+
+        categories.sort_by(|a, b| b.count.cmp(&a.count));
+        categories
+    }
+
     /// Camera identifiers (Make + Model from EXIF) with photo counts, most common first.
     pub fn get_camera_counts(&self, limit: i64) -> Vec<(String, i64)> {
         let mut by_photo: std::collections::HashMap<String, (Option<String>, Option<String>)> =
@@ -1871,6 +2028,34 @@ impl Database {
                     count: row.get(1)?,
                     photo_location: row.get(2).ok(),
                     encoded: row.get(3).ok(),
+                })
+            }) {
+                for g in iter.flatten() {
+                    groups.push(g);
+                }
+            }
+        }
+        groups
+    }
+
+    /// Lightweight variant of `get_location_groups` that omits the `encoded`
+    /// subquery, avoiding megabytes of base64 data in the payload.  Used by
+    /// `get_album_sections` where only name / count / cover path are needed.
+    pub fn get_location_groups_light(&self, limit: i64) -> Vec<LocationGroup> {
+        let mut groups = Vec::new();
+        let sql = "SELECT pr.value AS name, COUNT(*) AS cnt, \
+            (SELECT p2.location FROM photo p2 JOIN properties pr2 ON pr2.photo_id=p2.id \
+                WHERE pr2.key='location_name' AND pr2.value=pr.value \
+                ORDER BY p2.created DESC LIMIT 1) AS rep_loc \
+            FROM properties pr WHERE pr.key='location_name' \
+            GROUP BY pr.value ORDER BY cnt DESC LIMIT ?1";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) = stmt.query_map([limit], |row| {
+                Ok(LocationGroup {
+                    name: row.get(0)?,
+                    count: row.get(1)?,
+                    photo_location: row.get(2).ok(),
+                    encoded: None,
                 })
             }) {
                 for g in iter.flatten() {
@@ -1969,7 +2154,7 @@ impl Database {
     /// Get all photos that have non-zero GPS coordinates, for map heatmap display.
     pub fn get_heatmap_points(&self) -> Vec<MapPoint> {
         let mut points = Vec::new();
-        let sql = "SELECT id, latitude, longitude, location FROM photo \
+        let sql = "SELECT id, latitude, longitude, location, created FROM photo \
             WHERE (latitude != 0.0 OR longitude != 0.0)";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([], |row| {
@@ -1978,6 +2163,7 @@ impl Database {
                     latitude: row.get(1).unwrap_or(0.0),
                     longitude: row.get(2).unwrap_or(0.0),
                     location: row.get(3).unwrap_or_default(),
+                    created: row.get(4).ok(),
                 })
             }) {
                 for p in iter.flatten() {
@@ -3026,6 +3212,47 @@ impl Database {
         photos
     }
 
+    /// Ids of photos awaiting analysis, restricted to rows inserted after
+    /// `min_rowid` (0 = no restriction). Backs the "skip existing library"
+    /// option: ProcessAll filters its backlog through the cutoff captured
+    /// when the user enabled it, so only photos added afterwards are analyzed.
+    pub fn get_unindexed_photo_ids_after(&self, min_rowid: i64, limit: usize) -> Vec<String> {
+        let mut ids = Vec::new();
+        let sql = "SELECT p.id FROM photo p WHERE p.indexed < 2 AND p.rowid > ?1 LIMIT ?2";
+        if let Ok(mut stmt) = self.connection.prepare(sql) {
+            if let Ok(iter) = stmt.query_map(rusqlite::params![min_rowid, limit as i64], |row| {
+                row.get::<_, String>(0)
+            }) {
+                for id in iter.flatten() {
+                    ids.push(id);
+                }
+            }
+        }
+        ids
+    }
+
+    /// Count of photos awaiting analysis above a rowid cutoff (see
+    /// [`Self::get_unindexed_photo_ids_after`]).
+    pub fn count_unindexed_after(&self, min_rowid: i64) -> i64 {
+        self.connection
+            .query_row(
+                "SELECT COUNT(*) FROM photo p WHERE p.indexed < 2 AND p.rowid > ?1",
+                [min_rowid],
+                |r| r.get(0),
+            )
+            .unwrap_or(0)
+    }
+
+    /// Highest rowid in the photo table; snapshotted as the cutoff when the
+    /// "skip existing library" option is enabled.
+    pub fn max_photo_rowid(&self) -> i64 {
+        self.connection
+            .query_row("SELECT COALESCE(MAX(rowid), 0) FROM photo", [], |r| {
+                r.get(0)
+            })
+            .unwrap_or(0)
+    }
+
     /// Get photo IDs that have not been processed by the given model.
     ///
     /// Explicit `{model} = 0` rows are served by a partial index
@@ -3113,6 +3340,8 @@ pub struct MapPoint {
     pub latitude: f64,
     pub longitude: f64,
     pub location: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -3366,6 +3595,131 @@ impl Database {
             .unwrap_or(0)
     }
 
+    /// Move a photo to trash by setting its deleted_at timestamp.
+    pub fn trash_photo(&self, photo_id: &str) -> Result<(), String> {
+        self.connection
+            .execute(
+                "UPDATE photo SET deleted_at = datetime('now') WHERE id = ?1",
+                rusqlite::params![photo_id],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    /// Restore a photo from trash.
+    pub fn restore_photo(&self, photo_id: &str) -> Result<(), String> {
+        self.connection
+            .execute(
+                "UPDATE photo SET deleted_at = NULL WHERE id = ?1",
+                rusqlite::params![photo_id],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    /// Delete photos that have been in trash for more than 30 days.
+    /// Returns the number of photos permanently deleted.
+    pub fn empty_trash(&self) -> i64 {
+        // Get photo ids and file paths for cleanup
+        let ids: Vec<(String, String)> = self
+            .connection
+            .prepare("SELECT id, location FROM photo WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-30 days')")
+            .and_then(|mut stmt| {
+                let rows = stmt.query_map([], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                })?;
+                Ok(rows.filter_map(|r| r.ok()).collect())
+            })
+            .unwrap_or_default();
+
+        let count = ids.len() as i64;
+
+        // Delete associated data
+        for (id, _) in &ids {
+            let _ = self.connection.execute(
+                "DELETE FROM object WHERE photo_id = ?1",
+                rusqlite::params![id],
+            );
+            let _ = self
+                .connection
+                .execute("DELETE FROM ocr WHERE photo_id = ?1", rusqlite::params![id]);
+            let _ = self.connection.execute(
+                "DELETE FROM faces WHERE photo_id = ?1",
+                rusqlite::params![id],
+            );
+            let _ = self.connection.execute(
+                "DELETE FROM properties WHERE photo_id = ?1",
+                rusqlite::params![id],
+            );
+            let _ = self.connection.execute(
+                "DELETE FROM ai_status WHERE photo_id = ?1",
+                rusqlite::params![id],
+            );
+            let _ = self.connection.execute(
+                "DELETE FROM album_item WHERE photo_id = ?1",
+                rusqlite::params![id],
+            );
+        }
+
+        // Delete the photo rows
+        if !ids.is_empty() {
+            let _ = self.connection.execute(
+                "DELETE FROM photo WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-30 days')",
+                (),
+            );
+        }
+
+        // Delete actual files from disk
+        for (_, path) in &ids {
+            let _ = std::fs::remove_file(path);
+        }
+
+        count
+    }
+
+    /// Count photos currently in trash.
+    pub fn count_trash(&self) -> i64 {
+        self.connection
+            .query_row(
+                "SELECT COUNT(*) FROM photo WHERE deleted_at IS NOT NULL",
+                (),
+                |row| row.get(0),
+            )
+            .unwrap_or(0)
+    }
+
+    /// List photos currently in trash (for display).
+    pub fn list_trash(&self, limit: i64) -> Vec<Photo> {
+        let mut stmt = match self.connection.prepare(
+            "SELECT id, location, encoded, created, latitude, longitude, indexed, caption, aesthetics_score FROM photo WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT ?1",
+        ) {
+            Ok(s) => s,
+            Err(_) => return vec![],
+        };
+        let rows = stmt
+            .query_map(rusqlite::params![limit], |row| {
+                Ok(Photo {
+                    id: row.get(0)?,
+                    location: row.get(1)?,
+                    encoded: row.get(2)?,
+                    created: row.get(3)?,
+                    latitude: row.get(4).unwrap_or_default(),
+                    longitude: row.get(5).unwrap_or_default(),
+                    objects: HashMap::new(),
+                    properties: HashMap::new(),
+                    favorite: false,
+                    indexed: row.get(6)?,
+                    caption: row.get(7)?,
+                    aesthetics_score: row.get(8)?,
+                    ai_status: AiStatus::default(),
+                    sync_needed: false,
+                    received: false,
+                })
+            })
+            .unwrap();
+        rows.filter_map(|r| r.ok()).collect()
+    }
+
     fn album_from_row(row: &rusqlite::Row) -> rusqlite::Result<Album> {
         Ok(Album {
             id: row.get(0)?,
@@ -3393,10 +3747,70 @@ impl Database {
     /// Fill in live counts and covers for smart/trip albums (which are computed
     /// from their rule rather than stored album_item rows).
     fn resolve_album_metrics(&self, albums: &mut [Album]) {
-        for album in albums {
-            if album.kind == AlbumKind::Manual {
-                continue;
+        // Separate trip albums from smart albums so we can batch-trip counts.
+        let (mut trips, smart): (Vec<&mut Album>, Vec<&mut Album>) =
+            albums.iter_mut().partition(|a| a.kind == AlbumKind::Trip);
+
+        // Batch-trip: count all photos for every trip date-range in a single
+        // query using UNION ALL.  Each sub-query is a simple indexed range scan
+        // so the total cost is O(N_trips) instead of O(N_trips × N_photos).
+        if !trips.is_empty() {
+            let mut parts: Vec<String> = Vec::with_capacity(trips.len());
+            let mut all_params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+            for (i, trip) in trips.iter().enumerate() {
+                if let Some(filter) = Self::album_rule_filter(trip) {
+                    parts.push(format!(
+                        "SELECT ? AS idx, COUNT(*) AS cnt FROM photo p WHERE p.created >= ? AND p.created <= ?"
+                    ));
+                    all_params.push(Box::new(i as i64));
+                    all_params.push(Box::new(filter.date_from.clone().unwrap_or_default()));
+                    all_params.push(Box::new(filter.date_to.clone().unwrap_or_default()));
+                }
             }
+            if !parts.is_empty() {
+                let sql = format!("SELECT idx, cnt FROM ({})", parts.join(" UNION ALL "));
+                if let Ok(mut stmt) = self.connection.prepare(&sql) {
+                    let param_refs: Vec<&dyn rusqlite::ToSql> =
+                        all_params.iter().map(|p| p.as_ref()).collect();
+                    if let Ok(rows) = stmt.query_map(param_refs.as_slice(), |row| {
+                        Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+                    }) {
+                        for row in rows.flatten() {
+                            let idx = row.0 as usize;
+                            if idx < trips.len() {
+                                trips[idx].item_count = row.1;
+                            }
+                        }
+                    }
+                }
+            }
+            // Still need covers for trips that lack them.
+            for trip in trips.iter_mut() {
+                if trip.cover_photo_id.is_none() {
+                    if let Some(filter) = Self::album_rule_filter(trip) {
+                        let query = filter.query.as_deref().unwrap_or("");
+                        let videos = filter.videos.unwrap_or(false);
+                        let mut cover_filter = filter.clone();
+                        cover_filter.order_by = Some("best".to_string());
+                        let first = self.list_photos_filtered(
+                            query,
+                            0,
+                            1,
+                            false,
+                            videos,
+                            &cover_filter,
+                            false,
+                        );
+                        if let Some(photo) = first.first() {
+                            trip.cover_photo_id = Some(photo.id.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Smart albums: process individually (there are only a handful).
+        for album in smart {
             if let Some(filter) = Self::album_rule_filter(album) {
                 let query = filter.query.as_deref().unwrap_or("");
                 let videos = filter.videos.unwrap_or(false);
@@ -3524,24 +3938,51 @@ impl Database {
         albums
     }
 
-    /// Cover preview for an album: the persisted data-URL thumbnail plus the
-    /// cover photo's filesystem location (so the frontend can request a fresh
-    /// thumbnail from the media server).
-    fn album_cover_encoded(&self, album: &Album) -> (Option<String>, Option<String>) {
-        let Some(cover) = album.cover_photo_id.as_deref() else {
-            return (None, None);
-        };
-        self.connection
-            .query_row(
-                "SELECT encoded, location FROM photo WHERE id = ?1",
-                rusqlite::params![cover],
-                |r| {
-                    let encoded = r.get::<_, String>(0).ok();
-                    let location = r.get::<_, String>(1).ok();
-                    Ok((encoded, location))
-                },
-            )
-            .unwrap_or((None, None))
+    /// Batch-fetch cover locations for many albums in a single query.
+    /// Returns a map from album_id → cover photo filesystem path.
+    fn album_cover_locations_batch(
+        &self,
+        albums: &[Album],
+    ) -> std::collections::HashMap<String, Option<String>> {
+        use std::collections::HashMap;
+        let mut map = HashMap::new();
+        let cover_ids: Vec<String> = albums
+            .iter()
+            .filter_map(|a| a.cover_photo_id.clone())
+            .collect();
+        if cover_ids.is_empty() {
+            return map;
+        }
+        // Pre-populate with None so albums without covers are represented.
+        for a in albums {
+            map.insert(a.id.clone(), None);
+        }
+        let placeholders: Vec<String> = cover_ids
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect();
+        let sql = format!(
+            "SELECT id, location FROM photo WHERE id IN ({})",
+            placeholders.join(",")
+        );
+        if let Ok(mut stmt) = self.connection.prepare(&sql) {
+            if let Ok(iter) = stmt.query_map(rusqlite::params_from_iter(cover_ids.iter()), |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1).ok()))
+            }) {
+                // Build a reverse map: photo_id → album_id.
+                let photo_to_album: HashMap<String, String> = albums
+                    .iter()
+                    .filter_map(|a| a.cover_photo_id.as_ref().map(|c| (c.clone(), a.id.clone())))
+                    .collect();
+                for row in iter.flatten() {
+                    if let Some(album_id) = photo_to_album.get(&row.0) {
+                        map.insert(album_id.clone(), Some(row.1.unwrap_or_default()));
+                    }
+                }
+            }
+        }
+        map
     }
 
     /// Turn one time-clustered group of photos into a trip: a display name, a
@@ -3553,8 +3994,13 @@ impl Database {
         }
         let date_from = day_index_to_date(acc.first_day)?;
         let date_to = day_index_to_date(acc.last_day)?;
-        let year = &date_from[..4];
-        let name = format!("{} · {year}", acc.display_name());
+        let loc_name = acc.display_name();
+        let name = if loc_name.is_empty() {
+            acc.date_range_name()
+        } else {
+            let year = &date_from[..4];
+            format!("{loc_name} · {year}")
+        };
         Some((name, format!("{date_from}|{date_to}"), acc.photos.clone()))
     }
 
@@ -3682,11 +4128,58 @@ impl Database {
         trip_ids.len() as i64
     }
 
-    /// Full data for the Albums view: People, Places, Trips, Smart albums, and
-    /// manual albums, in that order.
+    /// Full data for the Collections view: Favorites, Trash, People, Trips,
+    /// Albums, Places, and Documents, in that order.
     pub fn get_album_sections(&self) -> Vec<AlbumSection> {
+        use std::time::Instant;
+        let t0 = Instant::now();
         let mut sections = Vec::new();
 
+        // Favorites
+        let fav_count = self.count_photos_filtered("", true, false, &PhotoFilter::default());
+        tracing::info!("[perf] favorites count: {:?}", t0.elapsed());
+        if fav_count > 0 {
+            let fav_photos = self.get_favorite_photos(4);
+            let items: Vec<AlbumSectionItem> = fav_photos
+                .into_iter()
+                .map(|p| AlbumSectionItem {
+                    id: p.id.clone(),
+                    name: "Favorites".to_string(),
+                    count: 0,
+                    cover_encoded: None,
+                    cover_location: Some(p.location.clone()),
+                    cover_crop: None,
+                    kind: "favorites".to_string(),
+                    album: None,
+                })
+                .collect();
+            sections.push(AlbumSection {
+                id: "favorites".to_string(),
+                items,
+            });
+        }
+
+        // Trash
+        let trash_count = self.count_trash();
+        tracing::info!("[perf] trash count: {:?}", t0.elapsed());
+
+        if trash_count > 0 {
+            sections.push(AlbumSection {
+                id: "trash".to_string(),
+                items: vec![AlbumSectionItem {
+                    id: "trash".to_string(),
+                    name: "Trash".to_string(),
+                    count: trash_count,
+                    cover_encoded: None,
+                    cover_location: None,
+                    cover_crop: None,
+                    kind: "trash".to_string(),
+                    album: None,
+                }],
+            });
+        }
+
+        // People
         let people: Vec<AlbumSectionItem> = self
             .get_search_people(100)
             .into_iter()
@@ -3694,13 +4187,14 @@ impl Database {
                 id: format!("person:{}", p.id),
                 name: p.name,
                 count: p.photo_count,
-                cover_encoded: p.encoded,
+                cover_encoded: None,
                 cover_location: None,
                 cover_crop: p.representative_crop,
                 kind: "person".to_string(),
                 album: None,
             })
             .collect();
+        tracing::info!("[perf] people ({}): {:?}", people.len(), t0.elapsed());
         if !people.is_empty() {
             sections.push(AlbumSection {
                 id: "people".to_string(),
@@ -3708,17 +4202,18 @@ impl Database {
             });
         }
 
-        self.sync_trips();
-        let mut trips: Vec<AlbumSectionItem> = self
-            .list_albums_by_kind(AlbumKind::Trip)
-            .into_iter()
+        // Trips — read persisted trip albums
+        let mut trip_albums = self.list_albums_by_kind(AlbumKind::Trip);
+        let trip_covers = self.album_cover_locations_batch(&trip_albums);
+        let mut trips: Vec<AlbumSectionItem> = trip_albums
+            .drain(..)
             .map(|album| {
-                let (cover_encoded, cover_location) = self.album_cover_encoded(&album);
+                let cover_location = trip_covers.get(&album.id).and_then(|c| c.clone());
                 AlbumSectionItem {
                     id: album.id.clone(),
                     name: album.name.clone(),
                     count: album.item_count,
-                    cover_encoded,
+                    cover_encoded: None,
                     cover_location,
                     cover_crop: None,
                     kind: "trip".to_string(),
@@ -3726,9 +4221,8 @@ impl Database {
                 }
             })
             .collect();
-        // Surface trips that fall around this time of year (newest first on
-        // ties) instead of always showing the oldest first.
         trips.sort_by_key(|item| trip_sort_key(&item.id));
+        tracing::info!("[perf] trips ({}): {:?}", trips.len(), t0.elapsed());
         if !trips.is_empty() {
             sections.push(AlbumSection {
                 id: "trips".to_string(),
@@ -3736,16 +4230,18 @@ impl Database {
             });
         }
 
-        let smart: Vec<AlbumSectionItem> = self
-            .list_albums_by_kind(AlbumKind::Smart)
+        // Smart albums — batch cover query
+        let smart_albums = self.list_albums_by_kind(AlbumKind::Smart);
+        let smart_covers = self.album_cover_locations_batch(&smart_albums);
+        let smart: Vec<AlbumSectionItem> = smart_albums
             .into_iter()
             .map(|album| {
-                let (cover_encoded, cover_location) = self.album_cover_encoded(&album);
+                let cover_location = smart_covers.get(&album.id).and_then(|c| c.clone());
                 AlbumSectionItem {
                     id: album.id.clone(),
                     name: album.name.clone(),
                     count: album.item_count,
-                    cover_encoded,
+                    cover_encoded: None,
                     cover_location,
                     cover_crop: None,
                     kind: "smart".to_string(),
@@ -3753,6 +4249,7 @@ impl Database {
                 }
             })
             .collect();
+        tracing::info!("[perf] smart albums: {:?}", t0.elapsed());
         if !smart.is_empty() {
             sections.push(AlbumSection {
                 id: "smart".to_string(),
@@ -3760,16 +4257,18 @@ impl Database {
             });
         }
 
-        let manual: Vec<AlbumSectionItem> = self
-            .list_albums_by_kind(AlbumKind::Manual)
+        // Manual albums — batch cover query
+        let manual_albums = self.list_albums_by_kind(AlbumKind::Manual);
+        let manual_covers = self.album_cover_locations_batch(&manual_albums);
+        let manual: Vec<AlbumSectionItem> = manual_albums
             .into_iter()
             .map(|album| {
-                let (cover_encoded, cover_location) = self.album_cover_encoded(&album);
+                let cover_location = manual_covers.get(&album.id).and_then(|c| c.clone());
                 AlbumSectionItem {
                     id: album.id.clone(),
                     name: album.name.clone(),
                     count: album.item_count,
-                    cover_encoded,
+                    cover_encoded: None,
                     cover_location,
                     cover_crop: None,
                     kind: "manual".to_string(),
@@ -3777,6 +4276,7 @@ impl Database {
                 }
             })
             .collect();
+        tracing::info!("[perf] manual albums: {:?}", t0.elapsed());
         if !manual.is_empty() {
             sections.push(AlbumSection {
                 id: "albums".to_string(),
@@ -3784,6 +4284,77 @@ impl Database {
             });
         }
 
+        // Places
+        let places = self.get_location_groups_light(8);
+        tracing::info!("[perf] places: {:?}", t0.elapsed());
+        if !places.is_empty() {
+            let items: Vec<AlbumSectionItem> = places
+                .into_iter()
+                .map(|g| AlbumSectionItem {
+                    id: format!("location:{}", g.name),
+                    name: g.name,
+                    count: g.count,
+                    cover_encoded: None,
+                    cover_location: g.photo_location,
+                    cover_crop: None,
+                    kind: "location".to_string(),
+                    album: None,
+                })
+                .collect();
+            sections.push(AlbumSection {
+                id: "places".to_string(),
+                items,
+            });
+        }
+
+        // Documents
+        let doc_count = self.count_photos_filtered(
+            "",
+            false,
+            false,
+            &PhotoFilter {
+                papers: true,
+                ..Default::default()
+            },
+        );
+        tracing::info!("[perf] documents: {:?}", t0.elapsed());
+        if doc_count > 0 {
+            let doc_photos = self.list_photos_filtered(
+                "",
+                0,
+                6,
+                false,
+                false,
+                &PhotoFilter {
+                    papers: true,
+                    ..Default::default()
+                },
+                false,
+            );
+            let items: Vec<AlbumSectionItem> = doc_photos
+                .into_iter()
+                .map(|p| AlbumSectionItem {
+                    id: p.id.clone(),
+                    name: "Document".to_string(),
+                    count: 0,
+                    cover_encoded: None,
+                    cover_location: Some(p.location.clone()),
+                    cover_crop: None,
+                    kind: "document".to_string(),
+                    album: None,
+                })
+                .collect();
+            sections.push(AlbumSection {
+                id: "documents".to_string(),
+                items,
+            });
+        }
+
+        tracing::info!(
+            "[perf] get_album_sections TOTAL ({} sections): {:?}",
+            sections.len(),
+            t0.elapsed()
+        );
         sections
     }
 
@@ -3908,12 +4479,12 @@ impl Database {
                 let query = filter.query.as_deref().unwrap_or("");
                 let videos = filter.videos.unwrap_or(false);
                 return self
-                    .list_photos_filtered(query, offset, limit, false, videos, &filter, true);
+                    .list_photos_filtered(query, offset, limit, false, videos, &filter, false);
             }
             return Vec::new();
         }
         let mut photos = Vec::new();
-        let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, \
+        let sql = "SELECT p.id, p.location, NULL AS encoded, p.latitude, p.longitude, p.created, \
             EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, \
             p.caption, p.aesthetics_score, \
             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, \
@@ -3931,7 +4502,7 @@ impl Database {
                     Ok(Photo {
                         id: row.get(0)?,
                         location: row.get(1)?,
-                        encoded: row.get(2)?,
+                        encoded: String::new(),
                         created: row.get(5).unwrap_or_default(),
                         objects: HashMap::new(),
                         properties: HashMap::new(),
@@ -4164,7 +4735,7 @@ mod tests {
         assert_eq!(db.sync_trips(), 1);
         let trips = db.list_albums_by_kind(AlbumKind::Trip);
         assert_eq!(trips.len(), 1);
-        assert_eq!(trips[0].name, "Trip · 2023");
+        assert_eq!(trips[0].name, "Jun 1 – 3, 2023");
     }
 
     #[test]
@@ -4557,6 +5128,55 @@ mod tests {
 
         let batch_past = db.get_unindexed_photos_batch(20, 3);
         assert!(batch_past.is_empty());
+    }
+
+    #[test]
+    fn test_unindexed_rowid_cutoff() {
+        let mut db = test_db();
+        let photos: Vec<Photo> = (0..5)
+            .map(|i| Photo {
+                id: format!("cutoff_{i}"),
+                location: format!("/tmp/test_cutoff_{i}.jpg"),
+                encoded: String::new(),
+                created: "2024-01-01".to_string(),
+                objects: HashMap::new(),
+                properties: HashMap::new(),
+                latitude: 0.0,
+                longitude: 0.0,
+                favorite: false,
+                indexed: 1,
+                caption: None,
+                aesthetics_score: None,
+                ai_status: AiStatus::default(),
+                sync_needed: true,
+                received: false,
+            })
+            .collect();
+        let _ = db.store_photo_batch(&photos);
+
+        let max_before = db.max_photo_rowid();
+        assert!(max_before > 0);
+
+        // Cutoff at the current max excludes the whole existing backlog.
+        assert_eq!(db.count_unindexed_after(max_before), 0);
+        assert!(db.get_unindexed_photo_ids_after(max_before, 100).is_empty());
+
+        // Photos inserted after the cutoff are picked up.
+        let mut newer = photos[0].clone();
+        newer.id = "cutoff_new".to_string();
+        newer.location = "/tmp/test_cutoff_new.jpg".to_string();
+        let _ = db.store_photo_batch(&[newer]);
+
+        assert_eq!(db.count_unindexed_after(max_before), 1);
+        let ids = db.get_unindexed_photo_ids_after(max_before, 100);
+        assert_eq!(ids, vec!["cutoff_new".to_string()]);
+
+        // Cutoff 0 (option off) sees everything.
+        assert_eq!(db.count_unindexed_after(0), 6);
+
+        // Fully analyzed rows drop out of the filtered set too.
+        db.update_photo_indexed("cutoff_new", 2);
+        assert_eq!(db.count_unindexed_after(max_before), 0);
     }
 
     #[test]

@@ -187,6 +187,8 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
     let pending_count_clone = Arc::clone(&pending_count);
     let abort = Arc::new(AtomicBool::new(false));
     let abort_clone = Arc::clone(&abort);
+    let paused = Arc::new(AtomicBool::new(false));
+    let paused_clone = Arc::clone(&paused);
     let db_path = config_path.clone();
     let callbacks = Arc::new(callbacks);
     let models: Arc<Mutex<Option<LoadedModels>>> = Arc::new(Mutex::new(None));
@@ -295,8 +297,26 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                 }
                 Job::ProcessAll => {
                     let lock = db.lock().unwrap_or_else(|e| e.into_inner());
-                    let photos = lock.get_unindexed_photos_batch(0, 10000);
-                    (photos.iter().map(|p| p.id.clone()).collect(), None, None)
+                    // "Skip existing library": when enabled, only photos added
+                    // after the cutoff rowid are analyzed; the pre-existing
+                    // backlog is left untouched until the option is turned off.
+                    let state = lock.get_state();
+                    let cutoff = if state
+                        .get("analysis_skip_existing")
+                        .is_some_and(|v| v == "true")
+                    {
+                        state
+                            .get("analysis_cutoff_rowid")
+                            .and_then(|v| v.parse::<i64>().ok())
+                            .unwrap_or(0)
+                    } else {
+                        0
+                    };
+                    (
+                        lock.get_unindexed_photo_ids_after(cutoff, 10000),
+                        None,
+                        None,
+                    )
                 }
             };
 
@@ -355,6 +375,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
             let batch_delay_ms = batch_delay_ms_from_config(&config);
 
             let abort_flag = Arc::clone(&abort_clone);
+            let paused_flag = Arc::clone(&paused_clone);
             let db_ref = Arc::clone(&db);
             let pending_count_ref = Arc::clone(&pending_count_clone);
             let faces_dir_ref = faces_dir.clone();
@@ -420,11 +441,25 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                     if abort_flag.load(Ordering::SeqCst) {
                         break;
                     }
+                    while paused_flag.load(Ordering::SeqCst) && !abort_flag.load(Ordering::SeqCst) {
+                        std::thread::sleep(Duration::from_millis(500));
+                    }
+                    if abort_flag.load(Ordering::SeqCst) {
+                        break;
+                    }
 
                     let mut pending_flush: Vec<(String, PhotoResult)> = Vec::new();
                     let mut pending_people: Vec<(String, Vec<f32>)> = Vec::new();
 
                     for photo_id in &batch {
+                        if abort_flag.load(Ordering::SeqCst) {
+                            break;
+                        }
+                        while paused_flag.load(Ordering::SeqCst)
+                            && !abort_flag.load(Ordering::SeqCst)
+                        {
+                            std::thread::sleep(Duration::from_millis(500));
+                        }
                         if abort_flag.load(Ordering::SeqCst) {
                             break;
                         }
@@ -554,6 +589,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
         tx,
         pending_count,
         abort,
+        paused,
         models,
     }
 }

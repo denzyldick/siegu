@@ -191,6 +191,7 @@ impl SyncEvent for TauriSyncEvent {
                     caption: caption.map(|c| c.to_string()),
                     aesthetics_score,
                     indexed: 2,
+                    deleted_at: None,
                 });
             }
         }

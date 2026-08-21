@@ -87,6 +87,7 @@ impl SyncEvent for CliSyncEvent {
             caption: _caption.map(|c| c.to_string()),
             aesthetics_score: _aesthetics_score,
             indexed: 2,
+            deleted_at: None,
         };
         self.on_log(&format!("Metadata updated for {_photo_id}"));
         if let Ok(g) = self.sync_tx.try_lock() {

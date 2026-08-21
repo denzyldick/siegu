@@ -15,6 +15,7 @@ pub struct MlContext {
     pub tx: Sender<Job>,
     pub pending_count: Arc<AtomicUsize>,
     pub abort: Arc<AtomicBool>,
+    pub paused: Arc<AtomicBool>,
     pub models: LoadedModelsHandle,
 }
 

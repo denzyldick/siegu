@@ -13,12 +13,16 @@ const displayEta = computed(() => {
   }
   return null;
 });
+
+function handleShow(): void {
+  scanStore.show();
+}
 </script>
 
 <template>
   <v-slide-y-reverse-transition>
     <div
-      v-if="scanStore.isActive || scanStore.stoppedMessage"
+      v-if="(scanStore.showCollapsedBanner || scanStore.stoppedMessage) && !scanStore.showFullScreen"
       class="progress-banner"
       data-tour="scan-progress"
     >
@@ -36,8 +40,14 @@ const displayEta = computed(() => {
               <template v-if="scanStore.stoppedMessage">
                 <span>{{ t('sync.stopped_resume') }}</span>
               </template>
-              <template v-else-if="scanStore.status === 'scanning'">
-                <span>{{ t('sync.scanning') }}</span>
+              <template v-else-if="scanStore.phase === 'discovering'">
+                <span>{{ t('scan.discovering') }}</span>
+                <span v-if="scanStore.filesFound > 0" class="text-disabled font-weight-regular ml-1">
+                  {{ scanStore.filesFound.toLocaleString() }} {{ t('scan.photos_found') }}
+                </span>
+              </template>
+              <template v-else-if="scanStore.phase === 'paused'">
+                <span class="text-warning">{{ t('scan.paused') }}</span>
               </template>
               <template v-else-if="scanStore.status === 'indexing' || scanStore.indexingCount > 0">
                 <span>{{ t('sync.indexing') }}: </span>
@@ -65,6 +75,16 @@ const displayEta = computed(() => {
                 })
               }}
             </span>
+            <v-btn
+              v-if="scanStore.isActive && !scanStore.stoppedMessage"
+              size="x-small"
+              variant="tonal"
+              color="primary"
+              class="text-none"
+              @click="handleShow"
+            >
+              {{ t('scan.show') }}
+            </v-btn>
             <v-btn
               v-if="scanStore.isActive"
               size="x-small"

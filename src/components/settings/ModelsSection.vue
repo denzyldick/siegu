@@ -53,6 +53,27 @@
       </v-chip>
     </v-sheet>
 
+    <v-sheet
+      class="d-flex align-center justify-space-between px-4 py-3 mb-4 rounded-lg"
+      border
+    >
+      <div class="min-width-0 mr-4">
+        <div class="text-body-2 font-weight-bold text-high-emphasis">
+          {{ $t('settings.analyze_existing') }}
+        </div>
+        <div class="text-caption text-disabled">
+          {{ $t('settings.analyze_existing_hint') }}
+        </div>
+      </div>
+      <v-switch
+        :model-value="analyzeExisting"
+        @update:model-value="toggleAnalyzeExisting"
+        hide-details
+        color="primary"
+        density="compact"
+      ></v-switch>
+    </v-sheet>
+
     <v-row dense>
       <v-col v-for="model in sortedModels" :key="model.id" cols="12" md="6" class="mb-2">
         <v-card
@@ -363,6 +384,7 @@ const {
   downloadedModels,
   selectedModels,
   modelEnabled,
+  analyzeExisting,
   isDownloading,
   isAnyModelProcessing,
   missingSelectedCount,
@@ -393,6 +415,7 @@ const {
   formatIndexingCount,
   formatEta,
   toggleModel,
+  setAnalyzeExisting,
   downloadModels,
   runModel,
   freeMemory,
@@ -419,6 +442,10 @@ function toggleModelSelection(modelId: string): void {
     current.push(modelId);
   }
   store.selectedModels = current;
+}
+
+function toggleAnalyzeExisting(value: boolean | null): void {
+  void setAnalyzeExisting(value === true);
 }
 </script>
 

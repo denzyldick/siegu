@@ -12,7 +12,7 @@ const scanStore = useScanStore();
 
 const navItems = [
   { page: 'home' as const, icon: null, tour: 'dock-home', useLogo: true },
-  { page: 'albums' as const, icon: 'mdi-image-album', tour: 'dock-albums', useLogo: false },
+  { page: 'collections' as const, icon: 'mdi-album', tour: 'dock-collections', useLogo: false },
   { page: 'location' as const, icon: 'mdi-map-outline', tour: 'dock-map', useLogo: false },
   { page: 'devices' as const, icon: 'mdi-laptop', tour: 'dock-devices', useLogo: false },
   { page: 'settings' as const, icon: 'mdi-cog-outline', tour: 'dock-settings', useLogo: false },
@@ -41,7 +41,7 @@ const tooltipText = computed(() => {
   return statusLabel.value;
 });
 
-function navigate(page: 'home' | 'albums' | 'location' | 'devices' | 'settings'): void {
+function navigate(page: 'home' | 'collections' | 'location' | 'devices' | 'settings'): void {
   uiStore.setPage(page);
 }
 </script>

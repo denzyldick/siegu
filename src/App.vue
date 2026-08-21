@@ -14,13 +14,15 @@ import AppToolbar from '@/components/layout/AppToolbar.vue';
 import SyncStatusBanner from '@/components/layout/SyncStatusBanner.vue';
 import OnboardingFlow from '@/components/onboarding/OnboardingFlow.vue';
 import MediaLibrary from '@/components/MediaLibrary.vue';
-import AlbumsView from '@/components/AlbumsView.vue';
+import CollectionsView from '@/components/CollectionsView.vue';
 import MapView from '@/components/MapView.vue';
 import DeviceList from '@/components/DeviceList.vue';
 import SettingsView from '@/components/SettingsView.vue';
 import GuidedTour from '@/components/GuidedTour.vue';
 import ErrorBoundary from '@/components/shared/ErrorBoundary.vue';
 import PersonMatchControls from '@/components/search/PersonMatchControls.vue';
+import ScanExperience from '@/components/ScanExperience.vue';
+import ProgressBanner from '@/components/layout/ProgressBanner.vue';
 
 const { t } = useI18n();
 const appStore = useAppStore();
@@ -145,6 +147,8 @@ function removeFilterChip(index: number): void {
     </template>
 
     <template v-else>
+      <ScanExperience />
+
       <AppToolbar v-if="currentPage === 'home'" />
 
       <v-main>
@@ -187,13 +191,14 @@ function removeFilterChip(index: number): void {
               @search-person="handleSearchPerson"
             />
           </div>
-          <AlbumsView v-if="currentPage === 'albums'" />
+          <CollectionsView v-if="currentPage === 'collections'" />
           <MapView v-if="currentPage === 'location'" />
           <DeviceList v-if="currentPage === 'devices'" />
           <SettingsView v-if="currentPage === 'settings'" @done="uiStore.setPage('home')" />
         </ErrorBoundary>
       </v-main>
 
+      <ProgressBanner />
       <AppDock />
     </template>
 
@@ -209,7 +214,7 @@ function removeFilterChip(index: number): void {
       </div>
     </v-snackbar>
     <GuidedTour
-      :active="appStore.showTour"
+      :active="appStore.showTour && !scanStore.showFullScreen"
       @finish="appStore.dismissTour()"
       @skip="appStore.dismissTour()"
     />

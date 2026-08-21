@@ -112,6 +112,8 @@ pub enum SyncMessage {
         caption: Option<String>,
         aesthetics_score: Option<f64>,
         indexed: i32,
+        #[serde(default)]
+        deleted_at: Option<String>,
     },
     VersionNegotiate {
         version: u8,
@@ -1002,10 +1004,23 @@ impl MeshManager {
                 caption,
                 aesthetics_score,
                 indexed,
+                deleted_at,
             } => {
                 let db = Database::new(config_path);
-                db.update_photo_metadata(&photo_id, caption.as_deref(), aesthetics_score, indexed);
-                event.on_log(&format!("Metadata updated for {photo_id}"));
+                if let Some(ref dt) = deleted_at {
+                    if !dt.is_empty() {
+                        let _ = db.trash_photo(&photo_id);
+                        event.on_log(&format!("Photo {photo_id} trashed by peer"));
+                    }
+                } else {
+                    db.update_photo_metadata(
+                        &photo_id,
+                        caption.as_deref(),
+                        aesthetics_score,
+                        indexed,
+                    );
+                    event.on_log(&format!("Metadata updated for {photo_id}"));
+                }
             }
             SyncMessage::VersionNegotiate {
                 version,
@@ -1428,6 +1443,7 @@ mod tests {
             caption: Some("A beautiful sunset".to_string()),
             aesthetics_score: Some(0.95),
             indexed: 2,
+            deleted_at: None,
         };
         let json = serde_json::to_string(&msg).unwrap();
         let decoded: SyncMessage = serde_json::from_str(&json).unwrap();
@@ -1437,11 +1453,13 @@ mod tests {
                 caption,
                 aesthetics_score,
                 indexed,
+                deleted_at,
             } => {
                 assert_eq!(photo_id, "photo-1");
                 assert_eq!(caption, Some("A beautiful sunset".to_string()));
                 assert_eq!(aesthetics_score, Some(0.95));
                 assert_eq!(indexed, 2);
+                assert_eq!(deleted_at, None);
             }
             _ => panic!("Expected MetadataUpdate"),
         }

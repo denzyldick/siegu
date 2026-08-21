@@ -117,7 +117,7 @@ pub async fn resolve_photo_locations(app: tauri::AppHandle) -> Result<(), String
     })
     .await
     .map_err(|e| e.to_string())?;
-    emit_log(&app, format!("Resolved {} photo locations", resolved));
+    emit_log(&app, format!("Found places for {resolved} photos."));
     Ok(())
 }
 

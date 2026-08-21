@@ -258,6 +258,7 @@ async fn two_joiners_connect_with_initiator_flag() {
             caption: Some("two-joiner caption".to_string()),
             aesthetics_score: Some(0.25),
             indexed: 3,
+            deleted_at: None,
         })
         .await
         .expect("send_message should succeed once channel is open");

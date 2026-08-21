@@ -25,18 +25,19 @@
           <v-btn
             variant="flat"
             color="rgb(var(--v-theme-surface))"
-            class="px-6 rounded-xl text-none font-weight-bold"
+            class="px-3 px-sm-6 rounded-xl text-none font-weight-bold"
             size="small"
+            :aria-label="$t('albums.remove_from_album')"
             @click="bulkRemoveFromAlbum"
           >
-            <v-icon size="16" class="mr-2">mdi-minus-circle-outline</v-icon>
-            {{ $t('albums.remove_from_album') }}
+            <v-icon size="16">mdi-minus-circle-outline</v-icon>
+            <span class="d-none d-sm-inline ml-2">{{ $t('albums.remove_from_album') }}</span>
           </v-btn>
         </v-sheet>
       </div>
     </v-fade-transition>
 
-    <template v-if="!currentSectionItem">
+    <template v-if="!currentSectionItem && !trashView">
       <div class="d-flex align-center px-2 mb-4">
         <div>
           <h1 class="text-h5 font-weight-bold text-high-emphasis letter-spacing-tight">
@@ -46,81 +47,99 @@
         </div>
         <v-spacer></v-spacer>
         <v-btn
-          variant="text"
-          class="mr-1"
-          :title="$t('albums.restore_trips')"
-          :aria-label="$t('albums.restore_trips')"
-          @click="restoreTrips"
+          variant="flat"
+          color="primary"
+          class="new-album-btn px-3 px-sm-6"
+          :aria-label="$t('albums.new_album')"
+          @click="openNewAlbumDialog"
         >
-          <v-icon size="18">mdi-undo</v-icon>
+          <v-icon size="18">mdi-plus</v-icon>
+          <span class="d-none d-sm-inline ml-2">{{ $t('albums.new_album') }}</span>
         </v-btn>
-        <v-btn variant="flat" color="primary" class="px-6" @click="openNewAlbumDialog">
-          <v-icon start size="18">mdi-plus</v-icon>
-          {{ $t('albums.new_album') }}
-        </v-btn>
+      </div>
+
+      <div class="d-flex ga-3 mb-6 px-2">
+        <v-chip
+          v-if="favoritesCount > 0"
+          variant="tonal"
+          color="primary"
+          size="large"
+          class="shortcut-chip"
+          @click="openFavorites"
+        >
+          <v-icon start size="18">mdi-heart</v-icon>
+          {{ $t('albums.section_favorites') }} ({{ favoritesCount }})
+        </v-chip>
+        <v-chip
+          v-if="trashCount > 0"
+          variant="tonal"
+          color="error"
+          size="large"
+          class="shortcut-chip"
+          @click="openTrash"
+        >
+          <v-icon start size="18">mdi-delete-outline</v-icon>
+          {{ $t('albums.section_trash') }} ({{ trashCount }})
+        </v-chip>
       </div>
 
       <PageLoading v-if="!hasAnyItems && albumsStore.sectionsLoading" class="py-12" />
       <template v-else-if="hasAnyItems">
-        <div v-for="section in sections" :key="section.id" class="mb-8">
-          <div v-if="section.items.length > 0" class="animate-fade-in">
-            <div class="d-flex align-center px-2 mb-3">
-              <h2
-                class="section-title text-subtitle-1 font-weight-bold text-high-emphasis flex-grow-1"
-              >
-                {{ sectionTitle(section.id) }}
-              </h2>
-              <v-btn
-                v-if="section.id === 'people'"
-                size="small"
-                variant="text"
-                class="ml-1"
-                @click="togglePeopleManage"
-              >
-                <v-icon start size="13">mdi-account-edit-outline</v-icon>
-                {{ $t('albums.manage_people') }}
-              </v-btn>
-            </div>
-            <div class="album-grid" :style="{ gridTemplateColumns: `repeat(${columns}, 1fr)` }">
-              <div
-                v-for="item in section.items"
-                :key="item.id"
-                class="album-card"
-                @click="openSectionItem(item)"
-              >
-                <div class="album-cover">
-                  <img
-                    v-if="tileSrc(item)"
-                    :src="tileSrc(item)"
-                    :alt="item.name"
-                    loading="lazy"
-                    class="album-cover-img"
-                  />
-                  <div v-else class="album-cover-placeholder d-flex align-center justify-center">
-                    <v-icon size="44" color="rgba(var(--v-theme-on-surface), 0.25)">{{
-                      tileIcon(item.kind)
-                    }}</v-icon>
-                  </div>
-                  <div class="album-count">
-                    <v-icon size="12">mdi-image</v-icon>
-                    {{ $t('albums.items_count', { count: item.count }) }}
-                  </div>
+        <div class="collections-grid mb-6">
+          <div
+            v-for="section in gridSections"
+            :key="section.id"
+            class="collection-tile"
+            @click="openSectionItem(section.items[0])"
+          >
+            <div class="tile-preview">
+              <template v-if="section.items.length >= 4">
+                <div class="tile-mosaic">
+                  <template v-for="(mosaicItem, i) in section.items.slice(0, 4)" :key="i">
+                    <img
+                      v-if="tileSrc(mosaicItem)"
+                      :src="tileSrc(mosaicItem)"
+                      :alt="mosaicItem.name"
+                      loading="lazy"
+                      class="mosaic-img"
+                    />
+                    <div v-else class="mosaic-placeholder d-flex align-center justify-center">
+                      <v-icon size="24" color="rgba(var(--v-theme-on-surface), 0.25)">{{ tileIcon(section.id) }}</v-icon>
+                    </div>
+                  </template>
                 </div>
-                <div class="album-name text-subtitle-2 font-weight-bold text-high-emphasis">
-                  {{ item.name }}
+              </template>
+              <template v-else-if="section.items.length > 0">
+                <img
+                  v-if="tileSrc(section.items[0])"
+                  :src="tileSrc(section.items[0])"
+                  :alt="section.items[0].name"
+                  loading="lazy"
+                  class="tile-cover-img"
+                />
+                <div v-else class="tile-cover-placeholder d-flex align-center justify-center">
+                  <v-icon size="44" color="rgba(var(--v-theme-on-surface), 0.25)">{{ tileIcon(section.id) }}</v-icon>
                 </div>
+              </template>
+              <div v-else class="tile-cover-placeholder d-flex align-center justify-center">
+                <v-icon size="44" color="rgba(var(--v-theme-on-surface), 0.25)">{{ tileIcon(section.id) }}</v-icon>
               </div>
             </div>
-            <div v-if="section.id === 'people' && peopleManageOpen" class="mt-6">
-              <PeopleManagePanel
-                :faces="unnamedFaces"
-                :indexing-count="indexingCount"
-                @start-indexing="startPeopleIndexing"
-                @view-cluster="handleViewCluster"
-                @prompt-name="promptName"
-              />
+            <div class="tile-label d-flex align-center justify-space-between">
+              <span class="text-subtitle-2 font-weight-bold text-high-emphasis">{{ sectionTitle(section.id) }}</span>
+              <span class="text-caption text-disabled">{{ section.items.length }} {{ section.id === 'people' || section.id === 'places' || section.id === 'trips' ? '' : '' }}</span>
             </div>
           </div>
+        </div>
+
+        <div v-if="hasPeopleSection && peopleManageOpen" class="mb-8">
+          <PeopleManagePanel
+            :faces="unnamedFaces"
+            :indexing-count="indexingCount"
+            @start-indexing="startPeopleIndexing"
+            @view-cluster="handleViewCluster"
+            @prompt-name="promptName"
+          />
         </div>
         <div v-if="showPeopleManageFallback" class="mb-8">
           <PeopleManagePanel
@@ -137,22 +156,81 @@
         v-else
         class="empty-state-container d-flex flex-column align-center justify-center text-center"
       >
-        <div class="empty-state-icon mb-6">
-          <v-icon size="80" color="rgba(var(--v-theme-on-surface), 0.25)">mdi-image-album</v-icon>
+        <div
+          class="create-album-card"
+          role="button"
+          tabindex="0"
+          :aria-label="$t('albums.new_album')"
+          @click="openNewAlbumDialog"
+          @keydown.enter.prevent="openNewAlbumDialog"
+          @keydown.space.prevent="openNewAlbumDialog"
+        >
+          <div class="create-album-icon mb-4">
+            <v-icon size="28" color="rgb(var(--v-theme-primary))">mdi-plus</v-icon>
+          </div>
+          <h3 class="text-h6 font-weight-bold text-high-emphasis mb-1">
+            {{ $t('albums.no_albums') }}
+          </h3>
+          <p class="text-body-2 text-medium-emphasis mb-5">{{ $t('albums.no_albums_hint') }}</p>
+          <div class="benefit-list text-left">
+            <div v-for="benefit in albumBenefits" :key="benefit.icon" class="benefit-item">
+              <v-icon size="18" color="primary">{{ benefit.icon }}</v-icon>
+              <span class="text-body-2 text-medium-emphasis">{{ benefit.text }}</span>
+            </div>
+          </div>
         </div>
-        <h3 class="text-h5 font-weight-bold text-high-emphasis mb-2">
-          {{ $t('albums.no_albums') }}
-        </h3>
-        <p class="text-body-1 text-medium-emphasis max-w-400 mx-auto mb-8">
-          {{ $t('albums.no_albums_hint') }}
-        </p>
-        <v-btn variant="flat" class="px-8 py-6" color="primary" @click="openNewAlbumDialog">
-          {{ $t('albums.new_album') }}
-        </v-btn>
       </div>
     </template>
 
-    <template v-else>
+    <template v-if="trashView">
+      <div class="d-flex align-center px-2 mb-4">
+        <v-btn icon variant="text" size="small" @click="closeTrash">
+          <v-icon size="20">mdi-arrow-left</v-icon>
+        </v-btn>
+        <div class="ml-2">
+          <h1 class="text-h6 font-weight-bold text-high-emphasis letter-spacing-tight">
+            {{ $t('albums.section_trash') }}
+          </h1>
+          <p class="text-caption text-disabled">
+            {{ trashPhotos.length }} {{ $t('albums.items_count', { count: trashPhotos.length }) }}
+          </p>
+        </div>
+        <v-spacer></v-spacer>
+        <v-btn
+          variant="flat"
+          color="error"
+          class="px-3 px-sm-4"
+          size="small"
+          :aria-label="$t('albums.empty_trash')"
+          @click="handleEmptyTrash"
+        >
+          <v-icon size="16">mdi-delete-sweep</v-icon>
+          <span class="d-none d-sm-inline ml-2">{{ $t('albums.empty_trash') }}</span>
+        </v-btn>
+      </div>
+      <PageLoading v-if="trashLoading" class="py-12" />
+      <div v-else-if="trashPhotos.length > 0" class="photo-row" :style="{ gridTemplateColumns: `repeat(${columns}, 1fr)` }">
+        <div v-for="photo in trashPhotos" :key="photo.id" class="trash-photo-wrapper">
+          <MediaCard :path="photo" :selected="false" :selection-mode="false" @click="() => {}" />
+          <div class="trash-actions d-flex ga-1">
+            <v-btn size="x-small" variant="flat" color="primary" @click="handleRestorePhoto(String(photo.id))">
+              <v-icon size="14">mdi-restore</v-icon>
+            </v-btn>
+            <v-btn size="x-small" variant="flat" color="error" @click="handleDeleteForever(String(photo.id))">
+              <v-icon size="14">mdi-delete</v-icon>
+            </v-btn>
+          </div>
+        </div>
+      </div>
+      <div v-else class="empty-state-container d-flex flex-column align-center justify-center text-center py-12">
+        <v-icon size="80" color="rgba(var(--v-theme-on-surface), 0.25)">mdi-delete-empty-outline</v-icon>
+        <h3 class="text-h5 font-weight-bold text-high-emphasis mb-2 mt-4">
+          {{ $t('albums.trash_empty') }}
+        </h3>
+      </div>
+    </template>
+
+    <template v-if="currentSectionItem && !trashView">
       <div class="d-flex align-center px-2 mb-2">
         <v-btn icon variant="text" size="small" :aria-label="$t('albums.back')" @click="closeAlbum">
           <v-icon size="20">mdi-arrow-left</v-icon>
@@ -167,9 +245,23 @@
               <span class="mx-1">·</span>
             </template>
             {{ $t('albums.items_count', { count: items.length }) }}
+            <template v-if="isTrip && tripDateRange">
+              <span class="mx-1">·</span>
+              {{ tripDateRange }}
+            </template>
           </p>
         </div>
         <v-spacer></v-spacer>
+        <v-btn
+          v-if="isTrip"
+          icon
+          variant="text"
+          size="small"
+          :aria-label="$t('albums.view_map')"
+          @click="openTripMap"
+        >
+          <v-icon size="20">mdi-map-outline</v-icon>
+        </v-btn>
         <v-menu v-if="currentSectionItem?.album || currentSectionItem?.kind === 'person'">
           <template v-slot:activator="{ props: menuProps }">
             <v-btn v-bind="menuProps" icon variant="text" size="small">
@@ -336,7 +428,8 @@
             v-else-if="!searching && !allLoaded && items.length > 0"
             @click="loadMore"
             variant="outlined"
-            class="px-10 py-6"
+            size="small"
+            class="px-4"
           >
             {{ $t('albums.load_more') }}
           </v-btn>
@@ -368,7 +461,6 @@
           <v-btn
             variant="flat"
             color="primary"
-            class="px-6"
             :disabled="!newAlbumName.trim()"
             :loading="creating"
             @click="createAlbum"
@@ -396,7 +488,6 @@
           <v-btn
             variant="flat"
             color="primary"
-            class="px-6"
             :disabled="!renameName.trim()"
             @click="renameCurrentAlbum"
           >
@@ -414,7 +505,7 @@
         <p class="text-body-2 text-medium-emphasis mb-4">{{ $t('albums.delete_confirm') }}</p>
         <div class="d-flex justify-end ga-2">
           <v-btn variant="text" @click="confirmDelete = false">{{ $t('common.cancel') }}</v-btn>
-          <v-btn variant="flat" color="error" class="px-6" @click="deleteCurrentAlbum">
+          <v-btn variant="flat" color="error" @click="deleteCurrentAlbum">
             {{ $t('common.delete') }}
           </v-btn>
         </div>
@@ -455,6 +546,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller';
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
 import { useI18n } from 'vue-i18n';
+import { listen } from '@tauri-apps/api/event';
 import MediaCard from '@/components/MediaCard.vue';
 import MediaViewer from '@/components/MediaViewer.vue';
 import PeopleManagePanel from '@/components/people/PeopleManagePanel.vue';
@@ -465,6 +557,7 @@ import PageLoading from '@/components/shared/PageLoading.vue';
 import { useAlbumsStore } from '@/stores/albums';
 import { useSearchStore } from '@/stores/search';
 import { useUiStore } from '@/stores/ui';
+import { useMapFilterStore } from '@/stores/mapFilter';
 import { usePeople } from '@/composables/usePeople';
 import { toggleFavorite, listFiles } from '@/services/tauri';
 import { getFaceImageSrc } from '@/composables/useMediaUtils';
@@ -497,6 +590,40 @@ const hasAnyItems = computed(() => sections.value.some((s) => s.items.length > 0
 const openedItem = ref<AlbumSectionItem | null>(null);
 const currentSectionItem = computed(() => openedItem.value);
 const isManualAlbum = computed(() => openedItem.value?.kind === 'manual');
+const isTrip = computed(() => openedItem.value?.kind === 'trip');
+
+const tripDateRange = computed(() => {
+  const album = currentSectionItem.value?.album;
+  if (!album?.rule) return null;
+  try {
+    const rule = JSON.parse(album.rule);
+    const from = rule.date_from as string | undefined;
+    const to = rule.date_to as string | undefined;
+    if (!from && !to) return null;
+    const fmtDate = (s: string) => {
+      const d = s.slice(0, 10);
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const m = parseInt(d.slice(5, 7), 10) - 1;
+      const day = parseInt(d.slice(8, 10), 10);
+      const year = d.slice(0, 4);
+      return `${months[m]} ${day}, ${year}`;
+    };
+    if (from && to) {
+      const fromShort = from.slice(0, 10);
+      const toShort = to.slice(0, 10);
+      if (fromShort === toShort) return fmtDate(from);
+      if (fromShort.slice(0, 7) === toShort.slice(0, 7)) {
+        const m = parseInt(fromShort.slice(5, 7), 10) - 1;
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return `${months[m]} ${parseInt(fromShort.slice(8, 10), 10)} – ${parseInt(toShort.slice(8, 10), 10)}, ${fromShort.slice(0, 4)}`;
+      }
+      return `${fmtDate(from)} – ${fmtDate(to)}`;
+    }
+    return from ? fmtDate(from) : fmtDate(to!);
+  } catch {
+    return null;
+  }
+});
 
 const PAGE_SIZE = 60;
 const items = ref<MediaItem[]>([]);
@@ -537,6 +664,72 @@ const showPeopleManageFallback = computed(
 const searching = computed(() => query.value.trim().length > 0);
 const selectionActive = computed(() => selectedIds.value.length > 0);
 const displayItems = computed(() => (searching.value ? searchResults.value : items.value));
+
+const albumBenefits = computed(() => [
+  { icon: 'mdi-image-multiple-outline', text: t('albums.benefit_organize') },
+  { icon: 'mdi-auto-fix', text: t('albums.benefit_smart') },
+  { icon: 'mdi-shield-lock-outline', text: t('albums.benefit_private') },
+]);
+
+// Grid sections for the 2x2 tile layout (favorites, trash, people, places, trips, albums, documents)
+const gridSections = computed(() => {
+  return sections.value.filter(s =>
+    ['favorites', 'trash', 'people', 'places', 'trips', 'albums', 'documents'].includes(s.id)
+  );
+});
+
+// Trash view state
+const trashView = ref(false);
+const trashPhotos = ref<MediaItem[]>([]);
+const trashLoading = ref(false);
+const trashCount = computed(() => {
+  const trashSection = sections.value.find(s => s.id === 'trash');
+  return trashSection?.items[0]?.count ?? 0;
+});
+const favoritesCount = computed(() => {
+  const favSection = sections.value.find(s => s.id === 'favorites');
+  return favSection?.items.length ?? 0;
+});
+
+async function openTrash(): Promise<void> {
+  trashView.value = true;
+  trashLoading.value = true;
+  try {
+    const { listTrash } = await import('@/services/tauri');
+    trashPhotos.value = await listTrash(200);
+  } catch (e) {
+    console.error('[Collections] Failed to load trash:', e);
+  } finally {
+    trashLoading.value = false;
+  }
+}
+
+function closeTrash(): void {
+  trashView.value = false;
+  trashPhotos.value = [];
+}
+
+async function handleRestorePhoto(id: string): Promise<void> {
+  const { restorePhoto } = await import('@/services/tauri');
+  await restorePhoto(id);
+  trashPhotos.value = trashPhotos.value.filter(p => String(p.id) !== id);
+  await albumsStore.loadSections();
+}
+
+async function handleDeleteForever(id: string): Promise<void> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('delete_photo_permanently', { id });
+  trashPhotos.value = trashPhotos.value.filter(p => String(p.id) !== id);
+  await albumsStore.loadSections();
+}
+
+async function handleEmptyTrash(): Promise<void> {
+  const { emptyTrash } = await import('@/services/tauri');
+  await emptyTrash();
+  trashPhotos.value = [];
+  await albumsStore.loadSections();
+  closeTrash();
+}
 
 const useVirtualScroller = computed(
   () => typeof IntersectionObserver !== 'undefined' && displayItems.value.length > 48,
@@ -582,6 +775,16 @@ function tileIcon(kind: string): string {
       return 'mdi-airplane';
     case 'smart':
       return 'mdi-auto-fix';
+    case 'favorites':
+      return 'mdi-heart';
+    case 'trash':
+      return 'mdi-delete-outline';
+    case 'places':
+      return 'mdi-map-marker';
+    case 'albums':
+      return 'mdi-image-multiple-outline';
+    case 'documents':
+      return 'mdi-file-document-outline';
     default:
       return 'mdi-image-multiple-outline';
   }
@@ -639,6 +842,26 @@ function closeAlbum(): void {
   resetContents();
 }
 
+function openTripMap(): void {
+  const album = openedItem.value?.album;
+  if (!album?.rule) return;
+  try {
+    const rule = JSON.parse(album.rule);
+    uiStore.setPage('location');
+    const mapStore = useMapFilterStore();
+    mapStore.setDateRange(rule.date_from ?? null, rule.date_to ?? null);
+  } catch {
+    uiStore.setPage('location');
+  }
+}
+
+function openFavorites(): void {
+  const favSection = sections.value.find(s => s.id === 'favorites');
+  if (favSection && favSection.items.length > 0) {
+    openSectionItem(favSection.items[0]);
+  }
+}
+
 function editSmartAlbumRules(): void {
   const album = openedItem.value?.album;
   if (!album || album.kind !== 'smart' || !album.rule) return;
@@ -652,16 +875,6 @@ function editSmartAlbumRules(): void {
   albumsStore.startEditingSmartAlbum(album);
   uiStore.setPage('home');
   closeAlbum();
-}
-
-async function restoreTrips(): Promise<void> {
-  await albumsStore.clearDismissedTrips();
-  showMessage(t('albums.trips_restored'));
-}
-
-function togglePeopleManage(): void {
-  peopleManageOpen.value = !peopleManageOpen.value;
-  if (peopleManageOpen.value) void fetchPeopleData();
 }
 
 function isPersonItem(item: AlbumSectionItem): boolean {
@@ -728,6 +941,15 @@ function baseFilterOptions(): Omit<ListFilesOptions, 'offset' | 'limit'> {
   if (item.kind === 'person' && item.id.startsWith('person:')) {
     return { personIds: [item.id.slice('person:'.length)], personMatch: 'and' };
   }
+  if (item.kind === 'favorites') {
+    return { favoritesOnly: true };
+  }
+  if (item.kind === 'location' && item.id.startsWith('location:')) {
+    return { location: item.id.slice('location:'.length) };
+  }
+  if (item.kind === 'document') {
+    return { papers: true };
+  }
   return { albumId: item.id };
 }
 
@@ -737,7 +959,7 @@ async function loadContents(): Promise<void> {
   loadingContents.value = true;
   try {
     let photos: MediaItem[];
-    if (item.kind === 'person') {
+    if (item.kind === 'person' || item.kind === 'favorites' || item.kind === 'location' || item.kind === 'document') {
       photos = await listFiles({
         offset: offset.value,
         limit: PAGE_SIZE,
@@ -927,15 +1149,21 @@ function computeColumns(): void {
   else columns.value = 5;
 }
 
-onMounted(() => {
+let unlistenRefreshed: (() => void) | null = null;
+
+onMounted(async () => {
   computeColumns();
   window.addEventListener('resize', computeColumns);
   void albumsStore.loadSections();
+  unlistenRefreshed = await listen('photos-refreshed', () => {
+    void albumsStore.loadSections();
+  });
 });
 
 onUnmounted(() => {
   window.removeEventListener('resize', computeColumns);
   if (searchTimer) clearTimeout(searchTimer);
+  unlistenRefreshed?.();
 });
 </script>
 
@@ -945,9 +1173,68 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
-.album-grid {
+.collections-grid {
   display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
+}
+
+.collection-tile {
+  cursor: pointer;
+  border-radius: 20px;
+  overflow: hidden;
+  background: rgb(var(--v-theme-surface-light));
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+}
+
+.collection-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.tile-preview {
+  aspect-ratio: 1.2;
+  overflow: hidden;
+}
+
+.tile-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tile-cover-placeholder {
+  width: 100%;
+  height: 100%;
+}
+
+.tile-mosaic {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  height: 100%;
+}
+
+.mosaic-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mosaic-placeholder {
+  width: 100%;
+  height: 100%;
+  background: rgb(var(--v-theme-surface-light));
+}
+
+.tile-label {
+  padding: 12px 16px;
+}
+
+.shortcut-chip {
+  cursor: pointer;
+  font-weight: 600;
 }
 
 .section-title {
@@ -956,60 +1243,20 @@ onUnmounted(() => {
   font-size: 12px;
 }
 
-.album-card {
-  cursor: pointer;
-  transition: transform 0.2s ease;
-}
-
-.album-card:hover {
-  transform: translateY(-2px);
-}
-
-.album-cover {
-  position: relative;
-  aspect-ratio: 1;
-  border-radius: 24px;
-  overflow: hidden;
-  background: rgb(var(--v-theme-surface-light));
-}
-
-.album-cover-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.album-cover-placeholder {
-  width: 100%;
-  height: 100%;
-}
-
-.album-count {
-  position: absolute;
-  bottom: 8px;
-  left: 8px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  backdrop-filter: blur(4px);
-}
-
-.album-name {
-  margin-top: 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .photo-row {
   display: grid;
   gap: 8px;
+}
+
+.trash-photo-wrapper {
+  position: relative;
+}
+
+.trash-actions {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  z-index: 10;
 }
 
 .drag-item {
@@ -1032,6 +1279,74 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.create-album-card {
+  width: 100%;
+  max-width: 340px;
+  padding: 32px 24px;
+  border-radius: 20px;
+  background: rgb(var(--v-theme-surface-light));
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  cursor: pointer;
+  transition:
+    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.create-album-card:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.create-album-card:active {
+  transform: scale(0.98);
+}
+
+.create-album-card:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
+}
+
+.create-album-icon {
+  width: 64px;
+  height: 64px;
+  margin-left: auto;
+  margin-right: auto;
+  border-radius: 9999px;
+  background: rgba(var(--v-theme-primary), 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.benefit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.benefit-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@media (max-width: 600px) {
+  .empty-state-icon {
+    width: 88px;
+    height: 88px;
+  }
+
+  .empty-state-icon :deep(.v-icon),
+  .empty-state-container > .v-icon {
+    font-size: 48px !important;
+  }
+
+  .create-album-card {
+    padding: 24px 18px;
+    max-width: 100%;
+  }
 }
 
 .bulk-toolbar-container {

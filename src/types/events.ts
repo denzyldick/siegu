@@ -1,5 +1,5 @@
 import type { MediaItem } from './media';
-import type { ScanProgress, IndexingProgress } from './scan';
+import type { ScanProgress, IndexingProgress, AnalysisActivity } from './scan';
 import type { SyncProgress, PeerDevice } from './sync';
 import type { ModelProgress, DownloadProgress } from './models';
 
@@ -78,11 +78,20 @@ export interface RoomCodeEvent {
   payload: string;
 }
 
+export interface ScanLogEvent {
+  payload: string;
+}
+
+export interface AnalysisActivityEvent {
+  payload: AnalysisActivity;
+}
+
 export type TauriEventMap = {
   'scan-progress': ScanProgressEvent;
   'indexing-progress': IndexingProgressEvent;
   'indexing-eta': IndexingEtaEvent;
   'indexing-job': IndexingJobEvent;
+  'analysis-activity': AnalysisActivityEvent;
   'media-received': MediaReceivedEvent;
   'media-synced': MediaSyncedEvent;
   'media-analysis-result': MediaAnalysisResultEvent;
@@ -95,6 +104,7 @@ export type TauriEventMap = {
   'peer-connected': PeerConnectedEvent;
   'peer-disconnected': PeerDisconnectedEvent;
   'room-code': RoomCodeEvent;
+  'scan-log': ScanLogEvent;
 };
 
 export type TauriEventName = keyof TauriEventMap;
