@@ -1,9 +1,0 @@
-{
-  "name": "siegu-landing-page",
-  "version": "1.0.0",
-  "description": "Landing page for Siegu",
-  "main": "server.js",
-  "dependencies": {
-    "express": "^4.18.2"
-  }
-}
