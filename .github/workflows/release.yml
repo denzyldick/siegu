@@ -288,49 +288,6 @@ jobs:
           tag_name: ${{ github.ref_name }}
           files: src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
 
-  # ── Arch Linux AppImage ─────────────────────────────────────────────────
-  arch:
-    needs: [ci-gate]
-    permissions:
-      contents: write
-    runs-on: ubuntu-24.04
-    env:
-      ORT_STRATEGY: download
-    container:
-      image: archlinux:base-devel
-    # FFmpeg is bundled (features = ["build"]), so the rolling-Arch FFmpeg no
-    # longer affects this build. The job is still allowed to fail without
-    # blocking the release so any Arch-specific issue stays visible.
-    continue-on-error: true
-    steps:
-      - name: Install dependencies
-        run: |
-          pacman -Syu --noconfirm
-          # clang provides libclang, which ffmpeg-sys-next's bindgen step
-          # requires while generating FFI bindings for the bundled FFmpeg build.
-          pacman -S --noconfirm git nodejs npm rustup webkit2gtk-4.1 libayatana-appindicator librsvg xdotool openssl sudo yarn xdg-utils fuse2 ffmpeg nasm pkgconf clang
-
-          useradd -m -G wheel builder
-          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-
-      - uses: actions/checkout@v4
-
-      - name: Build Arch AppImage
-        run: |
-          chown -R builder:builder .
-          su builder -c "
-            rustup default stable
-            npm ci
-            APPIMAGE_EXTRACT_AND_RUN=1 npm run tauri build -- --bundles appimage
-          "
-
-      - name: Upload Arch AppImage
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: src-tauri/target/release/bundle/appimage/*.AppImage
-
   # ── iOS ─────────────────────────────────────────────────────────────────
   ios:
     needs: [ci-gate]
