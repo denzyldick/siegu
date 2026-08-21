@@ -64,7 +64,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     env:
       ORT_STRATEGY: download
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
@@ -141,9 +141,13 @@ jobs:
             && DECODED="$(printf '%s' "$KEY" | base64 -d 2>/dev/null)" \
             && printf '%s' "$DECODED" | iconv -f UTF-8 -t UTF-8 >/dev/null 2>&1 \
             && printf '%s' "$DECODED" | grep -q 'encrypted secret key'; then
-            mkdir -p ~/.tauri
-            printf '%s' "$KEY" > ~/.tauri/siegu.key
-            echo "TAURI_SIGNING_PRIVATE_KEY=$HOME/.tauri/siegu.key" >> "$GITHUB_ENV"
+            # Write into the workspace and export a workspace-relative path:
+            # a $HOME-based path is shell-specific (git-bash on Windows yields
+            # /home/runneradmin/..., which the Rust build cannot resolve, so
+            # tauri then misreads the path string itself as the key).
+            KEYFILE="$GITHUB_WORKSPACE/.tauri-signing.key"
+            printf '%s' "$KEY" > "$KEYFILE"
+            echo "TAURI_SIGNING_PRIVATE_KEY=$KEYFILE" >> "$GITHUB_ENV"
             echo "SIGNING_READY=true" >> "$GITHUB_ENV"
           else
             echo "::warning::TAURI_SIGNING_PRIVATE_KEY missing or malformed (not a valid minisign key box); building unsigned installers."
@@ -273,6 +277,16 @@ jobs:
           mkdir -p src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a
           cp target/aarch64-linux-android/release/libsiegu_lib.so \
              src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a/
+
+      # app/build.gradle.kts signs releases with the debug keystore at
+      # ~/.android/debug.keystore (standard Android debug credentials). That
+      # file does not exist on fresh runners, and generating a random one per
+      # run would change the APK signature every release, so a fixed keystore
+      # is stored in ANDROID_KEYSTORE_B64.
+      - name: Restore signing keystore
+        run: |
+          mkdir -p ~/.android
+          echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > ~/.android/debug.keystore
 
       - name: Build APK
         working-directory: src-tauri/gen/android
