@@ -73,6 +73,9 @@ jobs:
         shell: pwsh
         run: |
           $bin = Join-Path '${{ steps.msys2.outputs.msys2-location }}' 'usr\bin'
+          # coreutils' link.exe would shadow MSVC's linker (rustc resolves
+          # link.exe via PATH) and break every Rust link step.
+          Remove-Item (Join-Path $bin 'link.exe') -Force -ErrorAction SilentlyContinue
           Write-Host "Prepending $bin to PATH"
           Add-Content $env:GITHUB_PATH $bin
 
