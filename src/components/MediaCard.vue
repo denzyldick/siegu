@@ -5,10 +5,26 @@
     :class="{ 'is-selected': selected, 'selection-active': selectionMode }"
     @click="handleClick"
   >
-    <div class="media-card-wrapper elevation-1">
+    <div
+      class="media-card-wrapper elevation-1"
+      @mouseenter="startPreview"
+      @mouseleave="stopPreview"
+    >
       <template v-if="isVisible">
+        <video
+          v-if="showHoverPreview"
+          :src="computedVideoUrl"
+          :type="videoType"
+          class="media-card-img"
+          muted
+          loop
+          autoplay
+          playsinline
+          preload="metadata"
+          @error="onVideoError($event)"
+        ></video>
         <img
-          v-if="imageSrc"
+          v-else-if="imageSrc"
           :src="imageSrc"
           loading="lazy"
           :alt="$t('media_card.alt_photo')"
@@ -145,7 +161,7 @@ const isVideo = computed(() => {
 
 const computedVideoUrl = computed(() => {
   if (!props.path?.location || !isVideo.value) return '';
-  return buildVideoUrl(props.path.location);
+  return buildVideoUrl(props.path.location) ?? '';
 });
 
 const videoType = computed(() => {
@@ -159,6 +175,37 @@ const videoType = computed(() => {
 });
 
 const posterFailed = ref(false);
+
+const canHover = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover)').matches;
+const prefersReducedMotion =
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+let previewTimerId: number | undefined;
+const hovering = ref(false);
+
+function startPreview(): void {
+  if (!canHover || prefersReducedMotion) return;
+  if (previewTimerId !== undefined) window.clearTimeout(previewTimerId);
+  previewTimerId = window.setTimeout(() => {
+    hovering.value = true;
+  }, 300);
+}
+
+function stopPreview(): void {
+  if (previewTimerId !== undefined) {
+    window.clearTimeout(previewTimerId);
+    previewTimerId = undefined;
+  }
+  hovering.value = false;
+}
+
+onUnmounted(() => stopPreview());
+
+// Hover-preview takes precedence over the poster; without hover support
+// (touch devices) or with reduced motion the poster stays put.
+const showHoverPreview = computed(
+  () => isVideo.value && hovering.value && !!computedVideoUrl.value,
+);
 
 const imageSrc = computed(() => {
   if (!props.path?.location || isVideo.value) return undefined;
