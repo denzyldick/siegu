@@ -91,18 +91,39 @@ jobs:
         run: |
           brew install nasm
 
+      # Mirror of windows.yml CI setup: ffmpeg-sys-next builds FFmpeg from
+      # source (features = ["build"]) and needs the full MSVC dev environment,
+      # nasm, and a coherent MSYS2 sh+make+gawk toolchain. Omitting any of
+      # these fails `tauri build` with "configure failed" before any installer
+      # is produced.
+      - name: Set up MSVC dev environment (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Install nasm (Windows)
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: choco install nasm -y --no-progress
 
-      - name: Install gawk (Windows)
+      - name: Set up MSYS2 (make + gawk for the ffmpeg source build) (Windows)
+        if: matrix.platform == 'windows-latest'
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          release: false # reuse the preinstalled C:\msys64
+          update: false
+          install: make gawk
+
+      - name: Prepend MSYS2 tools to PATH (Windows)
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
-          choco install gawk -y --no-progress
-          $dir = Split-Path (Get-Command awk.exe -ErrorAction Stop).Source -Parent
-          Write-Host $dir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          $bin = Join-Path '${{ steps.msys2.outputs.msys2-location }}' 'usr\bin'
+          # coreutils' link.exe would shadow MSVC's linker (rustc resolves
+          # link.exe via PATH) and break every Rust link step.
+          Remove-Item (Join-Path $bin 'link.exe') -Force -ErrorAction SilentlyContinue
+          Write-Host "Prepending $bin to PATH"
+          Add-Content $env:GITHUB_PATH $bin
 
       - run: npm ci
 
@@ -220,27 +241,34 @@ jobs:
             --manifest-path src-tauri/Cargo.toml \
             build --features "tauri/custom-protocol tauri/custom-protocol" --lib --release
 
-      - name: Copy .so to jniLibs
-        run: |
-          mkdir -p src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a
-          cp target/aarch64-linux-android/release/libsiegu_lib.so \
-             src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a/
-
-      - name: Generate missing Android Gradle project files
+      - name: Regenerate gitignored Gradle files (fresh init + tracked overlay)
         working-directory: src-tauri
         run: |
-          # tauri.settings.gradle and app/tauri.build.gradle.kts are gitignored
-          # (they carry machine-specific absolute paths into the cargo registry)
-          # so they must be regenerated on the CI machine. The old step used the
-          # non-existent `tauri android android-studio-script` subcommand and
-          # swallowed the failure with `|| true`, which is why gradle could never
-          # read the settings script.
+          # tauri.settings.gradle and app/tauri.build.gradle.kts carry absolute
+          # paths into the local cargo registry, so they are gitignored and must
+          # be regenerated per machine. Running `tauri android init` against the
+          # existing tracked project does NOT rewrite them (it bails out after
+          # path fixups, which is why the release failed with "Could not read
+          # script .../tauri.settings.gradle"). Instead: snapshot every TRACKED
+          # file, scaffold a completely fresh project (which emits all
+          # gitignored files with correct machine-specific paths), then overlay
+          # the tracked customizations back on top.
+          rm -rf /tmp/fresh-android && mkdir -p /tmp/fresh-android
+          git ls-files -z gen/android | tar --null -T - -cf - | tar -xf - -C /tmp/fresh-android
+          rm -rf gen/android
           npx tauri android init --ci --skip-targets-install
+          cp -a /tmp/fresh-android/src-tauri/gen/android/. gen/android/
           # init also re-emits its stock buildSrc under a fresh package dir; the
           # tracked copy is customized (cargo-ndk + -PskipRustBuild) and shares
           # the default package with the regenerated one, which would make Gradle
           # fail to compile buildSrc on duplicate RustPlugin classes.
           rm -rf gen/android/buildSrc/src/main/java/io/denzyl/siegu
+
+      - name: Copy .so to jniLibs
+        run: |
+          mkdir -p src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a
+          cp target/aarch64-linux-android/release/libsiegu_lib.so \
+             src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a/
 
       - name: Build APK
         working-directory: src-tauri/gen/android
@@ -274,7 +302,9 @@ jobs:
       - name: Install dependencies
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm git nodejs npm rustup webkit2gtk-4.1 libayatana-appindicator librsvg xdotool openssl sudo yarn xdg-utils fuse2 ffmpeg nasm pkgconf
+          # clang provides libclang, which ffmpeg-sys-next's bindgen step
+          # requires while generating FFI bindings for the bundled FFmpeg build.
+          pacman -S --noconfirm git nodejs npm rustup webkit2gtk-4.1 libayatana-appindicator librsvg xdotool openssl sudo yarn xdg-utils fuse2 ffmpeg nasm pkgconf clang
 
           useradd -m -G wheel builder
           echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
