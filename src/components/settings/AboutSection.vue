@@ -13,7 +13,9 @@
     <v-card-text class="pt-4">
       <div class="d-flex align-center justify-space-between py-1">
         <span class="font-weight-bold text-high-emphasis">Siegu</span>
-        <span v-if="version" class="text-caption text-medium-emphasis">v{{ version }}</span>
+        <span v-if="version" class="text-caption text-medium-emphasis">
+          v{{ version }}<template v-if="commitSha"> ({{ commitSha }})</template>
+        </span>
       </div>
       <v-divider class="my-3 mx-n4 border"></v-divider>
       <v-expansion-panels flat class="bg-transparent">
@@ -46,6 +48,7 @@ import { ref, onMounted } from 'vue';
 import { getVersion } from '@tauri-apps/api/app';
 
 const version = ref('');
+const commitSha = typeof __APP_COMMIT_SHA__ === 'string' ? __APP_COMMIT_SHA__ : '';
 
 const dependencies = [
   { name: 'Vue.js', license: 'MIT' },

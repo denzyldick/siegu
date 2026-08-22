@@ -6,6 +6,8 @@ declare module '*.vue' {
   export default component;
 }
 
+declare const __APP_COMMIT_SHA__: string;
+
 interface Window {
   __img_mediaPort: number | null;
   __rail_mediaPort: number | null;

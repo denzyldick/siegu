@@ -1,45 +1,118 @@
 name: Release
 
+# Automated flow: a push to main that introduces a brand-new app version
+# (per src-tauri/tauri.conf.json) waits for CI to pass, then builds every
+# platform and attaches the artifacts to a DRAFT release tagged
+# v<version>-<short-sha> (e.g. v0.1.8-gahafeufae). Publishing the draft is
+# the only manual step; the Tauri updater picks the release up on publish
+# because latest.json carries the pure semver version.
+#
+# Note: the old `release: published` trigger was removed on purpose —
+# publishing a draft must not kick off a redundant full rebuild.
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  # ── Gate: only release if CI already passed for this commit ────────────
-  # Avoids duplicating toolchain setup that CI already validates.
-  # If CI hasn't run or failed, the release is blocked.
+  # ── Gate: version-bump detection + CI wait + draft pre-create ───────────
   ci-gate:
     runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    outputs:
+      should_release: ${{ steps.decide.outputs.should_release }}
+      tag_name: ${{ steps.decide.outputs.tag_name }}
+      release_title: ${{ steps.decide.outputs.release_title }}
+      version: ${{ steps.decide.outputs.version }}
+      short_sha: ${{ steps.decide.outputs.short_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Verify CI passed for HEAD
+      - id: decide
+        name: Decide release, wait for CI, pre-create draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          HEAD_SHA=$(git rev-parse HEAD)
-          echo "Checking CI status for $HEAD_SHA"
+          set -euo pipefail
 
-          # Find the most recent completed CI run for this commit
-          # Check each CI workflow (Ubuntu, Windows, macOS, Android, iOS)
-          FAILED=0
-          for wf in Ubuntu Windows macOS Android; do
-            echo "--- Checking $wf CI ---"
-            # Get the latest run for this workflow + commit
-            RUN_ID=$(gh run list --workflow="${wf,,}.yml" --commit="$HEAD_SHA" \
-              --status=completed --limit=1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || true)
-            if [ -z "$RUN_ID" ]; then
-              echo "::warning::No completed $wf CI run found for $HEAD_SHA — skipping check"
-              continue
+          VERSION=$(jq -r .version src-tauri/tauri.conf.json)
+          SHORT_SHA=$(git rev-parse --short=9 HEAD)
+          TAG="v${VERSION}-${SHORT_SHA}"
+          TITLE="Siegu v${VERSION} (${SHORT_SHA})"
+          HEAD_SHA=$(git rev-parse HEAD)
+
+          echo "App version: $VERSION | HEAD: $SHORT_SHA | Tag: $TAG"
+
+          # workflow_dispatch = manual escape hatch: always (re)build assets
+          # for the current version, attaching to whatever release exists.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual dispatch — forcing release"
+            SHOULD=true
+          else
+            # Release only when this exact version has never been shipped,
+            # draft or published. Covers both legacy plain tags (v0.1.8)
+            # and hash-suffixed ones (v0.1.8-gahafeufae).
+            EXISTING=$(gh release list --limit 100 \
+              --json tagName \
+              --jq ".[].tagName | select(. == \"v${VERSION}\" or startswith(\"v${VERSION}-\"))")
+            if [ -n "$EXISTING" ]; then
+              echo "Version $VERSION already has a release/draft ($EXISTING) — nothing to do"
+              SHOULD=false
+            else
+              echo "New version detected — releasing"
+              SHOULD=true
             fi
-            CONCLUSION=$(gh run view "$RUN_ID" --json conclusion --jq '.conclusion')
-            echo "$wf CI run $RUN_ID concluded: $CONCLUSION"
+          fi
+
+          {
+            echo "should_release=$SHOULD"
+            echo "tag_name=$TAG"
+            echo "release_title=$TITLE"
+            echo "version=$VERSION"
+            echo "short_sha=$SHORT_SHA"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$SHOULD" != "true" ]; then
+            exit 0
+          fi
+
+          # ── Wait for the CI workflows triggered by this same push ────────
+          # Avoids duplicating toolchain setup that CI already validates.
+          FAILED=0
+          TIMEOUT=$((60 * 95))
+          for wf in Ubuntu Windows macOS Android; do
+            FILE="${wf,,}.yml"
+            echo "--- Waiting for $wf CI on $HEAD_SHA ---"
+            CONCLUSION=""
+            DEADLINE=$((SECONDS + TIMEOUT))
+            while :; do
+              READOUT=$(gh run list --workflow="$FILE" --commit="$HEAD_SHA" \
+                --limit 1 --json databaseId,status,conclusion \
+                --jq '.[0] | "\(.status) \(.conclusion // "")"' 2>/dev/null || echo "missing ")
+              STATUS=${READOUT%% *}
+              CONCLUSION=${READOUT#* }
+              if [ "$STATUS" = "completed" ]; then
+                break
+              fi
+              if [ $SECONDS -ge $DEADLINE ]; then
+                echo "::error::Timed out waiting for $wf CI on $HEAD_SHA"
+                FAILED=1
+                break
+              fi
+              sleep 30
+            done
+            echo "$wf CI concluded: ${CONCLUSION:-unknown}"
             if [ "$CONCLUSION" != "success" ]; then
               echo "::error::$wf CI did not pass for $HEAD_SHA (conclusion: $CONCLUSION)"
               FAILED=1
@@ -52,9 +125,22 @@ jobs:
           fi
           echo "All CI checks passed for $HEAD_SHA"
 
+          # ── Pre-create the draft so parallel build jobs attach to it ────
+          # Without this, the Android uploader would race ahead and publish
+          # its own release before tauri-action finishes the desktop one.
+          if ! gh release view "$TAG" --json id >/dev/null 2>&1; then
+            gh release create "$TAG" --draft --target "$HEAD_SHA" \
+              --title "$TITLE" \
+              --notes "Automated draft build for v${VERSION} (${SHORT_SHA}). Review the assets, then publish to ship."
+            echo "Created draft release $TAG"
+          else
+            echo "Release $TAG already exists — assets will be appended"
+          fi
+
   # ── Desktop installers (macOS, Ubuntu, Windows) ────────────────────────
   desktop:
     needs: [ci-gate]
+    if: needs.ci-gate.outputs.should_release == 'true'
     permissions:
       contents: write
     strategy:
@@ -65,6 +151,7 @@ jobs:
     env:
       ORT_STRATEGY: download
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APP_COMMIT_SHA: ${{ needs.ci-gate.outputs.short_sha }}
 
     steps:
       - uses: actions/checkout@v4
@@ -160,8 +247,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Siegu v__VERSION__'
+          tagName: ${{ needs.ci-gate.outputs.tag_name }}
+          releaseName: ${{ needs.ci-gate.outputs.release_title }}
           releaseBody: 'See the attached assets for the latest release versions.'
           releaseDraft: true
           prerelease: false
@@ -173,8 +260,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Siegu v__VERSION__'
+          tagName: ${{ needs.ci-gate.outputs.tag_name }}
+          releaseName: ${{ needs.ci-gate.outputs.release_title }}
           releaseBody: 'See the attached assets for the latest release versions.'
           releaseDraft: true
           prerelease: false
@@ -183,11 +270,13 @@ jobs:
   # ── Android APK ─────────────────────────────────────────────────────────
   android:
     needs: [ci-gate]
+    if: needs.ci-gate.outputs.should_release == 'true'
     permissions:
       contents: write
     runs-on: ubuntu-24.04
     env:
       ORT_STRATEGY: download
+      APP_COMMIT_SHA: ${{ needs.ci-gate.outputs.short_sha }}
     steps:
       - uses: actions/checkout@v4
 
@@ -296,15 +385,15 @@ jobs:
         run: ./gradlew assembleUniversalRelease -PskipRustBuild=true
 
       - name: Upload APK to Release
-        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ needs.ci-gate.outputs.tag_name }}
           files: src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
 
   # ── iOS ─────────────────────────────────────────────────────────────────
   ios:
     needs: [ci-gate]
+    if: needs.ci-gate.outputs.should_release == 'true'
     permissions:
       contents: write
     runs-on: macos-latest
