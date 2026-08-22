@@ -101,7 +101,7 @@
           >
           <v-btn
             variant="flat"
-            color="primary"
+            color="error"
             @click="startConfirmedCleanup"
             class="flex-grow-1"
             height="44"

@@ -2,6 +2,7 @@ use crate::common::{emit_log, get_config_path};
 use crate::database;
 use crate::database::Database;
 use crate::log::{self, LogEntry};
+use tauri::Manager;
 
 /// Pure business logic — testable without Tauri.
 pub fn do_get_logs(limit: usize) -> Vec<LogEntry> {
@@ -19,17 +20,25 @@ pub fn do_get_last_scan_time(db: &Database) -> String {
 }
 
 /// Pure business logic — testable without Tauri.
-pub fn do_cleanup_database(path: &str, confirm: bool) -> bool {
+pub fn do_cleanup_database(db: &Database, confirm: bool) -> bool {
     if !confirm {
         return false;
     }
-    let db_path = std::path::Path::new(path).join("siegu.db");
-    if db_path.exists() {
-        let _ = std::fs::remove_file(&db_path);
-        true
-    } else {
-        false
+    db.wipe_all_data().is_ok()
+}
+
+/// Wait out any running scan, then hold the scan guard so no scan can start
+/// while the database is being wiped. Gives up after ~5s (matching the SQLite
+/// busy timeout).
+fn hold_scan_guard(app: &tauri::AppHandle) -> Option<siegu_core::scanner::ScanSession> {
+    let scan_state = app.state::<crate::ScanState>();
+    for _ in 0..50 {
+        if let Some(session) = scan_state.guard.try_start() {
+            return Some(session);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
     }
+    None
 }
 
 /// Pure business logic — testable without Tauri.
@@ -92,7 +101,16 @@ pub async fn cleanup_database(app: tauri::AppHandle, confirm: bool) {
     if path.is_empty() {
         return;
     }
-    do_cleanup_database(&path, confirm);
+    let Some(_scan_session) = hold_scan_guard(&app) else {
+        emit_log(
+            &app,
+            "Couldn't reset the library: a scan is still running. Try again in a moment."
+                .to_string(),
+        );
+        return;
+    };
+    let database = database::Database::new(&path);
+    do_cleanup_database(&database, confirm);
 }
 
 #[tauri::command]
@@ -134,6 +152,7 @@ pub async fn get_location_names(app: tauri::AppHandle) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::directories::do_is_initialized;
     use crate::test_helpers::*;
 
     static LOG_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -192,32 +211,25 @@ mod tests {
 
     #[test]
     fn cleanup_database_confirm_false_noop() {
-        let dir = tempfile::tempdir().unwrap();
+        let (db, _dir) = test_db();
+        db.add_directory("/tmp/photos");
+        assert!(!do_cleanup_database(&db, false));
+        assert!(db.has_any_photos() || !db.list_directories().is_empty());
+    }
+
+    #[test]
+    fn cleanup_database_confirm_true_wipes_rows_keeps_file() {
+        let (db, dir) = test_db();
+        db.add_directory("/tmp/photos");
         let db_path = dir.path().join("siegu.db");
-        std::fs::write(&db_path, "fake").unwrap();
-        assert!(!do_cleanup_database(
-            &dir.path().display().to_string(),
-            false
-        ));
         assert!(db_path.exists());
-    }
 
-    #[test]
-    fn cleanup_database_confirm_true_deletes() {
-        let dir = tempfile::tempdir().unwrap();
-        let db_path = dir.path().join("siegu.db");
-        std::fs::write(&db_path, "fake").unwrap();
-        assert!(do_cleanup_database(&dir.path().display().to_string(), true));
-        assert!(!db_path.exists());
-    }
+        assert!(do_cleanup_database(&db, true));
 
-    #[test]
-    fn cleanup_database_no_file_returns_false() {
-        let dir = tempfile::tempdir().unwrap();
-        assert!(!do_cleanup_database(
-            &dir.path().display().to_string(),
-            true
-        ));
+        assert!(db_path.exists(), "the db file must not be deleted");
+        assert!(!do_is_initialized(&db));
+        assert_eq!(db.list_directories().len(), 0);
+        assert!(!db.is_onboarding_complete());
     }
 
     #[test]

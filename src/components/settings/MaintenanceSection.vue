@@ -24,7 +24,7 @@
             <v-btn
               size="small"
               variant="flat"
-              color="primary"
+              color="error"
               @click="cleanupDialog.show = true"
               :loading="isCleaning"
               class="px-4"

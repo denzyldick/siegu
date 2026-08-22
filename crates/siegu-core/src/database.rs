@@ -2748,6 +2748,42 @@ impl Database {
             .unwrap_or(false)
     }
 
+    /// Delete every row from all user tables, leaving the schema intact.
+    ///
+    /// Unlike deleting `siegu.db` on disk, this works while the connection is
+    /// open and does not depend on OS file locks, so it is safe on Windows
+    /// where removing an open database file fails. The WAL sidecars stay
+    /// consistent because the connection itself performs the deletes.
+    pub fn wipe_all_data(&self) -> rusqlite::Result<()> {
+        let tables: Vec<String> = {
+            let mut stmt = self.connection.prepare(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+            )?;
+            let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+            rows.flatten().collect()
+        };
+        // Single atomic transaction: concurrent writers either land before
+        // this begins (and are wiped with everything else) or wait until it
+        // commits. VACUUM cannot run inside a transaction, so it follows.
+        self.connection.execute_batch("BEGIN IMMEDIATE")?;
+        let result = (|| {
+            for table in &tables {
+                self.connection
+                    .execute(&format!("DELETE FROM \"{table}\""), [])?;
+            }
+            Ok(())
+        })();
+        match result {
+            Ok(()) => self.connection.execute_batch("COMMIT")?,
+            Err(e) => {
+                let _ = self.connection.execute_batch("ROLLBACK");
+                return Err(e);
+            }
+        }
+        self.connection.execute("VACUUM", [])?;
+        Ok(())
+    }
+
     /// Merge all faces from `from_id` into `to_id`, then delete the source person.
     pub fn merge_people(&self, from_id: &str, to_id: &str) {
         if let Err(e) = self.connection.execute(
