@@ -66,6 +66,8 @@ impl SyncEvent for CliSyncEvent {
             last_seen: String::new(),
             photo_count: 0,
             video_count: 0,
+            remote_photo_count: 0,
+            remote_video_count: 0,
         });
     }
 

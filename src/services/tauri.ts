@@ -308,6 +308,8 @@ export async function listDevices(): Promise<
     os: string;
     photo_count: number;
     video_count: number;
+    remote_photo_count: number;
+    remote_video_count: number;
     host: string;
     subtitle: string;
   }>

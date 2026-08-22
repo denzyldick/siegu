@@ -23,6 +23,8 @@ export const useSyncStore = defineStore('sync', () => {
         name: d.title,
         photo_count: d.photo_count,
         video_count: d.video_count,
+        remote_photo_count: d.remote_photo_count ?? 0,
+        remote_video_count: d.remote_video_count ?? 0,
         os: d.os,
         icon: d.icon,
         host: d.host,

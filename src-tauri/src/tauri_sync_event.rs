@@ -125,6 +125,8 @@ impl SyncEvent for TauriSyncEvent {
             last_seen: String::new(),
             photo_count: 0,
             video_count: 0,
+            remote_photo_count: 0,
+            remote_video_count: 0,
         };
         db.upsert_peer_device(&device);
         if let Ok(mut peer) = self.active_peer.try_lock() {
@@ -147,6 +149,21 @@ impl SyncEvent for TauriSyncEvent {
         if !self.offline_notified.swap(true, Ordering::SeqCst) {
             self.on_log("Peer offline: sync paused until device reconnects");
             notify_sync_paused(&self.app, &self.config_path);
+        }
+    }
+
+    fn on_peer_library_stats(&self, photo_count: i64, video_count: i64) {
+        let peer_id = self.active_peer.try_lock().ok().and_then(|p| p.clone());
+        if let Some(peer_id) = peer_id {
+            Database::new(&self.config_path).set_peer_remote_counts(
+                &peer_id,
+                photo_count,
+                video_count,
+            );
+            self.on_log(&format!(
+                "Peer library: {photo_count} photos, {video_count} videos"
+            ));
+            let _ = self.app.emit("refresh-devices", ());
         }
     }
 

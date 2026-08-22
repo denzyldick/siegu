@@ -134,7 +134,7 @@
                 }}</span>
                 <v-spacer></v-spacer>
                 <span class="text-caption text-high-emphasis font-weight-bold">{{
-                  device.photo_count
+                  device.remote_photo_count || device.photo_count
                 }}</span>
               </div>
               <div class="d-flex align-center">
@@ -146,7 +146,7 @@
                 }}</span>
                 <v-spacer></v-spacer>
                 <span class="text-caption text-high-emphasis font-weight-bold">{{
-                  device.video_count
+                  device.remote_video_count || device.video_count
                 }}</span>
               </div>
             </div>
@@ -372,6 +372,8 @@ interface DeviceWithSync {
   os: string;
   photo_count: number;
   video_count: number;
+  remote_photo_count: number;
+  remote_video_count: number;
   host: string;
   subtitle: string;
   syncing: boolean;
@@ -508,11 +510,16 @@ onMounted(async () => {
         d.syncing =
           payload.status !== 'idle' &&
           !payload.status.includes('Finished') &&
-          !payload.status.includes('Up to date');
-        d.progress = payload.progress;
-        d.syncStatus = payload.status;
+          !payload.status.includes('Up to date') &&
+          !payload.status.includes('All files synced');
         d.items_completed = payload.items_completed;
         d.items_total = payload.items_total;
+        // The bar tracks overall batch progress, never per-file bytes.
+        d.progress =
+          payload.items_total > 0
+            ? (payload.items_completed / payload.items_total) * 100
+            : d.progress;
+        d.syncStatus = payload.status;
       }
     });
   });

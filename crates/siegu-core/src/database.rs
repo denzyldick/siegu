@@ -1023,6 +1023,17 @@ impl Database {
             "ALTER TABLE peer_device ADD COLUMN video_count INTEGER DEFAULT 0;",
             (),
         );
+        // Full library size as announced by the peer itself (PeerLibraryStats),
+        // in contrast to photo_count/video_count which only track files
+        // received during a session.
+        let _ = conn.execute(
+            "ALTER TABLE peer_device ADD COLUMN remote_photo_count INTEGER DEFAULT 0;",
+            (),
+        );
+        let _ = conn.execute(
+            "ALTER TABLE peer_device ADD COLUMN remote_video_count INTEGER DEFAULT 0;",
+            (),
+        );
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS faces (photo_id STRING, face_id STRING PRIMARY KEY, crop_path STRING, encoded STRING, embedding BLOB, person_id STRING);", ());
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS people (id STRING PRIMARY KEY, name STRING, embedding BLOB);", ());
         // Must run after the faces/people tables exist: created here (not above)
@@ -3410,6 +3421,9 @@ pub struct DeviceInfo {
     pub host: bool,
     pub photo_count: i64,
     pub video_count: i64,
+    /// Peer's self-reported library size; 0 until the peer announces it.
+    pub remote_photo_count: i64,
+    pub remote_video_count: i64,
     pub os: String,
 }
 
@@ -3429,6 +3443,11 @@ pub struct PeerDevice {
     /// Media received from this peer (running total).
     pub photo_count: i64,
     pub video_count: i64,
+    /// The peer's full library size as it reported it.
+    #[serde(default)]
+    pub remote_photo_count: i64,
+    #[serde(default)]
+    pub remote_video_count: i64,
 }
 
 impl Database {
@@ -3453,6 +3472,15 @@ impl Database {
         );
     }
 
+    /// Persist the library size the peer announced about itself. Deliberately
+    /// separate from upsert_peer_device so reconnects never clobber it.
+    pub fn set_peer_remote_counts(&self, device_id: &str, photo_count: i64, video_count: i64) {
+        let _ = self.connection.execute(
+            "UPDATE peer_device SET remote_photo_count = ?2, remote_video_count = ?3 WHERE device_id = ?1",
+            rusqlite::params![device_id, photo_count, video_count],
+        );
+    }
+
     pub fn update_peer_device_seen(&self, device_id: &str) {
         let _ = self.connection.execute(
             "UPDATE peer_device SET last_seen = datetime('now') WHERE device_id = ?1",
@@ -3470,7 +3498,7 @@ impl Database {
     pub fn list_peer_devices(&self) -> Vec<PeerDevice> {
         let mut results = Vec::new();
         if let Ok(mut stmt) = self.connection.prepare(
-            "SELECT device_id, name, ip, port, device_type, os, models_enabled, protocol_version, storage_used, storage_capacity, last_seen, photo_count, video_count \
+            "SELECT device_id, name, ip, port, device_type, os, models_enabled, protocol_version, storage_used, storage_capacity, last_seen, photo_count, video_count, remote_photo_count, remote_video_count \
              FROM peer_device ORDER BY last_seen DESC"
         ) {
             if let Ok(iter) = stmt.query_map([], |row| {
@@ -3490,6 +3518,8 @@ impl Database {
                     last_seen: row.get(10)?,
                     photo_count: row.get(11)?,
                     video_count: row.get(12)?,
+                    remote_photo_count: row.get::<_, i64>(13).unwrap_or(0),
+                    remote_video_count: row.get::<_, i64>(14).unwrap_or(0),
                 })
             }) {
                 for d in iter.flatten() {
@@ -3502,7 +3532,7 @@ impl Database {
 
     pub fn get_peer_device(&self, device_id: &str) -> Option<PeerDevice> {
         self.connection.query_row(
-            "SELECT device_id, name, ip, port, device_type, os, models_enabled, protocol_version, storage_used, storage_capacity, last_seen, photo_count, video_count \
+            "SELECT device_id, name, ip, port, device_type, os, models_enabled, protocol_version, storage_used, storage_capacity, last_seen, photo_count, video_count, remote_photo_count, remote_video_count \
              FROM peer_device WHERE device_id = ?1",
             rusqlite::params![device_id],
             |row| {
@@ -3522,6 +3552,8 @@ impl Database {
                     last_seen: row.get(10)?,
                     photo_count: row.get(11)?,
                     video_count: row.get(12)?,
+                    remote_photo_count: row.get::<_, i64>(13).unwrap_or(0),
+                    remote_video_count: row.get::<_, i64>(14).unwrap_or(0),
                 })
             },
         ).ok()
@@ -4930,6 +4962,8 @@ mod tests {
             last_seen: String::new(),
             photo_count: 0,
             video_count: 0,
+            remote_photo_count: 0,
+            remote_video_count: 0,
         });
         let peers = db.list_peer_devices();
         assert!(peers.iter().any(|p| p.name == "test-device"));
@@ -4952,6 +4986,8 @@ mod tests {
             last_seen: String::new(),
             photo_count: 0,
             video_count: 0,
+            remote_photo_count: 0,
+            remote_video_count: 0,
         });
 
         db.rename_peer_device("test-id", "new-name");

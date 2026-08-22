@@ -38,6 +38,8 @@ pub fn do_join_network(db: &database::Database, ip: &str, name: &str) {
         last_seen: String::new(),
         photo_count: 0,
         video_count: 0,
+        remote_photo_count: 0,
+        remote_video_count: 0,
     });
 }
 
@@ -60,6 +62,8 @@ pub fn do_list_devices(db: &database::Database) -> Vec<database::DeviceInfo> {
             host: false,
             photo_count: peer.photo_count,
             video_count: peer.video_count,
+            remote_photo_count: peer.remote_photo_count,
+            remote_video_count: peer.remote_video_count,
             os: peer.os,
         })
         .collect();
@@ -82,6 +86,10 @@ pub fn do_list_devices(db: &database::Database) -> Vec<database::DeviceInfo> {
             host: true,
             photo_count,
             video_count,
+            // The host card shows this device's own library; remote_* mirror
+            // it so the UI can use one code path.
+            remote_photo_count: photo_count,
+            remote_video_count: video_count,
             os: std::env::consts::OS.to_string(),
         },
     );

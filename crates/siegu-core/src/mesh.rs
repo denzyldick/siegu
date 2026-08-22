@@ -107,6 +107,12 @@ pub enum SyncMessage {
         items_completed: usize,
         items_total: usize,
     },
+    /// One-shot announcement of this device's full library size so the peer's
+    /// linked-devices page can show real totals instead of per-session counts.
+    PeerLibraryStats {
+        photo_count: i64,
+        video_count: i64,
+    },
     MetadataUpdate {
         photo_id: String,
         caption: Option<String>,
@@ -177,6 +183,8 @@ pub trait SyncEvent: Send + Sync {
     fn on_peer_disconnected(&self, peer_id: String);
     /// Called when the connected peer drops off (transport failure / explicit leave).
     fn on_peer_offline(&self) {}
+    /// Called when the peer announces its full library size (photo, video).
+    fn on_peer_library_stats(&self, _photo_count: i64, _video_count: i64) {}
     fn on_device_registered(&self, db: &Database);
     fn on_metadata_updated(
         &self,
@@ -383,10 +391,20 @@ impl MeshManager {
         dc: Arc<webrtc::data_channel::RTCDataChannel>,
         outgoing: OutgoingFile,
         event: Arc<dyn SyncEvent>,
+        items_completed: &Arc<std::sync::atomic::AtomicUsize>,
+        items_total: &Arc<std::sync::atomic::AtomicUsize>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut last_err = None;
         for attempt in 0..MAX_RETRY_ATTEMPTS {
-            match Self::send_file_inner(&dc, &outgoing, event.as_ref()).await {
+            match Self::send_file_inner(
+                &dc,
+                &outgoing,
+                event.as_ref(),
+                items_completed,
+                items_total,
+            )
+            .await
+            {
                 Ok(()) => return Ok(()),
                 Err(e) => {
                     event.on_log(&format!(
@@ -413,12 +431,21 @@ impl MeshManager {
         dc: &Arc<webrtc::data_channel::RTCDataChannel>,
         outgoing: &OutgoingFile,
         event: &dyn SyncEvent,
+        items_completed: &Arc<std::sync::atomic::AtomicUsize>,
+        items_total: &Arc<std::sync::atomic::AtomicUsize>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let photo_id = outgoing.id.clone();
         let path = Path::new(&outgoing.path);
         if !path.exists() {
             return Err(format!("File not found: {}", outgoing.path).into());
         }
+
+        let counters = || {
+            (
+                items_completed.load(std::sync::atomic::Ordering::SeqCst),
+                items_total.load(std::sync::atomic::Ordering::SeqCst),
+            )
+        };
 
         let mut file = tokio::fs::File::open(path).await?;
         let metadata = file.metadata().await?;
@@ -430,14 +457,16 @@ impl MeshManager {
 
         // Surface the per-file start event immediately (before the thumbnail
         // pass) so the UI shows the next file without waiting on a decode.
+        // Counters ride along so batch progress in the UI never resets to 0/0.
+        let (completed, total) = counters();
         event.on_sync_progress(SyncProgress {
             device_id: "peer".to_string(),
             status: format!("Sending {filename}"),
             phase: SyncPhase::Syncing,
             progress: 0.0,
             bytes_per_second: 0,
-            items_completed: 0,
-            items_total: 0,
+            items_completed: completed,
+            items_total: total,
             filename: Some(filename.clone()),
             thumbnail: None,
         });
@@ -454,8 +483,8 @@ impl MeshManager {
                     phase: SyncPhase::Syncing,
                     progress: 0.0,
                     bytes_per_second: 0,
-                    items_completed: 0,
-                    items_total: 0,
+                    items_completed: completed,
+                    items_total: total,
                     filename: Some(filename.clone()),
                     thumbnail: Some(thumb.clone()),
                 });
@@ -513,15 +542,23 @@ impl MeshManager {
             chunk_index += 1;
             total_sent += n as u64;
 
-            let progress = (total_sent as f32 / size as f32) * 100.0;
+            // `progress` carries the overall batch percentage so every UI
+            // surface moves monotonically; per-file byte detail lives only in
+            // the status text.
+            let (completed, total) = counters();
+            let batch_progress = if total > 0 {
+                (completed as f32 / total as f32) * 100.0
+            } else {
+                (total_sent as f32 / size as f32) * 100.0
+            };
             event.on_sync_progress(SyncProgress {
                 device_id: "peer".to_string(),
                 status: format!("Sending {filename}"),
                 phase: SyncPhase::Syncing,
-                progress,
+                progress: batch_progress,
                 bytes_per_second: 0,
-                items_completed: 0,
-                items_total: 0,
+                items_completed: completed,
+                items_total: total,
                 filename: None,
                 thumbnail: None,
             });
@@ -556,10 +593,17 @@ impl MeshManager {
             device_id: "peer".to_string(),
             status: format!("Finished sending {filename}"),
             phase: SyncPhase::Syncing,
-            progress: 100.0,
+            progress: {
+                let (completed, total) = counters();
+                if total > 0 {
+                    (completed as f32 / total as f32) * 100.0
+                } else {
+                    100.0
+                }
+            },
             bytes_per_second: 0,
-            items_completed: 1,
-            items_total: 1,
+            items_completed: counters().0,
+            items_total: counters().1,
             filename: Some(filename.clone()),
             thumbnail: Some(encoded.clone()),
         });
@@ -585,6 +629,17 @@ impl MeshManager {
             SyncMessage::ManifestRequest => {
                 event.on_log("DEBUG handle ManifestRequest");
                 let db = Database::new(config_path);
+                // Announce our full library size so the peer's linked-devices
+                // page can show real totals for this device.
+                let (photo_count, video_count) = db.get_media_counts();
+                let _ = Self::send_sync_message(
+                    dc,
+                    &SyncMessage::PeerLibraryStats {
+                        photo_count,
+                        video_count,
+                    },
+                )
+                .await;
                 let photos = db.get_photo_sync_info();
                 if let Err(e) = Self::send_manifest_response(dc, photos).await {
                     event.on_log(&format!("ERROR sending manifest response: {e}"));
@@ -666,6 +721,9 @@ impl MeshManager {
             }
             SyncMessage::FileRequest { id } => {
                 let db = Database::new(config_path);
+                // Count every outgoing transfer in the shared batch counters so
+                // the UI's overall progress covers both directions of the sync.
+                items_total.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 match db.connection.query_row(
                     "SELECT p.location, p.created, p.latitude, p.longitude,
                      (SELECT json_group_array(json_object('class', class, 'probability', probability)) FROM object WHERE photo_id = p.id),
@@ -682,10 +740,34 @@ impl MeshManager {
                         let event_arc = Arc::clone(&event);
                         let config_path_clone = config_path.to_string();
                         let id_clone = id.clone();
-                        let semaphore = Arc::clone(transfer_semaphore);
+                        let semaphore = Arc::clone(&transfer_semaphore);
+                        let completed_task = Arc::clone(items_completed);
+                        let total_task = Arc::clone(items_total);
+                        let event_task = Arc::clone(&event);
                         tokio::spawn(async move {
                             let _permit = match semaphore.acquire_owned().await {
-                                Ok(p) => p,
+                                Ok(p) => {
+                                    let (completed, total) = (
+                                        completed_task.load(std::sync::atomic::Ordering::SeqCst),
+                                        total_task.load(std::sync::atomic::Ordering::SeqCst),
+                                    );
+                                    event_arc.on_sync_progress(SyncProgress {
+                                        device_id: "peer".to_string(),
+                                        status: "Preparing to send files".to_string(),
+                                        phase: SyncPhase::Syncing,
+                                        progress: if total > 0 {
+                                            (completed as f32 / total as f32) * 100.0
+                                        } else {
+                                            0.0
+                                        },
+                                        bytes_per_second: 0,
+                                        items_completed: completed,
+                                        items_total: total,
+                                        filename: None,
+                                        thumbnail: None,
+                                    });
+                                    p
+                                }
                                 Err(e) => {
                                     event_arc.on_log(&format!(
                                         "DEBUG transfer semaphore closed, skipping {id_clone}: {e}"
@@ -709,11 +791,48 @@ impl MeshManager {
                                     encoded,
                                 },
                                 event_arc,
+                                &completed_task,
+                                &total_task,
                             )
                             .await;
                             if result.is_ok() {
                                 let db = Database::new(&config_path_clone);
                                 db.clear_sync_needed(&id_clone);
+
+                                let completed =
+                                    completed_task.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                                        + 1;
+                                let total =
+                                    total_task.load(std::sync::atomic::Ordering::SeqCst);
+                                let progress = if total > 0 {
+                                    (completed as f32 / total as f32) * 100.0
+                                } else {
+                                    100.0
+                                };
+                                event_task.on_sync_progress(SyncProgress {
+                                    device_id: "peer".to_string(),
+                                    status: format!("Sent {completed}/{total}"),
+                                    phase: SyncPhase::Syncing,
+                                    progress,
+                                    bytes_per_second: 0,
+                                    items_completed: completed,
+                                    items_total: total,
+                                    filename: None,
+                                    thumbnail: None,
+                                });
+                                if total > 0 && completed >= total {
+                                    event_task.on_sync_progress(SyncProgress {
+                                        device_id: "peer".to_string(),
+                                        status: "All files synced".to_string(),
+                                        phase: SyncPhase::Completed,
+                                        progress: 100.0,
+                                        bytes_per_second: 0,
+                                        items_completed: completed,
+                                        items_total: total,
+                                        filename: None,
+                                        thumbnail: None,
+                                    });
+                                }
                             }
                         });
                     }
@@ -787,8 +906,9 @@ impl MeshManager {
                             phase: SyncPhase::Syncing,
                             progress: 0.0,
                             bytes_per_second: 0,
-                            items_completed: 0,
-                            items_total: 0,
+                            items_completed: items_completed
+                                .load(std::sync::atomic::Ordering::SeqCst),
+                            items_total: items_total.load(std::sync::atomic::Ordering::SeqCst),
                             filename: Some(sanitized.clone()),
                             thumbnail: Some(encoded),
                         });
@@ -808,15 +928,23 @@ impl MeshManager {
                     }
                     file_state.received += data.len() as u64;
 
-                    let progress = (file_state.received as f32 / file_state.size as f32) * 100.0;
+                    // Overall batch percentage keeps the UI monotonic; the
+                    // per-file byte fraction is not useful across files.
+                    let completed = items_completed.load(std::sync::atomic::Ordering::SeqCst);
+                    let total = items_total.load(std::sync::atomic::Ordering::SeqCst);
+                    let progress = if total > 0 {
+                        (completed as f32 / total as f32) * 100.0
+                    } else {
+                        (file_state.received as f32 / file_state.size as f32) * 100.0
+                    };
                     event.on_sync_progress(SyncProgress {
                         device_id: "peer".to_string(),
                         status: format!("Receiving {}", file_state.filename),
                         phase: SyncPhase::Syncing,
                         progress,
                         bytes_per_second: 0,
-                        items_completed: 0,
-                        items_total: 0,
+                        items_completed: completed,
+                        items_total: total,
                         filename: None,
                         thumbnail: None,
                     });
@@ -932,7 +1060,7 @@ impl MeshManager {
                         if total > 0 && completed >= total {
                             event.on_sync_progress(SyncProgress {
                                 device_id: "peer".to_string(),
-                                status: "All files received".to_string(),
+                                status: "All files synced".to_string(),
                                 phase: SyncPhase::Completed,
                                 progress: 100.0,
                                 bytes_per_second: 0,
@@ -998,6 +1126,15 @@ impl MeshManager {
                     filename: None,
                     thumbnail: None,
                 });
+            }
+            SyncMessage::PeerLibraryStats {
+                photo_count,
+                video_count,
+            } => {
+                event.on_log(&format!(
+                    "Peer library: {photo_count} photos, {video_count} videos"
+                ));
+                event.on_peer_library_stats(photo_count, video_count);
             }
             SyncMessage::MetadataUpdate {
                 photo_id,

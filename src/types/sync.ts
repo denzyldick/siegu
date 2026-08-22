@@ -16,6 +16,9 @@ export interface Device {
   name: string;
   photo_count: number;
   video_count: number;
+  /** Peer's self-reported library size; 0 until announced. */
+  remote_photo_count: number;
+  remote_video_count: number;
   os: string;
   icon: string;
   host: string;

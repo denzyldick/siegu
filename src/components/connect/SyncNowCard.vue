@@ -1,13 +1,20 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useSyncStore } from '@/stores/sync';
 
-defineProps<{
+const props = defineProps<{
   progress: number;
   itemsCompleted: number;
   itemsTotal: number;
 }>();
 
 const syncStore = useSyncStore();
+
+// Overall batch percentage; per-file byte progress is too jumpy (it resets
+// to ~0 for every file, hence the old 1%→100% flicker).
+const batchProgress = computed(() =>
+  props.itemsTotal > 0 ? Math.round((props.itemsCompleted / props.itemsTotal) * 100) : null,
+);
 </script>
 
 <template>
@@ -25,7 +32,16 @@ const syncStore = useSyncStore();
       </span>
       <div class="d-flex align-center ga-2 w-100">
         <v-progress-linear
-          :model-value="progress"
+          v-if="batchProgress !== null"
+          :model-value="batchProgress"
+          color="success"
+          height="6"
+          rounded
+          class="flex-grow-1"
+        />
+        <v-progress-linear
+          v-else
+          indeterminate
           color="success"
           height="6"
           rounded
