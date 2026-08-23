@@ -338,13 +338,11 @@ const props = withDefaults(
     embedded?: boolean;
     initialMode?: 'host' | 'join';
     hideModeToggle?: boolean;
-    keepSessionOnUnmount?: boolean;
   }>(),
   {
     embedded: false,
     initialMode: 'host',
     hideModeToggle: false,
-    keepSessionOnUnmount: false,
   },
 );
 
@@ -448,9 +446,13 @@ watch(dialog, async (open) => {
     started.value = false;
     confirmDialog.value = false;
     pendingMode.value = null;
-    await disconnectSession();
     stopEventListeners();
     loading.value = false;
+    // NOTE: closing the dialog must NOT tear down the backend session.
+    // Hosting is a background service: the app-level auto-reconnect resumes
+    // it on startup, the sync banner keeps reporting progress, and the peer
+    // must still be able to rejoin while this window shows other pages.
+    // Only the explicit Disconnect button ends a session (handleDisconnect).
   }
 });
 
@@ -465,9 +467,9 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  if (!props.keepSessionOnUnmount) {
-    disconnectSession();
-  }
+  // Same as above: never kill the live session from UI lifecycle hooks —
+  // navigating away from this component used to silently stop hosting and
+  // strand the joiner on a dead room ("Rejoin does nothing").
   stopEventListeners();
 });
 </script>

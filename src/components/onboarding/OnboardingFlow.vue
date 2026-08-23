@@ -188,7 +188,6 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
               :embedded="true"
               :initial-mode="connectionMode"
               :hide-mode-toggle="true"
-              :keep-session-on-unmount="true"
               @connected="deviceConnected = true"
               @mode-change="connectionMode = $event"
             />

@@ -5,7 +5,7 @@ use crate::transport;
 use crate::common::emit_log;
 use siegu_core::{PeerDevice, SavedSession};
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct LanHostInfo {
@@ -557,6 +557,9 @@ pub async fn auto_reconnect(
             handle.abort();
         }
         let config_path_for_task = config_path_for_session.clone();
+        // Surface progress on the same channel the UI already listens to, so
+        // pressing Rejoin shows what is happening instead of silently failing.
+        let _ = app_handle.emit("webrtc-state", "Reconnecting: searching for host");
         let handle = tauri::async_runtime::spawn(async move {
             'candidates: for url in candidates {
                 for attempt in 0..2 {
@@ -575,13 +578,23 @@ pub async fn auto_reconnect(
                     );
                     match transport.start().await {
                         Ok(()) => break 'candidates,
-                        Err(e) => emit_log(
-                            &app_handle,
-                            format!("Reconnect attempt {attempt} to {url} failed: {e}"),
-                        ),
+                        Err(e) => {
+                            emit_log(
+                                &app_handle,
+                                format!("Reconnect attempt {attempt} to {url} failed: {e}"),
+                            );
+                            let _ = app_handle
+                                .emit("webrtc-state", format!("Reconnecting: {url} unreachable"));
+                        }
                     }
                     tokio::time::sleep(std::time::Duration::from_secs(8)).await;
                 }
+            }
+            if !connected.load(std::sync::atomic::Ordering::SeqCst) {
+                let _ = app_handle.emit(
+                    "webrtc-state",
+                    "Reconnect failed — host not found. Is the host app running?",
+                );
             }
         });
         *active = Some(handle);
