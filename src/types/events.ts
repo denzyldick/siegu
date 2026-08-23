@@ -82,6 +82,10 @@ export interface ScanLogEvent {
   payload: string;
 }
 
+export interface ViewManifestEvent {
+  payload: string;
+}
+
 export interface AnalysisActivityEvent {
   payload: AnalysisActivity;
 }
@@ -105,6 +109,7 @@ export type TauriEventMap = {
   'peer-disconnected': PeerDisconnectedEvent;
   'room-code': RoomCodeEvent;
   'scan-log': ScanLogEvent;
+  'view-manifest': ViewManifestEvent;
 };
 
 export type TauriEventName = keyof TauriEventMap;

@@ -3124,6 +3124,29 @@ impl Database {
             .unwrap_or(false)
     }
 
+    /// Raw stored thumbnail (base64 data URL) for view-only serving.
+    pub fn get_photo_thumbnail_bytes(&self, id: &str) -> Option<Vec<u8>> {
+        let encoded: String = self
+            .connection
+            .query_row("SELECT encoded FROM photo WHERE id = ?1", [id], |row| {
+                row.get(0)
+            })
+            .ok()?;
+        let b64 = encoded
+            .strip_prefix("data:image/jpeg;base64,")
+            .unwrap_or(&encoded);
+        base64::Engine::decode(&base64::engine::general_purpose::STANDARD, b64).ok()
+    }
+
+    /// Filesystem location recorded for a photo, if any.
+    pub fn get_photo_location(&self, id: &str) -> Option<String> {
+        self.connection
+            .query_row("SELECT location FROM photo WHERE id = ?1", [id], |row| {
+                row.get(0)
+            })
+            .ok()
+    }
+
     /// Update caption, aesthetics_score, and indexed level for a photo.
     pub fn clear_sync_needed(&self, id: &str) {
         if let Err(e) = self

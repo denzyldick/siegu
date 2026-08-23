@@ -167,6 +167,17 @@ impl SyncEvent for TauriSyncEvent {
         }
     }
 
+    /// Peer sent us a read-only manifest (#9): hand it to the frontend so the
+    /// guest gallery can render without any data being written locally.
+    fn on_view_manifest(&self, photos: &[siegu_core::PhotoSyncInfo]) {
+        match serde_json::to_string(&photos) {
+            Ok(json) => {
+                let _ = self.app.emit("view-manifest", json);
+            }
+            Err(e) => self.on_log(&format!("Failed to serialize view manifest: {e}")),
+        }
+    }
+
     fn on_peer_disconnected(&self, peer_id: String) {
         let db = Database::new(&self.config_path);
         db.update_peer_device_seen(&peer_id);

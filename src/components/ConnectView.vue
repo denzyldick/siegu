@@ -147,41 +147,45 @@
         </div>
 
         <template v-if="started">
-          <ConnectHostView
-            v-if="mode === 'host'"
-            :passphrase="passphrase"
-            :is-connected="isConnected"
-            :syncing="syncing"
-            :progress="syncProgress.progress"
-            :items-completed="syncProgress.items_completed"
-            :items-total="syncProgress.items_total"
-            :peer-name="peerList[0]?.name ?? ''"
-            :peer-os="peerList[0]?.os ?? ''"
-          />
+          <GuestGallery v-if="syncStore.viewOnlyActive" />
 
-          <ConnectJoinView
-            v-if="mode === 'join'"
-            v-model="joinPassphrase"
-            :loading="loading"
-            :is-connected="isConnected"
-            :show-sync-button="isConnected"
-            :syncing="syncing"
-            :host-ip="selectedLanHost?.ip ?? ''"
-            :host-port="selectedLanHost?.port ?? 0"
-            :device-name="selectedLanHost?.name ?? ''"
-            :device-os="peerList[0]?.os ?? ''"
-            :items-completed="syncProgress.items_completed"
-            :items-total="syncProgress.items_total"
-            :progress="syncProgress.progress"
-            :connection-status="connectionStatus"
-            @join="(ip: string, port: string) => joinWebRTC(ip, port)"
-            @sync="triggerSync"
-          />
+          <template v-else>
+            <ConnectHostView
+              v-if="mode === 'host'"
+              :passphrase="passphrase"
+              :is-connected="isConnected"
+              :syncing="syncing"
+              :progress="syncProgress.progress"
+              :items-completed="syncProgress.items_completed"
+              :items-total="syncProgress.items_total"
+              :peer-name="peerList[0]?.name ?? ''"
+              :peer-os="peerList[0]?.os ?? ''"
+            />
 
-          <ConnectLanDiscovery
-            v-if="mode === 'join' && !selectedLanHost && !isConnected"
-            @select="selectLanHost"
-          />
+            <ConnectJoinView
+              v-if="mode === 'join'"
+              v-model="joinPassphrase"
+              :loading="loading"
+              :is-connected="isConnected"
+              :show-sync-button="isConnected"
+              :syncing="syncing"
+              :host-ip="selectedLanHost?.ip ?? ''"
+              :host-port="selectedLanHost?.port ?? 0"
+              :device-name="selectedLanHost?.name ?? ''"
+              :device-os="peerList[0]?.os ?? ''"
+              :items-completed="syncProgress.items_completed"
+              :items-total="syncProgress.items_total"
+              :progress="syncProgress.progress"
+              :connection-status="connectionStatus"
+              @join="(ip: string, port: string) => joinWebRTC(ip, port)"
+              @sync="triggerSync"
+            />
+
+            <ConnectLanDiscovery
+              v-if="mode === 'join' && !selectedLanHost && !isConnected"
+              @select="selectLanHost"
+            />
+          </template>
 
           <div v-if="peerList.length > 1" class="text-left px-2 mb-2">
             <div class="text-caption font-weight-bold text-medium-emphasis mb-1">
@@ -200,6 +204,18 @@
               <span class="text-caption text-medium-emphasis ml-2">{{ peer.os }}</span>
             </div>
           </div>
+
+          <v-btn
+            v-if="isConnected && !syncStore.viewOnlyActive"
+            variant="tonal"
+            color="secondary"
+            size="small"
+            class="text-none mb-2 mx-2 align-self-center"
+            prepend-icon="mdi-eye-outline"
+            @click="syncStore.browseOnly()"
+          >
+            {{ $t('connect.view_only_browse') }}
+          </v-btn>
 
           <ConnectStatusBar
             :status="connectionStatus"
@@ -255,41 +271,45 @@
       </div>
 
       <template v-if="started">
-        <ConnectHostView
-          v-if="mode === 'host'"
-          :passphrase="passphrase"
-          :is-connected="isConnected"
-          :syncing="syncing"
-          :progress="syncProgress.progress"
-          :items-completed="syncProgress.items_completed"
-          :items-total="syncProgress.items_total"
-          :peer-name="peerList[0]?.name ?? ''"
-          :peer-os="peerList[0]?.os ?? ''"
-        />
+        <GuestGallery v-if="syncStore.viewOnlyActive" />
 
-        <ConnectJoinView
-          v-if="mode === 'join'"
-          v-model="joinPassphrase"
-          :loading="loading"
-          :is-connected="isConnected"
-          :show-sync-button="false"
-          :syncing="syncing"
-          :host-ip="selectedLanHost?.ip ?? ''"
-          :host-port="selectedLanHost?.port ?? 0"
-          :device-name="selectedLanHost?.name ?? ''"
-          :device-os="peerList[0]?.os ?? ''"
-          :items-completed="syncProgress.items_completed"
-          :items-total="syncProgress.items_total"
-          :progress="syncProgress.progress"
-          :connection-status="connectionStatus"
-          @join="(ip: string, port: string) => joinWebRTC(ip, port)"
-          @sync="triggerSync"
-        />
+        <template v-else>
+          <ConnectHostView
+            v-if="mode === 'host'"
+            :passphrase="passphrase"
+            :is-connected="isConnected"
+            :syncing="syncing"
+            :progress="syncProgress.progress"
+            :items-completed="syncProgress.items_completed"
+            :items-total="syncProgress.items_total"
+            :peer-name="peerList[0]?.name ?? ''"
+            :peer-os="peerList[0]?.os ?? ''"
+          />
 
-        <ConnectLanDiscovery
-          v-if="mode === 'join' && !selectedLanHost && !isConnected"
-          @select="selectLanHost"
-        />
+          <ConnectJoinView
+            v-if="mode === 'join'"
+            v-model="joinPassphrase"
+            :loading="loading"
+            :is-connected="isConnected"
+            :show-sync-button="false"
+            :syncing="syncing"
+            :host-ip="selectedLanHost?.ip ?? ''"
+            :host-port="selectedLanHost?.port ?? 0"
+            :device-name="selectedLanHost?.name ?? ''"
+            :device-os="peerList[0]?.os ?? ''"
+            :items-completed="syncProgress.items_completed"
+            :items-total="syncProgress.items_total"
+            :progress="syncProgress.progress"
+            :connection-status="connectionStatus"
+            @join="(ip: string, port: string) => joinWebRTC(ip, port)"
+            @sync="triggerSync"
+          />
+
+          <ConnectLanDiscovery
+            v-if="mode === 'join' && !selectedLanHost && !isConnected"
+            @select="selectLanHost"
+          />
+        </template>
 
         <div v-if="peerList.length > 1" class="text-left px-2 mb-2">
           <div class="text-caption font-weight-bold text-medium-emphasis mb-1">
@@ -306,6 +326,18 @@
             <span class="text-caption text-medium-emphasis ml-2">{{ peer.os }}</span>
           </div>
         </div>
+
+        <v-btn
+          v-if="isConnected && !syncStore.viewOnlyActive"
+          variant="tonal"
+          color="secondary"
+          size="small"
+          class="text-none mb-2 align-self-center"
+          prepend-icon="mdi-eye-outline"
+          @click="syncStore.browseOnly()"
+        >
+          {{ $t('connect.view_only_browse') }}
+        </v-btn>
 
         <div
           class="text-caption text-disabled mb-1 text-center py-2"
@@ -331,14 +363,17 @@
 import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useConnect } from '@/composables/useConnect';
+import { useSyncStore } from '@/stores/sync';
 import { connectionStatusKey } from '@/utils/connectStatus';
 import { deviceOsIcon } from '@/utils/format';
 import ConnectHostView from '@/components/connect/ConnectHostView.vue';
 import ConnectJoinView from '@/components/connect/ConnectJoinView.vue';
 import ConnectLanDiscovery from '@/components/connect/ConnectLanDiscovery.vue';
 import ConnectStatusBar from '@/components/connect/ConnectStatusBar.vue';
+import GuestGallery from '@/components/connect/GuestGallery.vue';
 
 const { t } = useI18n();
+const syncStore = useSyncStore();
 
 const props = withDefaults(
   defineProps<{

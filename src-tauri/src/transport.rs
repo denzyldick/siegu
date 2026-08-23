@@ -228,6 +228,49 @@ async fn serve_media_file(
     builder.body(body).map_err(|_| warp::reject::not_found())
 }
 
+/// Serve an in-memory media item fetched over the view-only data channel
+/// (#9). Key format: `<photo_id>` for originals, `thumb:<photo_id>` for
+/// thumbnails. On a miss we ask the peer and wait briefly for the transfer.
+async fn serve_remote_media(
+    key: String,
+    is_head: bool,
+) -> Result<warp::http::Response<Vec<u8>>, warp::Rejection> {
+    let state = siegu_core::view_only::state();
+    let (id, thumbnail) = match key.strip_prefix("thumb:") {
+        Some(id) => (id.to_string(), true),
+        None => (key.clone(), false),
+    };
+    let media = match state.get(&key) {
+        Some(m) => m,
+        None => {
+            // Trigger the on-demand pull and wait for the mesh layer to
+            // deliver the bytes into the cache.
+            if !state.request_media(&id, thumbnail) {
+                return Err(warp::reject::not_found());
+            }
+            let timeout = if thumbnail {
+                std::time::Duration::from_secs(15)
+            } else {
+                std::time::Duration::from_secs(60)
+            };
+            state
+                .wait_for(&key, timeout)
+                .await
+                .ok_or_else(warp::reject::not_found)?
+        }
+    };
+    Ok(warp::http::Response::builder()
+        .header("Content-Type", media.mime)
+        .header("Cache-Control", "no-store")
+        .header("Content-Length", media.bytes.len())
+        .body(if is_head {
+            Vec::new()
+        } else {
+            (*media.bytes).clone()
+        })
+        .map_err(|_| warp::reject::not_found())?)
+}
+
 pub fn start_media_server(config_path: String) -> u16 {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
@@ -310,6 +353,17 @@ pub fn start_media_server(config_path: String) -> u16 {
                 })
                 .boxed();
 
+            let remote = warp::get()
+                .or(warp::head())
+                .unify()
+                .and(warp::path!("remote" / String))
+                .and(warp::method())
+                .and_then(|key: String, method| async move {
+                    let is_head = method == warp::http::Method::HEAD;
+                    serve_remote_media(key, is_head).await
+                })
+                .boxed();
+
             let addr: std::net::SocketAddr = ([127, 0, 0, 1], 0).into();
             let listener = match tokio::net::TcpListener::bind(addr).await {
                 Ok(l) => l,
@@ -327,7 +381,10 @@ pub fn start_media_server(config_path: String) -> u16 {
             };
             let port = addr.port();
             let _ = tx.send(port);
-            warp::serve(media.or(thumb)).incoming(listener).run().await;
+            warp::serve(media.or(thumb).or(remote))
+                .incoming(listener)
+                .run()
+                .await;
         });
     });
 

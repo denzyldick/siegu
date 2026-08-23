@@ -9,6 +9,12 @@ use crate::sync_transport::{
     cleanup_sync_temp, resolve_sync_target_dir, sanitize_filename, sync_temp_dir,
 };
 
+/// Shared view-only session state (#9). One mesh session can be active at a
+/// time, so a process-global registry is sufficient.
+fn view_state() -> &'static crate::view_only::ViewOnlyState {
+    crate::view_only::state()
+}
+
 pub const PROTOCOL_VERSION: u8 = 2;
 pub const MAX_MESH_DEVICES: usize = 5;
 
@@ -38,6 +44,8 @@ pub enum SyncPhase {
     #[default]
     Idle,
     Syncing,
+    /// Browsing a peer's library without writing anything (#9).
+    ViewOnly,
     Completed,
 }
 
@@ -131,6 +139,27 @@ pub enum SyncMessage {
     VersionReject {
         reason: String,
     },
+    /// Viewer asks to browse the peer's library without any writes (#9).
+    EnterViewOnly,
+    /// Chunked manifest of the sharer's library, sent to a view-only client.
+    ViewOnlyManifest {
+        photos: Vec<PhotoSyncInfo>,
+        #[serde(default)]
+        more: bool,
+    },
+    /// View-only client requests media for one photo. Thumbnails stream back
+    /// as a direct `ViewMedia` reply; originals reuse FileHeader/Chunk/End.
+    FetchMediaRequest {
+        id: String,
+        #[serde(default)]
+        thumbnail: bool,
+    },
+    /// Sharer replies with directly-served bytes (thumbnails) for one photo.
+    ViewMedia {
+        id: String,
+        mime: String,
+        data: Vec<u8>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -185,6 +214,9 @@ pub trait SyncEvent: Send + Sync {
     fn on_peer_offline(&self) {}
     /// Called when the peer announces its full library size (photo, video).
     fn on_peer_library_stats(&self, _photo_count: i64, _video_count: i64) {}
+    /// Called once when a view-only peer finishes receiving our manifest
+    /// chunks (#9): the UI builds an ephemeral read-only gallery from it.
+    fn on_view_manifest(&self, _photos: &[PhotoSyncInfo]) {}
     fn on_device_registered(&self, db: &Database);
     fn on_metadata_updated(
         &self,
@@ -387,6 +419,25 @@ impl MeshManager {
         Ok(())
     }
 
+    /// Chunked manifest for a view-only client (#9): metadata only, no
+    /// counters or sync state involved.
+    pub async fn send_manifest_view_only(
+        dc: &Arc<webrtc::data_channel::RTCDataChannel>,
+        photos: Vec<PhotoSyncInfo>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        for (chunk, more) in Self::split_manifest_chunks(photos) {
+            Self::send_sync_message(
+                dc,
+                &SyncMessage::ViewOnlyManifest {
+                    photos: chunk,
+                    more,
+                },
+            )
+            .await?;
+        }
+        Ok(())
+    }
+
     pub async fn send_file_with_retry(
         dc: Arc<webrtc::data_channel::RTCDataChannel>,
         outgoing: OutgoingFile,
@@ -406,6 +457,7 @@ impl MeshManager {
                 items_total,
                 mirror_completed,
                 mirror_total,
+                true,
             )
             .await
             {
@@ -431,6 +483,10 @@ impl MeshManager {
         Err(last_err.unwrap_or_else(|| "Send failed after retries".into()))
     }
 
+    /// Stream one file over the data channel. `track_progress` gates batch
+    /// counter emissions: sync transfers report progress; on-demand view-only
+    /// reads must stay silent (a friend browsing should not move our k/N).
+    #[allow(clippy::too_many_arguments)]
     async fn send_file_inner(
         dc: &Arc<webrtc::data_channel::RTCDataChannel>,
         outgoing: &OutgoingFile,
@@ -439,6 +495,7 @@ impl MeshManager {
         items_total: &Arc<std::sync::atomic::AtomicUsize>,
         mirror_completed: &Arc<std::sync::atomic::AtomicUsize>,
         mirror_total: &Arc<std::sync::atomic::AtomicUsize>,
+        track_progress: bool,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let photo_id = outgoing.id.clone();
         let path = Path::new(&outgoing.path);
@@ -470,18 +527,20 @@ impl MeshManager {
         // Surface the per-file start event immediately (before the thumbnail
         // pass) so the UI shows the next file without waiting on a decode.
         // Counters ride along so batch progress in the UI never resets to 0/0.
-        let (completed, total) = counters();
-        event.on_sync_progress(SyncProgress {
-            device_id: "peer".to_string(),
-            status: format!("Sending {filename}"),
-            phase: SyncPhase::Syncing,
-            progress: 0.0,
-            bytes_per_second: 0,
-            items_completed: completed,
-            items_total: total,
-            filename: Some(filename.clone()),
-            thumbnail: None,
-        });
+        if track_progress {
+            let (completed, total) = counters();
+            event.on_sync_progress(SyncProgress {
+                device_id: "peer".to_string(),
+                status: format!("Sending {filename}"),
+                phase: SyncPhase::Syncing,
+                progress: 0.0,
+                bytes_per_second: 0,
+                items_completed: completed,
+                items_total: total,
+                filename: Some(filename.clone()),
+                thumbnail: None,
+            });
+        }
 
         // Generate a missing thumbnail here (on the send path) so the peer's
         // FileHeader always carries one, then surface it to the local UI and
@@ -489,17 +548,20 @@ impl MeshManager {
         let encoded = if outgoing.encoded.is_empty() {
             let thumb = crate::thumbnail::generate_thumbnail(&outgoing.path).unwrap_or_default();
             if !thumb.is_empty() {
-                event.on_sync_progress(SyncProgress {
-                    device_id: "peer".to_string(),
-                    status: format!("Sending {filename}"),
-                    phase: SyncPhase::Syncing,
-                    progress: 0.0,
-                    bytes_per_second: 0,
-                    items_completed: completed,
-                    items_total: total,
-                    filename: Some(filename.clone()),
-                    thumbnail: Some(thumb.clone()),
-                });
+                if track_progress {
+                    let (completed, total) = counters();
+                    event.on_sync_progress(SyncProgress {
+                        device_id: "peer".to_string(),
+                        status: format!("Sending {filename}"),
+                        phase: SyncPhase::Syncing,
+                        progress: 0.0,
+                        bytes_per_second: 0,
+                        items_completed: completed,
+                        items_total: total,
+                        filename: Some(filename.clone()),
+                        thumbnail: Some(thumb.clone()),
+                    });
+                }
                 let db = Database::new(&event.get_config_path());
                 db.update_photo_thumbnail(&photo_id, &thumb);
             }
@@ -557,23 +619,25 @@ impl MeshManager {
             // `progress` carries the overall batch percentage so every UI
             // surface moves monotonically; per-file byte detail lives only in
             // the status text.
-            let (completed, total) = counters();
-            let batch_progress = if total > 0 {
-                (completed as f32 / total as f32) * 100.0
-            } else {
-                (total_sent as f32 / size as f32) * 100.0
-            };
-            event.on_sync_progress(SyncProgress {
-                device_id: "peer".to_string(),
-                status: format!("Sending {filename}"),
-                phase: SyncPhase::Syncing,
-                progress: batch_progress,
-                bytes_per_second: 0,
-                items_completed: completed,
-                items_total: total,
-                filename: None,
-                thumbnail: None,
-            });
+            if track_progress {
+                let (completed, total) = counters();
+                let batch_progress = if total > 0 {
+                    (completed as f32 / total as f32) * 100.0
+                } else {
+                    (total_sent as f32 / size as f32) * 100.0
+                };
+                event.on_sync_progress(SyncProgress {
+                    device_id: "peer".to_string(),
+                    status: format!("Sending {filename}"),
+                    phase: SyncPhase::Syncing,
+                    progress: batch_progress,
+                    bytes_per_second: 0,
+                    items_completed: completed,
+                    items_total: total,
+                    filename: None,
+                    thumbnail: None,
+                });
+            }
 
             let buffer_wait_start = std::time::Instant::now();
             while dc.buffered_amount().await > MAX_BUFFERED_BYTES {
@@ -601,24 +665,26 @@ impl MeshManager {
             return Err(e);
         }
 
-        event.on_sync_progress(SyncProgress {
-            device_id: "peer".to_string(),
-            status: format!("Finished sending {filename}"),
-            phase: SyncPhase::Syncing,
-            progress: {
-                let (completed, total) = counters();
-                if total > 0 {
-                    (completed as f32 / total as f32) * 100.0
-                } else {
-                    100.0
-                }
-            },
-            bytes_per_second: 0,
-            items_completed: counters().0,
-            items_total: counters().1,
-            filename: Some(filename.clone()),
-            thumbnail: Some(encoded.clone()),
-        });
+        if track_progress {
+            event.on_sync_progress(SyncProgress {
+                device_id: "peer".to_string(),
+                status: format!("Finished sending {filename}"),
+                phase: SyncPhase::Syncing,
+                progress: {
+                    let (completed, total) = counters();
+                    if total > 0 {
+                        (completed as f32 / total as f32) * 100.0
+                    } else {
+                        100.0
+                    }
+                },
+                bytes_per_second: 0,
+                items_completed: counters().0,
+                items_total: counters().1,
+                filename: Some(filename.clone()),
+                thumbnail: Some(encoded.clone()),
+            });
+        }
 
         event.on_log(&format!("File {filename} sent over"));
 
@@ -638,6 +704,7 @@ impl MeshManager {
         items_total: &Arc<std::sync::atomic::AtomicUsize>,
         mirror_completed: &Arc<std::sync::atomic::AtomicUsize>,
         mirror_total: &Arc<std::sync::atomic::AtomicUsize>,
+        pending_view_manifest: &Arc<tokio::sync::Mutex<Vec<PhotoSyncInfo>>>,
     ) {
         match msg {
             SyncMessage::ManifestRequest => {
@@ -661,6 +728,15 @@ impl MeshManager {
                 event.on_log("DEBUG sent ManifestResponse (chunked)");
             }
             SyncMessage::ManifestResponse { photos, more } => {
+                if view_state()
+                    .serving_view_only
+                    .load(std::sync::atomic::Ordering::SeqCst)
+                {
+                    // A view-only guest feeding us a manifest would turn this
+                    // side into a puller that writes files. Never.
+                    event.on_log("DEBUG ignoring ManifestResponse from view-only peer");
+                    return;
+                }
                 let chunk_len = photos.len();
                 let mut pending = pending_manifest.lock().await;
                 pending.extend(photos);
@@ -868,6 +944,15 @@ impl MeshManager {
                 aesthetics_score,
                 encoded,
             } => {
+                if view_state()
+                    .viewing
+                    .load(std::sync::atomic::Ordering::SeqCst)
+                {
+                    // View-only session: stage an in-memory buffer keyed by
+                    // photo id; chunks append and FileEnd verifies+caches.
+                    view_state().insert_partial(&id, checksum, sanitize_filename(&filename));
+                    return;
+                }
                 if Self::check_storage_quota(config_path, size) {
                     event.on_sync_error(format!(
                         "Storage quota would be exceeded by {} ({} bytes). Set max_storage_mb to increase limit.",
@@ -935,6 +1020,14 @@ impl MeshManager {
                 }
             }
             SyncMessage::FileChunk { id, index: _, data } => {
+                if view_state()
+                    .viewing
+                    .load(std::sync::atomic::Ordering::SeqCst)
+                {
+                    // View-only session: buffer in memory, never touch disk.
+                    view_state().append_chunk(&id, &data);
+                    return;
+                }
                 let mut incoming = incoming_files.lock().await;
                 if let Some(file_state) = incoming.get_mut(&id) {
                     if let Err(e) = file_state.file.write_all(&data).await {
@@ -965,6 +1058,17 @@ impl MeshManager {
                 }
             }
             SyncMessage::FileEnd { id, checksum } => {
+                if view_state()
+                    .viewing
+                    .load(std::sync::atomic::Ordering::SeqCst)
+                {
+                    // Verify and cache in memory; nothing is persisted.
+                    let ok = view_state().complete(&id, |bytes| Self::compute_data_checksum(bytes));
+                    if !ok {
+                        event.on_sync_error(format!("Checksum mismatch for view-only media {id}"));
+                    }
+                    return;
+                }
                 let mut incoming = incoming_files.lock().await;
                 if let Some(mut file_state) = incoming.remove(&id) {
                     let _ = file_state.file.flush().await;
@@ -1127,6 +1231,15 @@ impl MeshManager {
                     Self::send_sync_message(dc, &SyncMessage::FileRequest { id: photo.id }).await;
             }
             SyncMessage::StartSync => {
+                if view_state()
+                    .serving_view_only
+                    .load(std::sync::atomic::Ordering::SeqCst)
+                {
+                    // A view-only guest cannot trigger a pull that would make
+                    // us write anything to our library.
+                    event.on_log("DEBUG ignoring StartSync from view-only peer");
+                    return;
+                }
                 event.on_log("DEBUG handle StartSync");
                 event.on_state_change("Sync started");
                 let _ = Self::send_sync_message(dc, &SyncMessage::ManifestRequest).await;
@@ -1204,6 +1317,13 @@ impl MeshManager {
                 indexed,
                 deleted_at,
             } => {
+                if view_state()
+                    .serving_view_only
+                    .load(std::sync::atomic::Ordering::SeqCst)
+                {
+                    event.on_log("DEBUG ignoring MetadataUpdate from view-only peer");
+                    return;
+                }
                 let db = Database::new(config_path);
                 if let Some(ref dt) = deleted_at {
                     if !dt.is_empty() {
@@ -1249,6 +1369,118 @@ impl MeshManager {
             }
             SyncMessage::VersionReject { reason } => {
                 event.on_sync_error(format!("Peer rejected connection: {reason}"));
+            }
+            SyncMessage::EnterViewOnly => {
+                // Serve our manifest as read-only metadata. Nothing on this
+                // device may mutate from here on until the session ends.
+                view_state()
+                    .serving_view_only
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
+                event.on_log("DEBUG peer entered view-only mode; serving manifest");
+                let db = Database::new(config_path);
+                let photos = db.get_photo_sync_info();
+                if let Err(e) = Self::send_manifest_view_only(dc, photos).await {
+                    event.on_log(&format!("ERROR sending view-only manifest: {e}"));
+                }
+            }
+            SyncMessage::ViewOnlyManifest { photos, more } => {
+                let mut pending = pending_view_manifest.lock().await;
+                pending.extend(photos);
+                if more {
+                    return;
+                }
+                let photos = std::mem::take(&mut *pending);
+                drop(pending);
+                event.on_log(&format!(
+                    "DEBUG view-only manifest complete ({} items)",
+                    photos.len()
+                ));
+                event.on_view_manifest(&photos);
+            }
+            SyncMessage::FetchMediaRequest { id, thumbnail } => {
+                if thumbnail {
+                    // Small direct reply: DB-cached thumbnail or generate.
+                    let db = Database::new(config_path);
+                    let bytes = match db.get_photo_thumbnail_bytes(&id) {
+                        Some(b) => Some(b),
+                        None => db
+                            .get_photo_location(&id)
+                            .and_then(|loc| crate::thumbnail::generate_thumbnail_bytes(&loc)),
+                    };
+                    match bytes {
+                        Some(data) if data.len() <= MAX_DATA_CHANNEL_MSG_SIZE / 2 => {
+                            let _ = Self::send_sync_message(
+                                dc,
+                                &SyncMessage::ViewMedia {
+                                    id,
+                                    mime: "image/jpeg".to_string(),
+                                    data,
+                                },
+                            )
+                            .await;
+                        }
+                        _ => event.on_log(&format!(
+                            "WARN no thumbnail available for view-only request {id}"
+                        )),
+                    }
+                    return;
+                }
+
+                // Original: stream via the normal header/chunk/end protocol.
+                let db = Database::new(config_path);
+                let Ok((path, created, lat, lon, objects, faces, caption, aesthetics_score, encoded)) =
+                    db.connection.query_row(
+                        "SELECT p.location, p.created, p.latitude, p.longitude,
+                         (SELECT json_group_array(json_object('class', class, 'probability', probability)) FROM object WHERE photo_id = p.id),
+                         (SELECT json_group_array(json_object('face_id', face_id, 'crop_path', crop_path, 'encoded', encoded, 'person_id', person_id)) FROM faces WHERE photo_id = p.id),
+                         p.caption, p.aesthetics_score, p.encoded
+                         FROM photo p WHERE p.id = ?1",
+                        [&id],
+                        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<f64>>(2)?, row.get::<_, Option<f64>>(3)?, row.get::<_, String>(4).unwrap_or("[]".to_string()), row.get::<_, String>(5).unwrap_or("[]".to_string()), row.get::<_, Option<String>>(6)?, row.get::<_, Option<f64>>(7)?, row.get::<_, String>(8).unwrap_or_default())),
+                    )
+                else {
+                    event.on_log(&format!("ERROR FetchMediaRequest {id}: photo not found"));
+                    return;
+                };
+                let relative_path = Self::compute_relative_path(&path, &event.get_directories());
+                let outgoing = OutgoingFile {
+                    id,
+                    path,
+                    relative_path,
+                    created,
+                    latitude: lat,
+                    longitude: lon,
+                    objects,
+                    faces,
+                    caption,
+                    aesthetics_score,
+                    encoded,
+                };
+                // Untracked: no counters, no batch progress — this is an
+                // on-demand read for a viewer, not a sync transfer.
+                if let Err(e) = Self::send_file_inner(
+                    dc,
+                    &outgoing,
+                    event.as_ref(),
+                    items_completed,
+                    items_total,
+                    mirror_completed,
+                    mirror_total,
+                    false,
+                )
+                .await
+                {
+                    event.on_log(&format!("ERROR serving view-only media: {e}"));
+                }
+            }
+            SyncMessage::ViewMedia { id, mime, data } => {
+                view_state().insert_completed(
+                    format!("thumb:{id}"),
+                    crate::view_only::RemoteMedia {
+                        bytes: Arc::new(data),
+                        mime,
+                    },
+                );
             }
         }
     }

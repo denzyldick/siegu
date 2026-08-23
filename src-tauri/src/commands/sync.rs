@@ -370,6 +370,8 @@ pub async fn stop_webrtc_session(
         let mut tx = state.sync_tx.lock().await;
         *tx = None;
     }
+    // Drop any ephemeral view-only buffers/cache bound to the session.
+    siegu_core::view_only::state().reset_session();
     if let Ok(mut d) = mdns_state.daemon.lock() {
         if let Some(daemon) = d.take() {
             daemon.shutdown();
@@ -441,6 +443,22 @@ pub async fn request_start_sync(state: tauri::State<'_, crate::WebRtcState>) -> 
         return Err("Not connected to a device".to_string());
     };
     tx.send(transport::SyncMessage::StartSync)
+        .map_err(|e| e.to_string())
+}
+
+/// Enter view-only mode on the active connection (#9): bind the media cache
+/// to this session and ask the peer for its read-only manifest.
+#[tauri::command]
+pub async fn enter_view_only(state: tauri::State<'_, crate::WebRtcState>) -> Result<(), String> {
+    let mut tx_lock = state.sync_tx.lock().await;
+    let Some(tx) = tx_lock.as_mut() else {
+        return Err("Not connected to a device".to_string());
+    };
+    let view = siegu_core::view_only::state();
+    view.viewing
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    view.bind_session(tx.clone());
+    tx.send(transport::SyncMessage::EnterViewOnly)
         .map_err(|e| e.to_string())
 }
 

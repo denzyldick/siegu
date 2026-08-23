@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { listDevices, autoReconnect } from '@/services/tauri';
+import { listDevices, autoReconnect, enterViewOnly } from '@/services/tauri';
 import { listenEvent } from '@/services/events';
-import type { SyncStatus, Device } from '@/types/sync';
+import type { SyncStatus, Device, ViewPhoto } from '@/types/sync';
 
 export const useSyncStore = defineStore('sync', () => {
   const status = ref<SyncStatus>('idle');
@@ -14,6 +14,10 @@ export const useSyncStore = defineStore('sync', () => {
   const connection = ref<'idle' | 'connected' | 'offline'>('idle');
   const connectionMode = ref<'lan' | 'internet' | null>(null);
   const activePeerId = ref<string | null>(null);
+  /** #9 view-only browsing state. */
+  const viewOnlyActive = ref(false);
+  const viewOnlyPhotos = ref<ViewPhoto[]>([]);
+  const viewOnlyLoading = ref(false);
 
   async function loadDevices(): Promise<void> {
     try {
@@ -102,10 +106,44 @@ export const useSyncStore = defineStore('sync', () => {
   void listenEvent('peer-disconnected', (payload: string) => {
     connection.value = 'offline';
     connected.value = false;
+    viewOnlyActive.value = false;
+    viewOnlyPhotos.value = [];
     if (typeof payload === 'string' && payload) {
       activePeerId.value = payload;
     }
   });
+
+  void listenEvent('view-manifest', (payload: string) => {
+    try {
+      const photos = JSON.parse(payload) as ViewPhoto[];
+      viewOnlyPhotos.value = Array.isArray(photos) ? photos : [];
+      viewOnlyLoading.value = false;
+    } catch (e) {
+      console.error('[SyncStore] Failed to parse view manifest:', e);
+      viewOnlyLoading.value = false;
+    }
+  });
+
+  /** Ask the peer for a read-only look at their library (#9). */
+  async function browseOnly(): Promise<void> {
+    viewOnlyLoading.value = true;
+    viewOnlyPhotos.value = [];
+    viewOnlyActive.value = true;
+    try {
+      await enterViewOnly();
+    } catch (e) {
+      console.error('[SyncStore] enter_view_only failed:', e);
+      viewOnlyActive.value = false;
+      viewOnlyLoading.value = false;
+    }
+  }
+
+  function exitViewOnly(): void {
+    viewOnlyActive.value = false;
+    viewOnlyPhotos.value = [];
+    // Backend state is reset on disconnect/stop; the sharer keeps serving
+    // nothing once we stop requesting.
+  }
 
   async function reconnect(): Promise<boolean> {
     try {
@@ -132,7 +170,12 @@ export const useSyncStore = defineStore('sync', () => {
     connection,
     connectionMode,
     activePeerId,
+    viewOnlyActive,
+    viewOnlyPhotos,
+    viewOnlyLoading,
     loadDevices,
     reconnect,
+    browseOnly,
+    exitViewOnly,
   };
 });

@@ -296,6 +296,10 @@ export async function requestStartSync(): Promise<void> {
   await call<unknown>('request_start_sync');
 }
 
+export async function enterViewOnly(): Promise<void> {
+  await call<unknown>('enter_view_only');
+}
+
 export async function autoReconnect(discoveredUrl?: string | null): Promise<boolean> {
   return call<boolean>('auto_reconnect', { discoveredUrl: discoveredUrl ?? null });
 }
