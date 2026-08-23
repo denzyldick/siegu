@@ -46,12 +46,10 @@ android {
         }
         getByName("release") {
             signingConfig = signingConfigs["debugKeystore"]
-            isMinifyEnabled = true
-            proguardFiles(
-                *fileTree(".") { include("**/*.pro") }
-                    .plus(getDefaultProguardFile("proguard-android-optimize.txt"))
-                    .toList().toTypedArray()
-            )
+            // R8 full-mode strips classes Tauri loads reflectively/JNI-by-name
+            // (plugins, Jackson-bound args) despite consumer rules; upstream
+            // template default is disabled, so keep it disabled.
+            isMinifyEnabled = false
         }
     }
     kotlinOptions {
