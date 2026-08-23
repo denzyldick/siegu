@@ -44,6 +44,18 @@ export function useMediaUrl() {
     return `http://127.0.0.1:${sharedPort.value}/thumb/${encoded}`;
   }
 
+  // Evicted (view-only) items stream through the media server's /remote
+  // route, which pulls bytes from the peer on demand (#10).
+  function remoteImageUrl(id: string | number): string | null {
+    if (!sharedPort.value) return null;
+    return `http://127.0.0.1:${sharedPort.value}/remote/${encodeURIComponent(String(id))}`;
+  }
+
+  function remoteThumbUrl(id: string | number): string | null {
+    if (!sharedPort.value) return null;
+    return `http://127.0.0.1:${sharedPort.value}/remote/thumb:${encodeURIComponent(String(id))}`;
+  }
+
   function isVideo(location: string): boolean {
     return isVideoFile(location);
   }
@@ -54,6 +66,8 @@ export function useMediaUrl() {
     videoUrl,
     imageUrl,
     thumbUrl,
+    remoteImageUrl,
+    remoteThumbUrl,
     isVideo,
   };
 }

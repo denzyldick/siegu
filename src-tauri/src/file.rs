@@ -230,6 +230,8 @@ pub fn scan_folder(
                     ai_status: database::AiStatus::default(),
                     sync_needed: true,
                     received: false,
+                    view_only: false,
+                    last_opened: 0,
                 })
             })
             .collect();

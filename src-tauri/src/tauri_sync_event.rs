@@ -93,6 +93,8 @@ impl SyncEvent for TauriSyncEvent {
                 ai_status: crate::database::AiStatus::default(),
                 sync_needed: false,
                 received: true,
+                view_only: false,
+                last_opened: 0,
             },
         );
     }

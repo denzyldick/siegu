@@ -279,6 +279,11 @@
     "cleanup_db": "Restablecer biblioteca",
     "cleanup_db_desc": "Borrar todo el índice de la biblioteca y empezar de cero. Tus archivos de fotos no se modifican.",
     "clean": "Limpiar",
+    "storage": "Almacenamiento",
+    "storage_cap": "Límite de almacenamiento",
+    "storage_cap_desc": "Limita cuánto espacio pueden usar las fotos recibidas. Al alcanzar el límite, los archivos más antiguos que recibiste se reemplazan por miniaturas; los originales permanecen en el dispositivo de origen.",
+    "storage_cap_mb": "Límite en MB",
+    "storage_used": "Espacio usado",
     "clear_db_title": "¿Restablecer la biblioteca?",
     "clear_db_desc": "Esto borrará todas las fotos indexadas, personas, álbumes, rostros y configuraciones de la app. Tus archivos de fotos originales no se eliminan. ¿Deseas continuar?",
     "clear": "Borrar",
@@ -441,7 +446,8 @@
     "faces_detected": "Rostros detectados",
     "fully_indexed": "Totalmente indexado",
     "not_synced": "No respaldado en otro dispositivo — toca para reconectar",
-    "nsfw": "NSFW detectado"
+    "nsfw": "NSFW detectado",
+    "view_only": "Guardado en tu otro dispositivo — abre para verlo"
   },
   "media_thumbnail": {
     "alt_thumb": "Miniatura de foto"
@@ -556,6 +562,8 @@
     "copy": "Copiar",
     "copy_text": "Copiar texto",
     "copied": "Texto copiado",
+    "restore_original": "Restaurar original",
+    "restore_started": "Restaurando el original desde tu dispositivo...",
     "copy_failed": "Error al copiar",
     "add_to_album": "Añadir al álbum"
   },

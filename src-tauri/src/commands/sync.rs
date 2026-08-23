@@ -13,6 +13,13 @@ pub struct LanHostInfo {
     pub port: u16,
 }
 
+/// Storage usage against the configured cap (#10).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct StorageUsage {
+    pub used: u64,
+    pub quota: u64,
+}
+
 /// Returns the first non-loopback IPv4 address on the machine.
 fn get_local_ip() -> Option<String> {
     let s = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
@@ -460,6 +467,37 @@ pub async fn enter_view_only(state: tauri::State<'_, crate::WebRtcState>) -> Res
     view.bind_session(tx.clone());
     tx.send(transport::SyncMessage::EnterViewOnly)
         .map_err(|e| e.to_string())
+}
+
+/// Pull the original of an evicted (view-only) photo from the peer (#10).
+/// The transfer persists via the normal receive path and clears view_only.
+#[tauri::command]
+pub async fn fetch_original(
+    state: tauri::State<'_, crate::WebRtcState>,
+    id: String,
+) -> Result<(), String> {
+    let mut tx_lock = state.sync_tx.lock().await;
+    let Some(tx) = tx_lock.as_ref() else {
+        return Err("Not connected to a device".to_string());
+    };
+    tx.send(transport::SyncMessage::FetchMediaRequest {
+        id,
+        thumbnail: false,
+        restore: true,
+    })
+    .map_err(|e| e.to_string())
+}
+
+/// Current storage usage vs. the configured cap, in bytes (#10).
+#[tauri::command]
+pub async fn storage_usage(app: tauri::AppHandle) -> Result<StorageUsage, String> {
+    let config_path = get_config_path(&app);
+    if config_path.is_empty() {
+        return Err("Config error".to_string());
+    }
+    let quota = siegu_core::mesh::MeshManager::get_storage_quota(&config_path);
+    let used = siegu_core::mesh::MeshManager::get_storage_used(&config_path);
+    Ok(StorageUsage { used, quota })
 }
 
 #[tauri::command]

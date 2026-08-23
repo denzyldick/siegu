@@ -279,6 +279,11 @@
     "cleanup_db": "Redefinir biblioteca",
     "cleanup_db_desc": "Apagar todo o índice da biblioteca e começar do zero. Seus arquivos de fotos não são alterados.",
     "clean": "Limpar",
+    "storage": "Armazenamento",
+    "storage_cap": "Limite de armazenamento",
+    "storage_cap_desc": "Limite quanto espaço as fotos recebidas podem usar. Ao atingir o limite, os ficheiros recebidos mais antigos são substituídos por miniaturas; os originais ficam no dispositivo de origem.",
+    "storage_cap_mb": "Limite em MB",
+    "storage_used": "Espaço usado",
     "clear_db_title": "Redefinir a biblioteca?",
     "clear_db_desc": "Isso apagará todas as fotos indexadas, pessoas, álbuns, rostos e configurações do aplicativo. Seus arquivos de fotos originais não são excluídos. Deseja continuar?",
     "clear": "Limpar",
@@ -441,7 +446,8 @@
     "faces_detected": "Rostos detectados",
     "fully_indexed": "Totalmente indexado",
     "not_synced": "Não copiado para outro dispositivo — toque para reconectar",
-    "nsfw": "NSFW detectado"
+    "nsfw": "NSFW detectado",
+    "view_only": "Guardado no seu outro dispositivo — abra para ver"
   },
   "media_thumbnail": {
     "alt_thumb": "Miniatura de foto"
@@ -556,6 +562,8 @@
     "copy": "Copiar",
     "copy_text": "Copiar texto",
     "copied": "Texto copiado",
+    "restore_original": "Restaurar original",
+    "restore_started": "A restaurar o original do seu dispositivo...",
     "copy_failed": "Falha ao copiar",
     "add_to_album": "Adicionar ao álbum"
   },

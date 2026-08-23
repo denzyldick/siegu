@@ -68,6 +68,7 @@ export interface MediaItem {
   longitude: number | null;
   sync_needed?: boolean;
   received?: boolean;
+  view_only?: boolean;
   _groupKey?: string;
   _sortKey?: string;
 }

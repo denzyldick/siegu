@@ -35,6 +35,8 @@
 
         <MaintenanceSection v-if="!embedded" />
 
+        <StorageSection v-if="!embedded" />
+
         <SignallingSection
           v-if="!embedded"
           :model-value="signalingUrl"
@@ -183,6 +185,7 @@ import AiSection from './settings/AiSection.vue';
 import LanguageSection from './settings/LanguageSection.vue';
 import AppearanceSection from './settings/AppearanceSection.vue';
 import MaintenanceSection from './settings/MaintenanceSection.vue';
+import StorageSection from './settings/StorageSection.vue';
 import SignallingSection from './settings/SignallingSection.vue';
 import UpdateSection from './settings/UpdateSection.vue';
 import AboutSection from './settings/AboutSection.vue';

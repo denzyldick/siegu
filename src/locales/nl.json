@@ -279,6 +279,11 @@
     "cleanup_db": "Bibliotheek herstellen",
     "cleanup_db_desc": "Wis de volledige bibliotheekindex en begin opnieuw. Je fotobestanden worden niet gewijzigd.",
     "clean": "Opschonen",
+    "storage": "Opslag",
+    "storage_cap": "Opslaglimiet",
+    "storage_cap_desc": "Beperk hoeveel ruimte ontvangen foto's mogen gebruiken. Bij het bereiken van de limiet worden de oudst ontvangen bestanden vervangen door miniaturen; originelen blijven op het bronapparaat.",
+    "storage_cap_mb": "Limiet in MB",
+    "storage_used": "Gebruikte ruimte",
     "clear_db_title": "Bibliotheek herstellen?",
     "clear_db_desc": "Dit wist alle geïndexeerde foto's, personen, albums, gezichten en instellingen uit de app. Je oorspronkelijke fotobestanden worden niet verwijderd. Wil je doorgaan?",
     "clear": "Wissen",
@@ -441,7 +446,8 @@
     "faces_detected": "Gezichten gedetecteerd",
     "fully_indexed": "Volledig geïndexeerd",
     "not_synced": "Niet geback-upt op een ander apparaat — tik om opnieuw te verbinden",
-    "nsfw": "NSFW gedetecteerd"
+    "nsfw": "NSFW gedetecteerd",
+    "view_only": "Opgeslagen op je andere apparaat — open om te bekijken"
   },
   "media_thumbnail": {
     "alt_thumb": "Fotominiatuur"
@@ -556,6 +562,8 @@
     "copy": "Kopiëren",
     "copy_text": "Tekst kopiëren",
     "copied": "Tekst gekopieerd",
+    "restore_original": "Origineel herstellen",
+    "restore_started": "Origineel wordt hersteld vanaf je apparaat...",
     "copy_failed": "Kopiëren mislukt",
     "add_to_album": "Toevoegen aan album"
   },

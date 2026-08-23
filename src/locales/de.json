@@ -279,6 +279,11 @@
     "cleanup_db": "Bibliothek zurücksetzen",
     "cleanup_db_desc": "Den gesamten Bibliotheksindex löschen und neu starten. Deine Fotodateien werden nicht verändert.",
     "clean": "Bereinigen",
+    "storage": "Speicher",
+    "storage_cap": "Speicherlimit",
+    "storage_cap_desc": "Begrenze, wie viel Speicher empfangene Fotos belegen dürfen. Wird das Limit erreicht, werden die ältesten empfangenen Dateien durch Vorschaubilder ersetzt; die Originale bleiben auf dem Quellgerät.",
+    "storage_cap_mb": "Limit in MB",
+    "storage_used": "Belegter Speicher",
     "clear_db_title": "Bibliothek zurücksetzen?",
     "clear_db_desc": "Damit werden alle indizierten Fotos, Personen, Alben, Gesichter und Einstellungen aus der App gelöscht. Deine ursprünglichen Fotodateien bleiben erhalten. Möchtest du fortfahren?",
     "clear": "Löschen",
@@ -441,7 +446,8 @@
     "faces_detected": "Gesichter erkannt",
     "fully_indexed": "Vollständig indiziert",
     "not_synced": "Nicht auf einem anderen Gerät gesichert — Tippen zum erneuten Verbinden",
-    "nsfw": "NSFW erkannt"
+    "nsfw": "NSFW erkannt",
+    "view_only": "Auf deinem anderen Gerät gespeichert — zum Streamen öffnen"
   },
   "media_thumbnail": {
     "alt_thumb": "Fotominiatur"
@@ -556,6 +562,8 @@
     "copy": "Kopieren",
     "copy_text": "Text kopieren",
     "copied": "Text kopiert",
+    "restore_original": "Original wiederherstellen",
+    "restore_started": "Original wird von deinem Gerät wiederhergestellt ...",
     "copy_failed": "Kopieren fehlgeschlagen",
     "add_to_album": "Zum Album hinzufügen"
   },

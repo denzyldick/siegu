@@ -332,6 +332,8 @@ pub fn run() {
             commands::sync::list_devices,
             commands::sync::request_start_sync,
             commands::sync::enter_view_only,
+            commands::sync::fetch_original,
+            commands::sync::storage_usage,
             commands::sync::initialize_sync_folder,
             commands::sync::get_media_server_port,
             commands::sync::generate_pairing_codes,

@@ -279,6 +279,11 @@
     "cleanup_db": "Réinitialiser la bibliothèque",
     "cleanup_db_desc": "Effacer tout l'index de la bibliothèque et repartir de zéro. Vos fichiers photos ne sont pas modifiés.",
     "clean": "Nettoyer",
+    "storage": "Stockage",
+    "storage_cap": "Limite de stockage",
+    "storage_cap_desc": "Limitez l'espace utilisé par les photos reçues. Une fois la limite atteinte, les fichiers les plus anciens reçus sont remplacés par des miniatures ; les originaux restent sur l'appareil d'origine.",
+    "storage_cap_mb": "Limite en Mo",
+    "storage_used": "Espace utilisé",
     "clear_db_title": "Réinitialiser la bibliothèque ?",
     "clear_db_desc": "Cela effacera toutes les photos indexées, les personnes, les albums, les visages et les paramètres de l'app. Vos fichiers photos d'origine ne sont pas supprimés. Voulez-vous continuer ?",
     "clear": "Effacer",
@@ -441,7 +446,8 @@
     "faces_detected": "Visages détectés",
     "fully_indexed": "Entièrement indexé",
     "not_synced": "Non sauvegardé sur un autre appareil — touchez pour reconnecter",
-    "nsfw": "NSFW détecté"
+    "nsfw": "NSFW détecté",
+    "view_only": "Stocké sur votre autre appareil — ouvrez pour le voir"
   },
   "media_thumbnail": {
     "alt_thumb": "Vignette photo"
@@ -556,6 +562,8 @@
     "copy": "Copier",
     "copy_text": "Copier le texte",
     "copied": "Texte copié",
+    "restore_original": "Restaurer l'original",
+    "restore_started": "Restauration de l'original depuis votre appareil...",
     "copy_failed": "Échec de la copie",
     "add_to_album": "Ajouter à l'album"
   },

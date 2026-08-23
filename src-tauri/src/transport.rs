@@ -234,6 +234,7 @@ async fn serve_media_file(
 async fn serve_remote_media(
     key: String,
     is_head: bool,
+    config_path: &str,
 ) -> Result<warp::http::Response<Vec<u8>>, warp::Rejection> {
     let state = siegu_core::view_only::state();
     let (id, thumbnail) = match key.strip_prefix("thumb:") {
@@ -241,7 +242,15 @@ async fn serve_remote_media(
         None => (key.clone(), false),
     };
     let media = match state.get(&key) {
-        Some(m) => m,
+        Some(m) => {
+            // Track opens for the storage-cap LRU (#10): recently viewed
+            // originals are evicted last.
+            if !thumbnail {
+                let db = siegu_core::database::Database::new(config_path);
+                db.touch_photo_opened(&id);
+            }
+            m
+        }
         None => {
             // Trigger the on-demand pull and wait for the mesh layer to
             // deliver the bytes into the cache.
@@ -292,6 +301,7 @@ pub fn start_media_server(config_path: String) -> u16 {
             let thumb_semaphore: Arc<tokio::sync::Semaphore> =
                 Arc::new(tokio::sync::Semaphore::new(4));
             let thumb_cache_dir = Path::new(&config_path).join("thumbs");
+            let remote_config = config_path.clone();
 
             let media_config = config_path.clone();
             let media_cache = Arc::clone(&cache);
@@ -358,9 +368,12 @@ pub fn start_media_server(config_path: String) -> u16 {
                 .unify()
                 .and(warp::path!("remote" / String))
                 .and(warp::method())
-                .and_then(|key: String, method| async move {
-                    let is_head = method == warp::http::Method::HEAD;
-                    serve_remote_media(key, is_head).await
+                .and_then(move |key: String, method| {
+                    let config_path = remote_config.clone();
+                    async move {
+                        let is_head = method == warp::http::Method::HEAD;
+                        serve_remote_media(key, is_head, &config_path).await
+                    }
                 })
                 .boxed();
 

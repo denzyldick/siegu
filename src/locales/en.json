@@ -19,7 +19,8 @@
     "faces_detected": "Faces detected",
     "fully_indexed": "Fully indexed",
     "not_synced": "Not backed up on another device — tap to reconnect",
-    "nsfw": "NSFW detected"
+    "nsfw": "NSFW detected",
+    "view_only": "Stored on your other device — open to stream"
   },
   "media_thumbnail": {
     "alt_thumb": "Photo thumbnail"
@@ -347,6 +348,8 @@
     "copy": "Copy",
     "copy_text": "Copy text",
     "copied": "Text copied",
+    "restore_original": "Restore original",
+    "restore_started": "Restoring original from your device...",
     "copy_failed": "Copy failed"
   },
   "folder_picker": {
@@ -440,6 +443,11 @@
     "cleanup_db": "Reset Library",
     "cleanup_db_desc": "Erase the entire library index and start fresh. Your photo files are not touched.",
     "clean": "Clean",
+    "storage": "Storage",
+    "storage_cap": "Storage cap",
+    "storage_cap_desc": "Limit how much space received photos may use. When the cap is hit, the oldest files you received are replaced with thumbnails; originals stay on the device they came from.",
+    "storage_cap_mb": "Cap in MB",
+    "storage_used": "Used space",
     "clear_db_title": "Reset library?",
     "clear_db_desc": "This erases all indexed photos, people, albums, faces and settings from the app. Your original photo files are not deleted. Do you want to continue?",
     "clear": "Clear",

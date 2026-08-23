@@ -92,6 +92,10 @@ pub enum SyncMessage {
         aesthetics_score: Option<f64>,
         #[serde(default)]
         encoded: String,
+        /// Receiver hint (#10): this transfer re-materializes an evicted
+        /// original, so the quota gate is bypassed and view_only is cleared.
+        #[serde(default)]
+        restore: bool,
     },
     FileChunk {
         id: String,
@@ -153,6 +157,10 @@ pub enum SyncMessage {
         id: String,
         #[serde(default)]
         thumbnail: bool,
+        /// #10: the requester wants the original re-materialized locally
+        /// (quota gate bypassed on their side, view_only cleared).
+        #[serde(default)]
+        restore: bool,
     },
     /// Sharer replies with directly-served bytes (thumbnails) for one photo.
     /// `data` is base64 on the wire: a JSON number array would inflate ~3.9x
@@ -196,6 +204,9 @@ pub struct OutgoingFile {
     pub caption: Option<String>,
     pub aesthetics_score: Option<f64>,
     pub encoded: String,
+    /// #10 hint carried in FileHeader so the receiver can bypass its quota
+    /// gate and clear the view_only flag once the bytes land.
+    pub restore: bool,
 }
 
 pub struct IncomingFile {
@@ -213,7 +224,13 @@ pub struct IncomingFile {
     pub caption: Option<String>,
     pub aesthetics_score: Option<f64>,
     pub encoded: String,
-    pub file: tokio::fs::File,
+    /// None when receiving in metadata-only mode (#10): the device is over
+    /// its storage cap, so chunks are discarded and only the DB row (with
+    /// thumbnail) is kept, marked view_only.
+    pub file: Option<tokio::fs::File>,
+    /// True for on-demand re-fetches of an evicted item (#10): bypasses the
+    /// quota gate and clears view_only once materialized.
+    pub restore: bool,
 }
 
 pub trait SyncEvent: Send + Sync {
@@ -346,6 +363,7 @@ impl MeshManager {
         caption: Option<String>,
         aesthetics_score: Option<f64>,
         encoded: String,
+        restore: bool,
     ) -> (SyncMessage, bool) {
         let build = |faces: &str, encoded: &str| SyncMessage::FileHeader {
             id: id.clone(),
@@ -361,6 +379,7 @@ impl MeshManager {
             caption: caption.clone(),
             aesthetics_score,
             encoded: encoded.to_string(),
+            restore,
         };
 
         let msg = build(&faces, &encoded);
@@ -607,6 +626,7 @@ impl MeshManager {
             outgoing.caption.clone(),
             outgoing.aesthetics_score,
             encoded.clone(),
+            outgoing.restore,
         );
         if trimmed {
             event.on_log(&format!(
@@ -927,6 +947,7 @@ impl MeshManager {
                                     caption,
                                     aesthetics_score,
                                     encoded,
+                                    restore: false,
                                 },
                                 event_arc,
                                 &completed_task,
@@ -964,6 +985,7 @@ impl MeshManager {
                 caption,
                 aesthetics_score,
                 encoded,
+                restore,
             } => {
                 if view_state()
                     .viewing
@@ -974,12 +996,28 @@ impl MeshManager {
                     view_state().insert_partial(&id, checksum, sanitize_filename(&filename));
                     return;
                 }
-                if Self::check_storage_quota(config_path, size) {
-                    event.on_sync_error(format!(
-                        "Storage quota would be exceeded by {} ({} bytes). Set max_storage_mb to increase limit.",
-                        filename, size
-                    ));
-                    return;
+
+                // Storage cap (#10). A restore pull always gets through (the
+                // user explicitly asked for this file back); everything else
+                // first tries to make room by evicting least-recently-opened
+                // peer-received originals. If the cap still can't fit the
+                // incoming file, fall back to metadata-only receive: chunks
+                // are discarded, but the DB row + thumbnail land so the
+                // library stays fully browsable and the item is marked
+                // view_only for later on-demand pulls.
+                let mut metadata_only = false;
+                if !restore && Self::check_storage_quota(config_path, size) {
+                    let freed = Self::evict_originals(config_path, size);
+                    if freed < size {
+                        metadata_only = true;
+                        event.on_log(&format!(
+                            "Storage cap reached: receiving {filename} as view-only metadata"
+                        ));
+                    } else {
+                        event.on_log(&format!(
+                            "Storage cap: evicted {freed} bytes of older files to fit {filename}"
+                        ));
+                    }
                 }
 
                 let sanitized = sanitize_filename(&filename);
@@ -988,56 +1026,64 @@ impl MeshManager {
                 // transfers (semaphore-limited) can share a basename, and a
                 // shared temp path would interleave chunks and fail checksums.
                 let save_path = temp_dir.join(sanitize_filename(&id));
-                if let Some(parent) = save_path.parent() {
-                    if let Err(e) = tokio::fs::create_dir_all(parent).await {
-                        event.on_log(&format!(
-                            "ERROR could not create sync_temp dir {parent:?} for {filename}: {e}"
-                        ));
+                let created_file = if metadata_only {
+                    None
+                } else {
+                    if let Some(parent) = save_path.parent() {
+                        if let Err(e) = tokio::fs::create_dir_all(parent).await {
+                            event.on_log(&format!(
+                                "ERROR could not create sync_temp dir {parent:?} for {filename}: {e}"
+                            ));
+                        }
                     }
+                    match tokio::fs::File::create(&save_path).await {
+                        Ok(f) => Some(f),
+                        Err(e) => {
+                            event.on_sync_error(format!(
+                                "Failed to create temp file for {filename}: {e}"
+                            ));
+                            return;
+                        }
+                    }
+                };
+                {
+                    let mut incoming = incoming_files.lock().await;
+                    incoming.insert(
+                        id.clone(),
+                        IncomingFile {
+                            id,
+                            filename: sanitized.clone(),
+                            relative_path,
+                            size,
+                            received: 0,
+                            checksum,
+                            created,
+                            latitude,
+                            longitude,
+                            objects,
+                            faces,
+                            caption,
+                            aesthetics_score,
+                            encoded: encoded.clone(),
+                            file: created_file,
+                            restore,
+                        },
+                    );
                 }
-                match tokio::fs::File::create(&save_path).await {
-                    Ok(file) => {
-                        let mut incoming = incoming_files.lock().await;
-                        incoming.insert(
-                            id.clone(),
-                            IncomingFile {
-                                id,
-                                filename: sanitized.clone(),
-                                relative_path,
-                                size,
-                                received: 0,
-                                checksum,
-                                created,
-                                latitude,
-                                longitude,
-                                objects,
-                                faces,
-                                caption,
-                                aesthetics_score,
-                                encoded: encoded.clone(),
-                                file,
-                            },
-                        );
-                        event.on_sync_progress(SyncProgress {
-                            device_id: "peer".to_string(),
-                            status: format!("Receiving {sanitized}"),
-                            phase: SyncPhase::Syncing,
-                            progress: 0.0,
-                            bytes_per_second: 0,
-                            items_completed: items_completed
-                                .load(std::sync::atomic::Ordering::SeqCst)
-                                + mirror_completed.load(std::sync::atomic::Ordering::SeqCst),
-                            items_total: items_total.load(std::sync::atomic::Ordering::SeqCst)
-                                + mirror_total.load(std::sync::atomic::Ordering::SeqCst),
-                            filename: Some(sanitized.clone()),
-                            thumbnail: Some(encoded),
-                        });
-                    }
-                    Err(e) => {
-                        event.on_log(&format!(
-                            "ERROR could not create temp file for {id} ({filename}) at {save_path:?}: {e}"
-                        ));
-                    }
+                if !metadata_only {
+                    event.on_sync_progress(SyncProgress {
+                        device_id: "peer".to_string(),
+                        status: format!("Receiving {sanitized}"),
+                        phase: SyncPhase::Syncing,
+                        progress: 0.0,
+                        bytes_per_second: 0,
+                        items_completed: items_completed.load(std::sync::atomic::Ordering::SeqCst)
+                            + mirror_completed.load(std::sync::atomic::Ordering::SeqCst),
+                        items_total: items_total.load(std::sync::atomic::Ordering::SeqCst)
+                            + mirror_total.load(std::sync::atomic::Ordering::SeqCst),
+                        filename: Some(sanitized.clone()),
+                        thumbnail: Some(encoded),
+                    });
                 }
             }
             SyncMessage::FileChunk { id, index: _, data } => {
@@ -1051,7 +1097,11 @@ impl MeshManager {
                 }
                 let mut incoming = incoming_files.lock().await;
                 if let Some(file_state) = incoming.get_mut(&id) {
-                    if let Err(e) = file_state.file.write_all(&data).await {
+                    // Metadata-only receive (#10): drop the bytes.
+                    let Some(file) = file_state.file.as_mut() else {
+                        return;
+                    };
+                    if let Err(e) = file.write_all(&data).await {
                         event.on_log(&format!("ERROR write to temp file failed for {id}: {e}"));
                     }
                     file_state.received += data.len() as u64;
@@ -1092,8 +1142,39 @@ impl MeshManager {
                 }
                 let mut incoming = incoming_files.lock().await;
                 if let Some(mut file_state) = incoming.remove(&id) {
-                    let _ = file_state.file.flush().await;
-                    drop(file_state.file);
+                    // Metadata-only receive (#10): nothing was written to
+                    // disk. Persist the row + thumbnail and flag it as
+                    // view_only so the UI can pull the original on demand.
+                    let Some(file) = file_state.file.as_mut() else {
+                        drop(incoming);
+                        let config_clone = config_path.to_string();
+                        let id_clone = file_state.id.clone();
+                        tokio::task::spawn_blocking(move || {
+                            let mut db = Database::new(&config_clone);
+                            db.import_photo(ImportedPhoto {
+                                id: &id_clone,
+                                location: "",
+                                created: &file_state.created,
+                                latitude: file_state.latitude,
+                                longitude: file_state.longitude,
+                                objects_json: &file_state.objects,
+                                faces_json: &file_state.faces,
+                                encoded: &file_state.encoded,
+                                caption: file_state.caption.as_deref(),
+                                aesthetics_score: file_state.aesthetics_score,
+                                received: true,
+                            });
+                            db.mark_view_only(&id_clone);
+                            db.clear_sync_needed(&id_clone);
+                        });
+                        event.on_log(&format!(
+                            "Stored {} as view-only (storage cap)",
+                            file_state.filename
+                        ));
+                        return;
+                    };
+                    let _ = file.flush().await;
+                    drop(file);
 
                     let temp_path =
                         sync_temp_dir(config_path).join(sanitize_filename(&file_state.id));
@@ -1136,6 +1217,49 @@ impl MeshManager {
                         event.on_sync_error(format!(
                             "Failed to move file to {final_path:?}. Error: {e}"
                         ));
+                    } else if file_state.restore {
+                        // On-demand restore of an evicted item (#10): persist
+                        // silently — no batch counters, and clear the
+                        // view_only flag so the UI stops showing the pull
+                        // icon. Budget headroom was already secured at
+                        // FileHeader time.
+                        let path_str = final_path.to_string_lossy().to_string();
+                        let id_clone = file_state.id.clone();
+                        let created_clone = file_state.created.clone();
+                        let lat_clone = file_state.latitude.unwrap_or(0.0);
+                        let lon_clone = file_state.longitude.unwrap_or(0.0);
+                        let objects_clone = file_state.objects.clone();
+                        let faces_clone = file_state.faces.clone();
+                        let caption_clone = file_state.caption.clone();
+                        let aesthetics_clone = file_state.aesthetics_score;
+                        let encoded_clone = file_state.encoded.clone();
+                        let config_clone = config_path.to_string();
+                        let id_for_event = id_clone.clone();
+                        let path_for_event = path_str.clone();
+                        tokio::task::spawn_blocking(move || {
+                            let thumb = if encoded_clone.is_empty() {
+                                crate::thumbnail::generate_thumbnail(&path_str).unwrap_or_default()
+                            } else {
+                                encoded_clone
+                            };
+                            let mut db = Database::new(&config_clone);
+                            db.import_photo(ImportedPhoto {
+                                id: &id_clone,
+                                location: &path_str,
+                                created: &created_clone,
+                                latitude: Some(lat_clone),
+                                longitude: Some(lon_clone),
+                                objects_json: &objects_clone,
+                                faces_json: &faces_clone,
+                                encoded: &thumb,
+                                caption: caption_clone.as_deref(),
+                                aesthetics_score: aesthetics_clone,
+                                received: true,
+                            });
+                            db.clear_view_only(&id_clone);
+                            db.clear_sync_needed(&id_clone);
+                        });
+                        event.on_photo_received(id_for_event, path_for_event);
                     } else {
                         // Count into the LOCAL pair: this side pulled the
                         // file. Display the combined k/N so concurrent
@@ -1418,7 +1542,11 @@ impl MeshManager {
                 ));
                 event.on_view_manifest(&photos);
             }
-            SyncMessage::FetchMediaRequest { id, thumbnail } => {
+            SyncMessage::FetchMediaRequest {
+                id,
+                thumbnail,
+                restore,
+            } => {
                 if thumbnail {
                     // Small direct reply: DB-cached thumbnail or generate.
                     let db = Database::new(config_path);
@@ -1478,6 +1606,7 @@ impl MeshManager {
                     caption,
                     aesthetics_score,
                     encoded,
+                    restore,
                 };
                 // Untracked: no counters, no batch progress — this is an
                 // on-demand read for a viewer, not a sync transfer.
@@ -1525,6 +1654,47 @@ impl MeshManager {
 }
 
 impl MeshManager {
+    /// Free at least `need_bytes` by evicting least-recently-opened
+    /// peer-received originals (#10). Returns the number of bytes actually
+    /// freed. Only `received` rows are ever candidates — user-imported
+    /// originals exist nowhere else and are never deleted.
+    pub fn evict_originals(config_path: &str, need_bytes: u64) -> u64 {
+        if need_bytes == 0 {
+            return 0;
+        }
+        let db = Database::new(config_path);
+        let mut freed: u64 = 0;
+        for (id, location) in db.list_eviction_candidates() {
+            if freed >= need_bytes {
+                break;
+            }
+            match std::fs::metadata(&location) {
+                Ok(meta) => {
+                    let size = meta.len();
+                    match std::fs::remove_file(&location) {
+                        Ok(()) => {
+                            db.mark_view_only(&id);
+                            freed += size;
+                            tracing::info!("storage cap: evicted original {id} ({size} bytes)");
+                        }
+                        Err(e) => {
+                            // File already gone or undeletable: still mark the
+                            // row view_only so we stop treating it as local.
+                            tracing::warn!("storage cap: could not delete {location}: {e}");
+                            db.mark_view_only(&id);
+                        }
+                    }
+                }
+                Err(_) => {
+                    // Location missing on disk: mark as evicted so it shows
+                    // the pull icon instead of a broken file entry.
+                    db.mark_view_only(&id);
+                }
+            }
+        }
+        freed
+    }
+
     /// Check if adding `additional_bytes` would exceed the configured storage quota.
     /// Returns true if quota would be exceeded.
     pub fn check_storage_quota(config_path: &str, additional_bytes: u64) -> bool {
@@ -1591,6 +1761,85 @@ mod tests {
     #[test]
     fn test_protocol_version() {
         assert_eq!(PROTOCOL_VERSION, 2);
+    }
+
+    #[test]
+    fn test_file_header_restore_defaults_false_for_old_peers() {
+        // Peers running the pre-#10 protocol send neither restore field;
+        // both must deserialize with restore=false.
+        let json = r#"{"type":"FileHeader","id":"x","filename":"a.jpg","relative_path":"a.jpg","size":1,"checksum":"c","created":"2024-01-01","latitude":null,"longitude":null,"objects":"[]","faces":"[]","caption":null,"aesthetics_score":null,"encoded":""}"#;
+        let decoded: SyncMessage = serde_json::from_str(json).unwrap();
+        match decoded {
+            SyncMessage::FileHeader { restore, .. } => assert!(!restore),
+            _ => panic!("expected FileHeader"),
+        }
+
+        let json = r#"{"type":"FetchMediaRequest","id":"x","thumbnail":true}"#;
+        let decoded: SyncMessage = serde_json::from_str(json).unwrap();
+        match decoded {
+            SyncMessage::FetchMediaRequest { restore, .. } => assert!(!restore),
+            _ => panic!("expected FetchMediaRequest"),
+        }
+    }
+
+    #[test]
+    fn test_evict_originals_spares_user_imports() {
+        let dir = std::env::temp_dir().join(format!(
+            "siegu_evict_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .subsec_nanos()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let config_path = dir.display().to_string();
+        let db = Database::new(&config_path);
+
+        // Two peer-received files plus one user import; only peers are
+        // evictable. The older peer file sorts first (LRU).
+        for (name, received) in [("peer_a.jpg", 1i64), ("peer_b.jpg", 1), ("own.jpg", 0)] {
+            let path = dir.join(name);
+            std::fs::write(&path, vec![0u8; 100]).unwrap();
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded, received) VALUES (?1, ?2, '2024-01-01', '', ?3)",
+                    (name.trim_end_matches(".jpg"), path.to_string_lossy().to_string(), received),
+                )
+                .unwrap();
+        }
+        db.touch_photo_opened("peer_b");
+
+        let freed = MeshManager::evict_originals(&config_path, 150);
+        assert_eq!(freed, 200, "both peer files evicted, own file spared");
+        assert!(!dir.join("peer_a.jpg").exists());
+        assert!(!dir.join("peer_b.jpg").exists());
+        assert!(
+            dir.join("own.jpg").exists(),
+            "user imports are never evicted"
+        );
+
+        let photo = db
+            .list_photos("", 0, 10, false, false)
+            .into_iter()
+            .find(|p| p.id == "peer_a")
+            .unwrap();
+        assert!(photo.view_only, "evicted row becomes view_only");
+        let own = db
+            .list_photos("", 0, 10, false, false)
+            .into_iter()
+            .find(|p| p.id == "own")
+            .unwrap();
+        assert!(!own.view_only);
+
+        // Asking for more than remains available frees nothing extra and
+        // leaves already-evicted rows alone.
+        let freed_again = MeshManager::evict_originals(&config_path, 500);
+        assert_eq!(freed_again, 0);
+        assert!(dir.join("own.jpg").exists());
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1715,6 +1964,7 @@ mod tests {
             None,
             None,
             String::new(),
+            false,
         );
 
         assert!(trimmed, "oversized header must be flagged as trimmed");
@@ -1748,6 +1998,7 @@ mod tests {
             None,
             None,
             String::new(),
+            false,
         );
         assert!(!trimmed, "small header must not be trimmed");
         match &msg {
@@ -1838,6 +2089,7 @@ mod tests {
             caption: None,
             aesthetics_score: None,
             encoded: String::new(),
+            restore: false,
         };
         let json = serde_json::to_string(&msg).unwrap();
         let decoded: SyncMessage = serde_json::from_str(&json).unwrap();

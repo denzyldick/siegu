@@ -63,6 +63,15 @@
           <v-icon size="14" color="white">mdi-cloud-upload-outline</v-icon>
         </v-btn>
 
+        <v-btn
+          v-if="isViewOnly"
+          variant="flat"
+          class="action-btn view-only-badge"
+          :title="$t('media_card.view_only')"
+        >
+          <v-icon size="14" color="white">mdi-cloud-outline</v-icon>
+        </v-btn>
+
         <div v-if="isVideo" class="video-indicator">
           <v-icon color="white" size="20">mdi-play</v-icon>
         </div>
@@ -148,7 +157,7 @@ const emit = defineEmits<{
   select: [id: string | number];
 }>();
 
-const { videoUrl: buildVideoUrl, thumbUrl: buildThumbUrl } = useMediaUrl();
+const { videoUrl: buildVideoUrl, thumbUrl: buildThumbUrl, remoteThumbUrl } = useMediaUrl();
 
 const containerRef = ref<HTMLElement | null>(null);
 const isVisible = ref(false);
@@ -159,8 +168,12 @@ const isVideo = computed(() => {
   return checkIsVideo(props.path.location);
 });
 
+const isViewOnly = computed((): boolean => !!props.path?.view_only);
+
 const computedVideoUrl = computed(() => {
   if (!props.path?.location || !isVideo.value) return '';
+  // Evicted items have no local bytes; hover preview would just 404.
+  if (isViewOnly.value) return '';
   return buildVideoUrl(props.path.location) ?? '';
 });
 
@@ -209,6 +222,11 @@ const showHoverPreview = computed(
 
 const imageSrc = computed(() => {
   if (!props.path?.location || isVideo.value) return undefined;
+  // Evicted items: stream the thumbnail from the peer, fall back to the
+  // inline copy that arrived with the manifest.
+  if (isViewOnly.value) {
+    return remoteThumbUrl(props.path.id) || props.path.encoded || undefined;
+  }
   const thumb = buildThumbUrl(props.path.location);
   if (thumb) return thumb;
   return props.path.encoded || undefined;
@@ -218,6 +236,7 @@ const imageSrc = computed(() => {
 // element per card, which forces the browser to download media bytes.
 const posterSrc = computed(() => {
   if (posterFailed.value || !isVideo.value || !props.path?.location) return undefined;
+  if (isViewOnly.value) return remoteThumbUrl(props.path.id);
   return buildThumbUrl(props.path.location);
 });
 
@@ -245,7 +264,6 @@ const nsfwScore = computed((): number => {
 });
 
 const notSynced = computed((): boolean => !!props.path?.sync_needed && !props.path?.received);
-
 const hasResults = computed((): boolean => {
   if (!props.path) return false;
   return (
@@ -479,6 +497,23 @@ onUnmounted(() => {
 
 .not-synced-badge:hover {
   background: rgb(var(--v-theme-warning));
+}
+
+.view-only-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: auto;
+  width: 28px;
+  height: 28px;
+  background: color-mix(in srgb, rgb(var(--v-theme-info)) 90%, transparent);
+  opacity: 1;
+  transform: none;
+  z-index: 6;
+}
+
+.view-only-badge:hover {
+  background: rgb(var(--v-theme-info));
 }
 
 .media-card-info {

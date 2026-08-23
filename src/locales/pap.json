@@ -279,6 +279,11 @@
     "cleanup_db": "Reset Biblioteka",
     "cleanup_db_desc": "Kita tur e biblioteka su i kuminsa di nobo. Bo archivonan di foto no ta kambia.",
     "clean": "Limpia",
+    "storage": "Almacenamento",
+    "storage_cap": "Límite di almacenamento",
+    "storage_cap_desc": "Limitá kuantu spasio fotunan risibí por usa. Ora e límite yega, e bieu nan mas bieu ku a risibí ta wordo remplasá pa thumbnail; originalnan keda riba device di origen.",
+    "storage_cap_mb": "Límite na MB",
+    "storage_used": "Spasio usa",
     "clear_db_title": "Reset biblioteka?",
     "clear_db_desc": "Akita lo kita tur foto indeksá, personanan, álbumnan, karanan i konfigurashon for di e app. Bo archivonan original di foto no lo wordo eliminá. Bo ke kontinuá?",
     "clear": "Limpia",
@@ -441,7 +446,8 @@
     "faces_detected": "Karanan detectá",
     "fully_indexed": "Kompletamente indeksá",
     "not_synced": "No respaldá na otro aparato — toca pa reconectá",
-    "nsfw": "NSFW detektá"
+    "nsfw": "NSFW detektá",
+    "view_only": "Stashá ribo bo otro device — habri pa mira"
   },
   "media_thumbnail": {
     "alt_thumb": "Miniatura di foto"
@@ -556,6 +562,8 @@
     "copy": "Kopia",
     "copy_text": "Kopia teksto",
     "copied": "Teksto kopia",
+    "restore_original": "Restaurá original",
+    "restore_started": "Ta restaurá original for di bo device...",
     "copy_failed": "Kopia no a funciona",
     "add_to_album": "Agregá na album"
   },

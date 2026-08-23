@@ -778,6 +778,8 @@ pub fn photo_from_metadata(path_str: &str, meta: &PhotoMetadata) -> Photo {
         ai_status: crate::database::AiStatus::default(),
         sync_needed: true,
         received: false,
+        view_only: false,
+        last_opened: 0,
     }
 }
 

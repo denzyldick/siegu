@@ -44,6 +44,8 @@ pub fn make_photo(id: &str, location: &str) -> Photo {
         ai_status: AiStatus::default(),
         sync_needed: true,
         received: false,
+        view_only: false,
+        last_opened: 0,
     }
 }
 

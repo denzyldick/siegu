@@ -910,6 +910,14 @@ impl Database {
             (),
         );
         let _ = conn.execute(
+            "ALTER TABLE photo ADD COLUMN view_only INTEGER DEFAULT 0;",
+            (),
+        );
+        let _ = conn.execute(
+            "ALTER TABLE photo ADD COLUMN last_opened INTEGER DEFAULT 0;",
+            (),
+        );
+        let _ = conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_photo_deleted_at ON photo(deleted_at) WHERE deleted_at IS NOT NULL;",
             (),
         );
@@ -1634,7 +1642,7 @@ impl Database {
             "NULL AS encoded"
         };
         let sql = format!("SELECT p.id, p.location, {encoded_col}, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, 
-            s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received 
+            s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received, COALESCE(p.view_only, 0), COALESCE(p.last_opened, 0)
             FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id {where_clause} {order_by} LIMIT ?1, ?2");
         if let Ok(mut stmt) = self.connection.prepare(&sql) {
             let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
@@ -1672,6 +1680,9 @@ impl Database {
                     },
                     sync_needed: row.get(22).unwrap_or(false),
                     received: row.get(23).unwrap_or(false),
+                    view_only: row.get(24).unwrap_or(false),
+                    #[allow(dead_code)]
+                    last_opened: row.get(25).unwrap_or(0),
                 })
             }) {
                 for p in iter.flatten() {
@@ -2198,7 +2209,7 @@ impl Database {
             .collect();
         let sql = format!(
             "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, \
-             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received \
+             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received, COALESCE(p.view_only, 0), COALESCE(p.last_opened, 0) \
              FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE p.id IN ({})",
             placeholders.join(",")
         );
@@ -2237,6 +2248,9 @@ impl Database {
                     },
                     sync_needed: row.get(22).unwrap_or(false),
                     received: row.get(23).unwrap_or(false),
+                    view_only: row.get(24).unwrap_or(false),
+                    #[allow(dead_code)]
+                    last_opened: row.get(25).unwrap_or(0),
                 })
             }) {
                 for p in iter.flatten() {
@@ -2271,7 +2285,7 @@ impl Database {
 
     pub fn get_photo_by_id(&self, photo_id: &str) -> Option<Photo> {
         let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, \
-             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received \
+             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received, COALESCE(p.view_only, 0), COALESCE(p.last_opened, 0) \
              FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE p.id = ?1";
         let mut stmt = self.connection.prepare(sql).ok()?;
         let mut rows = stmt
@@ -2305,6 +2319,9 @@ impl Database {
                     },
                     sync_needed: row.get(22).unwrap_or(false),
                     received: row.get(23).unwrap_or(false),
+                    view_only: row.get(24).unwrap_or(false),
+                    #[allow(dead_code)]
+                    last_opened: row.get(25).unwrap_or(0),
                 })
             })
             .ok()?;
@@ -2354,6 +2371,8 @@ impl Database {
                     },
                     sync_needed: false,
                     received: false,
+                    view_only: false,
+                    last_opened: 0,
                 })
             })
             .ok()?;
@@ -2644,7 +2663,7 @@ impl Database {
     ) -> Vec<Photo> {
         let mut photos = Vec::new();
         let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, 
-            s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres 
+            s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, COALESCE(p.view_only,0)
             FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id JOIN faces f ON p.id = f.photo_id WHERE f.person_id = ?1 GROUP BY p.id ORDER BY p.created DESC LIMIT ?2 OFFSET ?3";
         let params: [&dyn rusqlite::types::ToSql; 3] =
             [&person_id, &(limit as i64), &(offset as i64)];
@@ -2679,6 +2698,8 @@ impl Database {
                     },
                     sync_needed: false,
                     received: false,
+                    view_only: row.get(23).unwrap_or(false),
+                    last_opened: 0,
                 })
             }) {
                 for p in iter.flatten() {
@@ -3157,6 +3178,65 @@ impl Database {
         }
     }
 
+    /// Mark a photo's local original as evicted (#10): the DB row and
+    /// thumbnail stay, only the full-size file is gone.
+    pub fn mark_view_only(&self, id: &str) {
+        if let Err(e) = self
+            .connection
+            .execute("UPDATE photo SET view_only = 1 WHERE id = ?1", [id])
+        {
+            tracing::warn!("mark_view_only: failed for {id}: {e}");
+        }
+    }
+
+    /// Clear the evicted flag after an on-demand re-fetch materialized the
+    /// original again, and stamp it as recently opened.
+    pub fn clear_view_only(&self, id: &str) {
+        if let Err(e) = self.connection.execute(
+            "UPDATE photo SET view_only = 0, last_opened = strftime('%s','now') WHERE id = ?1",
+            [id],
+        ) {
+            tracing::warn!("clear_view_only: failed for {id}: {e}");
+        }
+    }
+
+    /// Stamp "recently opened" for LRU eviction ordering.
+    pub fn touch_photo_opened(&self, id: &str) {
+        if let Err(e) = self.connection.execute(
+            "UPDATE photo SET last_opened = strftime('%s','now') WHERE id = ?1",
+            [id],
+        ) {
+            tracing::warn!("touch_photo_opened: failed for {id}: {e}");
+        }
+    }
+
+    /// Candidates for storage-cap eviction (#10). ONLY peer-received copies
+    /// are ever evictable — originals imported by this device's user exist
+    /// nowhere else and must never be deleted. Least-recently-opened first;
+    /// never-opened rows (last_opened = 0) fall back to oldest created.
+    pub fn list_eviction_candidates(&self) -> Vec<(String, String)> {
+        let mut stmt = match self.connection.prepare(
+            "SELECT p.id, p.location FROM photo p
+             WHERE COALESCE(p.received, 0) = 1
+               AND COALESCE(p.view_only, 0) = 0
+               AND p.deleted_at IS NULL
+             ORDER BY COALESCE(p.last_opened, 0) ASC, p.created ASC",
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!("list_eviction_candidates: query failed: {e}");
+                return Vec::new();
+            }
+        };
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        });
+        match rows {
+            Ok(iter) => iter.filter_map(|r| r.ok()).collect(),
+            Err(_) => Vec::new(),
+        }
+    }
+
     pub fn update_photo_metadata(
         &self,
         id: &str,
@@ -3223,6 +3303,8 @@ impl Database {
                     },
                     sync_needed: false,
                     received: false,
+                    view_only: false,
+                    last_opened: 0,
                 })
             }) {
                 for p in iter.flatten() {
@@ -3271,6 +3353,8 @@ impl Database {
                         },
                         sync_needed: false,
                         received: false,
+                        view_only: false,
+                        last_opened: 0,
                     })
                 })
             {
@@ -3402,6 +3486,13 @@ pub struct Photo {
     /// True when this row was imported from a peer (a backup copy).
     #[serde(default)]
     pub received: bool,
+    /// True when the local original was evicted (#10): metadata + thumbnail
+    /// stay, the full-size file is pulled on demand from a peer.
+    #[serde(default)]
+    pub view_only: bool,
+    /// Unix seconds of the last full-size open; drives LRU eviction order.
+    #[serde(default)]
+    pub last_opened: i64,
 }
 
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
@@ -3805,6 +3896,8 @@ impl Database {
                     ai_status: AiStatus::default(),
                     sync_needed: false,
                     received: false,
+                    view_only: false,
+                    last_opened: 0,
                 })
             })
             .unwrap();
@@ -4579,7 +4672,7 @@ impl Database {
             EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, \
             p.caption, p.aesthetics_score, \
             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, \
-            s.whisper, s.sam, s.superres, p.sync_needed, p.received \
+            s.whisper, s.sam, s.superres, p.sync_needed, p.received, COALESCE(p.view_only, 0), COALESCE(p.last_opened, 0) \
             FROM photo p \
             JOIN album_item ai ON ai.photo_id = p.id \
             LEFT JOIN ai_status s ON p.id = s.photo_id \
@@ -4619,6 +4712,9 @@ impl Database {
                         },
                         sync_needed: row.get(22).unwrap_or(false),
                         received: row.get(23).unwrap_or(false),
+                        view_only: row.get(24).unwrap_or(false),
+                        #[allow(dead_code)]
+                        last_opened: row.get(25).unwrap_or(0),
                     })
                 },
             ) {
@@ -4665,6 +4761,60 @@ mod tests {
         let (photos, videos) = db.get_media_counts();
         assert!(photos >= 0);
         assert!(videos >= 0);
+    }
+
+    #[test]
+    fn test_view_only_lifecycle_and_eviction_candidates() {
+        let db = test_db();
+        let insert = |id: &str, received: i64, location: &str| {
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded, received) VALUES (?1, ?2, '2024-01-01', '', ?3)",
+                    (id, location, received),
+                )
+                .unwrap();
+        };
+        // Two evictable peer files (old first), one own import.
+        insert("peer-old", 1, "/tmp/old.jpg");
+        insert("peer-new", 1, "/tmp/new.jpg");
+        insert("own", 0, "/tmp/own.jpg");
+
+        let candidates = db.list_eviction_candidates();
+        let ids: Vec<&str> = candidates.iter().map(|(id, _)| id.as_str()).collect();
+        assert_eq!(ids, vec!["peer-old", "peer-new"]);
+
+        // Opening the older one bumps it to the back of the LRU queue.
+        db.touch_photo_opened("peer-old");
+        let ids: Vec<String> = db
+            .list_eviction_candidates()
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        assert_eq!(ids, vec!["peer-new", "peer-old"]);
+
+        // Marking view_only removes it from candidates; clearing restores it.
+        db.mark_view_only("peer-new");
+        let ids: Vec<String> = db
+            .list_eviction_candidates()
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        assert_eq!(ids, vec!["peer-old"]);
+
+        let photo = db
+            .list_photos("", 0, 10, false, false)
+            .into_iter()
+            .find(|p| p.id == "own")
+            .unwrap();
+        assert!(!photo.view_only);
+
+        db.clear_view_only("peer-new");
+        let photo = db
+            .list_photos("", 0, 10, false, false)
+            .into_iter()
+            .find(|p| p.id == "peer-new")
+            .unwrap();
+        assert!(!photo.view_only);
     }
 
     #[test]
@@ -4898,6 +5048,8 @@ mod tests {
             ai_status: AiStatus::default(),
             sync_needed: true,
             received: false,
+            view_only: false,
+            last_opened: 0,
         };
         let _ = db.store_photo_batch(&[photo]);
 
@@ -4935,6 +5087,8 @@ mod tests {
             ai_status: AiStatus::default(),
             sync_needed: true,
             received: false,
+            view_only: false,
+            last_opened: 0,
         };
         let _ = db.store_photo_batch(&[photo]);
 
@@ -4962,6 +5116,8 @@ mod tests {
             ai_status: AiStatus::default(),
             sync_needed: true,
             received: false,
+            view_only: false,
+            last_opened: 0,
         };
         let _ = db.store_photo_batch(&[photo]);
         let points = db.get_heatmap_points();
@@ -5065,6 +5221,8 @@ mod tests {
             ai_status: AiStatus::default(),
             sync_needed: true,
             received: false,
+            view_only: false,
+            last_opened: 0,
         };
         let _ = db.store_photo_batch(&[photo]);
 
@@ -5092,6 +5250,8 @@ mod tests {
             ai_status: AiStatus::default(),
             sync_needed: true,
             received: false,
+            view_only: false,
+            last_opened: 0,
         };
         let _ = db.store_photo_batch(&[photo]);
 
@@ -5125,6 +5285,8 @@ mod tests {
                 ai_status: AiStatus::default(),
                 sync_needed: true,
                 received: false,
+                view_only: false,
+                last_opened: 0,
             });
         }
         let _ = db.store_photo_batch(&photos);
@@ -5160,6 +5322,8 @@ mod tests {
             ai_status: AiStatus::default(),
             sync_needed: true,
             received: false,
+            view_only: false,
+            last_opened: 0,
         };
         let p2 = Photo {
             id: "unidx_2".to_string(),
@@ -5177,6 +5341,8 @@ mod tests {
             ai_status: AiStatus::default(),
             sync_needed: true,
             received: false,
+            view_only: false,
+            last_opened: 0,
         };
         let _ = db.store_photo_batch(&[p1, p2]);
 
@@ -5208,6 +5374,8 @@ mod tests {
                 ai_status: AiStatus::default(),
                 sync_needed: true,
                 received: false,
+                view_only: false,
+                last_opened: 0,
             })
             .collect();
         let _ = db.store_photo_batch(&photos);
@@ -5245,6 +5413,8 @@ mod tests {
                 ai_status: AiStatus::default(),
                 sync_needed: true,
                 received: false,
+                view_only: false,
+                last_opened: 0,
             })
             .collect();
         let _ = db.store_photo_batch(&photos);
@@ -5320,6 +5490,8 @@ mod tests {
                 ai_status: AiStatus::default(),
                 sync_needed: true,
                 received: false,
+                view_only: false,
+                last_opened: 0,
             })
             .collect();
         photos.push(Photo {
@@ -5338,6 +5510,8 @@ mod tests {
             ai_status: AiStatus::default(),
             sync_needed: true,
             received: false,
+            view_only: false,
+            last_opened: 0,
         });
         let _ = db.store_photo_batch(&photos);
 
@@ -5373,6 +5547,8 @@ mod tests {
                 ai_status: AiStatus::default(),
                 sync_needed: true,
                 received: false,
+                view_only: false,
+                last_opened: 0,
             })
             .collect();
         let _ = db.store_photo_batch(&photos);
@@ -5418,6 +5594,8 @@ mod tests {
                     ai_status: AiStatus::default(),
                     sync_needed: true,
                     received: false,
+                    view_only: false,
+                    last_opened: 0,
                 }
             })
             .collect();
@@ -5868,6 +6046,8 @@ mod tests {
             ai_status: AiStatus::default(),
             sync_needed: true,
             received: false,
+            view_only: false,
+            last_opened: 0,
         }
     }
 

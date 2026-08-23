@@ -425,7 +425,7 @@ import { useI18n } from 'vue-i18n';
 import type { MediaItem } from '@/types/media';
 
 const { t } = useI18n();
-const { ensurePort, videoUrl: buildVideoUrl, thumbUrl: buildThumbUrl } = useMediaUrl();
+const { ensurePort, videoUrl: buildVideoUrl, thumbUrl: buildThumbUrl, remoteImageUrl } = useMediaUrl();
 
 interface DetectedFace {
   photo_id: string;
@@ -500,8 +500,12 @@ const isVideo = computed(() => {
   return checkIsVideo(currentPhoto.value.location);
 });
 
+const isViewOnly = computed((): boolean => !!currentPhoto.value?.view_only);
+
 const computedVideoUrl = computed(() => {
   if (!currentPhoto.value || !isVideo.value) return '';
+  // Evicted items stream from the peer through the media server (#10).
+  if (isViewOnly.value) return remoteImageUrl(currentPhoto.value.id) ?? '';
   return buildVideoUrl(currentPhoto.value.location) ?? '';
 });
 
@@ -517,6 +521,10 @@ const videoType = computed(() => {
 
 const currentPhotoSrc = computed(() => {
   if (!currentPhoto.value || isVideo.value) return '';
+  // Evicted items: stream the original from the peer (#10).
+  if (currentPhoto.value.view_only) {
+    return remoteImageUrl(currentPhoto.value.id) ?? currentPhoto.value.encoded ?? '';
+  }
   const ext = currentPhoto.value.location.split('.').pop()?.toLowerCase();
   if (['heic', 'heif'].includes(ext ?? '')) {
     // Prefer the generated thumbnail; while it's still being produced, fall
@@ -856,7 +864,15 @@ function onAddedToAlbum(albumName: string): void {
 }
 
 const moreItems = computed(() => {
-  const items: Array<{ key: string; icon: string; action: () => void }> = [
+  const items: Array<{ key: string; icon: string; action: () => void }> = [];
+  if (isViewOnly.value) {
+    items.push({
+      key: 'restore_original',
+      icon: 'mdi-cloud-download-outline',
+      action: handleRestoreOriginal,
+    });
+  }
+  items.push(
     {
       key: 'set_wallpaper',
       icon: 'mdi-wallpaper',
@@ -880,13 +896,25 @@ const moreItems = computed(() => {
         addToAlbumOpen.value = true;
       },
     },
-  ];
+  );
   return items.filter((item) => {
     if (item.key === 'set_wallpaper' && os.value === 'ios') return false;
     if (item.key === 'show_in_explorer' && isMobile.value) return false;
     return true;
   });
 });
+
+async function handleRestoreOriginal(): Promise<void> {
+  const photo = currentPhoto.value;
+  if (!photo) return;
+  moreMenuOpen.value = false;
+  try {
+    await invoke('fetch_original', { id: String(photo.id) });
+    snackbar.value = { show: true, text: t('media_viewer.restore_started'), error: false };
+  } catch (e) {
+    snackbar.value = { show: true, text: String(e), error: true };
+  }
+}
 
 function closeMoreMenu(action: () => void): void {
   moreMenuOpen.value = false;

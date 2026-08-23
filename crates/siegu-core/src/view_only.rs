@@ -89,6 +89,7 @@ impl ViewOnlyState {
                 .send(SyncMessage::FetchMediaRequest {
                     id: id.to_string(),
                     thumbnail,
+                    restore: false,
                 })
                 .is_ok(),
             None => false,

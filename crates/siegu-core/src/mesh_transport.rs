@@ -203,8 +203,11 @@ impl MeshTransport {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<SyncMessage>();
         *self.sync_tx.lock().await = Some(tx.clone());
         if let Some(ext) = &self.external_tx {
-            *ext.lock().await = Some(tx);
+            *ext.lock().await = Some(tx.clone());
         }
+        // Bind on-demand media pulls (/remote/{id}) to this session: covers
+        // view-only browsing (#9) and restore pulls of evicted items (#10).
+        crate::view_only::state().bind_session(tx);
         let sync_rx = Arc::new(Mutex::new(rx));
 
         let config = RTCConfiguration {

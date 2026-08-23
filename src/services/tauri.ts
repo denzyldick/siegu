@@ -300,6 +300,19 @@ export async function enterViewOnly(): Promise<void> {
   await call<unknown>('enter_view_only');
 }
 
+export async function fetchOriginal(id: string): Promise<void> {
+  await call<unknown>('fetch_original', { id });
+}
+
+export interface StorageUsage {
+  used: number;
+  quota: number;
+}
+
+export async function getStorageUsage(): Promise<StorageUsage> {
+  return call<StorageUsage>('storage_usage');
+}
+
 export async function autoReconnect(discoveredUrl?: string | null): Promise<boolean> {
   return call<boolean>('auto_reconnect', { discoveredUrl: discoveredUrl ?? null });
 }
