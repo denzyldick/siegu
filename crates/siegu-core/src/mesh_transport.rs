@@ -152,7 +152,8 @@ impl MeshTransport {
         ));
         self.event.on_state_change("Connecting to signaling...");
 
-        let is_remote = self.signaling_url.contains("wss://");
+        let is_remote = self.signaling_url.contains("wss://")
+            || extract_token(&self.signaling_url).0.ends_with("/ws");
 
         let (base_url, token) = extract_token(&self.signaling_url);
 

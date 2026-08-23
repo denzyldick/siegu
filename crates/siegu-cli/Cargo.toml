@@ -17,10 +17,13 @@ uuid = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 serde_json = { workspace = true }
+serde = { workspace = true }
+futures-util = { workspace = true }
+tokio-tungstenite = { workspace = true }
+warp = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 indicatif = "0.17"
 reqwest = { version = "0.12", features = ["stream"] }
-futures-util = "0.3"
 rand = "0.8"
 jwalk = "0.8"
 rayon = "1"

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>siegu — view only</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header>
+      <span class="brand">siegu</span>
+      <span id="status" class="status">Starting…</span>
+    </header>
+
+    <main id="app">
+      <section id="gate">
+        <h1>View-only session</h1>
+        <p id="gate-msg">
+          Open the link printed by <code>siegu web</code>. Nothing you see here is
+          downloaded or stored: media streams straight from the other device and
+          disappears when the session ends.
+        </p>
+      </section>
+
+      <section id="gallery" hidden></section>
+    </main>
+
+    <dialog id="preview">
+      <div class="preview-bar">
+        <span id="preview-title"></span>
+        <button id="preview-close" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="preview-body" id="preview-body"></div>
+    </dialog>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

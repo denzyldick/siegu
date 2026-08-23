@@ -9,6 +9,7 @@ use siegu_core::scanner::ScanGuard;
 use siegu_core::{PeerDevice, SavedSession, SyncEvent, SyncProgress};
 
 mod analyze_tui;
+mod web;
 
 pub struct CliSyncEvent {
     pub config_path: String,
@@ -169,6 +170,14 @@ enum Commands {
     Mesh {
         #[command(subcommand)]
         action: MeshAction,
+    },
+    /// Share this library as a view-only gallery in a browser (#11)
+    Web {
+        /// Port for the static web client (signalling picks its own port)
+        #[arg(short, long, default_value = "8787")]
+        port: u16,
+        #[arg(short, long)]
+        config: Option<String>,
     },
 }
 
@@ -378,6 +387,18 @@ async fn main() {
                 cmd_mesh_quota(&config_dir);
             }
         },
+        Commands::Web { port, config } => {
+            let config_dir = resolve_config_dir(&cli.config_dir, &config);
+            if let Err(e) = web::run(web::WebOptions {
+                http_port: *port,
+                config: Some(config_dir.display().to_string()),
+            })
+            .await
+            {
+                eprintln!("Error: {e}");
+                std::process::exit(1);
+            }
+        }
     }
 }
 

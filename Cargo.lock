@@ -6947,12 +6947,15 @@ dependencies = [
  "ratatui",
  "rayon",
  "reqwest 0.12.28",
+ "serde",
  "serde_json",
  "siegu-core",
  "tokio",
+ "tokio-tungstenite 0.28.0",
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "warp",
 ]
 
 [[package]]

@@ -268,6 +268,12 @@ async fn handle_connection(
     let ctx_r = ctx.clone();
 
     let mut recv_task = tokio::spawn(async move {
+        // Token enforcement is once-per-connection: the first auth-bearing
+        // message (Join/JoinRoom/CreateRoom) must carry the expected token.
+        // Later protocol frames (Relay, DeviceAnnounce, ...) carry no
+        // top-level token field and MUST NOT be rejected for that, or every
+        // session dies after its first relay.
+        let mut authenticated = ctx_r.token.is_none();
         while let Some(Ok(msg)) = ws_receiver.next().await {
             if !(msg.is_text() || msg.is_binary()) {
                 continue;
@@ -290,22 +296,39 @@ async fn handle_connection(
                 Err(_) => continue,
             };
 
-            if let Some(expected) = &ctx_r.token {
-                let sent = match &signal {
-                    SignalMessage::Join { token, .. } => token.as_deref(),
-                    SignalMessage::JoinRoom { token, .. } => token.as_deref(),
-                    SignalMessage::CreateRoom { token } => token.as_deref(),
-                    _ => None,
-                };
-                if sent != Some(expected) {
-                    eprintln!("siegu-signal: rejected join with invalid token");
-                    send(
-                        &tx_write,
-                        &SignalMessage::Error {
-                            message: "Invalid or missing signalling token".to_string(),
-                        },
+            // Once-per-connection token gate (see `authenticated` above).
+            if !authenticated {
+                if let Some(expected) = &ctx_r.token {
+                    let is_auth_frame = matches!(
+                        &signal,
+                        SignalMessage::Join { .. }
+                            | SignalMessage::JoinRoom { .. }
+                            | SignalMessage::CreateRoom { .. }
                     );
-                    break;
+                    let sent = match &signal {
+                        SignalMessage::Join { token, .. } => token.as_deref(),
+                        SignalMessage::JoinRoom { token, .. } => token.as_deref(),
+                        SignalMessage::CreateRoom { token } => token.as_deref(),
+                        _ => None,
+                    };
+                    match (is_auth_frame, sent) {
+                        (true, Some(t)) if t == expected => authenticated = true,
+                        // An auth frame with a wrong or missing token is a
+                        // failed login: reject the connection outright.
+                        (true, _) => {
+                            eprintln!("siegu-signal: rejected join with invalid token");
+                            send(
+                                &tx_write,
+                                &SignalMessage::Error {
+                                    message: "Invalid or missing signalling token".to_string(),
+                                },
+                            );
+                            break;
+                        }
+                        // Protocol frames cannot authenticate and are useless
+                        // before joining anyway: skip them.
+                        (false, _) => continue,
+                    }
                 }
             }
 
@@ -1200,6 +1223,89 @@ mod tests {
                 );
             }
             other => panic!("Expected Error, got {other:?}"),
+        }
+    }
+
+    /// Regression: with a server token configured, protocol frames sent after
+    /// a successful authenticated join (Relay carries no top-level token) must
+    /// NOT be rejected — otherwise every remote session dies on its first
+    /// relayed SDP/ICE message.
+    #[tokio::test]
+    async fn test_relay_after_token_auth_survives() {
+        let server = start_with_config(ServerConfig {
+            port: 0,
+            token: Some("s3cret".to_string()),
+        })
+        .await;
+        let port = server.port;
+
+        // Creator authenticates and gets a code.
+        let mut ws_a = connect_client(port, "ws").await;
+        ws_a.send(Message::Text(
+            serde_json::to_string(&SignalMessage::CreateRoom {
+                token: Some("s3cret".to_string()),
+            })
+            .unwrap()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        let code = match recv_signal(&mut ws_a).await {
+            SignalMessage::RoomCreated { code } => code,
+            other => panic!("Expected RoomCreated, got {other:?}"),
+        };
+
+        // Joiner authenticates.
+        let mut ws_b = connect_client(port, "ws").await;
+        ws_b.send(Message::Text(
+            serde_json::to_string(&SignalMessage::JoinRoom {
+                code: code.clone(),
+                token: Some("s3cret".to_string()),
+            })
+            .unwrap()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        loop {
+            let msg =
+                tokio::time::timeout(std::time::Duration::from_secs(5), recv_signal(&mut ws_b))
+                    .await
+                    .expect("joiner never got a room reply");
+            match msg {
+                SignalMessage::RoomJoined => break,
+                SignalMessage::PeerList { .. } | SignalMessage::PeerJoined { .. } => continue,
+                SignalMessage::Error { message } => panic!("Joiner rejected: {message}"),
+                other => panic!("Unexpected signal while joining: {other:?}"),
+            }
+        }
+
+        // A relays a frame WITHOUT a top-level token: must be delivered, not
+        // rejected by the token gate.
+        ws_a.send(Message::Text(
+            serde_json::to_string(&SignalMessage::Relay {
+                from: None,
+                payload: serde_json::json!({"type": "offer", "payload": "{}", "target": "peer"}),
+            })
+            .unwrap()
+            .into(),
+        ))
+        .await
+        .unwrap();
+
+        loop {
+            let msg =
+                tokio::time::timeout(std::time::Duration::from_secs(5), recv_signal(&mut ws_b))
+                    .await
+                    .expect("joiner never received the relay");
+            match msg {
+                SignalMessage::Relay { payload, .. } => {
+                    assert_eq!(payload["type"], "offer");
+                    break;
+                }
+                SignalMessage::Error { message } => panic!("Post-auth relay rejected: {message}"),
+                _ => continue,
+            }
         }
     }
 }

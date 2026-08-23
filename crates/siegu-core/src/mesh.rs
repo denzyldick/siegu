@@ -155,11 +155,32 @@ pub enum SyncMessage {
         thumbnail: bool,
     },
     /// Sharer replies with directly-served bytes (thumbnails) for one photo.
+    /// `data` is base64 on the wire: a JSON number array would inflate ~3.9x
+    /// and blow the data-channel message limit for even modest thumbnails.
     ViewMedia {
         id: String,
         mime: String,
+        #[serde(with = "base64_bytes")]
         data: Vec<u8>,
     },
+}
+
+/// Serde adapter: `Vec<u8>` <-> base64 string.
+mod base64_bytes {
+    use base64::engine::general_purpose::STANDARD;
+    use base64::Engine as _;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&STANDARD.encode(bytes))
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<u8>, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        STANDARD
+            .decode(s.as_bytes())
+            .map_err(serde::de::Error::custom)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1408,7 +1429,9 @@ impl MeshManager {
                             .and_then(|loc| crate::thumbnail::generate_thumbnail_bytes(&loc)),
                     };
                     match bytes {
-                        Some(data) if data.len() <= MAX_DATA_CHANNEL_MSG_SIZE / 2 => {
+                        // Base64 inflates 4/3; 40 KB raw stays under the
+                        // 60 KB data-channel message budget after encoding.
+                        Some(data) if data.len() <= 40_000 => {
                             let _ = Self::send_sync_message(
                                 dc,
                                 &SyncMessage::ViewMedia {

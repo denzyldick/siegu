@@ -118,6 +118,28 @@ Start a standalone LAN signaling server.
 siegu serve --port 8080
 ```
 
+### `siegu web`
+
+Share this machine's library as a **view-only** gallery in any browser (#11).
+Starts an embedded signaling server plus a small static web server and prints a
+one-off link. Opening the link is the consent step — anyone holding it can
+browse the library read-only until the command stops. Nothing is downloaded or
+written on the viewing device; media streams over the WebRTC data channel on
+demand.
+
+```bash
+siegu web
+# Open in a browser on this machine:
+#   http://127.0.0.1:8787/#<code>.<token>
+# Or from another device on this network:
+#   http://192.168.1.45:8787/#<code>.<token>
+```
+
+Flags: `--port` for the static client port (default 8787), `--config` as usual.
+The web bundle lives in `webclient/`; build it once with
+`cd webclient && npm install && npm run build`, or point `SIEGU_WEB_DIST` at a
+built `dist/` directory.
+
 ### `siegu status`
 
 Show app overview.
