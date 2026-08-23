@@ -49,6 +49,19 @@ pub fn do_remove_device(db: &database::Database, id: &str) -> Result<(), String>
     Ok(())
 }
 
+/// MDI platform logo for a device `os` value (std::env::consts::OS style).
+fn os_icon(os: &str) -> &'static str {
+    match os {
+        "windows" => "mdi-microsoft-windows",
+        "macos" => "mdi-apple",
+        "ios" => "mdi-apple-ios",
+        "android" => "mdi-android",
+        "linux" => "mdi-linux",
+        "freebsd" | "openbsd" | "netbsd" => "mdi-freebsd",
+        _ => "mdi-laptop",
+    }
+}
+
 /// Pure business logic — lists devices and prepends the host device.
 pub fn do_list_devices(db: &database::Database) -> Vec<database::DeviceInfo> {
     let mut devices: Vec<database::DeviceInfo> = db
@@ -57,7 +70,7 @@ pub fn do_list_devices(db: &database::Database) -> Vec<database::DeviceInfo> {
         .map(|peer| database::DeviceInfo {
             id: peer.device_id,
             title: peer.name,
-            icon: "mdi-cellphone".to_string(),
+            icon: os_icon(&peer.os).to_string(),
             up_to_date: true,
             host: false,
             photo_count: peer.photo_count,
@@ -81,7 +94,7 @@ pub fn do_list_devices(db: &database::Database) -> Vec<database::DeviceInfo> {
         database::DeviceInfo {
             id: "host".to_string(),
             title: host_title,
-            icon: "mdi-laptop".to_string(),
+            icon: os_icon(std::env::consts::OS).to_string(),
             up_to_date: true,
             host: true,
             photo_count,

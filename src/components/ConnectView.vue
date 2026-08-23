@@ -191,7 +191,7 @@
               style="background: rgb(var(--v-theme-surface))"
               class="d-flex align-center pa-2 mb-1 rounded"
             >
-              <v-icon size="14" class="mr-2 text-medium-emphasis">mdi-laptop</v-icon>
+              <v-icon size="14" class="mr-2 text-medium-emphasis">{{ deviceOsIcon(peer.os) }}</v-icon>
               <span class="text-body-2 text-high-emphasis font-weight-medium">{{ peer.name }}</span>
               <span class="text-caption text-medium-emphasis ml-2">{{ peer.os }}</span>
             </div>
@@ -295,7 +295,7 @@
             style="background: rgb(var(--v-theme-surface))"
             class="d-flex align-center pa-2 mb-1 rounded"
           >
-            <v-icon size="14" class="mr-2 text-medium-emphasis">mdi-laptop</v-icon>
+            <v-icon size="14" class="mr-2 text-medium-emphasis">{{ deviceOsIcon(peer.os) }}</v-icon>
             <span class="text-body-2 text-high-emphasis font-weight-medium">{{ peer.name }}</span>
             <span class="text-caption text-medium-emphasis ml-2">{{ peer.os }}</span>
           </div>
@@ -326,6 +326,7 @@ import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useConnect } from '@/composables/useConnect';
 import { connectionStatusKey } from '@/utils/connectStatus';
+import { deviceOsIcon } from '@/utils/format';
 import ConnectHostView from '@/components/connect/ConnectHostView.vue';
 import ConnectJoinView from '@/components/connect/ConnectJoinView.vue';
 import ConnectLanDiscovery from '@/components/connect/ConnectLanDiscovery.vue';

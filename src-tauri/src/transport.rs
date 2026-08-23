@@ -35,7 +35,20 @@ fn load_allowed_roots(config_path: &str, cache: &DirCache) -> Vec<PathBuf> {
     const MAX_AGE: std::time::Duration = std::time::Duration::from_secs(5);
     let mut guard = cache.lock().unwrap_or_else(|e| e.into_inner());
     if guard.0.elapsed() > MAX_AGE {
-        guard.1 = database::Database::new(config_path).list_directories();
+        // Received sync files land under the resolved sync target dir, which
+        // is not necessarily one of the monitored photo directories (e.g. a
+        // custom sync path). Serve those too, or every transferred photo
+        // would 404 on /thumb and /media.
+        let db = database::Database::new(config_path);
+        let mut roots = db.list_directories();
+        let state = db.get_state();
+        let target = siegu_core::sync_transport::resolve_sync_target_dir(
+            config_path,
+            state.get("sync_path").map(|s| s.as_str()),
+            &roots,
+        );
+        roots.push(target.to_string_lossy().to_string());
+        guard.1 = roots;
         guard.0 = std::time::Instant::now();
     }
     guard.1.iter().map(PathBuf::from).collect()

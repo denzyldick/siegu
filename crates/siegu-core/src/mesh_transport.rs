@@ -191,6 +191,11 @@ impl MeshTransport {
             Arc::new(tokio::sync::Semaphore::new(1));
         let items_completed = Arc::new(AtomicUsize::new(0));
         let items_total = Arc::new(AtomicUsize::new(0));
+        // Mirror of the peer's own pull batch (arrives via PeerProgress).
+        // Kept separate from the local pair so concurrent opposite-direction
+        // batches never overwrite each other's counters.
+        let mirror_completed = Arc::new(AtomicUsize::new(0));
+        let mirror_total = Arc::new(AtomicUsize::new(0));
         let pending_ice: Arc<Mutex<Vec<RTCIceCandidateInit>>> = Arc::new(Mutex::new(Vec::new()));
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<SyncMessage>();
         *self.sync_tx.lock().await = Some(tx.clone());
@@ -297,6 +302,8 @@ impl MeshTransport {
         let pending_manifest_dc = Arc::clone(&pending_manifest);
         let items_completed_dc = Arc::clone(&items_completed);
         let items_total_dc = Arc::clone(&items_total);
+        let mirror_completed_dc = Arc::clone(&mirror_completed);
+        let mirror_total_dc = Arc::clone(&mirror_total);
         let device_id_dc = self.device_id.clone();
         let device_name_dc = self.device_name.clone();
         let device_os_dc = self.device_os.clone();
@@ -360,6 +367,8 @@ impl MeshTransport {
             let event_msg = Arc::clone(&event_dc);
             let completed_msg = Arc::clone(&items_completed_dc);
             let total_msg = Arc::clone(&items_total_dc);
+            let mirror_completed_msg = Arc::clone(&mirror_completed_dc);
+            let mirror_total_msg = Arc::clone(&mirror_total_dc);
 
             dc.on_message(Box::new(move |msg: DataChannelMessage| {
                 let dc = Arc::clone(&dc_msg);
@@ -370,12 +379,23 @@ impl MeshTransport {
                 let event = Arc::clone(&event_msg);
                 let completed = Arc::clone(&completed_msg);
                 let total = Arc::clone(&total_msg);
+                let mirror_completed = Arc::clone(&mirror_completed_msg);
+                let mirror_total = Arc::clone(&mirror_total_msg);
                 Box::pin(async move {
                     let text = String::from_utf8_lossy(&msg.data);
                     if let Ok(sync_msg) = serde_json::from_str::<SyncMessage>(&text) {
                         MeshManager::handle_sync_message(
-                            sync_msg, &dc, &incoming, &pending, &transfer, &config, event,
-                            &completed, &total,
+                            sync_msg,
+                            &dc,
+                            &incoming,
+                            &pending,
+                            &transfer,
+                            &config,
+                            event,
+                            &completed,
+                            &total,
+                            &mirror_completed,
+                            &mirror_total,
                         )
                         .await;
                     }
@@ -389,6 +409,8 @@ impl MeshTransport {
             let event_rcv = Arc::clone(&event_dc);
             let completed_rcv = Arc::clone(&items_completed_dc);
             let total_rcv = Arc::clone(&items_total_dc);
+            let mirror_completed_rcv = Arc::clone(&mirror_completed_dc);
+            let mirror_total_rcv = Arc::clone(&mirror_total_dc);
             let sync_rx_rcv = Arc::clone(&sync_rx);
             let device_id_rcv = device_id_dc.clone();
             let device_name_rcv = device_name_dc.clone();
@@ -413,6 +435,8 @@ impl MeshTransport {
                 let event_msg = Arc::clone(&event);
                 let completed_msg = Arc::clone(&completed);
                 let total_msg = Arc::clone(&total);
+                let mirror_completed_msg = Arc::clone(&mirror_completed_rcv);
+                let mirror_total_msg = Arc::clone(&mirror_total_rcv);
 
                 d.on_message(Box::new(move |msg: DataChannelMessage| {
                     let dc = Arc::clone(&dc_msg);
@@ -423,12 +447,23 @@ impl MeshTransport {
                     let event = Arc::clone(&event_msg);
                     let completed = Arc::clone(&completed_msg);
                     let total = Arc::clone(&total_msg);
+                    let mirror_completed = Arc::clone(&mirror_completed_msg);
+                    let mirror_total = Arc::clone(&mirror_total_msg);
                     Box::pin(async move {
                         let text = String::from_utf8_lossy(&msg.data);
                         if let Ok(sync_msg) = serde_json::from_str::<SyncMessage>(&text) {
                             MeshManager::handle_sync_message(
-                                sync_msg, &dc, &incoming, &pending, &transfer, &config, event,
-                                &completed, &total,
+                                sync_msg,
+                                &dc,
+                                &incoming,
+                                &pending,
+                                &transfer,
+                                &config,
+                                event,
+                                &completed,
+                                &total,
+                                &mirror_completed,
+                                &mirror_total,
                             )
                             .await;
                         }

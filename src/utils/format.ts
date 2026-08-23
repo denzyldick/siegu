@@ -44,3 +44,25 @@ export function updateDownloadProgress(
   }
   return { downloaded, total, speedBytesPerSec, etaMs, updatedAt: now };
 }
+
+/** MDI platform logo for a device `os` value (std::env::consts::OS style). */
+export function deviceOsIcon(os: string | null | undefined): string {
+  switch ((os ?? '').toLowerCase()) {
+    case 'windows':
+      return 'mdi-microsoft-windows';
+    case 'macos':
+      return 'mdi-apple';
+    case 'ios':
+      return 'mdi-apple-ios';
+    case 'android':
+      return 'mdi-android';
+    case 'linux':
+      return 'mdi-linux';
+    case 'freebsd':
+    case 'openbsd':
+    case 'netbsd':
+      return 'mdi-freebsd';
+    default:
+      return 'mdi-laptop';
+  }
+}
