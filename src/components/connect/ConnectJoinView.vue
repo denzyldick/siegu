@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import SyncNowCard from '@/components/connect/SyncNowCard.vue';
+import { deviceOsIcon } from '@/utils/format';
 
 const { t } = useI18n();
 
@@ -14,6 +15,7 @@ const props = defineProps<{
   hostIp: string;
   hostPort: number;
   deviceName: string;
+  deviceOs?: string;
   itemsCompleted: number;
   itemsTotal: number;
   progress: number;
@@ -35,7 +37,12 @@ const localValue = computed({
   <div v-if="hostIp" class="d-flex flex-column align-stretch mb-6 ga-4" style="width: 100%">
     <div v-if="deviceName" class="text-center mb-2">
       <div class="text-caption text-disabled">{{ t('connect.selected_device') }}</div>
-      <div class="text-body-1 font-weight-bold text-high-emphasis">{{ deviceName }}</div>
+      <div class="d-flex align-center justify-center ga-2">
+        <v-icon v-if="deviceOs" size="16" class="text-medium-emphasis">
+          {{ deviceOsIcon(deviceOs) }}
+        </v-icon>
+        <div class="text-body-1 font-weight-bold text-high-emphasis">{{ deviceName }}</div>
+      </div>
     </div>
 
     <v-text-field

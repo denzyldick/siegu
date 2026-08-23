@@ -1,10 +1,15 @@
 <template>
   <div class="d-flex justify-center ga-5 mb-4">
-    <v-icon size="28" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-microsoft-windows</v-icon>
-    <v-icon size="28" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-apple</v-icon>
-    <v-icon size="28" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-linux</v-icon>
-    <v-icon size="28" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-android</v-icon>
-    <v-icon size="28" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-apple-ios</v-icon>
+    <v-icon size="28" color="rgba(var(--v-theme-on-surface), 0.7)">
+      {{ isConnected && peerOs ? deviceOsIcon(peerOs) : 'mdi-laptop' }}
+    </v-icon>
+    <template v-if="!isConnected">
+      <v-icon size="28" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-microsoft-windows</v-icon>
+      <v-icon size="28" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-apple</v-icon>
+      <v-icon size="28" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-linux</v-icon>
+      <v-icon size="28" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-android</v-icon>
+      <v-icon size="28" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-apple-ios</v-icon>
+    </template>
   </div>
 
   <template v-if="isConnected">
@@ -14,6 +19,7 @@
         <span class="text-body-2 font-weight-bold" style="color: rgb(var(--v-theme-success))">
           {{ $t('connect.connected_to') }} {{ peerName }}
         </span>
+        <v-icon size="16" class="text-medium-emphasis">{{ deviceOsIcon(peerOs) }}</v-icon>
       </div>
       <div v-if="syncing" class="w-100">
         <SyncNowCard
@@ -69,6 +75,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import SyncNowCard from '@/components/connect/SyncNowCard.vue';
+import { deviceOsIcon } from '@/utils/format';
 
 const props = withDefaults(
   defineProps<{
@@ -79,6 +86,7 @@ const props = withDefaults(
     itemsCompleted?: number;
     itemsTotal?: number;
     peerName?: string;
+    peerOs?: string;
   }>(),
   {
     isConnected: false,
@@ -87,6 +95,7 @@ const props = withDefaults(
     itemsCompleted: 0,
     itemsTotal: 0,
     peerName: '',
+    peerOs: '',
   },
 );
 

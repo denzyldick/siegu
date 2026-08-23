@@ -156,6 +156,7 @@
             :items-completed="syncProgress.items_completed"
             :items-total="syncProgress.items_total"
             :peer-name="peerList[0]?.name ?? ''"
+            :peer-os="peerList[0]?.os ?? ''"
           />
 
           <ConnectJoinView
@@ -168,6 +169,7 @@
             :host-ip="selectedLanHost?.ip ?? ''"
             :host-port="selectedLanHost?.port ?? 0"
             :device-name="selectedLanHost?.name ?? ''"
+            :device-os="peerList[0]?.os ?? ''"
             :items-completed="syncProgress.items_completed"
             :items-total="syncProgress.items_total"
             :progress="syncProgress.progress"
@@ -260,6 +262,7 @@
           :items-completed="syncProgress.items_completed"
           :items-total="syncProgress.items_total"
           :peer-name="peerList[0]?.name ?? ''"
+          :peer-os="peerList[0]?.os ?? ''"
         />
 
         <ConnectJoinView
@@ -272,6 +275,7 @@
           :host-ip="selectedLanHost?.ip ?? ''"
           :host-port="selectedLanHost?.port ?? 0"
           :device-name="selectedLanHost?.name ?? ''"
+          :device-os="peerList[0]?.os ?? ''"
           :items-completed="syncProgress.items_completed"
           :items-total="syncProgress.items_total"
           :progress="syncProgress.progress"
