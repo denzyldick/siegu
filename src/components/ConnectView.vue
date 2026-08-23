@@ -193,7 +193,9 @@
               style="background: rgb(var(--v-theme-surface))"
               class="d-flex align-center pa-2 mb-1 rounded"
             >
-              <v-icon size="14" class="mr-2 text-medium-emphasis">{{ deviceOsIcon(peer.os) }}</v-icon>
+              <v-icon size="14" class="mr-2 text-medium-emphasis">{{
+                deviceOsIcon(peer.os)
+              }}</v-icon>
               <span class="text-body-2 text-high-emphasis font-weight-medium">{{ peer.name }}</span>
               <span class="text-caption text-medium-emphasis ml-2">{{ peer.os }}</span>
             </div>
