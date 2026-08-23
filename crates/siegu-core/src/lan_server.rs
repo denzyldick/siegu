@@ -239,11 +239,10 @@ async fn handle_connection(
     });
 
     if let Some(reason) = admission_reject(&ctx, remote) {
+        // No client IP in logs: reject reasons carry no identifying data.
         eprintln!(
-            "siegu-signal: rejected connection from {} ({reason})",
-            remote
-                .map(|a| a.ip())
-                .map_or_else(|| "?".into(), |ip| ip.to_string())
+            "siegu-signal: connection rejected ({reason}), total={}",
+            ctx.global_count.load(Ordering::Relaxed)
         );
         let tx_reject = tx.clone();
         send(&tx_reject, &SignalMessage::Error { message: reason });
@@ -299,12 +298,7 @@ async fn handle_connection(
                     _ => None,
                 };
                 if sent != Some(expected) {
-                    eprintln!(
-                        "siegu-signal: rejected join with invalid token from {}",
-                        remote
-                            .map(|a| a.ip())
-                            .map_or_else(|| "?".into(), |ip| ip.to_string())
-                    );
+                    eprintln!("siegu-signal: rejected join with invalid token");
                     send(
                         &tx_write,
                         &SignalMessage::Error {
