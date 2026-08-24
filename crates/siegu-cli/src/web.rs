@@ -154,9 +154,11 @@ async fn serve_static(
         .map(move || warp::reply::json(&serde_json::json!({ "code": session_code })))
         .boxed();
 
+    // After matching the "assets" URL prefix the remaining path is the bare
+    // filename, so the fs root must be the bundle's assets directory.
     let assets = warp::get()
         .and(warp::path("assets"))
-        .and(warp::fs::dir(dist))
+        .and(warp::fs::dir(dist.join("assets")))
         .boxed();
 
     let bridge_signal = signal_url.clone();
