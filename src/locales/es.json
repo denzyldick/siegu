@@ -447,7 +447,8 @@
     "fully_indexed": "Totalmente indexado",
     "not_synced": "No respaldado en otro dispositivo — toca para reconectar",
     "nsfw": "NSFW detectado",
-    "view_only": "Guardado en tu otro dispositivo — abre para verlo"
+    "view_only": "Guardado en tu otro dispositivo — abre para verlo",
+    "ai_analyzed": "Analizado por IA"
   },
   "media_thumbnail": {
     "alt_thumb": "Miniatura de foto"

@@ -425,7 +425,12 @@ import { useI18n } from 'vue-i18n';
 import type { MediaItem } from '@/types/media';
 
 const { t } = useI18n();
-const { ensurePort, videoUrl: buildVideoUrl, thumbUrl: buildThumbUrl, remoteImageUrl } = useMediaUrl();
+const {
+  ensurePort,
+  videoUrl: buildVideoUrl,
+  thumbUrl: buildThumbUrl,
+  remoteImageUrl,
+} = useMediaUrl();
 
 interface DetectedFace {
   photo_id: string;

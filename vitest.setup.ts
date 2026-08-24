@@ -93,17 +93,15 @@ vi.mock('vue-i18n', () => ({
   createI18n: vi.fn(),
 }))
 
-Object.defineProperty(globalThis, 'window', {
-  value: {
-    ...globalThis.window,
-    __img_mediaPort: null as number | null,
-    __siegu_mediaPort: null as number | null,
-    matchMedia: vi.fn((query: string) => ({
-      matches: false,
-      media: query,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    })),
-  },
-  writable: true,
-})
+// Augment the happy-dom window in place instead of replacing it: a plain
+// object spread drops prototype members like the Event/MouseEvent
+// constructors that @vue/test-utils' trigger() relies on.
+const domWindow = globalThis.window as unknown as Record<string, unknown>
+domWindow.__img_mediaPort = null
+domWindow.__siegu_mediaPort = null
+domWindow.matchMedia = vi.fn((query: string) => ({
+  matches: false,
+  media: query,
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+}))

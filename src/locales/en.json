@@ -20,7 +20,8 @@
     "fully_indexed": "Fully indexed",
     "not_synced": "Not backed up on another device — tap to reconnect",
     "nsfw": "NSFW detected",
-    "view_only": "Stored on your other device — open to stream"
+    "view_only": "Stored on your other device — open to stream",
+    "ai_analyzed": "Analyzed by AI"
   },
   "media_thumbnail": {
     "alt_thumb": "Photo thumbnail"

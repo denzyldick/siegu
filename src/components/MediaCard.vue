@@ -76,6 +76,10 @@
           <v-icon color="white" size="20">mdi-play</v-icon>
         </div>
 
+        <div v-if="isFavorite" class="favorite-heart" :class="{ pop: heartPop }">
+          <v-icon color="white" size="56">mdi-heart</v-icon>
+        </div>
+
         <div v-if="nsfwScore >= NSFW_THRESHOLD" class="nsfw-badge" :title="$t('media_card.nsfw')">
           <v-icon size="14" color="white">mdi-alert-octagon</v-icon>
           <span>{{ Math.round(nsfwScore * 100) }}%</span>
@@ -88,52 +92,15 @@
         </div>
 
         <v-btn
-          v-if="!selectionMode"
+          v-if="isAnalyzed"
           variant="flat"
-          class="action-btn favorite-action"
-          :class="{ 'is-fav': path.favorite }"
-          @click.stop="toggleFavorite"
+          class="action-btn ai-badge"
+          :title="$t('media_card.ai_analyzed')"
         >
-          <v-icon size="18" :color="path.favorite ? 'rgb(var(--v-theme-error))' : 'white'">
-            {{ path.favorite ? 'mdi-heart' : 'mdi-heart-outline' }}
-          </v-icon>
+          <v-icon size="14" color="white">mdi-auto-fix</v-icon>
         </v-btn>
       </template>
       <div v-else class="viewport-placeholder h-100 w-100 d-flex align-center justify-center"></div>
-    </div>
-    <div v-if="!selectionMode" class="media-card-info">
-      <div class="media-card-info-top">
-        <div class="media-card-tags" v-if="tags.length > 0">
-          <span v-for="tag in tags" :key="tag" class="info-tag">{{ tag }}</span>
-        </div>
-        <div class="media-card-meta" v-if="hasResults">
-          <v-icon size="12" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-auto-fix</v-icon>
-        </div>
-      </div>
-      <div
-        class="media-card-caption click-caption"
-        v-if="path.caption"
-        @click.stop="$emit('click')"
-      >
-        {{ path.caption }}
-      </div>
-      <div class="media-card-details" v-if="hasResults">
-        <span
-          v-if="path.aesthetics_score != null"
-          class="detail-item"
-          :title="$t('media_card.aesthetics_score')"
-        >
-          <v-icon size="10" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-star</v-icon>
-          {{ formatScore(path.aesthetics_score) }}
-        </span>
-        <span v-if="faceCount > 0" class="detail-item" :title="$t('media_card.faces_detected')">
-          <v-icon size="10" color="rgba(var(--v-theme-on-surface), 0.7)">mdi-face</v-icon>
-          {{ faceCount }}
-        </span>
-        <span v-if="path.indexed === 2" class="detail-item" :title="$t('media_card.fully_indexed')">
-          <v-icon size="10" color="rgb(var(--v-theme-success))">mdi-check-circle</v-icon>
-        </span>
-      </div>
     </div>
   </div>
 </template>
@@ -141,7 +108,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useMediaUrl } from '@/composables/useMediaUrl';
-import { isVideo as checkIsVideo, formatScore } from '@/composables/useMediaUtils';
+import { isVideo as checkIsVideo } from '@/composables/useMediaUtils';
 import type { MediaItem } from '@/types/media';
 
 const props = defineProps<{
@@ -239,20 +206,7 @@ const posterSrc = computed(() => {
   if (isViewOnly.value) return remoteThumbUrl(props.path.id);
   return buildThumbUrl(props.path.location);
 });
-
-const tags = computed((): string[] => {
-  if (!props.path?.objects) return [];
-  return Object.entries(props.path.objects)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map((entry) => entry[0]);
-});
-
-const faceCount = computed((): number => {
-  if (!props.path?.properties) return 0;
-  const v = props.path.properties['face_count'];
-  return v ? parseInt(String(v)) : 0;
-});
+const notSynced = computed((): boolean => !!props.path?.sync_needed && !props.path?.received);
 
 const NSFW_THRESHOLD = 0.8;
 
@@ -263,8 +217,7 @@ const nsfwScore = computed((): number => {
   return Number.isFinite(score) ? score : 0;
 });
 
-const notSynced = computed((): boolean => !!props.path?.sync_needed && !props.path?.received);
-const hasResults = computed((): boolean => {
+const isAnalyzed = computed((): boolean => {
   if (!props.path) return false;
   return (
     (props.path.objects && Object.keys(props.path.objects).length > 0) ||
@@ -274,16 +227,49 @@ const hasResults = computed((): boolean => {
   );
 });
 
-function toggleFavorite(): void {
-  emit('toggle-favorite', props.path.id);
+// Double-tap to favorite: the first tap waits TAP_DELAY before opening the
+// viewer so a second tap can cancel it and toggle favorite instead.
+const TAP_DELAY = 260;
+let lastTap = 0;
+let openTimer: number | undefined;
+let popTimer: number | undefined;
+
+const isFavorite = computed((): boolean => !!props.path?.favorite);
+const heartPop = ref(false);
+
+function triggerHeartPop(): void {
+  heartPop.value = false;
+  // Force a style flush so the animation restarts on consecutive likes.
+  void containerRef.value?.offsetWidth;
+  heartPop.value = true;
+  if (popTimer !== undefined) window.clearTimeout(popTimer);
+  popTimer = window.setTimeout(() => {
+    heartPop.value = false;
+    popTimer = undefined;
+  }, 450);
 }
 
 function handleClick(): void {
   if (props.selectionMode) {
     emit('select', props.path.id);
-  } else {
-    emit('click');
+    return;
   }
+  const now = Date.now();
+  if (now - lastTap < TAP_DELAY) {
+    lastTap = 0;
+    if (openTimer !== undefined) {
+      window.clearTimeout(openTimer);
+      openTimer = undefined;
+    }
+    emit('toggle-favorite', props.path.id);
+    triggerHeartPop();
+    return;
+  }
+  lastTap = now;
+  openTimer = window.setTimeout(() => {
+    openTimer = undefined;
+    emit('click');
+  }, TAP_DELAY);
 }
 
 function onImageError(): void {
@@ -321,6 +307,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   observer?.disconnect();
+  if (openTimer !== undefined) window.clearTimeout(openTimer);
+  if (popTimer !== undefined) window.clearTimeout(popTimer);
 });
 </script>
 
@@ -472,14 +460,9 @@ onUnmounted(() => {
   z-index: 5;
 }
 
-.media-card-container:hover .action-btn,
-.action-btn.is-fav {
+.media-card-container:hover .action-btn {
   opacity: 1;
   transform: translateY(0);
-}
-
-.action-btn.is-fav {
-  background: white;
 }
 
 .not-synced-badge {
@@ -516,73 +499,51 @@ onUnmounted(() => {
   background: rgb(var(--v-theme-info));
 }
 
-.media-card-info {
-  margin-top: 6px;
-  padding: 0 2px;
+.ai-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: color-mix(in srgb, rgb(var(--v-theme-primary)) 85%, transparent);
+  opacity: 1;
+  transform: none;
+  z-index: 6;
 }
 
-.media-card-info-top {
+.ai-badge:hover {
+  background: rgb(var(--v-theme-primary));
+}
+
+.favorite-heart {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 4px;
+  justify-content: center;
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 4;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
 }
 
-.media-card-tags {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-  min-width: 0;
-  overflow: hidden;
+.favorite-heart.pop :deep(.v-icon) {
+  animation: heart-pop 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.info-tag {
-  font-size: 10px;
-  font-weight: 600;
-  color: rgba(var(--v-theme-on-surface), 0.6);
-  background: rgb(var(--v-theme-surface));
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
-  padding: 1px 6px;
-  border-radius: 4px;
-  text-transform: capitalize;
-  white-space: nowrap;
-}
-
-.media-card-meta {
-  flex-shrink: 0;
-  opacity: 0.5;
-}
-
-.media-card-caption {
-  font-size: 11px;
-  color: rgba(var(--v-theme-on-surface), 0.7);
-  margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.click-caption {
-  cursor: pointer;
-}
-
-.click-caption:hover {
-  color: rgb(var(--v-theme-on-surface));
-  text-decoration: underline;
-}
-
-.media-card-details {
-  display: flex;
-  gap: 8px;
-  margin-top: 2px;
-  flex-wrap: wrap;
-}
-
-.detail-item {
-  font-size: 10px;
-  color: rgba(var(--v-theme-on-surface), 0.7);
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
+@keyframes heart-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  55% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
 }
 </style>

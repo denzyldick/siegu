@@ -447,7 +447,8 @@
     "fully_indexed": "Kompletamente indeksá",
     "not_synced": "No respaldá na otro aparato — toca pa reconectá",
     "nsfw": "NSFW detektá",
-    "view_only": "Stashá ribo bo otro device — habri pa mira"
+    "view_only": "Stashá ribo bo otro device — habri pa mira",
+    "ai_analyzed": "Analisa pa AI"
   },
   "media_thumbnail": {
     "alt_thumb": "Miniatura di foto"

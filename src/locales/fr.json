@@ -447,7 +447,8 @@
     "fully_indexed": "Entièrement indexé",
     "not_synced": "Non sauvegardé sur un autre appareil — touchez pour reconnecter",
     "nsfw": "NSFW détecté",
-    "view_only": "Stocké sur votre autre appareil — ouvrez pour le voir"
+    "view_only": "Stocké sur votre autre appareil — ouvrez pour le voir",
+    "ai_analyzed": "Analysé par l'IA"
   },
   "media_thumbnail": {
     "alt_thumb": "Vignette photo"

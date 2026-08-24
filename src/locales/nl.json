@@ -447,7 +447,8 @@
     "fully_indexed": "Volledig geïndexeerd",
     "not_synced": "Niet geback-upt op een ander apparaat — tik om opnieuw te verbinden",
     "nsfw": "NSFW gedetecteerd",
-    "view_only": "Opgeslagen op je andere apparaat — open om te bekijken"
+    "view_only": "Opgeslagen op je andere apparaat — open om te bekijken",
+    "ai_analyzed": "Geanalyseerd door AI"
   },
   "media_thumbnail": {
     "alt_thumb": "Fotominiatuur"
