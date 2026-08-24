@@ -109,7 +109,11 @@ function handleSync(msg: SyncMsg): void {
     case 'ViewOnlyManifest': {
       const m = msg as Extract<SyncMsg, { type: 'ViewOnlyManifest' }>;
       manifestPhotos = manifestPhotos.concat(m.photos);
-      setStatus(`Loaded ${manifestPhotos.length} items…`);
+      setStatus(
+        m.more
+          ? `Loaded ${manifestPhotos.length} items…`
+          : `Loaded ${manifestPhotos.length} photos`,
+      );
       renderGallery();
       break;
     }
@@ -176,59 +180,86 @@ function finishOriginal(id: string): void {
 // Gallery
 // ---------------------------------------------------------------------------
 
-function renderGallery(): void {
-  if (galleryEl.childElementCount >= manifestPhotos.length) return;
-
-  const observer = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        const tile = entry.target as HTMLElement;
-        observer.unobserve(tile);
-        const id = tile.dataset.id!;
-        const cached = cachedUrl(`thumb:${id}`);
-        if (cached) applyThumb(id, cached);
-        else requestThumb(id);
-      }
-    },
-    { rootMargin: '300px' },
-  );
-
-  for (const photo of manifestPhotos) {
-    if (galleryEl.querySelector(`[data-id="${CSS.escape(photo.id)}"]`)) continue;
-    const tile = document.createElement('button');
-    tile.type = 'button';
-    tile.className = 'tile';
-    tile.dataset.id = photo.id;
-    tile.title = photo.caption ?? '';
-    tile.setAttribute(
-      'aria-label',
-      photo.caption ?? photo.location ?? photo.id,
-    );
-    tile.addEventListener('click', () => openFull(photo));
-
-    const img = document.createElement('img');
-    img.alt = photo.caption ?? '';
-    img.loading = 'lazy';
-    img.addEventListener('load', () => img.classList.add('loaded'));
-    tile.appendChild(img);
-
-    if (/\.(mp4|mov|avi|mkv|webm)$/i.test(photo.location)) {
-      const badge = document.createElement('span');
-      badge.className = 'badge';
-      badge.textContent = '▶';
-      tile.appendChild(badge);
+// One observer for the lifetime of the page: tiles ask it for thumbnails when
+// they approach the viewport. Recreating it per render leaked every instance.
+const galleryObserver = new IntersectionObserver(
+  (entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      const tile = entry.target as HTMLElement;
+      galleryObserver.unobserve(tile);
+      const id = tile.dataset.id!;
+      const cached = cachedUrl(`thumb:${id}`);
+      if (cached) applyThumb(id, cached);
+      else requestThumb(id);
     }
+  },
+  { rootMargin: '300px' },
+);
 
-    galleryEl.appendChild(tile);
-    observer.observe(tile);
+function buildTile(photo: ViewPhoto): HTMLElement {
+  const tile = document.createElement('button');
+  tile.type = 'button';
+  tile.className = 'tile';
+  tile.dataset.id = photo.id;
+  tile.title = photo.caption ?? '';
+  tile.setAttribute('aria-label', photo.caption ?? photo.location ?? photo.id);
+  tile.addEventListener('click', () => openFull(photo));
+
+  const img = document.createElement('img');
+  img.alt = photo.caption ?? '';
+  img.loading = 'lazy';
+  img.addEventListener('load', () => img.classList.add('loaded'));
+  tile.appendChild(img);
+
+  if (/\.(mp4|mov|avi|mkv|webm)$/i.test(photo.location)) {
+    const badge = document.createElement('span');
+    badge.className = 'badge';
+    badge.textContent = '▶';
+    tile.appendChild(badge);
+  }
+
+  galleryObserver.observe(tile);
+  return tile;
+}
+
+// Large libraries stream in as many manifest chunks; building the whole DOM
+// on every chunk (with a per-photo querySelector) crashed the tab around 9k
+// items. Grow instead: append one batch per call and let a sentinel element
+// pull in the next batch when the user scrolls near the end.
+const GALLERY_BATCH = 500;
+let renderedTiles = 0;
+const gallerySentinel = document.createElement('div');
+gallerySentinel.className = 'sentinel';
+
+function renderGallery(): void {
+  if (renderedTiles >= manifestPhotos.length) return;
+
+  const end = Math.min(renderedTiles + GALLERY_BATCH, manifestPhotos.length);
+  const frag = document.createDocumentFragment();
+  for (let i = renderedTiles; i < end; i++) {
+    frag.appendChild(buildTile(manifestPhotos[i]));
+  }
+  renderedTiles = end;
+
+  if (renderedTiles < manifestPhotos.length) {
+    galleryEl.appendChild(gallerySentinel);
+    galleryEl.appendChild(frag);
+  } else {
+    galleryEl.appendChild(frag);
+    gallerySentinel.remove();
   }
 }
 
+const sentinelObserver = new IntersectionObserver((entries) => {
+  for (const entry of entries) {
+    if (entry.isIntersecting) renderGallery();
+  }
+});
+sentinelObserver.observe(gallerySentinel);
+
 function applyThumb(id: string, url: string): void {
-  const img = galleryEl.querySelector<HTMLImageElement>(
-    `[data-id="${CSS.escape(id)}"] img`,
-  );
+  const img = galleryEl.querySelector<HTMLImageElement>(`[data-id="${CSS.escape(id)}"] img`);
   if (img) {
     img.src = url;
     img.classList.add('loaded');
@@ -387,18 +418,24 @@ async function answerOffer(ws: WebSocket, sdpJson: string): Promise<void> {
     pc.ondatachannel = (ev) => {
       dc = ev.channel;
       dc.binaryType = 'arraybuffer';
+      console.log('[siegu-dc] channel', dc.label, dc.readyState);
       dc.onopen = () => {
+        console.log('[siegu-dc] open');
         setStatus('Connected — loading library…');
         gateEl.hidden = true;
         galleryEl.hidden = false;
         manifestPhotos = [];
         sendSync({ type: 'EnterViewOnly' });
       };
+      // webrtc-rs tags its outgoing frames as binary, so Chrome hands them
+      // to us as ArrayBuffers even though the payload is UTF-8 JSON.
+      const decoder = new TextDecoder();
       dc.onmessage = (me) => {
+        const text = typeof me.data === 'string' ? me.data : decoder.decode(me.data as ArrayBuffer);
         try {
-          handleSync(JSON.parse(me.data as string));
-        } catch {
-          /* ignore non-JSON frames */
+          handleSync(JSON.parse(text));
+        } catch (e) {
+          console.error('[siegu-dc] handle failed', e, text.slice(0, 120));
         }
       };
       dc.onclose = () => setStatus('Media channel closed');
