@@ -63,6 +63,14 @@ pub struct MeshTransport {
     pub event: Arc<dyn SyncEvent>,
     sync_tx: Arc<Mutex<Option<UnboundedSender<SyncMessage>>>>,
     external_tx: Option<Arc<Mutex<Option<UnboundedSender<SyncMessage>>>>>,
+    /// RPC permission for browser guests (#19). `None` (the default) rejects
+    /// CommandRequest messages entirely; device-to-device mesh sessions never
+    /// opt in, only `siegu web --share-mode ...` does.
+    share_mode: Option<crate::rpc::ShareMode>,
+    /// When set, the receiver branch skips ManifestRequest/CatchUp on channel
+    /// open: the guest drives EnterViewOnly/RPC itself and must never trigger
+    /// a full sync push from the sharer (#9/#19).
+    view_only_client: bool,
 }
 
 impl MeshTransport {
@@ -89,6 +97,8 @@ impl MeshTransport {
             event,
             sync_tx: Arc::new(Mutex::new(None)),
             external_tx: None,
+            share_mode: None,
+            view_only_client: false,
         }
     }
 
@@ -97,6 +107,18 @@ impl MeshTransport {
         external_tx: Arc<Mutex<Option<UnboundedSender<SyncMessage>>>>,
     ) -> Self {
         self.external_tx = Some(external_tx);
+        self
+    }
+
+    /// Enable RPC dispatch for this session with the given permission level
+    /// (#19). Only web-share hosts should call this.
+    pub fn with_share_mode(mut self, mode: crate::rpc::ShareMode) -> Self {
+        self.share_mode = Some(mode);
+        self
+    }
+
+    pub fn with_view_only_client(mut self, flag: bool) -> Self {
+        self.view_only_client = flag;
         self
     }
 
@@ -377,6 +399,7 @@ impl MeshTransport {
             let total_msg = Arc::clone(&items_total_dc);
             let mirror_completed_msg = Arc::clone(&mirror_completed_dc);
             let mirror_total_msg = Arc::clone(&mirror_total_dc);
+            let share_mode_msg = self.share_mode;
 
             dc.on_message(Box::new(move |msg: DataChannelMessage| {
                 let dc = Arc::clone(&dc_msg);
@@ -406,6 +429,7 @@ impl MeshTransport {
                             &mirror_completed,
                             &mirror_total,
                             &pending_view,
+                            share_mode_msg,
                         )
                         .await;
                     }
@@ -427,6 +451,8 @@ impl MeshTransport {
             let device_name_rcv = device_name_dc.clone();
             let device_os_rcv = device_os_dc.clone();
             let models_rcv = models_enabled_dc.clone();
+            let share_mode_rcv = self.share_mode;
+            let view_only_client_rcv = self.view_only_client;
 
             pc.on_data_channel(Box::new(move |d: Arc<RTCDataChannel>| {
                 let incoming = Arc::clone(&incoming_rcv);
@@ -450,6 +476,7 @@ impl MeshTransport {
                 let total_msg = Arc::clone(&total);
                 let mirror_completed_msg = Arc::clone(&mirror_completed_rcv);
                 let mirror_total_msg = Arc::clone(&mirror_total_rcv);
+                let share_mode_msg = share_mode_rcv;
 
                 d.on_message(Box::new(move |msg: DataChannelMessage| {
                     let dc = Arc::clone(&dc_msg);
@@ -479,6 +506,7 @@ impl MeshTransport {
                                 &mirror_completed,
                                 &mirror_total,
                                 &pending_view,
+                                share_mode_msg,
                             )
                             .await;
                         }
@@ -492,6 +520,7 @@ impl MeshTransport {
                 let device_name = device_name_rcv.clone();
                 let device_os = device_os_rcv.clone();
                 let models = models_rcv.clone();
+                let view_only_client = view_only_client_rcv;
 
                 d.on_open(Box::new(move || {
                     let dc = Arc::clone(&dc_open);
@@ -511,11 +540,19 @@ impl MeshTransport {
                         )
                         .await;
                         event_open.on_log("DEBUG [receiver] sent VersionNegotiate");
-                        let _ = MeshManager::send_sync_message(&dc, &SyncMessage::ManifestRequest)
-                            .await;
-                        event_open.on_log("DEBUG [receiver] sent ManifestRequest");
-                        let _ = MeshManager::send_sync_message(&dc, &SyncMessage::CatchUp).await;
-                        event_open.on_log("DEBUG [receiver] sent CatchUp");
+                        // View-only/RPC guests never ask for the library:
+                        // they drive EnterViewOnly / CommandRequest themselves
+                        // and a stray ManifestRequest would trigger a full
+                        // sync push before EnterViewOnly even lands.
+                        if !view_only_client {
+                            let _ =
+                                MeshManager::send_sync_message(&dc, &SyncMessage::ManifestRequest)
+                                    .await;
+                            event_open.on_log("DEBUG [receiver] sent ManifestRequest");
+                            let _ =
+                                MeshManager::send_sync_message(&dc, &SyncMessage::CatchUp).await;
+                            event_open.on_log("DEBUG [receiver] sent CatchUp");
+                        }
                         let mut rx = sync_rx.lock().await;
                         while let Some(msg) = rx.recv().await {
                             event_open.on_log(&format!(

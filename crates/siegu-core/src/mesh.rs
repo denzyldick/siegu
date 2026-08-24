@@ -171,6 +171,26 @@ pub enum SyncMessage {
         #[serde(with = "base64_bytes")]
         data: Vec<u8>,
     },
+    /// Generic RPC envelope (#19): the browser guest invokes the same
+    /// `do_*` business functions the Tauri app calls, without a local
+    /// backend. One variant covers every command; results come back as
+    /// JSON values so the payload schema stays owned by the command.
+    CommandRequest {
+        id: u64,
+        name: String,
+        #[serde(default)]
+        payload: serde_json::Value,
+    },
+    /// Reply to a CommandRequest. Exactly one of `result`/`error` is set.
+    /// Errors are plain strings: safe to log, cheap to render.
+    CommandResponse {
+        id: u64,
+        ok: bool,
+        #[serde(default)]
+        result: Option<serde_json::Value>,
+        #[serde(default)]
+        error: Option<String>,
+    },
 }
 
 /// Serde adapter: `Vec<u8>` <-> base64 string.
@@ -255,6 +275,16 @@ pub trait SyncEvent: Send + Sync {
     /// Called once when a view-only peer finishes receiving our manifest
     /// chunks (#9): the UI builds an ephemeral read-only gallery from it.
     fn on_view_manifest(&self, _photos: &[PhotoSyncInfo]) {}
+    /// Called when the connected peer answers one of our CommandRequests
+    /// (#19). Default no-op; drivers/clients override to await results.
+    fn on_command_response(
+        &self,
+        _id: u64,
+        _ok: bool,
+        _result: Option<&serde_json::Value>,
+        _error: Option<&str>,
+    ) {
+    }
     fn on_device_registered(&self, db: &Database);
     fn on_metadata_updated(
         &self,
@@ -746,6 +776,7 @@ impl MeshManager {
         mirror_completed: &Arc<std::sync::atomic::AtomicUsize>,
         mirror_total: &Arc<std::sync::atomic::AtomicUsize>,
         pending_view_manifest: &Arc<tokio::sync::Mutex<Vec<PhotoSyncInfo>>>,
+        share_mode: Option<crate::rpc::ShareMode>,
     ) {
         match msg {
             SyncMessage::ManifestRequest => {
@@ -1549,10 +1580,13 @@ impl MeshManager {
             } => {
                 if thumbnail {
                     // Small direct reply: DB-cached thumbnail or generate.
+                    // A photo that was scanned but never analyzed stores an
+                    // empty `encoded`, which decodes to a zero-byte vec —
+                    // treat that as "no cached thumbnail" and generate.
                     let db = Database::new(config_path);
                     let bytes = match db.get_photo_thumbnail_bytes(&id) {
-                        Some(b) => Some(b),
-                        None => db
+                        Some(b) if !b.is_empty() => Some(b),
+                        _ => db
                             .get_photo_location(&id)
                             .and_then(|loc| crate::thumbnail::generate_thumbnail_bytes(&loc)),
                     };
@@ -1633,6 +1667,63 @@ impl MeshManager {
                         mime,
                     },
                 );
+            }
+            SyncMessage::CommandRequest { id, name, payload } => {
+                // RPC from a browser guest (#19). Disabled unless the host
+                // session was created with an explicit share mode; the reply
+                // is generated off the message loop so slow SQLite work never
+                // blocks sync traffic.
+                let Some(mode) = share_mode else {
+                    let _ = Self::send_sync_message(
+                        dc,
+                        &SyncMessage::CommandResponse {
+                            id,
+                            ok: false,
+                            result: None,
+                            error: Some("RPC not enabled on this session".to_string()),
+                        },
+                    )
+                    .await;
+                    return;
+                };
+                event.on_log(&format!("DEBUG rpc request #{id} {name}"));
+                let dc = Arc::clone(dc);
+                let config_path = config_path.to_string();
+                tokio::spawn(async move {
+                    let ctx = crate::rpc::RpcContext {
+                        config_path: &config_path,
+                        mode,
+                    };
+                    let response = match crate::rpc::dispatch(&ctx, &name, &payload) {
+                        Ok(result) => SyncMessage::CommandResponse {
+                            id,
+                            ok: true,
+                            result: Some(result),
+                            error: None,
+                        },
+                        Err(error) => {
+                            event.on_log(&format!("ERROR rpc #{id} {name}: {error}"));
+                            SyncMessage::CommandResponse {
+                                id,
+                                ok: false,
+                                result: None,
+                                error: Some(error),
+                            }
+                        }
+                    };
+                    if let Err(e) = Self::send_sync_message(&dc, &response).await {
+                        event.on_log(&format!("ERROR sending CommandResponse #{id}: {e}"));
+                    }
+                });
+            }
+            // Guests consume these via on_command_response (default: ignore).
+            SyncMessage::CommandResponse {
+                id,
+                ok,
+                result,
+                error,
+            } => {
+                event.on_command_response(id, ok, result.as_ref(), error.as_deref());
             }
         }
     }

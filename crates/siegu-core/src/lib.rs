@@ -5,6 +5,7 @@ pub mod event_bus;
 pub mod face_detector;
 pub mod geocode;
 pub mod lan_server;
+pub mod library;
 pub mod mdns;
 pub mod mesh;
 pub mod mesh_transport;
@@ -13,6 +14,7 @@ pub mod ml_engine;
 #[cfg(feature = "ml")]
 pub mod ml_worker;
 pub mod model_manager;
+pub mod rpc;
 pub mod scanner;
 pub mod server;
 pub mod shutdown;
@@ -31,6 +33,7 @@ pub use event_bus::{ArcEventBus, CallbackEventBus, EventBus, Level, LogCollector
 pub use mesh::{MeshManager, SyncEvent, SyncMessage, SyncPhase, SyncProgress};
 #[cfg(feature = "ml")]
 pub use ml_worker::MlContext;
+pub use rpc::ShareMode;
 pub use scanner::{extract_photo_metadata, is_media_file, ScanGuard};
 pub use server::{generate_pairing_codes, hash_pairing_code, PairingCodes};
 pub use shutdown::{check_shutdown, ShutdownCoordinator};

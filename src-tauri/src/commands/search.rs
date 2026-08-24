@@ -1,123 +1,12 @@
-use serde::Serialize;
-
 use crate::common::get_config_path;
 use crate::database;
-use crate::database::Database;
 
-/// A single option inside a search facet section, with the number of matching photos.
-#[derive(Debug, Clone, Serialize)]
-pub struct SearchFacetGroup {
-    pub id: String,
-    pub name: Option<String>,
-    pub representative_crop: Option<String>,
-    pub encoded: Option<String>,
-    pub count: i64,
-}
-
-/// A counted facet value such as a city or an object tag.
-#[derive(Debug, Clone, Serialize)]
-pub struct SearchFacetCount {
-    pub name: String,
-    pub count: i64,
-}
-
-/// Everything the search dropdown needs to render its discovery sections.
-#[derive(Debug, Clone, Serialize)]
-pub struct SearchFacets {
-    pub people: Vec<SearchFacetGroup>,
-    pub unnamed_faces: Vec<SearchFacetGroup>,
-    pub locations: Vec<database::LocationGroup>,
-    pub tags: Vec<SearchFacetCount>,
-    pub papers: Vec<SearchFacetCount>,
-    pub cameras: Vec<SearchFacetCount>,
-    pub months: Vec<SearchFacetCount>,
-    pub best_photos: Vec<database::SearchPhotoTile>,
-    pub favorite_photos: Vec<database::SearchPhotoTile>,
-    pub recent_photos: Vec<database::SearchPhotoTile>,
-    pub stats: database::SearchStats,
-}
-
-fn to_group(
-    id: String,
-    name: Option<String>,
-    crop: Option<String>,
-    encoded: Option<String>,
-    count: i64,
-) -> SearchFacetGroup {
-    SearchFacetGroup {
-        id,
-        name,
-        representative_crop: crop,
-        encoded,
-        count,
-    }
-}
-
-/// Pure business logic — testable without Tauri.
-pub fn do_get_search_facets(db: &Database) -> SearchFacets {
-    let people = db
-        .get_search_people(20)
-        .into_iter()
-        .map(|p| {
-            to_group(
-                p.id,
-                Some(p.name),
-                p.representative_crop,
-                p.encoded,
-                p.photo_count,
-            )
-        })
-        .collect();
-    let unnamed_faces = db
-        .get_anonymous_people_groups()
-        .into_iter()
-        .take(12)
-        .map(|g| {
-            to_group(
-                g.id,
-                None,
-                g.representative_crop,
-                g.encoded,
-                g.face_count as i64,
-            )
-        })
-        .collect();
-    let locations = db.get_location_groups(25);
-    let tags = db
-        .get_tag_counts(40)
-        .into_iter()
-        .map(|(name, count)| SearchFacetCount { name, count })
-        .collect();
-    let papers = db
-        .get_paper_counts(8)
-        .into_iter()
-        .map(|(name, count)| SearchFacetCount { name, count })
-        .collect();
-    let cameras = db
-        .get_camera_counts(12)
-        .into_iter()
-        .map(|(name, count)| SearchFacetCount { name, count })
-        .collect();
-    let months = db
-        .get_month_counts(12)
-        .into_iter()
-        .map(|(name, count)| SearchFacetCount { name, count })
-        .collect();
-
-    SearchFacets {
-        people,
-        unnamed_faces,
-        locations,
-        tags,
-        papers,
-        cameras,
-        months,
-        best_photos: db.get_best_photos(8),
-        favorite_photos: db.get_favorite_photos(8),
-        recent_photos: db.get_recent_photos(8),
-        stats: db.get_search_stats(),
-    }
-}
+// Business logic lives in siegu-core (#19) so CLI hosts and RPC guests run
+// the exact same functions as this app.
+#[allow(unused_imports)]
+pub use siegu_core::library::{
+    do_get_search_facets, SearchFacetCount, SearchFacetGroup, SearchFacets,
+};
 
 #[tauri::command]
 pub async fn search_facets(app: tauri::AppHandle) -> Result<String, String> {

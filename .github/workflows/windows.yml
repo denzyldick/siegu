@@ -121,6 +121,10 @@ jobs:
       - name: Run mesh sync E2E (in-process signaling)
         run: bash scripts/e2e-sync.sh
 
+      # ── View-only browsing + RPC share modes over the same stack (#19) ──
+      - name: Run view-only + RPC E2E
+        run: bash scripts/e2e-view-only.sh
+
       # ── Full ONNX model inference on real photos/videos ────────────────
       - name: Cache AI test models
         uses: actions/cache@v4

@@ -1,133 +1,13 @@
 use crate::common::get_config_path;
 use crate::database;
-use crate::database::{Database, Photo};
 
-/// Pure business logic — testable without Tauri.
-#[allow(dead_code)]
-pub fn do_list_files(
-    db: &Database,
-    query: &str,
-    offset: usize,
-    limit: usize,
-    favorites_only: bool,
-    videos_only: bool,
-) -> Vec<Photo> {
-    do_list_files_filtered(
-        db,
-        query,
-        offset,
-        limit,
-        favorites_only,
-        videos_only,
-        vec![],
-        None,
-        false,
-        None,
-        None,
-        None,
-        None,
-        false,
-        None,
-        None,
-        false,
-        false,
-        false,
-        None,
-        None,
-    )
-}
-
-/// Pure business logic — testable without Tauri. Adds optional facet filters.
-#[allow(clippy::too_many_arguments)]
-pub fn do_list_files_filtered(
-    db: &Database,
-    query: &str,
-    offset: usize,
-    limit: usize,
-    favorites_only: bool,
-    videos_only: bool,
-    person_ids: Vec<String>,
-    person_match: Option<String>,
-    person_alone: bool,
-    location: Option<String>,
-    tag: Option<String>,
-    date_from: Option<String>,
-    date_to: Option<String>,
-    has_faces: bool,
-    aesthetics_min: Option<f64>,
-    camera: Option<String>,
-    papers: bool,
-    nsfw_only: bool,
-    random: bool,
-    order_by: Option<String>,
-    album_id: Option<String>,
-) -> Vec<Photo> {
-    let filter = crate::database::PhotoFilter {
-        person_ids,
-        person_match: match person_match.as_deref() {
-            Some("or") => crate::database::PersonMatch::Or,
-            _ => crate::database::PersonMatch::And,
-        },
-        person_alone,
-        location,
-        tag,
-        date_from,
-        date_to,
-        query: None,
-        videos: None,
-        favorite: favorites_only,
-        has_faces,
-        aesthetics_min,
-        camera,
-        papers,
-        nsfw_only,
-        random,
-        order_by,
-        album_id,
-    };
-    db.list_photos_filtered(
-        query,
-        offset,
-        limit,
-        favorites_only,
-        videos_only,
-        &filter,
-        false,
-    )
-}
-
-/// Pure business logic — testable without Tauri.
-pub fn do_toggle_favorite(db: &Database, id: &str) -> bool {
-    db.toggle_favorite(id)
-}
-
-/// Pure business logic — testable without Tauri.
-pub fn do_set_favorites(db: &Database, ids: &[String], favorite: bool) -> usize {
-    db.set_favorites(ids, favorite)
-}
-
-/// Pure business logic — testable without Tauri.
-pub fn do_get_photo_by_id(db: &Database, id: &str) -> Option<Photo> {
-    db.get_photo_by_id(id)
-}
-
-/// Pure business logic — testable without Tauri.
-pub fn do_get_photo_encoded_batch(
-    db: &Database,
-    ids: &[String],
-) -> std::collections::HashMap<String, String> {
-    db.get_photo_encoded_batch(ids)
-}
-
-/// Pure business logic — testable without Tauri.
-pub fn do_get_photos_by_ids(db: &Database, ids: &[String]) -> Vec<Photo> {
-    db.get_photos_by_ids(ids)
-}
-
-/// Pure business logic — testable without Tauri.
-pub fn do_get_heatmap_data(db: &Database) -> Vec<crate::database::MapPoint> {
-    db.get_heatmap_points()
-}
+// Business logic lives in siegu-core (#19) so CLI hosts and RPC guests run
+// the exact same functions as this app.
+#[allow(unused_imports)] // some are only used by the unit tests below
+pub use siegu_core::library::{
+    do_get_heatmap_data, do_get_photo_by_id, do_get_photo_encoded_batch, do_get_photos_by_ids,
+    do_list_files, do_list_files_filtered, do_set_favorites, do_toggle_favorite,
+};
 
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
@@ -326,6 +206,7 @@ pub async fn list_trash(app: tauri::AppHandle, limit: i64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::database::Database;
     use crate::test_helpers::*;
 
     #[test]
