@@ -245,6 +245,16 @@ enum Commands {
 
 #[derive(Subcommand)]
 enum MeshAction {
+    /// Create a manual album from the first N photos and print its ID (#16).
+    /// Test helper for scripts/e2e-view-only.sh.
+    SeedAlbum {
+        /// Album name
+        #[arg(long, default_value = "E2E Shared")]
+        name: String,
+        /// Put the first N photos of the library into the album
+        #[arg(long, default_value = "1")]
+        take_first: usize,
+    },
     /// Start a LAN mesh host and wait for peers
     Host {
         #[arg(short, long, default_value = "0")]
@@ -289,6 +299,13 @@ enum MeshAction {
         initiator: bool,
         #[arg(short, long)]
         config: Option<String>,
+        /// Enter album-share mode (#16): send EnterAlbumShare for this album
+        /// instead of EnterViewOnly and verify the host enforces membership.
+        #[arg(long)]
+        album: Option<String>,
+        /// Device name announced to the room (must be unique per guest).
+        #[arg(long, default_value = "siegu-browser")]
+        name: String,
     },
     /// Send a single CommandRequest to the peer and print its reply (#19).
     /// Used by scripts/e2e-view-only.sh to exercise the RPC surface.
@@ -456,6 +473,13 @@ async fn main() {
             }
         }
         Commands::Mesh { action } => match action {
+            MeshAction::SeedAlbum { name, take_first } => {
+                cmd_seed_album(
+                    &resolve_config_dir(&cli.config_dir, &None),
+                    name,
+                    *take_first,
+                );
+            }
             MeshAction::Host {
                 port,
                 server,
@@ -487,9 +511,19 @@ async fn main() {
                 server,
                 initiator,
                 config,
+                album,
+                name,
             } => {
                 let config_dir = resolve_config_dir(&cli.config_dir, config);
-                cmd_mesh_browse(room, server.as_deref(), *initiator, &config_dir).await;
+                cmd_mesh_browse(
+                    room,
+                    server.as_deref(),
+                    *initiator,
+                    &config_dir,
+                    album.clone(),
+                    name,
+                )
+                .await;
             }
             MeshAction::Rpc {
                 room,
@@ -1195,7 +1229,14 @@ impl MeshDriver {
 /// fetch, sync-guard probe and a restore pull. Each stage prints a greppable
 /// `VIEWONLY ...` marker for scripts/e2e-view-only.sh; any stage failure
 /// exits non-zero so CI only needs the markers plus exit code.
-async fn cmd_mesh_browse(room: &str, server: Option<&str>, initiator: bool, config_dir: &Path) {
+async fn cmd_mesh_browse(
+    room: &str,
+    server: Option<&str>,
+    initiator: bool,
+    config_dir: &Path,
+    album_id: Option<String>,
+    device_name: &str,
+) {
     use std::time::Duration;
 
     let _ = std::fs::create_dir_all(config_dir);
@@ -1204,12 +1245,18 @@ async fn cmd_mesh_browse(room: &str, server: Option<&str>, initiator: bool, conf
 
     println!("Browsing mesh room: {room}");
     let (driver, handle) =
-        MeshDriver::connect(room, server, initiator, config_dir, "siegu-browser").await;
+        MeshDriver::connect(room, server, initiator, config_dir, device_name).await;
     let tx = driver.sender().await;
 
-    // ── stage 1: EnterViewOnly → chunked manifest ─────────────────────────
-    if tx.send(SyncMessage::EnterViewOnly).is_err() {
-        eprintln!("FAIL: could not send EnterViewOnly");
+    // ── stage 1: EnterViewOnly / EnterAlbumShare → chunked manifest ───────
+    let entered = match &album_id {
+        Some(id) => tx.send(SyncMessage::EnterAlbumShare {
+            album_id: id.clone(),
+        }),
+        None => tx.send(SyncMessage::EnterViewOnly),
+    };
+    if entered.is_err() {
+        eprintln!("FAIL: could not send view-only/album-share entry");
         std::process::exit(1);
     }
     if tokio::time::timeout(Duration::from_secs(60), driver.view_notify.notified())
@@ -1225,6 +1272,9 @@ async fn cmd_mesh_browse(room: &str, server: Option<&str>, initiator: bool, conf
         std::process::exit(1);
     }
     println!("VIEWONLY MANIFEST OK count={}", photos.len());
+    if album_id.is_some() {
+        println!("VIEWONLY ALBUM SCOPE OK count={}", photos.len());
+    }
     let first_id = photos[0].id.clone();
     let first_name = std::path::Path::new(&photos[0].location)
         .file_name()
@@ -1256,6 +1306,29 @@ async fn cmd_mesh_browse(room: &str, server: Option<&str>, initiator: bool, conf
     let _ = tx.send(SyncMessage::StartSync);
     println!("VIEWONLY SYNC-GUARD PROBE SENT");
     tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // ── stage 3b (album share): membership enforcement (#16) ──────────────
+    // A photo outside the shared album must NOT be served; the host drops
+    // the FetchMediaRequest, so no media ever arrives for the bogus id.
+    if album_id.is_some() {
+        let bogus = "siegu-e2e-nonmember".to_string();
+        let _ = tx.send(SyncMessage::FetchMediaRequest {
+            id: bogus.clone(),
+            thumbnail: true,
+            restore: false,
+        });
+        println!("VIEWONLY ALBUM DENY PROBE SENT id={bogus}");
+        match view
+            .wait_for(&format!("thumb:{bogus}"), Duration::from_secs(5))
+            .await
+        {
+            Some(_) => {
+                eprintln!("FAIL: host served media for a photo outside the shared album");
+                std::process::exit(1);
+            }
+            None => println!("VIEWONLY ALBUM DENY OK id={bogus}"),
+        }
+    }
 
     // ── stage 4: restore pull (#10) re-materializes the original locally ──
     if tx
@@ -1293,6 +1366,33 @@ async fn cmd_mesh_browse(room: &str, server: Option<&str>, initiator: bool, conf
     println!("VIEWONLY DONE");
 
     handle.abort();
+}
+
+/// Test helper for scripts/e2e-view-only.sh (#16): build a manual album from
+/// the first N photos in this library and print its ID on stdout.
+fn cmd_seed_album(config_dir: &Path, name: &str, take_first: usize) {
+    let db = Database::new(&config_dir.display().to_string());
+    let ids: Vec<String> = db
+        .list_photos("", 0, take_first.max(1), false, false)
+        .iter()
+        .map(|p| p.id.clone())
+        .collect();
+    if ids.is_empty() {
+        eprintln!("FAIL: no photos in library to seed the album with");
+        std::process::exit(1);
+    }
+    let album = match db.create_album(name) {
+        Ok(a) => a,
+        Err(e) => {
+            eprintln!("FAIL: could not create album: {e}");
+            std::process::exit(1);
+        }
+    };
+    if let Err(e) = db.add_album_items(&album.id, &ids) {
+        eprintln!("FAIL: could not fill album: {e}");
+        std::process::exit(1);
+    }
+    println!("ALBUM ID {} photos={}", album.id, ids.len());
 }
 
 /// One-shot RPC driver (#19): connect, send a single CommandRequest and

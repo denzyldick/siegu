@@ -16,11 +16,29 @@ pub enum SignalMessage {
         peer_count: usize,
     },
     #[serde(rename = "offer")]
-    Offer { payload: String, target: String },
+    Offer {
+        payload: String,
+        target: String,
+        /// Sender identity stamped by the signalling server so a
+        /// multi-guest host can route replies back (#16). Absent on
+        /// frames from servers that predate per-peer routing.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        from: Option<String>,
+    },
     #[serde(rename = "answer")]
-    Answer { payload: String, target: String },
+    Answer {
+        payload: String,
+        target: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        from: Option<String>,
+    },
     #[serde(rename = "ice_candidate")]
-    IceCandidate { payload: String, target: String },
+    IceCandidate {
+        payload: String,
+        target: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        from: Option<String>,
+    },
     #[serde(rename = "peer_disconnected")]
     PeerDisconnected { device_id: String },
     #[serde(rename = "peer_joined")]
@@ -107,14 +125,17 @@ mod tests {
             SignalMessage::Offer {
                 payload: "sdp".into(),
                 target: "peer".into(),
+                from: Some("d1".into()),
             },
             SignalMessage::Answer {
                 payload: "sdp".into(),
                 target: "peer".into(),
+                from: None,
             },
             SignalMessage::IceCandidate {
                 payload: "candidate".into(),
                 target: "peer".into(),
+                from: None,
             },
             SignalMessage::PeerDisconnected {
                 device_id: "d1".into(),

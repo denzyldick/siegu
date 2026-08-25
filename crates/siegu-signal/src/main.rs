@@ -12,9 +12,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok()
         .filter(|t| !t.is_empty());
 
+    let web_dist = std::env::var("SIEGU_WEB_DIST_DIR")
+        .ok()
+        .filter(|d| !d.is_empty())
+        .map(std::path::PathBuf::from);
+
     let runtime = tokio::runtime::Runtime::new()?;
     runtime.block_on(async move {
-        let server = start_with_config(ServerConfig { port, token }).await;
+        let server = start_with_config(ServerConfig {
+            port,
+            token,
+            web_dist,
+        })
+        .await;
         println!("siegu-signal listening on port {}", server.port);
 
         let mut sigterm =

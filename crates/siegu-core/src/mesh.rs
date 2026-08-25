@@ -145,6 +145,12 @@ pub enum SyncMessage {
     },
     /// Viewer asks to browse the peer's library without any writes (#9).
     EnterViewOnly,
+    /// Guest asks to browse one shared album only (#16). The manifest is
+    /// scoped to album members and every media request is membership-checked.
+    EnterAlbumShare {
+        #[serde(default)]
+        album_id: String,
+    },
     /// Chunked manifest of the sharer's library, sent to a view-only client.
     ViewOnlyManifest {
         photos: Vec<PhotoSyncInfo>,
@@ -777,6 +783,7 @@ impl MeshManager {
         mirror_total: &Arc<std::sync::atomic::AtomicUsize>,
         pending_view_manifest: &Arc<tokio::sync::Mutex<Vec<PhotoSyncInfo>>>,
         share_mode: Option<crate::rpc::ShareMode>,
+        session_scope: &Arc<tokio::sync::Mutex<Option<crate::view_only::AlbumScope>>>,
     ) {
         match msg {
             SyncMessage::ManifestRequest => {
@@ -1205,7 +1212,6 @@ impl MeshManager {
                         return;
                     };
                     let _ = file.flush().await;
-                    drop(file);
 
                     let temp_path =
                         sync_temp_dir(config_path).join(sanitize_filename(&file_state.id));
@@ -1559,6 +1565,36 @@ impl MeshManager {
                     event.on_log(&format!("ERROR sending view-only manifest: {e}"));
                 }
             }
+            SyncMessage::EnterAlbumShare { album_id } => {
+                // Album-scoped share (#16): the guest only ever learns about
+                // (and can only fetch) photos that belong to this album.
+                view_state()
+                    .serving_view_only
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
+                let db = Database::new(config_path);
+                if db.get_album(&album_id).is_none() {
+                    event.on_log(&format!(
+                        "WARN album share rejected: unknown album {album_id}"
+                    ));
+                    return;
+                }
+                let photos = db.get_album_photo_sync_info(&album_id);
+                let members: std::collections::HashSet<String> =
+                    photos.iter().map(|p| p.id.clone()).collect();
+                // Scope is PER SESSION so concurrent guests don't grant or
+                // deny each other's fetches (#16).
+                *session_scope.lock().await = Some(crate::view_only::AlbumScope {
+                    members,
+                    album_id: album_id.clone(),
+                });
+                event.on_log(&format!(
+                    "DEBUG peer entered album share '{album_id}' ({} items)",
+                    photos.len()
+                ));
+                if let Err(e) = Self::send_manifest_view_only(dc, photos).await {
+                    event.on_log(&format!("ERROR sending album-share manifest: {e}"));
+                }
+            }
             SyncMessage::ViewOnlyManifest { photos, more } => {
                 let mut pending = pending_view_manifest.lock().await;
                 pending.extend(photos);
@@ -1578,6 +1614,18 @@ impl MeshManager {
                 thumbnail,
                 restore,
             } => {
+                // Album-scoped share (#16): refuse anything outside the
+                // shared album, or the link would leak the whole library to
+                // anyone guessing photo ids.
+                if let Some(scope) = session_scope.lock().await.clone() {
+                    if !scope.members.contains(&id) {
+                        event.on_log(&format!(
+                            "DENIED FetchMediaRequest {id}: not in shared album '{}'",
+                            scope.album_id
+                        ));
+                        return;
+                    }
+                }
                 if thumbnail {
                     // Small direct reply: DB-cached thumbnail or generate.
                     // A photo that was scanned but never analyzed stores an

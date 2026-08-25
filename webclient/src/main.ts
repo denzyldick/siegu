@@ -43,12 +43,14 @@ function setStatus(text: string): void {
   statusEl.textContent = text;
 }
 
-/** Parse "#CODE.TOKEN" from the URL fragment. */
-function parseHash(): { code: string; token: string } | null {
+/** Parse "#CODE.TOKEN[.ALBUM_ID]" from the URL fragment. */
+function parseHash(): { code: string; token: string; albumId?: string } | null {
   const raw = decodeURIComponent(window.location.hash.replace(/^#/, ''));
-  const [code, token] = raw.split('.');
+  const parts = raw.split('.');
+  if (parts.length < 2) return null;
+  const [code, token, albumId] = parts;
   if (!code || !token || code.includes('/') || token.includes('/')) return null;
-  return { code, token };
+  return { code, token, albumId: albumId || undefined };
 }
 
 // ---------------------------------------------------------------------------
@@ -85,6 +87,7 @@ function storeBlobUrl(key: string, bytes: Uint8Array, mime: string): string {
 
 let dc: RTCDataChannel | null = null;
 let manifestPhotos: ViewPhoto[] = [];
+let currentSession: { code: string; token: string; albumId?: string } | null = null;
 
 function sendSync(msg: SyncMsg): void {
   if (!dc || dc.readyState !== 'open') return;
@@ -92,6 +95,10 @@ function sendSync(msg: SyncMsg): void {
   if (dc.bufferedAmount > 1_000_000) return;
   dc.send(JSON.stringify(msg));
 }
+
+// After sending EnterAlbumShare, if no ViewOnlyManifest arrives within this
+// window we assume the host denied the request (non-member or unsupported).
+let albumShareTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function requestThumb(id: string): void {
   if (cachedUrl(`thumb:${id}`) || inflightThumbs.has(id)) return;
@@ -108,6 +115,10 @@ function handleSync(msg: SyncMsg): void {
   switch (msg.type) {
     case 'ViewOnlyManifest': {
       const m = msg as Extract<SyncMsg, { type: 'ViewOnlyManifest' }>;
+      if (albumShareTimeout) {
+        clearTimeout(albumShareTimeout);
+        albumShareTimeout = null;
+      }
       manifestPhotos = manifestPhotos.concat(m.photos);
       setStatus(
         m.more
@@ -321,6 +332,7 @@ async function start(): Promise<void> {
   }
 
   setStatus('Connecting…');
+  currentSession = session;
   const ws = new WebSocket(wsUrl());
 
   ws.addEventListener('open', () => {
@@ -425,7 +437,19 @@ async function answerOffer(ws: WebSocket, sdpJson: string): Promise<void> {
         gateEl.hidden = true;
         galleryEl.hidden = false;
         manifestPhotos = [];
-        sendSync({ type: 'EnterViewOnly' });
+        if (currentSession?.albumId) {
+          sendSync({ type: 'EnterAlbumShare', album_id: currentSession.albumId });
+          albumShareTimeout = setTimeout(() => {
+            if (manifestPhotos.length === 0) {
+              setStatus('Access denied — you are not a member of this album');
+              gateEl.hidden = false;
+              gateMsg.textContent =
+                'This link does not grant access to the requested album. Ask the owner to add you as a member.';
+            }
+          }, 8_000);
+        } else {
+          sendSync({ type: 'EnterViewOnly' });
+        }
       };
       // webrtc-rs tags its outgoing frames as binary, so Chrome hands them
       // to us as ArrayBuffers even though the payload is UTF-8 JSON.

@@ -34,6 +34,16 @@ struct Room {
     clients: HashMap<String, Tx>,
 }
 
+impl Room {
+    /// Drop entries whose WebSocket sink is gone (abrupt disconnects leave
+    /// the TCP socket to die asynchronously). Without this a fast reconnect
+    /// sees ghost peers: inflated counts, offers broadcast to nobody, and
+    /// duplicate WebRTC sessions (#16).
+    fn prune_dead(&mut self) {
+        self.clients.retain(|_, tx| !tx.is_closed());
+    }
+}
+
 /// Server-wide runtime state shared across connections.
 struct ServerContext {
     rooms: Rooms,
@@ -48,6 +58,10 @@ pub struct ServerConfig {
     pub port: u16,
     /// When set, every `Join`/`JoinRoom`/`CreateRoom` must carry this token.
     pub token: Option<String>,
+    /// When set, serve the webclient bundle from this directory. The built
+    /// SPA (`index.html` + `assets/`) must live here. The signal server will
+    /// serve it at `GET /` so guests can open the link directly in a browser.
+    pub web_dist: Option<std::path::PathBuf>,
 }
 
 /// A running LAN signaling server. Holds the bound port and an optional
@@ -73,7 +87,12 @@ impl LanServer {
 
 /// Start a LAN signaling server with the default (in-app) configuration.
 pub async fn start(port: u16) -> LanServer {
-    start_with_config(ServerConfig { port, token: None }).await
+    start_with_config(ServerConfig {
+        port,
+        token: None,
+        web_dist: None,
+    })
+    .await
 }
 
 /// Start a signalling server with optional security configuration. Serves both
@@ -128,7 +147,70 @@ pub async fn start_with_config(config: ServerConfig) -> LanServer {
             },
         );
 
-    let routes = remote_route.or(lan_route).or(health).boxed();
+    // When a webclient dist directory is configured, serve the SPA so
+    // guests can open the share link directly in a browser (#16).
+    // All six routes are always present so the boxed filter type is
+    // identical in both branches; when `web_dist` is None the web routes
+    // simply reject and warp falls through to the WS/health routes.
+    let routes = {
+        // Route 1: GET / → index.html (SPA entry point)
+        let index_web_dist = config.web_dist.clone();
+        let index = warp::get()
+            .and(warp::path::end())
+            .and(warp::any().map(move || index_web_dist.clone()))
+            .and_then(|dist: Option<std::path::PathBuf>| async move {
+                let Some(dist) = dist else {
+                    return Err(warp::reject::not_found());
+                };
+                let path = dist.join("index.html");
+                match tokio::fs::read(&path).await {
+                    Ok(bytes) => Ok::<_, warp::reject::Rejection>(
+                        warp::http::Response::builder()
+                            .header("content-type", "text/html; charset=utf-8")
+                            .body(bytes)
+                            .unwrap_or_else(|_| warp::http::Response::new("internal error".into())),
+                    ),
+                    Err(_) => Err(warp::reject::not_found()),
+                }
+            })
+            .boxed();
+
+        // Route 2: GET /session → JSON health probe for the guest client
+        let session_dist = config.web_dist.clone();
+        let session = warp::get()
+            .and(warp::path!("session"))
+            .and(warp::any().map(move || session_dist.clone()))
+            .and_then(|dist: Option<std::path::PathBuf>| async move {
+                if dist.is_none() {
+                    return Err(warp::reject::not_found());
+                }
+                Ok::<_, warp::reject::Rejection>(warp::reply::json(
+                    &serde_json::json!({ "status": "ok" }),
+                ))
+            })
+            .boxed();
+
+        // Route 3: GET /assets/* → static files (JS bundles, images).
+        // warp::fs::dir requires a fixed path; when web_dist is None we
+        // create a dummy dir so the filter type stays compatible.
+        let assets_base = config
+            .web_dist
+            .as_deref()
+            .unwrap_or(std::path::Path::new("/__siegu_noop__"))
+            .join("assets");
+        let assets = warp::get()
+            .and(warp::path("assets"))
+            .and(warp::fs::dir(assets_base))
+            .boxed();
+
+        index
+            .or(session)
+            .or(assets)
+            .or(remote_route)
+            .or(lan_route)
+            .or(health)
+            .boxed()
+    };
 
     let addr: SocketAddr = ([0, 0, 0, 0], config.port).into();
     // Prefer the configured (stable) port; if it is unavailable, fall back to an
@@ -339,6 +421,9 @@ async fn handle_connection(
                     let room_id_val = room_id_w.read().await.clone();
                     let room_key = room_id_val.clone().unwrap_or_default();
                     let mut rooms = rooms_write.write().await;
+                    if let Some(room) = rooms.get_mut(&room_key) {
+                        room.prune_dead();
+                    }
                     if !rooms.contains_key(&room_key) && rooms.len() >= MAX_ROOMS {
                         send(
                             &tx_write,
@@ -370,9 +455,20 @@ async fn handle_connection(
                     send(
                         &tx_write,
                         &SignalMessage::PeerList {
-                            peers: existing_peers,
+                            peers: existing_peers.clone(),
                         },
                     );
+                    // Introduce the newcomer to peers that were already here,
+                    // so an initiating host joining late learns concrete
+                    // identities instead of offering blindly (#16).
+                    for peer_id in &existing_peers {
+                        send(
+                            &tx_write,
+                            &SignalMessage::PeerJoined {
+                                device_id: peer_id.clone(),
+                            },
+                        );
+                    }
 
                     for (other_id, client) in room.clients.iter() {
                         if other_id != &id {
@@ -432,6 +528,9 @@ async fn handle_connection(
                 SignalMessage::JoinRoom { code, .. } => {
                     if remote_protocol {
                         let mut rooms = rooms_write.write().await;
+                        for room in rooms.values_mut() {
+                            room.prune_dead();
+                        }
                         let key = if rooms.contains_key(&code) {
                             code
                         } else {
@@ -479,22 +578,36 @@ async fn handle_connection(
                         send(
                             &tx_write,
                             &SignalMessage::PeerList {
-                                peers: existing_peers,
+                                peers: existing_peers.clone(),
                             },
                         );
+                        // Same introductions as the LAN path (#16).
+                        for peer_id in &existing_peers {
+                            send(
+                                &tx_write,
+                                &SignalMessage::PeerJoined {
+                                    device_id: peer_id.clone(),
+                                },
+                            );
+                        }
 
                         let notify: Vec<Tx> = room.clients.values().cloned().collect();
                         for client in notify {
+                            // The joiner's conn key rides along so an
+                            // initiating host can target its offer at this
+                            // specific guest instead of broadcasting (#16).
                             send(
                                 &client,
                                 &SignalMessage::PeerJoined {
-                                    device_id: String::new(),
+                                    device_id: ck.clone(),
                                 },
                             );
                         }
                     }
                 }
-                SignalMessage::Offer { payload, target } => {
+                SignalMessage::Offer {
+                    payload, target, ..
+                } => {
                     if !remote_protocol {
                         let d_id = did_w.read().await.clone();
                         let rid = room_id_w.read().await.clone();
@@ -506,12 +619,15 @@ async fn handle_connection(
                             SignalMessage::Offer {
                                 payload,
                                 target: target.clone(),
+                                from: None,
                             },
                         )
                         .await;
                     }
                 }
-                SignalMessage::Answer { payload, target } => {
+                SignalMessage::Answer {
+                    payload, target, ..
+                } => {
                     if !remote_protocol {
                         let d_id = did_w.read().await.clone();
                         let rid = room_id_w.read().await.clone();
@@ -523,12 +639,15 @@ async fn handle_connection(
                             SignalMessage::Answer {
                                 payload,
                                 target: target.clone(),
+                                from: None,
                             },
                         )
                         .await;
                     }
                 }
-                SignalMessage::IceCandidate { payload, target } => {
+                SignalMessage::IceCandidate {
+                    payload, target, ..
+                } => {
                     if !remote_protocol {
                         let d_id = did_w.read().await.clone();
                         let rid = room_id_w.read().await.clone();
@@ -540,6 +659,7 @@ async fn handle_connection(
                             SignalMessage::IceCandidate {
                                 payload,
                                 target: target.clone(),
+                                from: None,
                             },
                         )
                         .await;
@@ -550,14 +670,25 @@ async fn handle_connection(
                         let ck = conn_key_w.read().await.clone();
                         let rid = room_id_w.read().await.clone();
                         if let Some(rid) = rid {
+                            // Honor an explicit target client key; "peer"
+                            // (or absent) keeps the legacy broadcast so old
+                            // clients keep working unchanged.
+                            let target = payload
+                                .get("target")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("peer");
+                            let mut payload = payload.clone();
+                            if let Some(obj) = payload.as_object_mut() {
+                                obj.remove("target");
+                            }
                             let rooms = rooms_write.read().await;
                             if let Some(room) = rooms.get(&rid) {
                                 for (id, client) in &room.clients {
-                                    if id != &ck {
+                                    if id != &ck && (target == "peer" || id == target) {
                                         send(
                                             client,
                                             &SignalMessage::Relay {
-                                                from: None,
+                                                from: Some(ck.clone()),
                                                 payload: payload.clone(),
                                             },
                                         );
@@ -607,11 +738,17 @@ async fn handle_connection(
                         room.clients.remove(&d_id);
                     }
                     for client in room.clients.values() {
+                        // Remote guests never send a Join frame, so their
+                        // d_id is empty: fall back to the conn key, which is
+                        // what per-peer host sessions are keyed by (#16).
+                        let leaver = if d_id.is_empty() {
+                            ck.clone()
+                        } else {
+                            d_id.clone()
+                        };
                         send(
                             client,
-                            &SignalMessage::PeerDisconnected {
-                                device_id: d_id.clone(),
-                            },
+                            &SignalMessage::PeerDisconnected { device_id: leaver },
                         );
                     }
                     if room.clients.is_empty() {
@@ -649,8 +786,16 @@ async fn relay(
     room_id: Option<String>,
     sender_id: &str,
     target_id: &str,
-    msg: SignalMessage,
+    mut msg: SignalMessage,
 ) {
+    // Stamp the sender so a multi-guest host can tell which peer a
+    // reply belongs to and route it to the right WebRTC session (#16).
+    if let SignalMessage::Offer { from, .. }
+    | SignalMessage::Answer { from, .. }
+    | SignalMessage::IceCandidate { from, .. } = &mut msg
+    {
+        *from = Some(sender_id.to_string());
+    }
     let rooms = rooms.read().await;
     if let Some(room_id) = room_id {
         if let Some(room) = rooms.get(&room_id) {
@@ -859,6 +1004,7 @@ mod tests {
         let offer = SignalMessage::Offer {
             payload: "sdp-offer-123".to_string(),
             target: "peer".to_string(),
+            from: None,
         };
         ws_a.send(Message::Text(serde_json::to_string(&offer).unwrap().into()))
             .await
@@ -866,7 +1012,9 @@ mod tests {
 
         let received = recv_signal(&mut ws_b).await;
         match received {
-            SignalMessage::Offer { payload, target } => {
+            SignalMessage::Offer {
+                payload, target, ..
+            } => {
                 assert_eq!(payload, "sdp-offer-123");
                 assert_eq!(target, "peer");
             }
@@ -890,6 +1038,7 @@ mod tests {
         let answer = SignalMessage::Answer {
             payload: "sdp-answer-456".to_string(),
             target: "peer".to_string(),
+            from: None,
         };
         ws_b.send(Message::Text(
             serde_json::to_string(&answer).unwrap().into(),
@@ -899,7 +1048,9 @@ mod tests {
 
         let received = recv_signal(&mut ws_a).await;
         match received {
-            SignalMessage::Answer { payload, target } => {
+            SignalMessage::Answer {
+                payload, target, ..
+            } => {
                 assert_eq!(payload, "sdp-answer-456");
                 assert_eq!(target, "peer");
             }
@@ -924,6 +1075,7 @@ mod tests {
             payload: r#"{"candidate":"candidate:1 1 UDP 2122252543 192.168.1.5 54321 typ host"}"#
                 .to_string(),
             target: "peer".to_string(),
+            from: None,
         };
         ws_b.send(Message::Text(serde_json::to_string(&ice).unwrap().into()))
             .await
@@ -931,7 +1083,9 @@ mod tests {
 
         let received = recv_signal(&mut ws_a).await;
         match received {
-            SignalMessage::IceCandidate { payload, target } => {
+            SignalMessage::IceCandidate {
+                payload, target, ..
+            } => {
                 assert!(payload.contains("192.168.1.5"));
                 assert_eq!(target, "peer");
             }
@@ -991,6 +1145,7 @@ mod tests {
         let offer = SignalMessage::Offer {
             payload: "alpha-offer".to_string(),
             target: "peer".to_string(),
+            from: None,
         };
         ws_a.send(Message::Text(serde_json::to_string(&offer).unwrap().into()))
             .await
@@ -1007,6 +1162,7 @@ mod tests {
         let offer_c = SignalMessage::Offer {
             payload: "beta-offer".to_string(),
             target: "peer".to_string(),
+            from: None,
         };
         ws_c.send(Message::Text(
             serde_json::to_string(&offer_c).unwrap().into(),
@@ -1129,6 +1285,7 @@ mod tests {
         let server = start_with_config(ServerConfig {
             port: 0,
             token: Some("s3cret".to_string()),
+            web_dist: None,
         })
         .await;
         let port = server.port;
@@ -1172,6 +1329,7 @@ mod tests {
         let server = start_with_config(ServerConfig {
             port: 0,
             token: None,
+            web_dist: None,
         })
         .await;
         let port = server.port;
@@ -1235,6 +1393,7 @@ mod tests {
         let server = start_with_config(ServerConfig {
             port: 0,
             token: Some("s3cret".to_string()),
+            web_dist: None,
         })
         .await;
         let port = server.port;

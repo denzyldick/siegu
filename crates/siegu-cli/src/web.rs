@@ -214,6 +214,7 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
     let signal = lan_server::start_with_config(ServerConfig {
         port: 0,
         token: Some(token.clone()),
+        web_dist: None,
     })
     .await;
     println!("Signalling server on port {}", signal.port);

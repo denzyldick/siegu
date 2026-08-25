@@ -218,4 +218,49 @@ grep -q "RPC RESULT ok=true" "$WORK/rpc-fav-rw.log" || {
 }
 echo "OK: write applied under rw"
 
-echo "PASS: view-only browsing, sync guard, restore pull and RPC share modes all verified"
+# ── Album share links (#16): scoped manifest + membership enforcement ────
+echo "== fresh ro host for album-share checks =="
+restart_host ro "$WORK/host-album.log"
+
+ALBUM_ID="$("$BIN" --config-dir "$HOST_CFG" mesh seed-album --name "E2E Shared" --take-first 1 |
+  grep -oE 'ALBUM ID [0-9a-f-]+' | sed -E 's/ALBUM ID //' | tr -d '\r')"
+[ -n "$ALBUM_ID" ] || { echo "FAIL: seed-album produced no album id" >&2; exit 1; }
+echo "OK: seeded shared album $ALBUM_ID"
+
+mkdir -p "$WORK/album-cfg" "$WORK/guest2-cfg"
+echo "== multi-guest: view-only + album-share guests in parallel =="
+"$BIN" --config-dir "$WORK/guest2-cfg" mesh browse "$ROOM_ID" \
+  --server "$SERVER_URL" --name siegu-guest2 >"$WORK/browse2.log" 2>&1 &
+GUEST2_PID=$!
+"$BIN" --config-dir "$WORK/album-cfg" mesh browse "$ROOM_ID" \
+  --server "$SERVER_URL" --name siegu-guest3 --album "$ALBUM_ID" >"$WORK/browse3.log" 2>&1
+BROWSE3_RC=$?
+wait "$GUEST2_PID"
+BROWSE2_RC=$?
+
+if [ "$BROWSE3_RC" != "0" ]; then
+  echo "FAIL: album-share guest exited with $BROWSE3_RC" >&2; tail -40 "$WORK/browse3.log" >&2; exit 1
+fi
+grep -q "VIEWONLY ALBUM SCOPE OK count=1" "$WORK/browse3.log" || {
+  echo "FAIL: album guest did not receive a single-photo scoped manifest" >&2
+  tail -40 "$WORK/browse3.log" >&2
+  exit 1
+}
+grep -q "VIEWONLY ALBUM DENY OK" "$WORK/browse3.log" || {
+  echo "FAIL: membership enforcement probe missing from album guest log" >&2
+  tail -40 "$WORK/browse3.log" >&2
+  exit 1
+}
+grep -q "DENIED FetchMediaRequest" "$WORK/host-album.log" || {
+  echo "FAIL: host log lacks the DENIED FetchMediaRequest marker" >&2
+  tail -40 "$WORK/host-album.log" >&2
+  exit 1
+}
+grep -q "VIEWONLY MANIFEST OK" "$WORK/browse2.log" || {
+  echo "FAIL: second concurrent guest failed (multi-guest broken)" >&2
+  tail -40 "$WORK/browse2.log" >&2
+  exit 1
+}
+echo "OK: album scope held, non-member denied, both guests served concurrently"
+
+echo "PASS: view-only browsing, sync guard, restore pull, RPC share modes and album share links all verified"

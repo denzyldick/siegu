@@ -16,7 +16,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     protobuf-compiler \
     git \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Build the webclient SPA (Vite → dist/).
+COPY webclient/package.json webclient/package-lock.json /app/webclient/
+WORKDIR /app/webclient
+RUN npm ci --no-audit
+COPY webclient/ /app/webclient/
+RUN npx vite build
 
 COPY . .
 
@@ -36,8 +44,10 @@ USER siegu
 WORKDIR /home/siegu
 
 COPY --from=builder /app/target/release/siegu-signal /usr/local/bin/siegu-signal
+COPY --from=builder /app/webclient/dist /home/siegu/webclient
 
 ENV PORT=8080
+ENV SIEGU_WEB_DIST_DIR=/home/siegu/webclient
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

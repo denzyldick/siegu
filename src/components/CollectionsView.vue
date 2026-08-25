@@ -318,6 +318,13 @@
               >
                 <v-list-item-title>{{ $t('albums.edit_rules') }}</v-list-item-title>
               </v-list-item>
+              <v-list-item
+                v-if="currentSectionItem?.album?.kind === 'manual'"
+                @click="shareAlbum"
+                prepend-icon="mdi-share-variant-outline"
+              >
+                <v-list-item-title>{{ $t('albums.share_album') }}</v-list-item-title>
+              </v-list-item>
               <v-list-item @click="openRenameDialog" prepend-icon="mdi-pencil-outline">
                 <v-list-item-title>{{ $t('albums.rename_album') }}</v-list-item-title>
               </v-list-item>
@@ -546,6 +553,40 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="shareDialog" max-width="520">
+      <v-card class="rounded-xl pa-6" color="surface">
+        <h3 class="text-h6 font-weight-bold text-high-emphasis mb-2">
+          {{ $t('albums.share_album') }}
+        </h3>
+        <p class="text-body-2 text-medium-emphasis mb-4">
+          {{ $t('albums.share_album_desc') }}
+        </p>
+        <v-progress-linear v-if="shareLoading" indeterminate class="mb-4"></v-progress-linear>
+        <v-text-field
+          v-else
+          :model-value="shareUrl"
+          variant="outlined"
+          density="comfortable"
+          readonly
+          hide-details
+          class="mb-2"
+        >
+          <template v-slot:append-inner>
+            <v-btn
+              icon="mdi-content-copy"
+              variant="text"
+              size="small"
+              :disabled="!shareUrl || shareUrl.startsWith('Error:')"
+              @click="copyShareUrl"
+            ></v-btn>
+          </template>
+        </v-text-field>
+        <div class="d-flex justify-end mt-4">
+          <v-btn variant="text" @click="shareDialog = false">{{ $t('common.close') }}</v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
+
     <NameDialog
       v-model="nameDialog"
       :active-face="activeFace"
@@ -705,6 +746,9 @@ const creating = ref(false);
 const renameDialog = ref(false);
 const renameName = ref('');
 const confirmDelete = ref(false);
+const shareDialog = ref(false);
+const shareUrl = ref('');
+const shareLoading = ref(false);
 const snackbar = ref(false);
 const snackbarText = ref('');
 
@@ -1186,6 +1230,32 @@ function openRenameDialog(): void {
   if (!openedItem.value) return;
   renameName.value = openedItem.value.name;
   renameDialog.value = true;
+}
+
+async function shareAlbum(): Promise<void> {
+  const album = currentSectionItem.value?.album;
+  if (!album) return;
+  shareLoading.value = true;
+  shareDialog.value = true;
+  shareUrl.value = '';
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const url = await invoke<string>('generate_album_share_url', { albumId: album.id });
+    shareUrl.value = url;
+  } catch (e) {
+    shareUrl.value = `Error: ${String(e)}`;
+  } finally {
+    shareLoading.value = false;
+  }
+}
+
+function copyShareUrl(): void {
+  if (shareUrl.value && !shareUrl.value.startsWith('Error:')) {
+    navigator.clipboard.writeText(shareUrl.value);
+    snackbarText.value = $t('albums.share_link_copied');
+    snackbar.value = true;
+    shareDialog.value = false;
+  }
 }
 
 async function renameCurrentAlbum(): Promise<void> {
