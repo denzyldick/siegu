@@ -2044,7 +2044,7 @@ impl Database {
             });
         }
 
-        categories.sort_by(|a, b| b.count.cmp(&a.count));
+        categories.sort_by_key(|b| std::cmp::Reverse(b.count));
         categories
     }
 
@@ -4005,9 +4005,9 @@ impl Database {
             let mut all_params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
             for (i, trip) in trips.iter().enumerate() {
                 if let Some(filter) = Self::album_rule_filter(trip) {
-                    parts.push(format!(
-                        "SELECT ? AS idx, COUNT(*) AS cnt FROM photo p WHERE p.created >= ? AND p.created <= ?"
-                    ));
+                    parts.push(
+                        "SELECT ? AS idx, COUNT(*) AS cnt FROM photo p WHERE p.created >= ? AND p.created <= ?".to_string()
+                    );
                     all_params.push(Box::new(i as i64));
                     all_params.push(Box::new(filter.date_from.clone().unwrap_or_default()));
                     all_params.push(Box::new(filter.date_to.clone().unwrap_or_default()));

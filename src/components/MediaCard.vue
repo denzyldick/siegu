@@ -506,14 +506,15 @@ onUnmounted(() => {
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  background: color-mix(in srgb, rgb(var(--v-theme-primary)) 85%, transparent);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
   opacity: 1;
   transform: none;
   z-index: 6;
 }
 
 .ai-badge:hover {
-  background: rgb(var(--v-theme-primary));
+  background: rgba(0, 0, 0, 0.7);
 }
 
 .favorite-heart {

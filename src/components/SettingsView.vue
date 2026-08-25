@@ -69,12 +69,12 @@
       <v-card color="surface" border class="border overflow-hidden">
         <v-card-item class="py-4">
           <template v-slot:prepend>
-            <v-avatar color="on-surface" size="32" class="mr-3">
-              <v-icon color="surface" size="small">mdi-wrench-outline</v-icon>
+            <v-avatar color="surface" size="32" class="mr-3">
+              <v-icon color="on-surface" size="small">mdi-wrench-outline</v-icon>
             </v-avatar>
           </template>
           <v-card-title class="text-h6 text-high-emphasis font-weight-bold">{{
-            $t('settings.clear_db_title')
+            cleanupConfirming ? $t('settings.clear_db_title') : $t('settings.clear_db_title')
           }}</v-card-title>
           <template v-slot:append>
             <v-btn
@@ -87,8 +87,11 @@
         </v-card-item>
 
         <v-card-text class="py-6 text-center">
-          <div class="text-subtitle-1 text-medium-emphasis px-2">
+          <div v-if="!cleanupConfirming" class="text-subtitle-1 text-medium-emphasis px-2">
             {{ $t('settings.clear_db_desc') }}
+          </div>
+          <div v-else class="text-subtitle-1 px-2" style="color: rgb(var(--v-theme-error))">
+            {{ $t('settings.clear_db_confirm') }}
           </div>
         </v-card-text>
 
@@ -99,16 +102,20 @@
             @click="cleanupDialog.show = false"
             class="flex-grow-1"
             height="44"
-            >{{ $t('settings.cancel') }}</v-btn
           >
+            <v-icon start size="18">mdi-close</v-icon>
+            {{ $t('settings.cancel') }}
+          </v-btn>
           <v-btn
             variant="flat"
-            color="error"
-            @click="startConfirmedCleanup"
+            :color="cleanupConfirming ? 'error' : 'primary'"
+            @click="cleanupConfirming ? startConfirmedCleanup() : (cleanupConfirming = true)"
             class="flex-grow-1"
             height="44"
-            >{{ $t('settings.clear') }}</v-btn
           >
+            <v-icon start size="18">{{ cleanupConfirming ? 'mdi-alert' : 'mdi-delete-outline' }}</v-icon>
+            {{ cleanupConfirming ? $t('settings.clear_db_are_you_sure') : $t('settings.clear') }}
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -117,8 +124,8 @@
       <v-card color="surface" border class="border overflow-hidden">
         <v-card-item class="py-4">
           <template v-slot:prepend>
-            <v-avatar color="on-surface" size="32" class="mr-3">
-              <v-icon color="surface" size="small">mdi-folder-remove-outline</v-icon>
+            <v-avatar color="surface" size="32" class="mr-3">
+              <v-icon color="on-surface" size="small">mdi-folder-remove-outline</v-icon>
             </v-avatar>
           </template>
           <v-card-title class="text-h6 text-high-emphasis font-weight-bold">{{
@@ -135,8 +142,11 @@
         </v-card-item>
 
         <v-card-text class="py-6 text-center">
-          <div class="text-subtitle-1 text-medium-emphasis px-2">
+          <div v-if="!wipeConfirming" class="text-subtitle-1 text-medium-emphasis px-2">
             <span v-html="$t('settings.wipe_desc')"></span>
+          </div>
+          <div v-else class="text-subtitle-1 px-2" style="color: rgb(var(--v-theme-error))">
+            {{ $t('settings.wipe_confirm') }}
           </div>
         </v-card-text>
 
@@ -147,16 +157,20 @@
             @click="removeFolderDialog.show = false"
             class="flex-grow-1"
             height="44"
-            >{{ $t('settings.cancel') }}</v-btn
           >
+            <v-icon start size="18">mdi-close</v-icon>
+            {{ $t('settings.cancel') }}
+          </v-btn>
           <v-btn
             variant="flat"
-            color="primary"
-            @click="startConfirmedRemoveFolder"
+            :color="wipeConfirming ? 'error' : 'primary'"
+            @click="wipeConfirming ? startConfirmedRemoveFolder() : (wipeConfirming = true)"
             class="flex-grow-1"
             height="44"
-            >{{ $t('settings.wipe_data') }}</v-btn
           >
+            <v-icon start size="18">{{ wipeConfirming ? 'mdi-alert' : 'mdi-folder-remove-outline' }}</v-icon>
+            {{ wipeConfirming ? $t('settings.wipe_are_you_sure') : $t('settings.wipe_data') }}
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -177,7 +191,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useSettings } from '@/composables/useSettings';
 import FolderPicker from './FolderPicker.vue';
 import FoldersSection from './settings/FoldersSection.vue';
@@ -239,6 +253,11 @@ const isStoreManaged = computed(
 );
 
 const signallingSaving = ref(false);
+const cleanupConfirming = ref(false);
+const wipeConfirming = ref(false);
+
+watch(() => cleanupDialog.show, (v) => { if (!v) cleanupConfirming.value = false; });
+watch(() => removeFolderDialog.show, (v) => { if (!v) wipeConfirming.value = false; });
 
 const settingsLoading = ref(true);
 

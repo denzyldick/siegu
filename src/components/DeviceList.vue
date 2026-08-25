@@ -6,7 +6,7 @@
           <v-icon color="rgb(var(--v-theme-on-surface))" size="28" class="mr-3">mdi-devices</v-icon>
           <h1 class="text-h4 font-weight-bold text-high-emphasis">{{ $t('devices.title') }}</h1>
         </div>
-        <div class="text-subtitle-1 text-medium-emphasis">{{ $t('devices.desc') }}</div>
+        <div class="text-subtitle-1 text-medium-emphasis d-none d-sm-block">{{ $t('devices.desc') }}</div>
       </div>
       <ConnectView />
     </div>
@@ -41,8 +41,8 @@
         >
           <v-card-item class="py-4">
             <template v-slot:prepend>
-              <v-avatar color="on-surface" size="32" class="mr-3 device-icon-wrap">
-                <v-icon color="surface" size="small">{{ device.icon }}</v-icon>
+              <v-avatar color="surface" size="32" class="mr-3 device-icon-wrap">
+                <v-icon color="on-surface" size="small">{{ device.icon }}</v-icon>
                 <span
                   v-if="!device.host"
                   class="device-status-dot"
@@ -55,15 +55,6 @@
               class="text-high-emphasis text-subtitle-1 font-weight-bold d-flex align-center"
             >
               {{ device.title }}
-              <v-chip
-                v-if="device.host"
-                size="x-small"
-                variant="flat"
-                color="primary"
-                class="ml-2 font-weight-bold"
-                style="height: 18px"
-                >{{ $t('devices.this_device') }}</v-chip
-              >
             </v-card-title>
             <v-card-subtitle class="text-medium-emphasis text-caption">{{
               device.host
@@ -151,7 +142,18 @@
               </div>
             </div>
 
-            <div v-if="device.syncing" class="mt-4">
+          </v-card-text>
+
+          <v-card-actions class="px-4 pb-4 pt-0">
+            <v-chip
+              v-if="device.host"
+              size="x-small"
+              variant="outlined"
+              color="primary"
+              class="font-weight-bold mr-auto"
+              >{{ $t('devices.this_device') }}</v-chip
+            >
+            <div v-if="device.syncing" class="w-100">
               <div class="d-flex align-center justify-space-between mb-1">
                 <span class="text-caption text-disabled text-truncate mr-2">{{
                   device.syncStatus
@@ -170,7 +172,7 @@
                 rounded
               ></v-progress-linear>
             </div>
-            <div v-else class="d-flex align-center mt-2">
+            <div v-else class="d-flex align-center w-100">
               <v-btn
                 v-if="!device.host && connection === 'connected'"
                 variant="flat"
@@ -204,7 +206,7 @@
                 {{ $t('devices.online') }}
               </v-chip>
             </div>
-          </v-card-text>
+          </v-card-actions>
         </v-card>
       </v-col>
     </v-row>
@@ -358,6 +360,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import ConnectView from './ConnectView.vue';
 import PageLoading from './shared/PageLoading.vue';
 import { useSyncStore } from '@/stores/sync';
+import { deviceOsIcon } from '@/utils/format';
 import {
   listDevices,
   removeDevice as removeDeviceApi,

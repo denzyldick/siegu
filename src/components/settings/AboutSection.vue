@@ -2,8 +2,8 @@
   <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border overflow-hidden">
     <v-card-item class="py-4">
       <template v-slot:prepend>
-        <v-avatar color="on-surface" size="32" class="mr-3">
-          <v-icon color="surface" size="small">mdi-information-outline</v-icon>
+        <v-avatar color="surface" size="32" class="mr-3">
+          <v-icon color="on-surface" size="small">mdi-information-outline</v-icon>
         </v-avatar>
       </template>
       <v-card-title class="text-h6 text-high-emphasis font-weight-bold">{{

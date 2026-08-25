@@ -568,7 +568,7 @@ async fn main() {
                 );
                 siegu_core::ShareMode::ReadOnly
             });
-            let config_dir = resolve_config_dir(&cli.config_dir, &config);
+            let config_dir = resolve_config_dir(&cli.config_dir, config);
             if let Err(e) = web::run(web::WebOptions {
                 http_port: *port,
                 config: Some(config_dir.display().to_string()),

@@ -14,3 +14,14 @@ services:
       timeout: 10s
       retries: 3
       start_period: 5s
+
+  webclient:
+    build: ./webclient
+    ports:
+      - "5173:5173"
+    depends_on:
+      signalling:
+        condition: service_healthy
+    environment:
+      # The webclient dev server proxies /ws to the signalling server
+      SIGNALING_URL: "ws://signalling:8080"

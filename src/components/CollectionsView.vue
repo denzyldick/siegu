@@ -555,32 +555,79 @@
 
     <v-dialog v-model="shareDialog" max-width="520">
       <v-card class="rounded-xl pa-6" color="surface">
-        <h3 class="text-h6 font-weight-bold text-high-emphasis mb-2">
-          {{ $t('albums.share_album') }}
-        </h3>
-        <p class="text-body-2 text-medium-emphasis mb-4">
-          {{ $t('albums.share_album_desc') }}
-        </p>
-        <v-progress-linear v-if="shareLoading" indeterminate class="mb-4"></v-progress-linear>
-        <v-text-field
-          v-else
-          :model-value="shareUrl"
-          variant="outlined"
-          density="comfortable"
-          readonly
-          hide-details
-          class="mb-2"
+        <div class="d-flex align-center mb-4">
+          <v-avatar color="surface" size="40" class="mr-3">
+            <v-icon color="primary" size="20">mdi-link</v-icon>
+          </v-avatar>
+          <div>
+            <h3 class="text-h6 font-weight-bold text-high-emphasis">
+              {{ $t('albums.share_album') }}
+            </h3>
+            <p class="text-caption text-disabled mb-0">{{ $t('albums.share_album_subtitle') }}</p>
+          </div>
+        </div>
+
+        <v-alert
+          type="info"
+          variant="tonal"
+          color="primary"
+          border="start"
+          class="mb-4"
+          rounded="lg"
         >
-          <template v-slot:append-inner>
-            <v-btn
-              icon="mdi-content-copy"
-              variant="text"
-              size="small"
-              :disabled="!shareUrl || shareUrl.startsWith('Error:')"
-              @click="copyShareUrl"
-            ></v-btn>
-          </template>
-        </v-text-field>
+          <div class="text-body-2 text-high-emphasis">
+            {{ $t('albums.share_requires_signalling') }}
+          </div>
+        </v-alert>
+
+        <v-alert
+          type="info"
+          variant="outlined"
+          border="start"
+          class="mb-4"
+          rounded="lg"
+        >
+          <div class="text-body-2 text-high-emphasis font-weight-bold mb-1">
+            {{ $t('albums.share_how_it_works') }}
+          </div>
+          <div class="text-body-2 text-medium-emphasis">
+            {{ $t('albums.share_how_it_desc') }}
+          </div>
+        </v-alert>
+
+        <v-alert
+          type="info"
+          variant="tonal"
+          color="info"
+          border="start"
+          rounded="lg"
+          class="mb-0"
+        >
+          <div class="d-flex align-center">
+            <v-icon size="18" class="mr-2">mdi-cloud-outline</v-icon>
+            <div>
+              <div class="text-body-2 text-high-emphasis font-weight-bold">
+                {{ $t('signalling_upsell_title') }}
+              </div>
+              <div class="text-body-2 text-medium-emphasis">
+                {{ $t('signalling_upsell_desc') }}
+              </div>
+              <v-btn
+                variant="text"
+                color="primary"
+                size="small"
+                class="mt-2 px-0"
+                href="https://siegu.io/connect"
+                target="_blank"
+                rel="noopener"
+              >
+                {{ $t('signalling_upsell_cta') }}
+                <v-icon end size="14">mdi-open-in-new</v-icon>
+              </v-btn>
+            </div>
+          </div>
+        </v-alert>
+
         <div class="d-flex justify-end mt-4">
           <v-btn variant="text" @click="shareDialog = false">{{ $t('common.close') }}</v-btn>
         </div>
@@ -1235,27 +1282,9 @@ function openRenameDialog(): void {
 async function shareAlbum(): Promise<void> {
   const album = currentSectionItem.value?.album;
   if (!album) return;
-  shareLoading.value = true;
+  shareLoading.value = false;
   shareDialog.value = true;
   shareUrl.value = '';
-  try {
-    const { invoke } = await import('@tauri-apps/api/core');
-    const url = await invoke<string>('generate_album_share_url', { albumId: album.id });
-    shareUrl.value = url;
-  } catch (e) {
-    shareUrl.value = `Error: ${String(e)}`;
-  } finally {
-    shareLoading.value = false;
-  }
-}
-
-function copyShareUrl(): void {
-  if (shareUrl.value && !shareUrl.value.startsWith('Error:')) {
-    navigator.clipboard.writeText(shareUrl.value);
-    snackbarText.value = $t('albums.share_link_copied');
-    snackbar.value = true;
-    shareDialog.value = false;
-  }
 }
 
 async function renameCurrentAlbum(): Promise<void> {

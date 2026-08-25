@@ -1392,4 +1392,208 @@ mod tests {
         assert_eq!(transport.room_id, "test-room");
         assert!(transport.is_initiator);
     }
+
+    // --- extract_token ---
+
+    #[test]
+    fn test_extract_token_with_token() {
+        let (base, token) = extract_token("ws://127.0.0.1:8080?token=abc123");
+        assert_eq!(base, "ws://127.0.0.1:8080");
+        assert_eq!(token.as_deref(), Some("abc123"));
+    }
+
+    #[test]
+    fn test_extract_token_no_query() {
+        let (base, token) = extract_token("ws://127.0.0.1:8080");
+        assert_eq!(base, "ws://127.0.0.1:8080");
+        assert!(token.is_none());
+    }
+
+    #[test]
+    fn test_extract_token_empty_token() {
+        let (base, token) = extract_token("ws://127.0.0.1:8080?token=");
+        assert_eq!(base, "ws://127.0.0.1:8080");
+        assert_eq!(token.as_deref(), Some(""));
+    }
+
+    #[test]
+    fn test_extract_token_other_params() {
+        let (base, token) = extract_token("ws://127.0.0.1:8080?foo=bar&token=xyz&baz=1");
+        assert_eq!(base, "ws://127.0.0.1:8080");
+        assert_eq!(token.as_deref(), Some("xyz"));
+    }
+
+    #[test]
+    fn test_extract_token_strips_trailing_slash() {
+        let (base, _) = extract_token("ws://127.0.0.1:8080/");
+        assert_eq!(base, "ws://127.0.0.1:8080");
+    }
+
+    // --- route_key ---
+
+    #[test]
+    fn test_route_key_with_identity() {
+        assert_eq!(MeshTransport::route_key(Some("dev-42".into())), "dev-42");
+    }
+
+    #[test]
+    fn test_route_key_empty_string() {
+        assert_eq!(MeshTransport::route_key(Some("".into())), "peer");
+    }
+
+    #[test]
+    fn test_route_key_none() {
+        assert_eq!(MeshTransport::route_key(None), "peer");
+    }
+
+    // --- rtc_configuration ---
+
+    #[test]
+    fn test_rtc_configuration_default() {
+        std::env::remove_var("SIEGU_TURN_URLS");
+        std::env::remove_var("SIEGU_TURN_USERNAME");
+        std::env::remove_var("SIEGU_TURN_CREDENTIAL");
+        let cfg = MeshTransport::rtc_configuration();
+        assert_eq!(cfg.ice_servers.len(), 1);
+        assert_eq!(
+            cfg.ice_servers[0].urls,
+            vec!["stun:stun.l.google.com:19302"]
+        );
+    }
+
+    #[test]
+    fn test_rtc_configuration_turn() {
+        std::env::set_var("SIEGU_TURN_URLS", "turn:my.turn.server:3478");
+        std::env::set_var("SIEGU_TURN_USERNAME", "user1");
+        std::env::set_var("SIEGU_TURN_CREDENTIAL", "pass1");
+        let cfg = MeshTransport::rtc_configuration();
+        assert_eq!(cfg.ice_servers.len(), 2);
+        assert_eq!(cfg.ice_servers[1].urls, vec!["turn:my.turn.server:3478"]);
+        assert_eq!(cfg.ice_servers[1].username, "user1");
+        assert_eq!(cfg.ice_servers[1].credential, "pass1");
+        // cleanup
+        std::env::remove_var("SIEGU_TURN_URLS");
+        std::env::remove_var("SIEGU_TURN_USERNAME");
+        std::env::remove_var("SIEGU_TURN_CREDENTIAL");
+    }
+
+    #[test]
+    fn test_rtc_configuration_multiple_turn_urls() {
+        std::env::set_var("SIEGU_TURN_URLS", "turn:a.com:3478, turn:b.com:3478");
+        std::env::remove_var("SIEGU_TURN_USERNAME");
+        std::env::remove_var("SIEGU_TURN_CREDENTIAL");
+        let cfg = MeshTransport::rtc_configuration();
+        assert_eq!(cfg.ice_servers.len(), 2);
+        assert_eq!(
+            cfg.ice_servers[1].urls,
+            vec!["turn:a.com:3478", "turn:b.com:3478"]
+        );
+        // cleanup
+        std::env::remove_var("SIEGU_TURN_URLS");
+    }
+
+    // --- builder methods ---
+
+    #[test]
+    fn test_builder_with_share_mode() {
+        let t = MeshTransport::new(
+            "r".into(),
+            false,
+            "ws://x".into(),
+            "/tmp".into(),
+            "d".into(),
+            "n".into(),
+            vec![],
+            Arc::new(TestEvent),
+        )
+        .with_share_mode(crate::rpc::ShareMode::ReadOnly);
+        assert!(t.share_mode.is_some());
+    }
+
+    #[test]
+    fn test_builder_with_view_only_client() {
+        let t = MeshTransport::new(
+            "r".into(),
+            false,
+            "ws://x".into(),
+            "/tmp".into(),
+            "d".into(),
+            "n".into(),
+            vec![],
+            Arc::new(TestEvent),
+        )
+        .with_view_only_client(true);
+        assert!(t.view_only_client);
+    }
+
+    // --- send_message ---
+
+    #[tokio::test]
+    async fn test_send_message_ok() {
+        let t = MeshTransport::new(
+            "r".into(),
+            false,
+            "ws://x".into(),
+            "/tmp".into(),
+            "d".into(),
+            "n".into(),
+            vec![],
+            Arc::new(TestEvent),
+        );
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        *t.sync_tx.lock().await = Some(tx);
+        t.send_message(SyncMessage::VersionNegotiate {
+            version: PROTOCOL_VERSION,
+            device_id: "d".into(),
+            device_name: "n".into(),
+            os: "linux".into(),
+            models_enabled: vec![],
+        })
+        .await
+        .unwrap();
+        let msg = rx.recv().await.unwrap();
+        assert!(matches!(msg, SyncMessage::VersionNegotiate { .. }));
+    }
+
+    #[tokio::test]
+    async fn test_send_message_not_connected() {
+        let t = MeshTransport::new(
+            "r".into(),
+            false,
+            "ws://x".into(),
+            "/tmp".into(),
+            "d".into(),
+            "n".into(),
+            vec![],
+            Arc::new(TestEvent),
+        );
+        let err = t
+            .send_message(SyncMessage::VersionNegotiate {
+                version: PROTOCOL_VERSION,
+                device_id: "d".into(),
+                device_name: "n".into(),
+                os: "linux".into(),
+                models_enabled: vec![],
+            })
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("not initialized"));
+    }
+
+    // --- mark_peer_active ---
+
+    #[test]
+    fn test_mark_peer_active() {
+        let flag = Arc::new(AtomicBool::new(false));
+        let cb = MeshTransport::mark_peer_active(Some(flag.clone()));
+        assert!(!flag.load(Ordering::Relaxed));
+        cb();
+        assert!(flag.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn test_mark_peer_active_none() {
+        let cb = MeshTransport::mark_peer_active(None);
+        cb(); // should not panic
+    }
 }

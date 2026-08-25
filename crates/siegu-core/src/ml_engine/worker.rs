@@ -9,6 +9,9 @@ use crate::ml_worker::{self, decrement_pending_count, increment_pending_count, J
 use super::models::LoadedModels;
 use super::pipeline::{self, PhotoResult};
 
+/// Cached rayon pool state: `(configured_thread_count, pool)`.
+type ScanPool = Arc<Mutex<Option<(usize, Arc<rayon::ThreadPool>)>>>;
+
 /// Number of analysis results accumulated before DB writes are flushed in a
 /// single transaction (see [`pipeline::flush_results_batch_to_db`]).
 const FLUSH_BATCH_SIZE: usize = 32;
@@ -210,8 +213,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
         // Cached rayon pool for parallel photo analysis. Rebuilt lazily whenever
         // the scan_threads config value changes so the setting applies to the
         // next analysis without requiring an app restart.
-        let scan_pool: Arc<Mutex<Option<(usize, Arc<rayon::ThreadPool>)>>> =
-            Arc::new(Mutex::new(None));
+        let scan_pool: ScanPool = Arc::new(Mutex::new(None));
 
         let avg_photo_time_ms = 1000f64;
         let mut last_auto_job: Option<Instant> = None;

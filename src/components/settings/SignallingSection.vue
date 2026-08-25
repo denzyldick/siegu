@@ -2,8 +2,8 @@
   <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border overflow-hidden">
     <v-card-item class="py-4">
       <template v-slot:prepend>
-        <v-avatar color="on-surface" size="32" class="mr-3">
-          <v-icon color="surface" size="small">mdi-signal-variant</v-icon>
+        <v-avatar color="surface" size="32" class="mr-3">
+          <v-icon color="on-surface" size="small">mdi-signal-variant</v-icon>
         </v-avatar>
       </template>
       <v-card-title class="text-h6 text-high-emphasis font-weight-bold">{{
@@ -71,7 +71,7 @@
         </span>
       </div>
 
-      <div class="d-flex ga-2">
+      <div class="d-flex ga-2 mb-4">
         <v-btn
           size="small"
           variant="flat"
@@ -97,6 +97,46 @@
           <span class="font-weight-bold">{{ $t('settings.signalling_save') }}</span>
         </v-btn>
       </div>
+
+      <a
+        href="https://github.com/denzyl/siegu/blob/main/docs/SIGNALLING.md"
+        target="_blank"
+        class="d-inline-flex align-center text-caption font-weight-medium mb-4"
+        style="color: rgb(var(--v-theme-info)); text-decoration: none"
+      >
+        <v-icon size="14" class="mr-1">mdi-book-open-outline</v-icon>
+        {{ $t('settings.signalling_docs') }} →
+      </a>
+
+      <v-alert
+        variant="tonal"
+        color="primary"
+        rounded="lg"
+        class="mb-2"
+      >
+        <div class="d-flex align-center">
+          <v-icon size="20" class="mr-3">mdi-cloud-outline</v-icon>
+          <div>
+            <div class="text-body-2 font-weight-bold">{{ $t('settings.signalling_upsell_title') }}</div>
+            <div class="text-caption text-medium-emphasis mb-1">{{ $t('settings.signalling_upsell_desc') }}</div>
+            <div class="text-caption text-medium-emphasis" style="line-height: 1.5">
+              {{ $t('settings.signalling_upsell_benefits') }}
+            </div>
+          </div>
+        </div>
+        <template v-slot:append>
+          <v-btn
+            size="small"
+            variant="flat"
+            color="primary"
+            href="https://siegu.io/connect"
+            target="_blank"
+            class="text-none font-weight-bold"
+          >
+            {{ $t('settings.signalling_upsell_cta') }}
+          </v-btn>
+        </template>
+      </v-alert>
     </v-card-text>
   </v-card>
 </template>

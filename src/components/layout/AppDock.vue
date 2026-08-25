@@ -11,11 +11,11 @@ const uiStore = useUiStore();
 const scanStore = useScanStore();
 
 const navItems = [
-  { page: 'home' as const, icon: null, tour: 'dock-home', useLogo: true },
-  { page: 'collections' as const, icon: 'mdi-album', tour: 'dock-collections', useLogo: false },
-  { page: 'location' as const, icon: 'mdi-map-outline', tour: 'dock-map', useLogo: false },
-  { page: 'devices' as const, icon: 'mdi-laptop', tour: 'dock-devices', useLogo: false },
-  { page: 'settings' as const, icon: 'mdi-cog-outline', tour: 'dock-settings', useLogo: false },
+  { page: 'home' as const, icon: null, tour: 'dock-home', useLogo: true, label: 'dock.home' as const },
+  { page: 'collections' as const, icon: 'mdi-album', tour: 'dock-collections', useLogo: false, label: 'dock.collections' as const },
+  { page: 'location' as const, icon: 'mdi-map-outline', tour: 'dock-map', useLogo: false, label: 'dock.map' as const },
+  { page: 'devices' as const, icon: 'mdi-laptop', tour: 'dock-devices', useLogo: false, label: 'dock.devices' as const },
+  { page: 'settings' as const, icon: 'mdi-cog-outline', tour: 'dock-settings', useLogo: false, label: 'dock.settings' as const },
 ];
 
 const isIndexing = computed(() => scanStore.isActive);
@@ -56,15 +56,10 @@ function navigate(page: 'home' | 'collections' | 'location' | 'devices' | 'setti
       color="surface"
     >
       <template v-for="item in navItems" :key="item.page">
-        <v-tooltip
-          v-if="item.useLogo"
-          :text="isIndexing ? tooltipText : ''"
-          location="top"
-          :disabled="!isIndexing"
-        >
-          <template v-slot:activator="{ props }">
+        <v-tooltip location="top">
+          <template v-slot:activator="{ props: tooltipProps }">
             <v-btn
-              v-bind="props"
+              v-bind="tooltipProps"
               icon
               variant="text"
               size="small"
@@ -73,36 +68,30 @@ function navigate(page: 'home' | 'collections' | 'location' | 'devices' | 'setti
               :data-tour="item.tour"
               @click="navigate(item.page)"
             >
-              <div class="siegu-logo-wrap">
-                <v-img
-                  :src="logo"
-                  width="24"
-                  height="24"
-                  :class="uiStore.currentPage === item.page ? 'siegu-logo--active' : 'opacity-40'"
-                />
-                <template v-if="isIndexing">
-                  <span class="indexing-dot" aria-label="indexing"></span>
-                  <span v-if="jobsLeft > 0" class="indexing-pill">{{
-                    jobsLeft.toLocaleString()
-                  }}</span>
-                </template>
-              </div>
+              <template v-if="item.useLogo">
+                <div class="siegu-logo-wrap">
+                  <v-img
+                    :src="logo"
+                    width="24"
+                    height="24"
+                    :class="uiStore.currentPage === item.page ? 'siegu-logo--active' : 'opacity-40'"
+                  />
+                  <template v-if="isIndexing">
+                    <span class="indexing-dot" aria-label="indexing"></span>
+                    <span v-if="jobsLeft > 0" class="indexing-pill">{{
+                      jobsLeft.toLocaleString()
+                    }}</span>
+                  </template>
+                </div>
+              </template>
+              <template v-else>
+                <v-icon size="24">{{ item.icon }}</v-icon>
+              </template>
             </v-btn>
           </template>
+          <span v-if="item.useLogo && isIndexing">{{ tooltipText }}</span>
+          <span v-else>{{ t(item.label) }}</span>
         </v-tooltip>
-
-        <v-btn
-          v-else
-          icon
-          variant="text"
-          size="small"
-          class="siegu-dock-btn"
-          :class="{ 'siegu-dock-btn--active': uiStore.currentPage === item.page }"
-          :data-tour="item.tour"
-          @click="navigate(item.page)"
-        >
-          <v-icon size="24">{{ item.icon }}</v-icon>
-        </v-btn>
       </template>
     </v-sheet>
   </div>
@@ -143,7 +132,16 @@ function navigate(page: 'home' | 'collections' | 'location' | 'devices' | 'setti
   background: rgb(var(--v-theme-primary)) !important;
 }
 
+.siegu-dock-btn--active:hover {
+  background: rgb(var(--v-theme-primary)) !important;
+  filter: brightness(0.85);
+}
+
 .siegu-logo--active {
+  filter: invert(1) !important;
+}
+
+[data-theme="dark"] .siegu-logo-wrap .v-img:not(.siegu-logo--active) {
   filter: invert(1);
 }
 

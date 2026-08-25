@@ -33,13 +33,6 @@ impl ShareMode {
             _ => None,
         }
     }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::ReadOnly => "ro",
-            Self::ReadWrite => "rw",
-        }
-    }
 }
 
 /// Everything a command handler needs. Cheap to build per request; the

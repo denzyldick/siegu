@@ -503,7 +503,7 @@ pub async fn fetch_original(
     state: tauri::State<'_, crate::WebRtcState>,
     id: String,
 ) -> Result<(), String> {
-    let mut tx_lock = state.sync_tx.lock().await;
+    let tx_lock = state.sync_tx.lock().await;
     let Some(tx) = tx_lock.as_ref() else {
         return Err("Not connected to a device".to_string());
     };

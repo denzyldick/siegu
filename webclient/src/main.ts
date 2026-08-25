@@ -8,30 +8,13 @@
  * gallery and pulls media on demand. Nothing is persisted anywhere.
  */
 
-interface ViewPhoto {
-  id: string;
-  location: string;
-  created: string;
-  caption: string | null;
-}
+import { parseHash, inferMime, assembleChunks } from './lib';
+import type { ViewPhoto, SyncMsg } from './lib';
 
 type SignalMsg = Record<string, unknown> & { type: string };
 
-type SyncMsg =
-  | { type: 'ViewOnlyManifest'; photos: ViewPhoto[]; more: boolean }
-  | { type: 'ViewMedia'; id: string; mime: string; data: string }
-  | {
-      type: 'FileHeader';
-      id: string;
-      filename: string;
-      size: number;
-      checksum: string;
-    }
-  | { type: 'FileChunk'; id: string; index: number; data: number[] }
-  | { type: 'FileEnd'; id: string; checksum: string }
-  | { type: string; [k: string]: unknown };
-
 const statusEl = document.getElementById('status') as HTMLElement;
+const sessionTimerEl = document.getElementById('session-timer') as HTMLElement;
 const gateEl = document.getElementById('gate') as HTMLElement;
 const gateMsg = document.getElementById('gate-msg') as HTMLElement;
 const galleryEl = document.getElementById('gallery') as HTMLElement;
@@ -41,16 +24,6 @@ const previewBody = document.getElementById('preview-body') as HTMLElement;
 
 function setStatus(text: string): void {
   statusEl.textContent = text;
-}
-
-/** Parse "#CODE.TOKEN[.ALBUM_ID]" from the URL fragment. */
-function parseHash(): { code: string; token: string; albumId?: string } | null {
-  const raw = decodeURIComponent(window.location.hash.replace(/^#/, ''));
-  const parts = raw.split('.');
-  if (parts.length < 2) return null;
-  const [code, token, albumId] = parts;
-  if (!code || !token || code.includes('/') || token.includes('/')) return null;
-  return { code, token, albumId: albumId || undefined };
 }
 
 // ---------------------------------------------------------------------------
@@ -67,6 +40,31 @@ let pendingOriginal: {
   filename: string;
   chunks: Map<number, number[]>;
 } | null = null;
+
+/** Revoke a single blob URL and remove it from the cache. */
+function revokeObjectUrl(key: string): void {
+  const url = objectUrls.get(key);
+  if (url) {
+    URL.revokeObjectURL(url);
+    objectUrls.delete(key);
+  }
+}
+
+/** Revoke ALL blob URLs and clear every in-memory trace. */
+function destroyAllMedia(): void {
+  for (const url of objectUrls.values()) {
+    URL.revokeObjectURL(url);
+  }
+  objectUrls.clear();
+  inflightThumbs.clear();
+  pendingOriginal = null;
+  // Clear any img/video src attributes in the DOM
+  document.querySelectorAll<HTMLImageElement>('.tile img').forEach((img) => {
+    img.src = '';
+    img.removeAttribute('src');
+  });
+  previewBody.replaceChildren();
+}
 
 function cachedUrl(key: string): string | undefined {
   return objectUrls.get(key);
@@ -168,21 +166,9 @@ function finishOriginal(id: string): void {
   const orig = pendingOriginal;
   pendingOriginal = null;
   if (!orig || orig.id !== id) return;
-  const indexes = [...orig.chunks.keys()].sort((a, b) => a - b);
-  let len = 0;
-  for (const i of indexes) len += orig.chunks.get(i)!.length;
-  const bytes = new Uint8Array(len);
-  let offset = 0;
-  for (const i of indexes) {
-    bytes.set(orig.chunks.get(i)!, offset);
-    offset += orig.chunks.get(i)!.length;
-  }
-  const name = orig.filename.toLowerCase();
-  const mime = /\.(mp4|mov|m4v)$/.test(name)
-    ? 'video/mp4'
-    : /\.webm$/.test(name)
-      ? 'video/webm'
-      : 'image/jpeg';
+  const bytes = assembleChunks(orig.chunks);
+  if (!bytes) return;
+  const mime = inferMime(orig.filename);
   const url = storeBlobUrl(`original:${id}`, bytes, mime);
   showPreview(url, mime.startsWith('video/'));
 }
@@ -311,7 +297,133 @@ function showPreview(url: string, video: boolean): void {
 document.getElementById('preview-close')?.addEventListener('click', () => {
   previewEl.close();
   previewBody.replaceChildren();
+  // Revoke the full-res blob to free memory
+  if (pendingOriginal) {
+    pendingOriginal = null;
+  }
 });
+
+// ---------------------------------------------------------------------------
+// Session timer (30 min auto-expiry)
+// ---------------------------------------------------------------------------
+
+const SESSION_MAX_MS = 30 * 60 * 1000; // 30 minutes
+let sessionStart = 0;
+let sessionTimerRaf = 0;
+
+function startSessionTimer(): void {
+  sessionStart = Date.now();
+  sessionTimerEl.hidden = false;
+  tickSessionTimer();
+}
+
+function tickSessionTimer(): void {
+  const elapsed = Date.now() - sessionStart;
+  const remaining = Math.max(0, SESSION_MAX_MS - elapsed);
+  const mins = Math.floor(remaining / 60_000);
+  const secs = Math.floor((remaining % 60_000) / 1000);
+  sessionTimerEl.textContent = `${mins}:${String(secs).padStart(2, '0')}`;
+  if (remaining <= 60_000) {
+    sessionTimerEl.classList.add('session-timer--warning');
+  }
+  if (remaining <= 0) {
+    sessionTimerEl.textContent = 'Session expired';
+    destroySession();
+    return;
+  }
+  sessionTimerRaf = requestAnimationFrame(tickSessionTimer);
+}
+
+// ---------------------------------------------------------------------------
+// Destructor — wipe all in-memory data
+// ---------------------------------------------------------------------------
+
+let destroyed = false;
+
+function destroySession(): void {
+  if (destroyed) return;
+  destroyed = true;
+
+  // Stop the timer
+  cancelAnimationFrame(sessionTimerRaf);
+
+  // Revoke every blob URL
+  destroyAllMedia();
+
+  // Close WebRTC
+  if (dc) {
+    try { dc.close(); } catch { /* ignore */ }
+    dc = null;
+  }
+  if (pc) {
+    try { pc.close(); } catch { /* ignore */ }
+    pc = null;
+  }
+
+  // Clear manifest
+  manifestPhotos = [];
+  renderedTiles = 0;
+
+  // Wipe gallery DOM
+  galleryEl.replaceChildren();
+
+  // Show end state
+  gateEl.hidden = false;
+  galleryEl.hidden = true;
+  gateMsg.textContent = 'This session has ended. All data has been cleared from your browser.';
+  setStatus('Session ended — data cleared');
+
+  // Clear URL hash so the session link can't be reloaded
+  if (window.location.hash) {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+}
+
+// Close session on page unload
+window.addEventListener('beforeunload', destroySession);
+
+// Close session on visibility change (user switches tabs for >5 min)
+let hiddenTimer: ReturnType<typeof setTimeout> | null = null;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    hiddenTimer = setTimeout(destroySession, 5 * 60 * 1000);
+  } else if (hiddenTimer) {
+    clearTimeout(hiddenTimer);
+    hiddenTimer = null;
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Download Siegu upsell
+// ---------------------------------------------------------------------------
+
+function renderUpsell(): void {
+  const el = document.createElement('div');
+  el.className = 'upsell-banner';
+  el.innerHTML = `
+    <div class="upsell-inner">
+      <span class="upsell-icon">📥</span>
+      <div class="upsell-text">
+        <strong>Get Siegu</strong>
+        <span>Browse your own library — fast, private, and offline.</span>
+      </div>
+      <a href="https://siegu.io" target="_blank" rel="noopener" class="upsell-btn">Download</a>
+    </div>
+  `;
+  document.body.appendChild(el);
+}
+
+// Show upsell after gallery loads
+let upsellShown = false;
+const origRenderGallery = renderGallery;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(renderGallery as any) = function patchedRenderGallery(this: any): void {
+  origRenderGallery.apply(this);
+  if (!upsellShown && renderedTiles > 0) {
+    upsellShown = true;
+    renderUpsell();
+  }
+};
 
 // ---------------------------------------------------------------------------
 // Signalling + WebRTC
@@ -323,7 +435,7 @@ function wsUrl(): string {
 }
 
 async function start(): Promise<void> {
-  const session = parseHash();
+  const session = parseHash(window.location.hash);
   if (!session) {
     setStatus('Missing session link');
     gateMsg.textContent =
@@ -348,6 +460,7 @@ async function start(): Promise<void> {
 
   ws.addEventListener('close', () => {
     setStatus('Session ended');
+    destroySession();
   });
 
   ws.addEventListener('error', () => {
@@ -375,7 +488,7 @@ async function start(): Promise<void> {
       case 'peer_disconnected':
       case 'room_closed':
         setStatus('Peer disconnected — session over');
-        if (dc) dc.close();
+        destroySession();
         break;
       default:
         break;
@@ -437,6 +550,8 @@ async function answerOffer(ws: WebSocket, sdpJson: string): Promise<void> {
         gateEl.hidden = true;
         galleryEl.hidden = false;
         manifestPhotos = [];
+        renderedTiles = 0;
+        startSessionTimer();
         if (currentSession?.albumId) {
           sendSync({ type: 'EnterAlbumShare', album_id: currentSession.albumId });
           albumShareTimeout = setTimeout(() => {

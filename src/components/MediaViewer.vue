@@ -13,64 +13,55 @@
             class="viewer-nav-btn top-left"
             @click="close"
           ></v-btn>
+
           <template v-if="isMobile">
             <v-btn
-              icon="mdi-dots-vertical"
+              icon="mdi-share-variant-outline"
               variant="text"
-              color="rgba(var(--v-theme-on-surface), 0.6)"
-              class="viewer-nav-btn top-left-more"
-              @click="moreMenuOpen = true"
+              color="rgb(var(--v-theme-on-surface))"
+              class="viewer-nav-btn top-right"
+              @click="handleShare"
             ></v-btn>
-            <v-bottom-sheet v-model="moreMenuOpen">
+          </template>
+          <template v-else>
+            <v-menu location="bottom start" close-on-content-click>
+              <template v-slot:activator="{ props: menuProps }">
+                <v-btn
+                  v-bind="menuProps"
+                  icon="mdi-dots-vertical"
+                  variant="text"
+                  color="rgba(var(--v-theme-on-surface), 0.6)"
+                  class="viewer-nav-btn top-left-more"
+                ></v-btn>
+              </template>
               <v-list density="compact">
                 <v-list-item
                   v-for="item in moreItems"
                   :key="item.key"
-                  @click="closeMoreMenu(item.action)"
+                  @click="item.action()"
                   :prepend-icon="item.icon"
                 >
                   <v-list-item-title>{{ $t('media_viewer.' + item.key) }}</v-list-item-title>
                 </v-list-item>
               </v-list>
-            </v-bottom-sheet>
+            </v-menu>
+            <v-btn
+              v-if="!isVideo && !showInfo"
+              icon="mdi-information-outline"
+              variant="text"
+              color="rgba(var(--v-theme-on-surface), 0.6)"
+              class="viewer-nav-btn top-right"
+              @click="showInfo = !showInfo"
+            ></v-btn>
           </template>
-          <v-menu v-else location="bottom start" close-on-content-click>
-            <template v-slot:activator="{ props: menuProps }">
-              <v-btn
-                v-bind="menuProps"
-                icon="mdi-dots-vertical"
-                variant="text"
-                color="rgba(var(--v-theme-on-surface), 0.6)"
-                class="viewer-nav-btn top-left-more"
-              ></v-btn>
-            </template>
-            <v-list density="compact">
-              <v-list-item
-                v-for="item in moreItems"
-                :key="item.key"
-                @click="item.action()"
-                :prepend-icon="item.icon"
-              >
-                <v-list-item-title>{{ $t('media_viewer.' + item.key) }}</v-list-item-title>
-              </v-list-item>
-            </v-list>
-          </v-menu>
-          <v-btn
-            v-if="!isVideo && !showInfo"
-            icon="mdi-information-outline"
-            variant="text"
-            color="rgba(var(--v-theme-on-surface), 0.6)"
-            class="viewer-nav-btn top-right"
-            @click="showInfo = !showInfo"
-          ></v-btn>
 
           <div
+            ref="touchOverlayRef"
             class="touch-overlay"
-            v-touch="{
-              left: () => next(),
-              right: () => prev(),
-              down: () => close(),
-            }"
+            @touchstart.passive="onTouchStart"
+            @touchmove.passive="onTouchMove"
+            @touchend="onTouchEnd"
+            @click="onTouchClick"
           ></div>
 
           <div class="viewer-content-container">
@@ -115,7 +106,24 @@
             ></v-btn>
           </div>
 
-          <div class="thumbnail-rail-container">
+          <!-- Time period overlay (mobile) -->
+          <transition name="fade">
+            <div v-if="timePeriodOverlayVisible" class="time-period-overlay">
+              {{ timePeriodOverlayLabel }}
+            </div>
+          </transition>
+
+          <!-- Heart pop animation (mobile) -->
+          <transition name="heart-pop">
+            <div v-if="heartPopping" class="heart-overlay">
+              <v-icon :color="isFavorited ? 'error' : 'rgba(255,255,255,0.7)'" size="80">
+                {{ isFavorited ? 'mdi-heart' : 'mdi-heart-outline' }}
+              </v-icon>
+            </div>
+          </transition>
+
+          <!-- Thumbnail rail (desktop only) -->
+          <div v-if="!isMobile" class="thumbnail-rail-container">
             <RecycleScroller
               ref="scrollerRef"
               class="thumbnail-rail"
@@ -131,6 +139,50 @@
               />
             </RecycleScroller>
           </div>
+
+          <!-- Mobile bottom bar -->
+          <div v-if="isMobile" class="mobile-bottom-bar">
+            <v-btn
+              icon
+              variant="text"
+              :color="isFavorited ? 'error' : 'rgb(var(--v-theme-on-surface))'"
+              @click="toggleFavorite"
+              size="small"
+            >
+              <v-icon>{{ isFavorited ? 'mdi-heart' : 'mdi-heart-outline' }}</v-icon>
+            </v-btn>
+            <v-btn
+              icon
+              variant="text"
+              color="rgb(var(--v-theme-on-surface))"
+              @click="showInfo = !showInfo"
+              size="small"
+            >
+              <v-icon>mdi-information-outline</v-icon>
+            </v-btn>
+            <v-btn
+              icon
+              variant="text"
+              color="rgb(var(--v-theme-on-surface))"
+              @click="moreMenuOpen = true"
+              size="small"
+            >
+              <v-icon>mdi-dots-vertical</v-icon>
+            </v-btn>
+          </div>
+
+          <v-bottom-sheet v-model="moreMenuOpen">
+            <v-list density="compact">
+              <v-list-item
+                v-for="item in moreItems"
+                :key="item.key"
+                @click="closeMoreMenu(item.action)"
+                :prepend-icon="item.icon"
+              >
+                <v-list-item-title>{{ $t('media_viewer.' + item.key) }}</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-bottom-sheet>
         </v-main>
 
         <v-navigation-drawer
@@ -421,6 +473,8 @@ import { RecycleScroller } from 'vue-virtual-scroller';
 import AddToAlbumSheet from '@/components/albums/AddToAlbumSheet.vue';
 import { isVideo as checkIsVideo } from '@/composables/useMediaUtils';
 import { useMediaUrl } from '@/composables/useMediaUrl';
+import { useDoubleTap } from '@/composables/useDoubleTap';
+import { useTimePeriods } from '@/composables/useTimePeriods';
 import { useI18n } from 'vue-i18n';
 import type { MediaItem } from '@/types/media';
 
@@ -454,6 +508,10 @@ const emit = defineEmits<{
   'navigate-to-person': [person: { id: string; name: string }];
 }>();
 
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+
 const showInfo = ref(false);
 const os = ref('');
 const moreMenuOpen = ref(false);
@@ -475,6 +533,7 @@ const videoPlayer = ref<HTMLVideoElement | null>(null);
 const scrollerRef = ref<{
   scrollToItem: (index: number, options?: ScrollToOptions) => void;
 } | null>(null);
+const touchOverlayRef = ref<HTMLElement | null>(null);
 
 const modelInfo = [
   { id: 'clip' },
@@ -487,6 +546,146 @@ const modelInfo = [
   { id: 'midas' },
   { id: 'whisper' },
 ];
+
+// ---------------------------------------------------------------------------
+// Time periods + touch gestures
+// ---------------------------------------------------------------------------
+
+const {
+  overlayLabel: timePeriodOverlayLabel,
+  overlayVisible: timePeriodOverlayVisible,
+  jumpToPrevious,
+  jumpToNext,
+} = useTimePeriods(() => props.photos);
+
+const { handleTap, heartPop: heartPopping, cancelPending } = useDoubleTap(
+  () => {
+    /* single tap: no-op in viewer (could toggle chrome) */
+  },
+  () => {
+    toggleFavorite();
+  },
+);
+
+// Touch gesture state
+let touchStartX = 0;
+let touchStartY = 0;
+let touchStartTime = 0;
+const SWIPE_THRESHOLD = 40;
+const SWIPE_VELOCITY = 0.3;
+
+function onTouchStart(e: TouchEvent): void {
+  const t = e.touches[0];
+  touchStartX = t.clientX;
+  touchStartY = t.clientY;
+  touchStartTime = Date.now();
+}
+
+function onTouchMove(_e: TouchEvent): void {
+  // Handled in onTouchEnd for simplicity; passive listener
+}
+
+function onTouchEnd(e: TouchEvent): void {
+  const t = e.changedTouches[0];
+  const dx = t.clientX - touchStartX;
+  const dy = t.clientY - touchStartY;
+  const elapsed = Date.now() - touchStartTime;
+  const absDx = Math.abs(dx);
+  const absDy = Math.abs(dy);
+
+  // Only process if it's a swipe (not a tap)
+  if (absDx < SWIPE_THRESHOLD && absDy < SWIPE_THRESHOLD) return;
+
+  const velocity = Math.max(absDx, absDy) / elapsed;
+  if (velocity < SWIPE_VELOCITY) return;
+
+  if (absDx > absDy) {
+    // Horizontal swipe
+    if (dx < 0) next();
+    else prev();
+  } else {
+    // Vertical swipe
+    if (dy < 0) {
+      // Swipe up = previous time period
+      const target = jumpToPrevious(props.index);
+      if (target !== null) emit('update:index', target);
+    } else {
+      // Swipe down = next time period
+      const target = jumpToNext(props.index);
+      if (target !== null) emit('update:index', target);
+    }
+  }
+}
+
+function onTouchClick(): void {
+  handleTap();
+}
+
+// ---------------------------------------------------------------------------
+// Favorites
+// ---------------------------------------------------------------------------
+
+const isFavorited = computed((): boolean => !!currentPhoto.value?.favorite);
+
+async function toggleFavorite(): Promise<void> {
+  if (!currentPhoto.value) return;
+  try {
+    const isNow = await invoke<boolean>('toggle_favorite', { id: currentPhoto.value.id });
+    emit('update:photo', { ...currentPhoto.value, favorite: isNow } as MediaItem);
+  } catch (e) {
+    console.error('Failed to toggle favorite', e);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Share
+// ---------------------------------------------------------------------------
+
+async function handleShare(): Promise<void> {
+  if (!currentPhoto.value) return;
+  const photo = currentPhoto.value;
+
+  // Try native OS share if available
+  if (navigator.share) {
+    try {
+      const ext = photo.location.split('.').pop()?.toLowerCase();
+      const mimeMap: Record<string, string> = {
+        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+        webp: 'image/webp', heic: 'image/heic', heif: 'image/heif',
+        mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
+      };
+      const mime = mimeMap[ext ?? ''] ?? 'application/octet-stream';
+
+      // Convert file to blob for sharing
+      if (!photo.view_only) {
+        const { convertFileSrc } = await import('@tauri-apps/api/core');
+        const url = convertFileSrc(photo.location);
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const file = new File([blob], photo.location.split('/').pop() ?? 'photo', { type: mime });
+
+        await navigator.share({
+          title: photo.caption ?? 'Photo from Siegu',
+          files: [file],
+        });
+        return;
+      }
+    } catch {
+      // User cancelled or share failed — fall through to upsell
+    }
+  }
+
+  // Fallback: show upsell dialog
+  snackbar.value = {
+    show: true,
+    text: t('media_viewer.share_upsell_hint'),
+    error: false,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Computed
+// ---------------------------------------------------------------------------
 
 const isMobile = computed(() => os.value === 'android' || os.value === 'ios');
 
@@ -509,7 +708,6 @@ const isViewOnly = computed((): boolean => !!currentPhoto.value?.view_only);
 
 const computedVideoUrl = computed(() => {
   if (!currentPhoto.value || !isVideo.value) return '';
-  // Evicted items stream from the peer through the media server (#10).
   if (isViewOnly.value) return remoteImageUrl(currentPhoto.value.id) ?? '';
   return buildVideoUrl(currentPhoto.value.location) ?? '';
 });
@@ -526,16 +724,11 @@ const videoType = computed(() => {
 
 const currentPhotoSrc = computed(() => {
   if (!currentPhoto.value || isVideo.value) return '';
-  // Evicted items: stream the original from the peer (#10).
   if (currentPhoto.value.view_only) {
     return remoteImageUrl(currentPhoto.value.id) ?? currentPhoto.value.encoded ?? '';
   }
   const ext = currentPhoto.value.location.split('.').pop()?.toLowerCase();
   if (['heic', 'heif'].includes(ext ?? '')) {
-    // Prefer the generated thumbnail; while it's still being produced, fall
-    // back to the media server's on-demand thumb (raw HEIC won't decode in
-    // the webview). The thumbnail-drain `photos-refreshed` upgrades this to
-    // the full generated image in a single reload.
     return (
       currentPhoto.value.encoded ||
       buildThumbUrl(currentPhoto.value.location) ||
@@ -627,6 +820,10 @@ const modelChips = computed(() => {
       done: status[m.id] === 1,
     }));
 });
+
+// ---------------------------------------------------------------------------
+// Analysis
+// ---------------------------------------------------------------------------
 
 function clearAnalysisListener(): void {
   if (unlistenResult) {
@@ -822,6 +1019,7 @@ async function listenForEta(): Promise<void> {
 }
 
 function close(): void {
+  cancelPending();
   stopVideo();
   visible.value = false;
 }
@@ -864,7 +1062,7 @@ function onAddedToAlbum(albumName: string): void {
   snackbar.value = {
     show: true,
     error: false,
-    text: t('albums.added_to_album', { album: albumName }),
+    text: t('albums.added_to_album', { collection: albumName }),
   };
 }
 
@@ -959,9 +1157,14 @@ function scrollToActiveThumb(): void {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Watchers
+// ---------------------------------------------------------------------------
+
 watch(
   () => props.index,
   () => {
+    cancelPending();
     stopVideo();
     isAnalyzing.value = false;
     isAnalyzingModel.value = null;
@@ -998,8 +1201,14 @@ watch(visible, (val) => {
     scrollToActiveThumb();
   } else {
     detectedFaces.value = [];
+    showInfo.value = false;
+    cancelPending();
   }
 });
+
+// ---------------------------------------------------------------------------
+// Lifecycle
+// ---------------------------------------------------------------------------
 
 onMounted(async () => {
   window.addEventListener('keydown', handleKeydown);
@@ -1053,9 +1262,6 @@ onUnmounted(() => {
   z-index: 1;
 }
 
-/* Videos need the native controls clickable, which means stacking above the
-   swipe-gesture touch-overlay (z-index: 5). Images stay below it so swiping
-   between photos keeps working. */
 .media-wrapper.interactive {
   position: relative;
   z-index: 6;
@@ -1075,7 +1281,7 @@ onUnmounted(() => {
   top: 0;
   left: 0;
   right: 0;
-  bottom: 100px;
+  bottom: 0;
   z-index: 5;
 }
 
@@ -1156,20 +1362,78 @@ onUnmounted(() => {
 }
 
 @keyframes dots {
-  0% {
-    content: '';
-  }
-  25% {
-    content: '.';
-  }
-  50% {
-    content: '..';
-  }
-  75% {
-    content: '...';
-  }
-  100% {
-    content: '';
-  }
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+  100% { content: ''; }
+}
+
+/* Mobile bottom bar */
+.mobile-bottom-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px 16px 20px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.4));
+  z-index: 100;
+}
+
+/* Time period overlay */
+.time-period-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(12px);
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding: 10px 24px;
+  border-radius: 24px;
+  z-index: 150;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Heart overlay */
+.heart-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 160;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+}
+
+/* Transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.heart-pop-enter-active {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.heart-pop-leave-active {
+  transition: opacity 0.4s ease;
+}
+.heart-pop-enter-from {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.5);
+}
+.heart-pop-leave-to {
+  opacity: 0;
 }
 </style>

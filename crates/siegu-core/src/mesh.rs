@@ -927,7 +927,7 @@ impl MeshManager {
                         let event_arc = Arc::clone(&event);
                         let config_path_clone = config_path.to_string();
                         let id_clone = id.clone();
-                        let semaphore = Arc::clone(&transfer_semaphore);
+                        let semaphore = Arc::clone(transfer_semaphore);
                         let completed_task = Arc::clone(items_completed);
                         let total_task = Arc::clone(items_total);
                         let mirror_completed_task = Arc::clone(mirror_completed);
@@ -1172,7 +1172,7 @@ impl MeshManager {
                     .load(std::sync::atomic::Ordering::SeqCst)
                 {
                     // Verify and cache in memory; nothing is persisted.
-                    let ok = view_state().complete(&id, |bytes| Self::compute_data_checksum(bytes));
+                    let ok = view_state().complete(&id, Self::compute_data_checksum);
                     if !ok {
                         event.on_sync_error(format!("Checksum mismatch for view-only media {id}"));
                     }
@@ -1216,10 +1216,9 @@ impl MeshManager {
                     let temp_path =
                         sync_temp_dir(config_path).join(sanitize_filename(&file_state.id));
 
-                    let received_checksum = match Self::compute_file_checksum(&temp_path).await {
-                        Ok(cs) => cs,
-                        Err(_) => String::new(),
-                    };
+                    let received_checksum = Self::compute_file_checksum(&temp_path)
+                        .await
+                        .unwrap_or_default();
 
                     if !checksum.is_empty() && received_checksum != checksum {
                         event.on_sync_error(format!(

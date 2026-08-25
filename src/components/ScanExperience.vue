@@ -224,9 +224,33 @@ function handlePauseResume(): void {
           <h2 class="text-h4 font-weight-bold text-high-emphasis mb-3">
             {{ t('scan.processing') }}
           </h2>
-          <p class="text-body-1 text-medium-emphasis">
+          <p class="text-body-1 text-medium-emphasis mb-6">
             {{ t('scan.loading_models') }}
           </p>
+
+          <!-- Model loading states -->
+          <div v-if="modelChips.length > 0" class="mb-4">
+            <div class="text-caption text-disabled mb-1">{{ t('scan.pipeline') }}</div>
+            <div class="d-flex flex-wrap justify-center ga-1">
+              <v-chip
+                v-for="m in modelChips"
+                :key="m.name"
+                size="x-small"
+                variant="tonal"
+                :color="chipColor(m.status)"
+              >
+                <v-icon start size="12">{{ chipIcon(m.status) }}</v-icon>
+                {{ m.name }}
+              </v-chip>
+            </div>
+          </div>
+
+          <!-- Activity log -->
+          <div v-if="scanStore.logLines.length > 0" class="scan-log mt-4" ref="logContainer">
+            <div v-for="(line, i) in scanStore.logLines" :key="i" class="scan-log-line">
+              {{ line }}
+            </div>
+          </div>
         </template>
 
         <!-- Indexing phase -->
