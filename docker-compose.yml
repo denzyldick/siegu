@@ -2,12 +2,8 @@ services:
   signalling:
     image: ghcr.io/denzyldick/siegu-signal:latest
     restart: unless-stopped
-    ports:
-      - "8080:8080"
     environment:
       PORT: "8080"
-      # Uncomment to require a token on every Join/JoinRoom/CreateRoom:
-      # SIEGU_SIGNAL_TOKEN: "change-me"
     healthcheck:
       test: ["CMD", "curl", "-sf", "--max-time", "4", "-o", "/dev/null", "http://127.0.0.1:8080/healthz"]
       interval: 30s
@@ -18,10 +14,7 @@ services:
   webclient:
     build: ./webclient
     ports:
-      - "5173:5173"
+      - "8080:8080"
     depends_on:
       signalling:
         condition: service_healthy
-    environment:
-      # The webclient dev server proxies /ws to the signalling server
-      SIGNALING_URL: "ws://signalling:8080"

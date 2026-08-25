@@ -57,17 +57,14 @@ The `dist/` folder is served by the host's embedded web server when running `sie
 
 ## Docker (Quick Test)
 
-Test the webclient in isolation with the signalling server:
+Test everything with one command:
 
 ```bash
-docker compose up signalling
+docker compose up
+# → http://localhost:8080
 ```
 
-This starts the signalling server on `ws://localhost:8080`. Then run the webclient dev server:
-
-```bash
-cd webclient && npm run dev
-```
+This starts both the signalling server and web client on **port 8080**. Nginx serves the web client and proxies WebSocket connections to the internal signalling server.
 
 ## URL Format
 

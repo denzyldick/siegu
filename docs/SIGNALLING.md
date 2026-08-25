@@ -21,46 +21,30 @@ Device B ──WebSocket──┘
 The fastest way to run both the signalling server and web client:
 
 ```bash
-# Start signalling server
-docker compose up signalling
-
-# In another terminal, start the web client dev server
-cd webclient
-npm install
-npm run dev
+docker compose up
 ```
 
-This gives you:
-- Signalling server at `ws://localhost:8080`
-- Web client at `http://localhost:5173`
+This gives you everything on **one port** (`http://localhost:8080`):
+- Web client (static files)
+- WebSocket signalling (proxied to the internal signalling server)
+
+### How It Works
+
+```
+Browser → http://localhost:8080
+              │
+              ├── /          → nginx serves webclient
+              └── /ws        → nginx proxies to signalling:8080
+                                    │
+                                    └── signalling server (internal)
+```
 
 ### Services
 
 | Service | Port | Description |
 |---------|------|-------------|
-| `signalling` | 8080 | WebSocket signalling server |
-| `webclient` | 5173 | Vite dev server for the view-only web client |
-
-### Docker Compose Configuration
-
-```yaml
-services:
-  signalling:
-    image: ghcr.io/denzyldick/siegu-signal:latest
-    ports:
-      - "8080:8080"
-    environment:
-      PORT: "8080"
-
-  webclient:
-    build: ./webclient
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./webclient:/app
-      - /app/node_modules
-    command: npm run dev -- --host 0.0.0.0
-```
+| `webclient` | 8080 | nginx serves webclient + proxies WebSocket |
+| `signalling` | internal | WebSocket signalling server (not exposed directly) |
 
 ## Self-Hosted Setup
 
@@ -123,11 +107,11 @@ If your signalling server enforces token-based auth:
 ### From Docker Compose
 
 ```bash
-# Start both services
+# Start everything on port 8080
 docker compose up
 
 # Open in browser
-open http://localhost:5173
+open http://localhost:8080
 ```
 
 ### With a Real Host
