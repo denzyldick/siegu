@@ -75,7 +75,12 @@
             >
               <div
                 class="carousel-track"
-                :style="{ transform: trackTransform, transition: isCarouselAnimating ? 'transform 300ms cubic-bezier(0.16, 1, 0.3, 1)' : 'none' }"
+                :style="{
+                  transform: trackTransform,
+                  transition: isCarouselAnimating
+                    ? 'transform 300ms cubic-bezier(0.16, 1, 0.3, 1)'
+                    : 'none',
+                }"
               >
                 <!-- Previous slide -->
                 <div class="carousel-slide">
@@ -610,7 +615,11 @@ const {
   },
 });
 
-const { handleTap, heartPop: heartPopping, cancelPending } = useDoubleTap(
+const {
+  handleTap,
+  heartPop: heartPopping,
+  cancelPending,
+} = useDoubleTap(
   () => {
     /* single tap: no-op in viewer (could toggle chrome) */
   },
@@ -669,9 +678,15 @@ async function handleShare(): Promise<void> {
     try {
       const ext = photo.location.split('.').pop()?.toLowerCase();
       const mimeMap: Record<string, string> = {
-        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-        webp: 'image/webp', heic: 'image/heic', heif: 'image/heif',
-        mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        png: 'image/png',
+        webp: 'image/webp',
+        heic: 'image/heic',
+        heif: 'image/heif',
+        mp4: 'video/mp4',
+        mov: 'video/quicktime',
+        webm: 'video/webm',
       };
       const mime = mimeMap[ext ?? ''] ?? 'application/octet-stream';
 
@@ -1414,11 +1429,21 @@ onUnmounted(() => {
 }
 
 @keyframes dots {
-  0% { content: ''; }
-  25% { content: '.'; }
-  50% { content: '..'; }
-  75% { content: '...'; }
-  100% { content: ''; }
+  0% {
+    content: '';
+  }
+  25% {
+    content: '.';
+  }
+  50% {
+    content: '..';
+  }
+  75% {
+    content: '...';
+  }
+  100% {
+    content: '';
+  }
 }
 
 /* Mobile bottom bar */

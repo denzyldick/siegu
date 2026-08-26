@@ -113,7 +113,9 @@
             class="flex-grow-1"
             height="44"
           >
-            <v-icon start size="18">{{ cleanupConfirming ? 'mdi-alert' : 'mdi-delete-outline' }}</v-icon>
+            <v-icon start size="18">{{
+              cleanupConfirming ? 'mdi-alert' : 'mdi-delete-outline'
+            }}</v-icon>
             {{ cleanupConfirming ? $t('settings.clear_db_are_you_sure') : $t('settings.clear') }}
           </v-btn>
         </v-card-actions>
@@ -168,7 +170,9 @@
             class="flex-grow-1"
             height="44"
           >
-            <v-icon start size="18">{{ wipeConfirming ? 'mdi-alert' : 'mdi-folder-remove-outline' }}</v-icon>
+            <v-icon start size="18">{{
+              wipeConfirming ? 'mdi-alert' : 'mdi-folder-remove-outline'
+            }}</v-icon>
             {{ wipeConfirming ? $t('settings.wipe_are_you_sure') : $t('settings.wipe_data') }}
           </v-btn>
         </v-card-actions>
@@ -256,8 +260,18 @@ const signallingSaving = ref(false);
 const cleanupConfirming = ref(false);
 const wipeConfirming = ref(false);
 
-watch(() => cleanupDialog.show, (v) => { if (!v) cleanupConfirming.value = false; });
-watch(() => removeFolderDialog.show, (v) => { if (!v) wipeConfirming.value = false; });
+watch(
+  () => cleanupDialog.show,
+  (v) => {
+    if (!v) cleanupConfirming.value = false;
+  },
+);
+watch(
+  () => removeFolderDialog.show,
+  (v) => {
+    if (!v) wipeConfirming.value = false;
+  },
+);
 
 const settingsLoading = ref(true);
 

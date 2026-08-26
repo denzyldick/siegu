@@ -6,7 +6,9 @@
           <v-icon color="rgb(var(--v-theme-on-surface))" size="28" class="mr-3">mdi-devices</v-icon>
           <h1 class="text-h4 font-weight-bold text-high-emphasis">{{ $t('devices.title') }}</h1>
         </div>
-        <div class="text-subtitle-1 text-medium-emphasis d-none d-sm-block">{{ $t('devices.desc') }}</div>
+        <div class="text-subtitle-1 text-medium-emphasis d-none d-sm-block">
+          {{ $t('devices.desc') }}
+        </div>
       </div>
       <ConnectView />
     </div>
@@ -141,7 +143,6 @@
                 }}</span>
               </div>
             </div>
-
           </v-card-text>
 
           <v-card-actions class="px-4 pb-4 pt-0">
@@ -214,6 +215,14 @@
     <!-- Delete Confirmation Dialog -->
     <v-dialog v-model="deleteDialog" max-width="400" rounded="xl">
       <v-card class="pa-6 border">
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          class="position-absolute"
+          style="top: 12px; right: 12px"
+          @click="deleteDialog = false"
+        ></v-btn>
         <v-avatar color="error" size="48" class="mb-4">
           <v-icon color="white">mdi-alert-outline</v-icon>
         </v-avatar>
@@ -249,6 +258,14 @@
     <!-- Rename Dialog -->
     <v-dialog v-model="renameDialog" max-width="400" rounded="xl">
       <v-card class="pa-6 border">
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          class="position-absolute"
+          style="top: 12px; right: 12px"
+          @click="renameDialog = false"
+        ></v-btn>
         <v-avatar color="on-surface" size="48" class="mb-4">
           <v-icon color="surface">mdi-pencil-outline</v-icon>
         </v-avatar>

@@ -165,7 +165,7 @@ export function useSwipeCarousel(options: SwipeCarouselOptions) {
       const total = options.totalItems();
       const atStart = index === 0 && dx > 0;
       const atEnd = index === total - 1 && dx < 0;
-      const resistance = (atStart || atEnd) ? 0.3 : 1;
+      const resistance = atStart || atEnd ? 0.3 : 1;
 
       offset.value = dx * resistance;
 

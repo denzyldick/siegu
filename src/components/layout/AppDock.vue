@@ -11,11 +11,41 @@ const uiStore = useUiStore();
 const scanStore = useScanStore();
 
 const navItems = [
-  { page: 'home' as const, icon: null, tour: 'dock-home', useLogo: true, label: 'dock.home' as const },
-  { page: 'collections' as const, icon: 'mdi-album', tour: 'dock-collections', useLogo: false, label: 'dock.collections' as const },
-  { page: 'location' as const, icon: 'mdi-map-outline', tour: 'dock-map', useLogo: false, label: 'dock.map' as const },
-  { page: 'devices' as const, icon: 'mdi-laptop', tour: 'dock-devices', useLogo: false, label: 'dock.devices' as const },
-  { page: 'settings' as const, icon: 'mdi-cog-outline', tour: 'dock-settings', useLogo: false, label: 'dock.settings' as const },
+  {
+    page: 'home' as const,
+    icon: null,
+    tour: 'dock-home',
+    useLogo: true,
+    label: 'dock.home' as const,
+  },
+  {
+    page: 'collections' as const,
+    icon: 'mdi-album',
+    tour: 'dock-collections',
+    useLogo: false,
+    label: 'dock.collections' as const,
+  },
+  {
+    page: 'location' as const,
+    icon: 'mdi-map-outline',
+    tour: 'dock-map',
+    useLogo: false,
+    label: 'dock.map' as const,
+  },
+  {
+    page: 'devices' as const,
+    icon: 'mdi-laptop',
+    tour: 'dock-devices',
+    useLogo: false,
+    label: 'dock.devices' as const,
+  },
+  {
+    page: 'settings' as const,
+    icon: 'mdi-cog-outline',
+    tour: 'dock-settings',
+    useLogo: false,
+    label: 'dock.settings' as const,
+  },
 ];
 
 const isIndexing = computed(() => scanStore.isActive);
@@ -141,7 +171,7 @@ function navigate(page: 'home' | 'collections' | 'location' | 'devices' | 'setti
   filter: invert(1) !important;
 }
 
-[data-theme="dark"] .siegu-logo-wrap .v-img:not(.siegu-logo--active) {
+[data-theme='dark'] .siegu-logo-wrap .v-img:not(.siegu-logo--active) {
   filter: invert(1);
 }
 

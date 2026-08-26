@@ -487,6 +487,14 @@
 
     <v-dialog v-model="newAlbumDialog" max-width="420">
       <v-card class="rounded-xl pa-6" color="surface">
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          class="position-absolute"
+          style="top: 12px; right: 12px"
+          @click="newAlbumDialog = false"
+        ></v-btn>
         <h3 class="text-h6 font-weight-bold text-high-emphasis mb-4">
           {{ $t('albums.new_album') }}
         </h3>
@@ -514,6 +522,14 @@
 
     <v-dialog v-model="renameDialog" max-width="420">
       <v-card class="rounded-xl pa-6" color="surface">
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          class="position-absolute"
+          style="top: 12px; right: 12px"
+          @click="renameDialog = false"
+        ></v-btn>
         <h3 class="text-h6 font-weight-bold text-high-emphasis mb-4">
           {{ $t('albums.rename_album') }}
         </h3>
@@ -540,6 +556,14 @@
 
     <v-dialog v-model="confirmDelete" max-width="420">
       <v-card class="rounded-xl pa-6" color="surface">
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          class="position-absolute"
+          style="top: 12px; right: 12px"
+          @click="confirmDelete = false"
+        ></v-btn>
         <h3 class="text-h6 font-weight-bold text-high-emphasis mb-2">
           {{ $t('albums.delete_confirm_title') }}
         </h3>
@@ -555,6 +579,14 @@
 
     <v-dialog v-model="shareDialog" max-width="520">
       <v-card class="rounded-xl pa-6" color="surface">
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          class="position-absolute"
+          style="top: 12px; right: 12px"
+          @click="shareDialog = false"
+        ></v-btn>
         <div class="d-flex align-center mb-4">
           <v-avatar color="surface" size="40" class="mr-3">
             <v-icon color="primary" size="20">mdi-link</v-icon>
@@ -580,13 +612,7 @@
           </div>
         </v-alert>
 
-        <v-alert
-          type="info"
-          variant="outlined"
-          border="start"
-          class="mb-4"
-          rounded="lg"
-        >
+        <v-alert type="info" variant="outlined" border="start" class="mb-4" rounded="lg">
           <div class="text-body-2 text-high-emphasis font-weight-bold mb-1">
             {{ $t('albums.share_how_it_works') }}
           </div>
@@ -595,14 +621,7 @@
           </div>
         </v-alert>
 
-        <v-alert
-          type="info"
-          variant="tonal"
-          color="info"
-          border="start"
-          rounded="lg"
-          class="mb-0"
-        >
+        <v-alert type="info" variant="tonal" color="info" border="start" rounded="lg" class="mb-0">
           <div class="d-flex align-center">
             <v-icon size="18" class="mr-2">mdi-cloud-outline</v-icon>
             <div>

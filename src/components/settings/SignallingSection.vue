@@ -108,17 +108,16 @@
         {{ $t('settings.signalling_docs') }} →
       </a>
 
-      <v-alert
-        variant="tonal"
-        color="primary"
-        rounded="lg"
-        class="mb-2"
-      >
+      <v-alert variant="tonal" color="primary" rounded="lg" class="mb-2">
         <div class="d-flex align-center">
           <v-icon size="20" class="mr-3">mdi-cloud-outline</v-icon>
           <div>
-            <div class="text-body-2 font-weight-bold">{{ $t('settings.signalling_upsell_title') }}</div>
-            <div class="text-caption text-medium-emphasis mb-1">{{ $t('settings.signalling_upsell_desc') }}</div>
+            <div class="text-body-2 font-weight-bold">
+              {{ $t('settings.signalling_upsell_title') }}
+            </div>
+            <div class="text-caption text-medium-emphasis mb-1">
+              {{ $t('settings.signalling_upsell_desc') }}
+            </div>
             <div class="text-caption text-medium-emphasis" style="line-height: 1.5">
               {{ $t('settings.signalling_upsell_benefits') }}
             </div>

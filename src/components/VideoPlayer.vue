@@ -346,8 +346,9 @@ import { computed } from 'vue';
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-              background 0.2s ease;
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.2s ease;
   pointer-events: auto;
 }
 
@@ -468,8 +469,9 @@ import { computed } from 'vue';
   font-weight: 500;
   cursor: pointer;
   z-index: 15;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-              background 0.2s ease;
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.2s ease;
   white-space: nowrap;
 }
 

@@ -25,6 +25,15 @@
         min-width="350"
         max-width="440"
       >
+        <v-btn
+          v-if="showDisconnect"
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          class="position-absolute"
+          style="top: 12px; right: 12px"
+          @click="handleDisconnect"
+        ></v-btn>
         <div
           v-if="!confirmDialog && !(started && mode === 'host' && !isConnected)"
           class="d-flex justify-center mb-3"

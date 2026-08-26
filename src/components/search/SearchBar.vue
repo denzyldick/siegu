@@ -881,6 +881,14 @@ function iconForFilter(type: string): string {
 
     <v-dialog v-model="saveAlbumDialog" max-width="420">
       <v-card class="rounded-xl pa-6" color="surface">
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          class="position-absolute"
+          style="top: 12px; right: 12px"
+          @click="saveAlbumDialog = false"
+        ></v-btn>
         <h3 class="text-h6 font-weight-bold text-high-emphasis mb-1">
           {{ isEditingAlbum ? t('search.update_album') : t('search.save_as_album') }}
         </h3>
