@@ -231,7 +231,6 @@ async function loadMapData() {
 
     const bounds: [number, number][] = [];
     const markerFill = resolveThemeColor('--v-theme-info');
-    const markerText = themeTextColor();
     for (const p of mapPoints.value) {
       const marker = L.circleMarker([p.latitude, p.longitude], {
         radius: 5,

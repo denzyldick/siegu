@@ -55,15 +55,6 @@
             ></v-btn>
           </template>
 
-          <div
-            ref="touchOverlayRef"
-            class="touch-overlay"
-            @touchstart.passive="onTouchStart"
-            @touchmove.passive="onTouchMove"
-            @touchend="onTouchEnd"
-            @click="onTouchClick"
-          ></div>
-
           <div class="viewer-content-container">
             <v-btn
               v-if="!isMobile"
@@ -71,28 +62,57 @@
               variant="text"
               color="rgb(var(--v-theme-on-surface))"
               size="x-large"
-              @click="prev"
+              @click="carouselAnimatePrev()"
               class="side-nav-btn left"
             ></v-btn>
 
-            <div class="media-wrapper" :class="{ interactive: isVideo }">
-              <img
-                v-if="currentPhoto && !isVideo"
-                :src="currentPhotoSrc"
-                class="viewer-image"
-                decoding="async"
-              />
-              <video
-                v-if="currentPhoto && isVideo && computedVideoUrl"
-                ref="videoPlayer"
-                :src="computedVideoUrl"
-                :type="videoType"
-                class="viewer-image"
-                controls
-                playsinline
-                preload="metadata"
-                @error="onVideoError($event)"
-              ></video>
+            <div
+              class="carousel-viewport"
+              @touchstart.passive="onCarouselTouchStart"
+              @touchmove.passive="onCarouselTouchMove"
+              @touchend="onCarouselTouchEnd"
+              @click="onCarouselClick"
+            >
+              <div
+                class="carousel-track"
+                :style="{ transform: trackTransform, transition: isCarouselAnimating ? 'transform 300ms cubic-bezier(0.16, 1, 0.3, 1)' : 'none' }"
+              >
+                <!-- Previous slide -->
+                <div class="carousel-slide">
+                  <template v-if="prevItem && !isItemVideo(prevItem)">
+                    <img :src="getItemSrc(prevItem)" class="viewer-image" decoding="async" />
+                  </template>
+                  <template v-else-if="prevItem && isItemVideo(prevItem)">
+                    <img :src="getItemThumbSrc(prevItem)" class="viewer-image" decoding="async" />
+                  </template>
+                </div>
+
+                <!-- Current slide -->
+                <div class="carousel-slide">
+                  <template v-if="currentPhoto && !isVideo">
+                    <img :src="currentPhotoSrc" class="viewer-image" decoding="async" />
+                  </template>
+                  <template v-else-if="currentPhoto && isVideo && computedVideoUrl">
+                    <VideoPlayer
+                      ref="videoPlayerRef"
+                      :src="computedVideoUrl"
+                      :type="videoType"
+                      :auto-play="true"
+                      @error="onVideoError($event)"
+                    />
+                  </template>
+                </div>
+
+                <!-- Next slide -->
+                <div class="carousel-slide">
+                  <template v-if="nextItem && !isItemVideo(nextItem)">
+                    <img :src="getItemSrc(nextItem)" class="viewer-image" decoding="async" />
+                  </template>
+                  <template v-else-if="nextItem && isItemVideo(nextItem)">
+                    <img :src="getItemThumbSrc(nextItem)" class="viewer-image" decoding="async" />
+                  </template>
+                </div>
+              </div>
             </div>
 
             <v-btn
@@ -101,7 +121,7 @@
               variant="text"
               color="rgb(var(--v-theme-on-surface))"
               size="x-large"
-              @click="next"
+              @click="carouselAnimateNext()"
               class="side-nav-btn right"
             ></v-btn>
           </div>
@@ -469,12 +489,14 @@ import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { revealItemInDir, openPath } from '@tauri-apps/plugin-opener';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import MediaThumbnail from './MediaThumbnail.vue';
+import VideoPlayer from './VideoPlayer.vue';
 import { RecycleScroller } from 'vue-virtual-scroller';
 import AddToAlbumSheet from '@/components/albums/AddToAlbumSheet.vue';
 import { isVideo as checkIsVideo } from '@/composables/useMediaUtils';
 import { useMediaUrl } from '@/composables/useMediaUrl';
 import { useDoubleTap } from '@/composables/useDoubleTap';
 import { useTimePeriods } from '@/composables/useTimePeriods';
+import { useSwipeCarousel } from '@/composables/useSwipeCarousel';
 import { useI18n } from 'vue-i18n';
 import type { MediaItem } from '@/types/media';
 
@@ -529,11 +551,10 @@ let unlistenEta: UnlistenFn | null = null;
 let unlistenResult: UnlistenFn | null = null;
 const snackbar = ref({ show: false, text: '', error: false });
 const downloadedModels = ref<string[]>([]);
-const videoPlayer = ref<HTMLVideoElement | null>(null);
+const videoPlayerRef = ref<InstanceType<typeof VideoPlayer> | null>(null);
 const scrollerRef = ref<{
   scrollToItem: (index: number, options?: ScrollToOptions) => void;
 } | null>(null);
-const touchOverlayRef = ref<HTMLElement | null>(null);
 
 const modelInfo = [
   { id: 'clip' },
@@ -558,6 +579,37 @@ const {
   jumpToNext,
 } = useTimePeriods(() => props.photos);
 
+// ---------------------------------------------------------------------------
+// Carousel + touch gestures
+// ---------------------------------------------------------------------------
+
+const {
+  phase: carouselPhase,
+  isAnimating: isCarouselAnimating,
+  trackTransform,
+  getPrevIndex,
+  getNextIndex,
+  onTouchStart: carouselOnTouchStart,
+  onTouchMove: carouselOnTouchMove,
+  onTouchEnd: carouselOnTouchEnd,
+  animateNext: carouselAnimateNext,
+  animatePrev: carouselAnimatePrev,
+  reset: carouselReset,
+} = useSwipeCarousel({
+  totalItems: () => props.photos.length,
+  currentIndex: () => props.index,
+  onNavigate: (idx: number) => emit('update:index', idx),
+  onVerticalSwipe: (dir: 'up' | 'down') => {
+    if (dir === 'up') {
+      const target = jumpToPrevious(props.index);
+      if (target !== null) emit('update:index', target);
+    } else {
+      const target = jumpToNext(props.index);
+      if (target !== null) emit('update:index', target);
+    }
+  },
+});
+
 const { handleTap, heartPop: heartPopping, cancelPending } = useDoubleTap(
   () => {
     /* single tap: no-op in viewer (could toggle chrome) */
@@ -567,58 +619,25 @@ const { handleTap, heartPop: heartPopping, cancelPending } = useDoubleTap(
   },
 );
 
-// Touch gesture state
-let touchStartX = 0;
-let touchStartY = 0;
-let touchStartTime = 0;
-const SWIPE_THRESHOLD = 40;
-const SWIPE_VELOCITY = 0.3;
-
-function onTouchStart(e: TouchEvent): void {
-  const t = e.touches[0];
-  touchStartX = t.clientX;
-  touchStartY = t.clientY;
-  touchStartTime = Date.now();
+function onCarouselTouchStart(e: TouchEvent): void {
+  carouselOnTouchStart(e);
 }
 
-function onTouchMove(_e: TouchEvent): void {
-  // Handled in onTouchEnd for simplicity; passive listener
-}
-
-function onTouchEnd(e: TouchEvent): void {
-  const t = e.changedTouches[0];
-  const dx = t.clientX - touchStartX;
-  const dy = t.clientY - touchStartY;
-  const elapsed = Date.now() - touchStartTime;
-  const absDx = Math.abs(dx);
-  const absDy = Math.abs(dy);
-
-  // Only process if it's a swipe (not a tap)
-  if (absDx < SWIPE_THRESHOLD && absDy < SWIPE_THRESHOLD) return;
-
-  const velocity = Math.max(absDx, absDy) / elapsed;
-  if (velocity < SWIPE_VELOCITY) return;
-
-  if (absDx > absDy) {
-    // Horizontal swipe
-    if (dx < 0) next();
-    else prev();
-  } else {
-    // Vertical swipe
-    if (dy < 0) {
-      // Swipe up = previous time period
-      const target = jumpToPrevious(props.index);
-      if (target !== null) emit('update:index', target);
-    } else {
-      // Swipe down = next time period
-      const target = jumpToNext(props.index);
-      if (target !== null) emit('update:index', target);
-    }
+function onCarouselTouchMove(e: TouchEvent): void {
+  const result = carouselOnTouchMove(e);
+  if (result.defaultPrevented) {
+    e.preventDefault();
   }
 }
 
-function onTouchClick(): void {
-  handleTap();
+function onCarouselTouchEnd(e: TouchEvent): void {
+  carouselOnTouchEnd(e);
+}
+
+function onCarouselClick(): void {
+  if (carouselPhase.value === 'idle') {
+    handleTap();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -843,12 +862,7 @@ function onVideoError(event: Event): void {
 }
 
 function stopVideo(): void {
-  const video = videoPlayer.value;
-  if (video) {
-    video.pause();
-    video.removeAttribute('src');
-    video.load();
-  }
+  videoPlayerRef.value?.pause();
 }
 
 async function fetchFaces(): Promise<void> {
@@ -1021,6 +1035,7 @@ async function listenForEta(): Promise<void> {
 function close(): void {
   cancelPending();
   stopVideo();
+  carouselReset();
   visible.value = false;
 }
 
@@ -1133,20 +1148,54 @@ function formatElapsed(start: number, tick: number): string {
   return `${m}m ${sec % 60}s`;
 }
 
-function next(): void {
-  if (props.photos.length === 0) return;
-  emit('update:index', (props.index + 1) % props.photos.length);
+// ---------------------------------------------------------------------------
+// Carousel item helpers
+// ---------------------------------------------------------------------------
+
+const prevItem = computed((): MediaItem | null => {
+  if (props.photos.length === 0) return null;
+  return props.photos[getPrevIndex()];
+});
+
+const nextItem = computed((): MediaItem | null => {
+  if (props.photos.length === 0) return null;
+  return props.photos[getNextIndex()];
+});
+
+function isItemVideo(item: MediaItem): boolean {
+  return checkIsVideo(item.location ?? '');
 }
 
-function prev(): void {
-  if (props.photos.length === 0) return;
-  emit('update:index', (props.index - 1 + props.photos.length) % props.photos.length);
+function getItemSrc(item: MediaItem): string {
+  if (item.view_only) return remoteImageUrl(item.id) ?? item.encoded ?? '';
+  const ext = item.location?.split('.').pop()?.toLowerCase();
+  if (['heic', 'heif'].includes(ext ?? '')) {
+    return item.encoded || buildThumbUrl(item.location) || convertFileSrc(item.location);
+  }
+  return convertFileSrc(item.location);
+}
+
+function getItemThumbSrc(item: MediaItem): string {
+  if (item.view_only) return remoteImageUrl(item.id) ?? '';
+  return buildThumbUrl(item.location) || convertFileSrc(item.location);
 }
 
 function handleKeydown(e: KeyboardEvent): void {
   if (!visible.value) return;
-  if (e.key === 'ArrowRight') next();
-  if (e.key === 'ArrowLeft') prev();
+  if (e.key === 'ArrowRight') {
+    carouselAnimateNext();
+  }
+  if (e.key === 'ArrowLeft') {
+    carouselAnimatePrev();
+  }
+  if (e.key === 'ArrowUp') {
+    const target = jumpToPrevious(props.index);
+    if (target !== null) emit('update:index', target);
+  }
+  if (e.key === 'ArrowDown') {
+    const target = jumpToNext(props.index);
+    if (target !== null) emit('update:index', target);
+  }
   if (e.key === 'Escape') close();
   if (e.key === 'i') showInfo.value = !showInfo.value;
 }
@@ -1203,6 +1252,7 @@ watch(visible, (val) => {
     detectedFaces.value = [];
     showInfo.value = false;
     cancelPending();
+    carouselReset();
   }
 });
 
@@ -1253,36 +1303,38 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.media-wrapper {
-  height: 100%;
+/* Carousel */
+.carousel-viewport {
   width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  touch-action: pan-y;
+}
+
+.carousel-track {
+  display: flex;
+  width: 300%;
+  height: 100%;
+  will-change: transform;
+}
+
+.carousel-slide {
+  width: 33.3333%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1;
-}
-
-.media-wrapper.interactive {
-  position: relative;
-  z-index: 6;
+  flex-shrink: 0;
 }
 
 .viewer-image {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  transition: opacity 0.2s ease-in-out;
   user-select: none;
   -webkit-user-drag: none;
-}
-
-.touch-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 5;
+  pointer-events: none;
 }
 
 .viewer-nav-btn {

@@ -360,7 +360,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import ConnectView from './ConnectView.vue';
 import PageLoading from './shared/PageLoading.vue';
 import { useSyncStore } from '@/stores/sync';
-import { deviceOsIcon } from '@/utils/format';
+
 import {
   listDevices,
   removeDevice as removeDeviceApi,
