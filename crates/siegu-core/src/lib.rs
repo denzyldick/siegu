@@ -6,6 +6,7 @@ pub mod face_detector;
 pub mod geocode;
 pub mod lan_server;
 pub mod library;
+pub mod logfmt;
 pub mod mdns;
 pub mod mesh;
 pub mod mesh_transport;

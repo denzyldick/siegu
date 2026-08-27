@@ -543,9 +543,9 @@ async function answerOffer(ws: WebSocket, sdpJson: string): Promise<void> {
     pc.ondatachannel = (ev) => {
       dc = ev.channel;
       dc.binaryType = 'arraybuffer';
-      console.log('[siegu-dc] channel', dc.label, dc.readyState);
+      console.log('ℹ [siegu-dc] channel', dc.label, dc.readyState);
       dc.onopen = () => {
-        console.log('[siegu-dc] open');
+        console.log('ℹ [siegu-dc] open');
         setStatus('Connected — loading library…');
         gateEl.hidden = true;
         galleryEl.hidden = false;
@@ -574,7 +574,7 @@ async function answerOffer(ws: WebSocket, sdpJson: string): Promise<void> {
         try {
           handleSync(JSON.parse(text));
         } catch (e) {
-          console.error('[siegu-dc] handle failed', e, text.slice(0, 120));
+          console.error('✗ [siegu-dc] handle failed', e, text.slice(0, 120));
         }
       };
       dc.onclose = () => setStatus('Media channel closed');

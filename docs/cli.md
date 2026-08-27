@@ -47,6 +47,9 @@ siegu analyze model <model-id>
 
 Model IDs: `clip`, `face`, `ocr`, `nsfw`, `aesthetics`, `yolo`, `blip`, `midas`, `whisper` (`ultraface`/`arcface` are accepted as aliases of `face`)
 
+All three forms accept `--headless`, which prints progress lines and an E2E
+summary instead of showing the interactive TUI (used by CI scripts).
+
 ### `siegu models`
 
 Manage AI model files.
@@ -88,27 +91,59 @@ siegu config keys
 Peer-to-peer mesh synchronization.
 
 ```bash
-# Host a LAN sync session (starts signaling server + mDNS)
+# Host a LAN sync session (starts a signaling server + mDNS)
 siegu mesh host
 
-# Host on a specific port
+# Host on a specific port (default 0 = pick a free port)
 siegu mesh host --port 9090
 
-# Join a mesh room via signaling URL
-siegu mesh join ws://192.168.1.100:8080/myroom
+# Host against an existing signaling server, joining/creating a room
+siegu mesh host --server ws://192.168.1.100:8080 --room myroom
 
-# Join via room ID (uses default local port)
+# Join a mesh room (room ID is positional; URL goes in --server)
 siegu mesh join myroom
+siegu mesh join myroom --server ws://192.168.1.100:8080
 
-# Show session status
+# When joining a --server host with a pre-agreed room, create the WebRTC offer
+siegu mesh join myroom --server ws://192.168.1.100:8080 --initiator
+
+# Show session status / disconnect / storage quota usage
 siegu mesh status
-
-# Disconnect and clear saved session
 siegu mesh disconnect
-
-# Show storage quota usage
 siegu mesh quota
+
+# Browse a peer's library view-only and verify the manifest (#9, e2e helper)
+siegu mesh browse myroom --server ws://192.168.1.100:8080
+
+# Browse in album-share mode for a specific album (#16)
+siegu mesh browse myroom --album <album-id>
+
+# Send a single RPC command to the peer and print its reply (#19, e2e helper)
+siegu mesh rpc myroom list_files --server ws://192.168.1.100:8080
+siegu mesh rpc myroom toggle_favorite '{"id": "<photo-id>"}'
+
+# Seed a manual album with the first N photos (prints ALBUM ID, e2e helper)
+siegu mesh seed-album --name "Shared" --take-first 5
 ```
+
+Availability and defaults:
+- `host` — `--server` connects to an existing signaling server instead of
+  starting a local one; `--room` names the room (required with `--server`).
+  `--share-mode <ro|rw>` sets the permission level for connected peers
+  (default `ro`): `ro` allows browsing only, `rw` also allows
+  favorites/trash mutations.
+- `join` — `--initiator` makes this peer create the WebRTC offer (needed when
+  joining a `--server` host).
+- `browse`, `rpc`, and `seed-album` are e2e test helpers; they print greppable
+  `VIEWONLY`, `RPC RESULT`, and `ALBUM ID` markers used by
+  `scripts/e2e-view-only.sh`.
+- All mesh subcommands accept `-c/--config` to point at a config directory.
+
+### Remote sync via mesh
+
+There is no separate `siegu sync` command. Remote (non-LAN) sync is done with
+the mesh commands above — host on one machine, join on the other — using a
+signaling server URL in `--server`.
 
 ### `siegu serve`
 
@@ -120,12 +155,11 @@ siegu serve --port 8080
 
 ### `siegu web`
 
-Share this machine's library as a **view-only** gallery in any browser (#11).
-Starts an embedded signaling server plus a small static web server and prints a
-one-off link. Opening the link is the consent step — anyone holding it can
-browse the library read-only until the command stops. Nothing is downloaded or
-written on the viewing device; media streams over the WebRTC data channel on
-demand.
+Share this machine's library as a browser gallery (#11, #19). Starts an
+embedded signaling server plus a small static web server and prints a one-off
+link. Opening the link is the consent step — anyone holding it can browse the
+library until the command stops. Nothing is downloaded or written on the
+viewing device; media streams over the WebRTC data channel on demand.
 
 ```bash
 siegu web
@@ -135,10 +169,15 @@ siegu web
 #   http://192.168.1.45:8787/#<code>.<token>
 ```
 
-Flags: `--port` for the static client port (default 8787), `--config` as usual.
+Flags: `--port` for the static client port (default 8787), `--config` as usual,
+and `--share-mode <ro|rw>` (default `ro`). The default `ro` is view-only — guests
+can browse but not change anything. `rw` additionally lets guests toggle
+favorites and trash photos. The browser webclient itself is read-only; the
+`rw` mode is consumed by the mesh `browse`/`rpc` test helpers.
+
 The web bundle lives in `webclient/`; build it once with
-`cd webclient && npm install && npm run build`, or point `SIEGU_WEB_DIST` at a
-built `dist/` directory.
+`cd webclient && bun install && bun run build` (npm also works), or point
+`SIEGU_WEB_DIST` at a built `dist/` directory.
 
 ### `siegu status`
 

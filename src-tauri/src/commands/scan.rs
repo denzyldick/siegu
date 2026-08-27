@@ -107,13 +107,7 @@ pub fn scan_files(app: tauri::AppHandle) {
     ));
 
     if !folders.is_empty() {
-        use tauri_plugin_notification::NotificationExt;
-        let _ = app
-            .notification()
-            .builder()
-            .title("Siegu")
-            .body(format!("Scanning {} folders…", folders.len()))
-            .show();
+        crate::notify::notify_routine(&app, format!("Scanning {} folders…", folders.len()));
     }
 
     let state = app.state::<ml::MlContext>();
@@ -296,13 +290,10 @@ pub fn scan_files(app: tauri::AppHandle) {
                 "scan-progress",
                 serde_json::json!({ "status": "indexing", "progress": 100, "message": "Analyzing photos with AI..." }),
             );
-            use tauri_plugin_notification::NotificationExt;
-            let _ = app
-                .notification()
-                .builder()
-                .title("Siegu")
-                .body("Files discovered, analyzing with AI...")
-                .show();
+            crate::notify::notify_routine(
+                &app,
+                "Files discovered, analyzing with AI...".to_string(),
+            );
         } else {
             let _ = app.emit(
                 "scan-progress",

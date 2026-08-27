@@ -1,7 +1,5 @@
-use std::io::Write;
-use std::path::Path;
+use std::fmt;
 use std::sync::{Mutex, OnceLock};
-use std::{fmt, io};
 
 use serde::Serialize;
 use tauri::Emitter;
@@ -13,11 +11,12 @@ use tracing_subscriber::layer::{Context, Layer};
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::registry::LookupSpan;
 
+use siegu_core::logfmt::{self, Level};
+
 /// How many recent log entries to keep in memory for the in-app log viewer.
 pub const RING_CAPACITY: usize = 2000;
-/// Maximum size of `siegu_debug.log` before it is rotated to `siegu_debug.log.1`.
-pub const MAX_LOG_FILE_BYTES: u64 = 5 * 1024 * 1024;
 
+/// A single structured log entry, matching what the frontend renders.
 #[derive(Debug, Clone, Serialize)]
 pub struct LogEntry {
     pub timestamp: String,
@@ -70,6 +69,8 @@ fn now_rfc3339() -> String {
     chrono::Utc::now().to_rfc3339()
 }
 
+/// Sniff a severity label from free-form message text. Used by higher-level
+/// log helpers (e.g. scan feed) that don't carry an explicit severity.
 pub fn infer_level(message: &str) -> &'static str {
     let upper = message.to_uppercase();
     if upper.contains("ERROR") || upper.contains("FATAL") {
@@ -83,10 +84,18 @@ pub fn infer_level(message: &str) -> &'static str {
     }
 }
 
+/// Persist a structured log entry: updates the in-memory ring for the viewer,
+/// appends to the rotated debug log file (plain, no ANSI), prints to stderr
+/// (colored when attached to a terminal), and emits a structured `log-message`
+/// event to the frontend so it can render by real severity.
+///
+/// Accepts a level *string* (e.g. `"error"`, `"info"`) so CLI/panic-hook callers
+/// can pass raw labels; unknown/empty strings fall back to `info`.
 pub fn persist_log(level: &str, message: &str) {
+    let level = Level::from_str(level);
     let entry = LogEntry {
         timestamp: now_rfc3339(),
-        level: level.to_string(),
+        level: level.as_str().to_string(),
         message: message.to_string(),
     };
 
@@ -95,39 +104,25 @@ pub fn persist_log(level: &str, message: &str) {
         buffer.push(entry.clone());
     }
 
-    eprintln!("[siegu] {message}");
+    // Single-line, symbol-prefixed text for the terminal (colored on a real
+    // TTY, plain otherwise so piped output stays grep-friendly).
+    if logfmt::color_enabled(logfmt::Stream::Stderr) {
+        let colored = logfmt::format_line(level, &entry.message, true);
+        eprintln!("[siegu] {colored}");
+    } else {
+        eprintln!("[siegu] {}", logfmt::format_plain(level, &entry.message));
+    }
 
     if let Some(handle) = APP_HANDLE.get() {
-        let _ = handle.emit("log-message", message.to_string());
+        // Structured payload: { timestamp, level, message }
+        let _ = handle.emit("log-message", &entry);
     }
 
     if let Some(dir) = app_config_dir() {
-        if let Err(e) = append_log_file(&dir, &entry) {
+        if let Err(e) = logfmt::append_log_entry(&dir, level, &entry.message) {
             eprintln!("[siegu] failed to write debug log: {e}");
         }
     }
-}
-
-fn append_log_file(dir: &Path, entry: &LogEntry) -> io::Result<()> {
-    let _ = std::fs::create_dir_all(dir);
-    let path = dir.join("siegu_debug.log");
-    let line = format!(
-        "{} [{}] {}\n",
-        entry.timestamp,
-        entry.level.to_uppercase(),
-        entry.message
-    );
-    if let Ok(meta) = std::fs::metadata(&path) {
-        if meta.len() + line.len() as u64 > MAX_LOG_FILE_BYTES {
-            let _ = std::fs::rename(&path, dir.join("siegu_debug.log.1"));
-        }
-    }
-    let mut file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)?;
-    file.write_all(line.as_bytes())?;
-    file.flush()
 }
 
 pub fn recent_logs(limit: usize) -> Vec<LogEntry> {
@@ -173,8 +168,8 @@ where
         let mut visitor = MessageVisitor { message: None };
         event.record(&mut visitor);
         let message = visitor.message.unwrap_or_default();
-        let level = event.metadata().level().as_str().to_lowercase();
-        persist_log(&level, &message);
+        let level = Level::from_str(event.metadata().level().as_str());
+        persist_log(level.as_str(), &message);
     }
 }
 
@@ -203,12 +198,12 @@ mod tests {
     static TEST_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
-    fn infer_level_from_text() {
-        assert_eq!(infer_level("ERROR: boom"), "error");
-        assert_eq!(infer_level("FATAL: boom"), "error");
-        assert_eq!(infer_level("WARNING: careful"), "warn");
-        assert_eq!(infer_level("debug stuff"), "debug");
-        assert_eq!(infer_level("all good"), "info");
+    fn level_from_str_known_values() {
+        assert_eq!(Level::from_str("error").as_str(), "error");
+        assert_eq!(Level::from_str("fatal").as_str(), "fatal");
+        assert_eq!(Level::from_str("warn").as_str(), "warn");
+        assert_eq!(Level::from_str("debug").as_str(), "debug");
+        assert_eq!(Level::from_str("info").as_str(), "info");
     }
 
     #[test]

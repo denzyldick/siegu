@@ -12,10 +12,10 @@
 ## Key Features
 
 - **Local Semantic Search** — find photos by describing them ("sunset at the beach") using on-device CLIP models
-- **Face Recognition** — automatic face detection and grouping via UltraFace + ArcFace
+- **Face Recognition** — automatic face detection and grouping via YuNet + ArcFace
 - **9 On-Device AI Models** — CLIP, face detection/recognition, OCR, NSFW, aesthetics, YOLO, BLIP, MiDaS, and Whisper, all running locally on ONNX Runtime
 - **Peer-to-Peer Sync** — encrypted WebRTC sync between devices, no cloud required
-- **Mesh Networking** — LAN discovery via mDNS, QR codes, or mnemonic phrases
+- **Mesh Networking** — LAN discovery via mDNS or 6-word mnemonic phrases
 - **Smart Library** — EXIF extraction, video indexing, heatmap, map view
 - **Cross-Platform** — Linux, macOS, Windows, Android, iOS
 
@@ -24,11 +24,14 @@
 ```bash
 git clone https://github.com/denzyldick/siegu.git
 cd siegu
-npm install
-npm run tauri dev
+bun install
+bun run tauri dev
 ```
 
-**Prerequisites**: Node.js v18+, Rust stable, system deps (see [docs/getting-started.md](docs/getting-started.md)).
+> **Note**: Bun is the repo's canonical package manager (used by CI). npm also
+> works — `npm install && npm run tauri dev`.
+
+**Prerequisites**: Node.js 20.19+ (or 22.12+), [Bun](https://bun.sh) (recommended, or npm), Rust stable, and the system deps for your platform (see [docs/getting-started.md](docs/getting-started.md)).
 
 ## Documentation
 
@@ -36,8 +39,8 @@ For full documentation, see the `docs/` directory:
 
 | Category | Docs |
 |----------|------|
-| **User** | [Getting Started](docs/getting-started.md), [Build](docs/build.md), [Configuration](docs/configuration.md), [CLI](docs/cli.md), [Sync Guide](docs/sync.md) |
-| **Technical** | [Architecture](docs/architecture.md), [Database](docs/database.md), [ML Engine](docs/ml-engine.md), [Mesh Protocol](docs/mesh-protocol.md), [Frontend](docs/frontend.md), [Backend](docs/backend.md), [Android](docs/android.md), [iOS](docs/ios.md), [Developing](docs/developing.md), [Security](docs/security.md) |
+| **User** | [Getting Started](docs/getting-started.md), [Build](docs/build.md), [Configuration](docs/configuration.md), [CLI](docs/cli.md), [Sync Guide](docs/sync.md), [Sharing](docs/sharing.md), [Web Client](docs/webclient.md), [Signaling](docs/SIGNALLING.md) |
+| **Technical** | [Architecture](docs/architecture.md), [Database](docs/database.md), [ML Engine](docs/ml-engine.md), [Mesh Protocol](docs/mesh-protocol.md), [Frontend](docs/frontend.md), [Backend](docs/backend.md), [Android](docs/android.md), [iOS](docs/ios.md), [Developing](docs/developing.md), [Security](docs/security.md), [CI](docs/ci.md) |
 
 ## License
 

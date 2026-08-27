@@ -9,6 +9,7 @@ use siegu_core::scanner::ScanGuard;
 use siegu_core::{PeerDevice, SavedSession, SyncEvent, SyncMessage, SyncProgress};
 
 mod analyze_tui;
+mod logging;
 mod web;
 
 /// Wire shape of one RPC reply: (request id, ok, result, error).
@@ -50,7 +51,7 @@ impl CliSyncEvent {
 
 impl SyncEvent for CliSyncEvent {
     fn on_state_change(&self, state: &str) {
-        println!("[sync] {state}");
+        cli_info!("[sync] {state}");
         // Initiators print "Secure Data Channel Ready"; receivers only get
         // the plain "Connected" peer-state line (exact match - never the
         // earlier "Connected to signaling...").
@@ -82,11 +83,11 @@ impl SyncEvent for CliSyncEvent {
     }
 
     fn on_log(&self, message: &str) {
-        println!("[sync] {message}");
+        cli_info!("[sync] {message}");
     }
 
     fn on_sync_progress(&self, progress: SyncProgress) {
-        println!(
+        cli_step!(
             "[sync] {}: {}/{} ({:.0}%) - {}",
             progress.device_id,
             progress.items_completed,
@@ -99,7 +100,7 @@ impl SyncEvent for CliSyncEvent {
     fn on_photo_received(&self, _photo_id: String, _path: String) {}
 
     fn on_sync_error(&self, error: String) {
-        eprintln!("[sync] Error: {error}");
+        cli_err!("[sync] Error: {error}");
     }
 
     fn on_peer_connected(
@@ -405,9 +406,7 @@ fn resolve_config_dir(cli_dir: &Option<String>, cmd_dir: &Option<String>) -> Pat
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
-        .init();
+    logging::init_tracing();
 
     let cli = Cli::parse();
 
@@ -999,35 +998,35 @@ async fn cmd_mesh_host(
 
     let (signaling_url, actual_port, daemon) = if let Some(server_url) = server {
         let url = server_url.trim_end_matches('/').to_string();
-        println!("Connecting to signaling server: {url}");
-        println!("Room ID: {room_id}");
+        cli_info!("Connecting to signaling server: {url}");
+        cli_line!("Room ID: {room_id}");
         (url, 0, None)
     } else {
-        println!("Starting LAN mesh host...");
-        println!("Room ID: {room_id}");
+        cli_info!("Starting LAN mesh host...");
+        cli_line!("Room ID: {room_id}");
 
         let server = match MeshTransport::start_lan_server(port).await {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("Error: failed to start LAN signaling server: {e}");
+                cli_err!("failed to start LAN signaling server: {e}");
                 std::process::exit(1);
             }
         };
         let actual_port = server.port;
         let signaling_url = format!("ws://127.0.0.1:{actual_port}");
-        println!("Signaling server on port {actual_port}");
+        cli_line!("Signaling server on port {actual_port}");
 
         let daemon = match siegu_core::mdns::create_daemon() {
             Ok(d) => {
                 if let Err(e) = siegu_core::mdns::register_service(&d, &hostname, actual_port) {
-                    eprintln!("mDNS registration failed: {e}");
+                    cli_warn!("mDNS registration failed: {e}");
                 } else {
-                    println!("mDNS registered as {hostname}");
+                    cli_info!("mDNS registered as {hostname}");
                 }
                 Some(d)
             }
             Err(e) => {
-                eprintln!("mDNS init failed: {e}");
+                cli_warn!("mDNS init failed: {e}");
                 None
             }
         };
@@ -1243,7 +1242,7 @@ async fn cmd_mesh_browse(
     // Ensure schema exists so restore persistence has somewhere to land.
     let _schema = Database::new(&config_dir.display().to_string());
 
-    println!("Browsing mesh room: {room}");
+    cli_info!("Browsing mesh room: {room}");
     let (driver, handle) =
         MeshDriver::connect(room, server, initiator, config_dir, device_name).await;
     let tx = driver.sender().await;
@@ -1256,24 +1255,24 @@ async fn cmd_mesh_browse(
         None => tx.send(SyncMessage::EnterViewOnly),
     };
     if entered.is_err() {
-        eprintln!("FAIL: could not send view-only/album-share entry");
+        cli_err!("FAIL: could not send view-only/album-share entry");
         std::process::exit(1);
     }
     if tokio::time::timeout(Duration::from_secs(60), driver.view_notify.notified())
         .await
         .is_err()
     {
-        eprintln!("FAIL: view-only manifest did not arrive within 60s");
+        cli_err!("FAIL: view-only manifest did not arrive within 60s");
         std::process::exit(1);
     }
     let photos = driver.view_manifest.lock().await.clone();
     if photos.is_empty() {
-        eprintln!("FAIL: view-only manifest is empty (host library not scanned?)");
+        cli_err!("FAIL: view-only manifest is empty (host library not scanned?)");
         std::process::exit(1);
     }
-    println!("VIEWONLY MANIFEST OK count={}", photos.len());
+    cli_line!("VIEWONLY MANIFEST OK count={}", photos.len());
     if album_id.is_some() {
-        println!("VIEWONLY ALBUM SCOPE OK count={}", photos.len());
+        cli_line!("VIEWONLY ALBUM SCOPE OK count={}", photos.len());
     }
     let first_id = photos[0].id.clone();
     let first_name = std::path::Path::new(&photos[0].location)
@@ -1284,27 +1283,27 @@ async fn cmd_mesh_browse(
     // ── stage 2: thumbnail round-trip via the view-only cache ─────────────
     let view = siegu_core::view_only::state();
     if !view.request_media(&first_id, true) {
-        eprintln!("FAIL: could not request thumbnail");
+        cli_err!("FAIL: could not request thumbnail");
         std::process::exit(1);
     }
     match view
         .wait_for(&format!("thumb:{first_id}"), Duration::from_secs(30))
         .await
     {
-        Some(media) => println!(
+        Some(media) => cli_line!(
             "VIEWONLY THUMB OK bytes={} mime={}",
             media.bytes.len(),
             media.mime
         ),
         None => {
-            eprintln!("FAIL: thumbnail for {first_id} did not arrive within 30s");
+            cli_err!("FAIL: thumbnail for {first_id} did not arrive within 30s");
             std::process::exit(1);
         }
     }
 
     // ── stage 3: sync-guard probe — the sharer must IGNORE StartSync ──────
     let _ = tx.send(SyncMessage::StartSync);
-    println!("VIEWONLY SYNC-GUARD PROBE SENT");
+    cli_line!("VIEWONLY SYNC-GUARD PROBE SENT");
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     // ── stage 3b (album share): membership enforcement (#16) ──────────────
@@ -1317,16 +1316,16 @@ async fn cmd_mesh_browse(
             thumbnail: true,
             restore: false,
         });
-        println!("VIEWONLY ALBUM DENY PROBE SENT id={bogus}");
+        cli_line!("VIEWONLY ALBUM DENY PROBE SENT id={bogus}");
         match view
             .wait_for(&format!("thumb:{bogus}"), Duration::from_secs(5))
             .await
         {
             Some(_) => {
-                eprintln!("FAIL: host served media for a photo outside the shared album");
+                cli_err!("FAIL: host served media for a photo outside the shared album");
                 std::process::exit(1);
             }
-            None => println!("VIEWONLY ALBUM DENY OK id={bogus}"),
+            None => cli_line!("VIEWONLY ALBUM DENY OK id={bogus}"),
         }
     }
 
@@ -1339,10 +1338,10 @@ async fn cmd_mesh_browse(
         })
         .is_err()
     {
-        eprintln!("FAIL: could not send restore FetchMediaRequest");
+        cli_err!("FAIL: could not send restore FetchMediaRequest");
         std::process::exit(1);
     }
-    println!("VIEWONLY RESTORE REQUESTED id={first_id}");
+    cli_line!("VIEWONLY RESTORE REQUESTED id={first_id}");
 
     let expected = config_dir.join("Siegu").join("siegu").join(&first_name);
     let mut restored = false;
@@ -1356,14 +1355,14 @@ async fn cmd_mesh_browse(
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
     if !restored {
-        eprintln!(
+        cli_err!(
             "FAIL: restored original not found at {}",
             expected.display()
         );
         std::process::exit(1);
     }
-    println!("VIEWONLY RESTORE OK path={}", expected.display());
-    println!("VIEWONLY DONE");
+    cli_line!("VIEWONLY RESTORE OK path={}", expected.display());
+    cli_line!("VIEWONLY DONE");
 
     handle.abort();
 }
@@ -1378,21 +1377,21 @@ fn cmd_seed_album(config_dir: &Path, name: &str, take_first: usize) {
         .map(|p| p.id.clone())
         .collect();
     if ids.is_empty() {
-        eprintln!("FAIL: no photos in library to seed the album with");
+        cli_err!("FAIL: no photos in library to seed the album with");
         std::process::exit(1);
     }
     let album = match db.create_album(name) {
         Ok(a) => a,
         Err(e) => {
-            eprintln!("FAIL: could not create album: {e}");
+            cli_err!("could not create album: {e}");
             std::process::exit(1);
         }
     };
     if let Err(e) = db.add_album_items(&album.id, &ids) {
-        eprintln!("FAIL: could not fill album: {e}");
+        cli_err!("could not fill album: {e}");
         std::process::exit(1);
     }
-    println!("ALBUM ID {} photos={}", album.id, ids.len());
+    cli_line!("ALBUM ID {} photos={}", album.id, ids.len());
 }
 
 /// One-shot RPC driver (#19): connect, send a single CommandRequest and
@@ -1412,12 +1411,12 @@ async fn cmd_mesh_rpc(
     let payload_value: serde_json::Value = match serde_json::from_str(payload) {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("FAIL: payload is not valid JSON: {e}");
+            cli_err!("FAIL: payload is not valid JSON: {e}");
             std::process::exit(1);
         }
     };
 
-    println!("RPC mesh room: {room} command: {command}");
+    cli_info!("RPC mesh room: {room} command: {command}");
     let (driver, handle) =
         MeshDriver::connect(room, server, initiator, config_dir, "siegu-rpc-client").await;
     let tx = driver.sender().await;
@@ -1430,7 +1429,7 @@ async fn cmd_mesh_rpc(
         })
         .is_err()
     {
-        eprintln!("FAIL: could not send CommandRequest");
+        cli_err!("FAIL: could not send CommandRequest");
         std::process::exit(1);
     }
 
@@ -1438,27 +1437,27 @@ async fn cmd_mesh_rpc(
         .await
         .is_err()
     {
-        eprintln!("FAIL: no CommandResponse within 45s");
+        cli_err!("FAIL: no CommandResponse within 45s");
         std::process::exit(1);
     }
     let (_id, ok, result, error) = match driver.rpc_slot.lock().await.take() {
         Some(entry) => entry,
         None => {
-            eprintln!("FAIL: response slot empty");
+            cli_err!("FAIL: response slot empty");
             std::process::exit(1);
         }
     };
     handle.abort();
 
     if ok {
-        println!(
+        cli_line!(
             "RPC RESULT ok=true result={}",
             result
                 .map(|v| v.to_string())
                 .unwrap_or_else(|| "null".into())
         );
     } else {
-        println!(
+        cli_line!(
             "RPC ERROR ok=false error={}",
             error.unwrap_or_else(|| "unknown".into())
         );

@@ -49,15 +49,13 @@
           <div
             v-for="(log, i) in logs"
             :key="i"
-            :style="
-              log.type === 'error'
-                ? 'color: rgb(var(--v-theme-error))'
-                : 'color: rgba(var(--v-theme-on-surface), 0.7)'
-            "
+            :style="`color: ${levelColor(log.level)}`"
             class="mb-1"
             style="font-family: monospace; font-size: 11px"
           >
-            <span class="text-disabled">[{{ log.time }}]</span> {{ log.message }}
+            <span class="text-disabled">[{{ log.time }}]</span>
+            <span :style="`color: ${levelColor(log.level)}`">{{ levelSymbol(log.level) }}</span>
+            {{ log.message }}
           </div>
           <div v-if="logs.length === 0" class="text-disabled text-center py-4 text-caption">
             {{ $t('settings.no_logs') }}
@@ -103,9 +101,42 @@ const { isCleaning, logs } = storeToRefs(store);
 
 const { cleanupDialog, clearLogs, showSnackbar } = store;
 
+function levelColor(level: string): string {
+  switch (level) {
+    case 'fatal':
+      return 'rgb(var(--v-theme-error-darken-2, var(--v-theme-error)))';
+    case 'error':
+      return 'rgb(var(--v-theme-error))';
+    case 'warn':
+      return 'rgb(var(--v-theme-warning))';
+    case 'debug':
+    case 'trace':
+      return 'rgba(var(--v-theme-on-surface), 0.5)';
+    default:
+      return 'rgba(var(--v-theme-on-surface), 0.7)';
+  }
+}
+
+function levelSymbol(level: string): string {
+  switch (level) {
+    case 'fatal':
+    case 'error':
+      return '✗';
+    case 'warn':
+      return '⚠';
+    case 'debug':
+    case 'trace':
+      return '🔍';
+    default:
+      return 'ℹ';
+  }
+}
+
 async function copyLogs(): Promise<void> {
   try {
-    const text = logs.value.map((log) => `[${log.time}] ${log.message}`).join('\n');
+    const text = logs.value
+      .map((log) => `[${log.time}] ${levelSymbol(log.level)} ${log.message}`)
+      .join('\n');
     await navigator.clipboard.writeText(text);
     showSnackbar(t('settings.logs_copied'));
   } catch {

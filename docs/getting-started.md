@@ -11,7 +11,7 @@
 - **Discover** — The search dropdown shows rails at a glance: Best shots, Favorites, Recent, People, Locations, Tags, Papers & screenshots, Cameras, and Months, plus one-tap filters (Favorites, Videos, Faces, Papers, NSFW, Surprise me).
 - **People** — Automatic face detection and grouping. Name people, merge duplicates, and jump to every photo of a person.
 - **Analyze** — On-device models enrich each photo with captions (BLIP), objects (YOLO), recognized text (OCR), aesthetics scores, depth maps (MiDaS), and audio transcription for videos (Whisper).
-- **Sync** — Encrypted peer-to-peer sync between your own devices over the network (WebRTC), with mesh networking via LAN discovery, QR codes, or mnemonic phrases.
+- **Sync** — Encrypted peer-to-peer sync between your own devices over the network (WebRTC), with mesh networking via LAN discovery or 6-word mnemonic phrases.
 
 ### Privacy model
 
@@ -32,11 +32,11 @@ how the on-device AI models are accelerated (via ONNX Runtime):
 | **Linux** | x86_64 desktops/laptops (Ubuntu, Debian, Fedora, Arch, …) | CPU |
 | **Linux ARM64** | Raspberry Pi 4/5, ARM single-board computers | CPU |
 | **Android** | arm64 (arm64-v8a) phones and tablets, ~2017 and newer | CPU |
-| **iOS / iPadOS** | iPhone and iPad (arm64, iOS 12+) | CoreML (GPU + Neural Engine) |
+| **iOS / iPadOS** | iPhone and iPad (arm64, iOS 12+) | CPU (CoreML is used on macOS) |
 
-**Not supported**: Intel Macs, 32-bit platforms, Android x86_64 (emulator
-images must be arm64), and Alpine Linux (musl). The iOS Simulator is supported
-for development on Apple Silicon Macs.
+**Not supported**: Intel Macs, 32-bit platforms, and Alpine Linux (musl).
+Android x86_64 (arm64 emulator images also work) and the iOS Simulator are
+supported for development; production Android builds target arm64-v8a.
 
 Sync works between any two of the supported devices — e.g. an Android phone and
 a Windows PC — over your own network.
@@ -45,7 +45,8 @@ a Windows PC — over your own network.
 
 ## Prerequisites
 
-- **Node.js** v18+
+- **Node.js** 20.19+ (or 22.12+) — required by Vite 8
+- **Bun** (recommended; npm also works) — the repo's CI uses Bun
 - **Rust** latest stable (install via [rustup](https://rustup.rs/))
 - **System dependencies** (varies per platform)
 
@@ -79,9 +80,12 @@ brew install ffmpeg
 ```bash
 git clone https://github.com/denzyldick/siegu.git
 cd siegu
-npm install
-npm run tauri dev
+bun install
+bun run tauri dev
 ```
+
+> **Note**: Bun is the canonical package manager (used by CI). npm also works —
+> `npm install && npm run tauri dev`.
 
 The app window opens with an onboarding wizard that walks you through setup.
 
@@ -136,7 +140,7 @@ Siegu groups faces automatically. Open the **People** page to:
 Use the **Connect** panel to host or join a sync session with another of your devices:
 
 - **LAN discovery** — devices on the same network find each other automatically
-- **QR code / mnemonic phrase** — connect over any network
+- **6-word mnemonic phrase** — connect over any network
 - Syncs photos, videos, and edits between devices, encrypted end-to-end
 
 See [docs/sync.md](sync.md) for the full guide.

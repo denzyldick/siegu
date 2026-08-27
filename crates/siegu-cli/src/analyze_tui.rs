@@ -837,23 +837,26 @@ fn print_e2e_summary(config_dir: &Path) {
     let unnamed = db.get_anonymous_people_groups();
     let (photos, videos) = db.get_media_counts();
 
-    println!("[e2e] media photos={photos} videos={videos}");
-    println!(
+    crate::cli_line!("[e2e] media photos={photos} videos={videos}");
+    crate::cli_line!(
         "[e2e] people_total={} named={} unnamed={}",
         named.len() + unnamed.len(),
         named.len(),
         unnamed.len()
     );
     for p in named {
-        println!(
+        crate::cli_line!(
             "[e2e] person id={} name={} faces={}",
-            p.id, p.name, p.face_count
+            p.id,
+            p.name,
+            p.face_count
         );
     }
     for p in unnamed {
-        println!(
+        crate::cli_line!(
             "[e2e] person id={} name=unnamed faces={}",
-            p.id, p.face_count
+            p.id,
+            p.face_count
         );
     }
 }
@@ -876,7 +879,7 @@ fn run_headless_loop(_ml_context: MlContext, rx: mpsc::Receiver<TuiEvent>, confi
                     .iter()
                     .filter_map(|f| f.person_id.as_deref())
                     .collect();
-                println!(
+                crate::cli_line!(
                     "[e2e] photo={} faces={} people=[{}] nsfw={} aesthetics={} ocr_chars={}",
                     name,
                     result.face_count,
@@ -890,12 +893,12 @@ fn run_headless_loop(_ml_context: MlContext, rx: mpsc::Receiver<TuiEvent>, confi
                 );
             }
             Ok(TuiEvent::Progress { completed, total }) => {
-                println!("[e2e] progress {completed}/{total}");
+                crate::cli_line!("[e2e] progress {completed}/{total}");
             }
             Ok(TuiEvent::ModelStatus { model, status }) => {
-                println!("[e2e] model {model} {status}");
+                crate::cli_line!("[e2e] model {model} {status}");
             }
-            Ok(TuiEvent::Log(msg)) => println!("[e2e] log {msg}"),
+            Ok(TuiEvent::Log(msg)) => crate::cli_line!("[e2e] log {msg}"),
             Ok(TuiEvent::ScanComplete) => {
                 print_e2e_summary(config_dir);
                 break;

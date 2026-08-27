@@ -12,6 +12,7 @@ import { MODEL_BLOCK_REASONS } from '@/types/models';
 import type {
   DirectoryEntry,
   LogEntry,
+  LogLevel,
   DownloadProgressState,
   DownloadStats,
   ModelProgressState,
@@ -153,20 +154,28 @@ export const useSettingsStore = defineStore('settings', () => {
     listenersSetUp = true;
 
     cleanupFns.push(
-      await listen<string>('log-message', (event) => {
-        const log: LogEntry = {
-          time: new Date().toLocaleTimeString(localStorage.getItem('siegu_language') || 'en'),
-          message: event.payload,
-          type: event.payload.toLowerCase().includes('error') ? 'error' : 'info',
-        };
-        logs.value.unshift(log);
-        if (logs.value.length > MAX_LOG_ENTRIES) logs.value.pop();
-        if (modelsReloading.value && event.payload.endsWith('Models ready.')) {
-          modelsReloading.value = false;
-          modelsLoaded.value = true;
-          showSnackbar(t('settings.models_reloaded'));
-        }
-      }),
+      await listen<{ timestamp: string; level: string; message: string }>(
+        'log-message',
+        (event) => {
+          const payload = event.payload;
+          const level: LogLevel = normalizeLogLevel(payload.level);
+          const log: LogEntry = {
+            time: new Date().toLocaleTimeString(
+              localStorage.getItem('siegu_language') || 'en',
+            ),
+            message: payload.message,
+            type: level === 'error' || level === 'fatal' ? 'error' : level === 'warn' ? 'warn' : level === 'debug' || level === 'trace' ? 'debug' : 'info',
+            level,
+          };
+          logs.value.unshift(log);
+          if (logs.value.length > MAX_LOG_ENTRIES) logs.value.pop();
+          if (modelsReloading.value && payload.message.endsWith('Models ready.')) {
+            modelsReloading.value = false;
+            modelsLoaded.value = true;
+            showSnackbar(t('settings.models_reloaded'));
+          }
+        },
+      ),
     );
 
     cleanupFns.push(
@@ -353,13 +362,17 @@ export const useSettingsStore = defineStore('settings', () => {
         message: string;
         level: string;
       }>;
-      logs.value = parsed.map((l) => ({
-        time: new Date(l.timestamp).toLocaleTimeString(
-          localStorage.getItem('siegu_language') || 'en',
-        ),
-        message: l.message,
-        type: l.level === 'error' ? 'error' : 'info',
-      }));
+      logs.value = parsed.map((l) => {
+        const level = normalizeLogLevel(l.level);
+        return {
+          time: new Date(l.timestamp).toLocaleTimeString(
+            localStorage.getItem('siegu_language') || 'en',
+          ),
+          message: l.message,
+          type: level === 'error' || level === 'fatal' ? 'error' : level === 'warn' ? 'warn' : level === 'debug' || level === 'trace' ? 'debug' : 'info',
+          level,
+        };
+      });
     } catch {
       // silent
     }
@@ -369,6 +382,16 @@ export const useSettingsStore = defineStore('settings', () => {
     await invoke('clear_logs');
     logs.value = [];
     showSnackbar('Logs cleared');
+  }
+
+  function normalizeLogLevel(value: string): LogLevel {
+    const v = value.toLowerCase();
+    if (v === 'fatal') return 'fatal';
+    if (v === 'error') return 'error';
+    if (v === 'warn' || v === 'warning') return 'warn';
+    if (v === 'debug') return 'debug';
+    if (v === 'trace') return 'trace';
+    return 'info';
   }
 
   function normalizeIndexingCount(value: number | string): number {

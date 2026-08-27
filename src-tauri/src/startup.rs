@@ -4,19 +4,11 @@ use crate::file;
 use std::sync::Arc;
 use tauri::AppHandle;
 use tauri::Emitter;
-use tauri_plugin_notification::NotificationExt;
 
 /// One-time notification so the user knows the app is running in the background.
+/// Suppressed when the window is focused (the app is visible then anyway).
 pub fn spawn_background_notification(app: &AppHandle) {
-    let app_handle = app.clone();
-    tauri::async_runtime::spawn(async move {
-        let _ = app_handle
-            .notification()
-            .builder()
-            .title("Siegu")
-            .body("Siegu is running in the background")
-            .show();
-    });
+    crate::notify::notify_routine(app, "Siegu is running in the background".to_string());
 }
 
 /// Clean up stale temp files on startup.
