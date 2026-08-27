@@ -17,6 +17,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     protobuf-compiler \
     git \
     curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Build the webclient SPA (Vite → dist/).
