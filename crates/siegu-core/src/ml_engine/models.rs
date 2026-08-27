@@ -86,11 +86,13 @@ impl SessionPool {
 
     /// Number of sessions to build for a model.
     ///
-    /// Defaults to 2 so concurrent library-indexing jobs can run inference in
-    /// parallel. Heavy models (BLIP captioning, Whisper transcription, the
-    /// 1.6 GB aesthetics model) stay single by default to bound memory, since
-    /// each extra session duplicates the model's weights. `SIEGU_ORT_POOL`
-    /// overrides the default for every model.
+    /// Defaults to 4 so concurrent library-indexing jobs (the rayon
+    /// `scan_threads` jobs, which default to 4) can run inference in
+    /// parallel without serializing on a shared session mutex. Heavy models
+    /// (BLIP captioning, Whisper transcription, the 1.6 GB aesthetics model)
+    /// stay single by default to bound memory, since each extra session
+    /// duplicates the model's weights. `SIEGU_ORT_POOL` overrides the default
+    /// for every model.
     fn pool_size_for(filename: &str) -> usize {
         let env_pool = std::env::var("SIEGU_ORT_POOL")
             .ok()
@@ -102,13 +104,37 @@ impl SessionPool {
                 if filename.contains("whisper")
                     || filename.starts_with("blip")
                     || filename.starts_with("aesthetics")
+                    || filename.starts_with("midas")
                 {
                     1
                 } else {
-                    2
+                    4
                 }
             }
         }
+    }
+
+    /// Pool size keyed by user-facing model name (mirrors [`pool_size_for`],
+    /// which keys on filename). Used so the `ml_memory_budget_mb` accounting
+    /// reflects the real resident RAM cost of multi-session pools.
+    fn model_pool_size(name: &str) -> usize {
+        let heavy = matches!(name, "aesthetics" | "blip" | "midas" | "whisper");
+        if heavy {
+            1
+        } else {
+            Self::pool_size_for_version()
+        }
+    }
+
+    /// The default (non-heavy) pool size used by [`pool_size_for`] and
+    /// [`model_pool_size`], honoring the `SIEGU_ORT_POOL` override.
+    fn pool_size_for_version() -> usize {
+        std::env::var("SIEGU_ORT_POOL")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .filter(|&n| n >= 1)
+            .map(|n| n.min(8))
+            .unwrap_or(4)
     }
 }
 
@@ -252,7 +278,12 @@ fn dropped_over_cap_bytes(
     let mut enabled: Vec<(u64, &'static str)> = MODEL_SIZES
         .iter()
         .filter(|(name, _)| model_enabled(config, name))
-        .map(|(name, size)| (*size, *name))
+        .map(|(name, size)| {
+            (
+                size.saturating_mul(SessionPool::model_pool_size(name) as u64),
+                *name,
+            )
+        })
         .collect();
     enabled.sort_by_key(|(size, _)| std::cmp::Reverse(*size));
 
@@ -812,9 +843,9 @@ mod tests {
         assert_eq!(SessionPool::pool_size_for("whisper-decoder.onnx"), 1);
         assert_eq!(
             SessionPool::pool_size_for("clip-vit-base-patch32-visual.onnx"),
-            2
+            4
         );
-        assert_eq!(SessionPool::pool_size_for("yolov8.onnx"), 2);
+        assert_eq!(SessionPool::pool_size_for("yolov8.onnx"), 4);
     }
 
     #[test]
@@ -895,6 +926,16 @@ mod tests {
         let config = config_with("2048", &["aesthetics", "blip", "yolo"]);
         let dropped = dropped_over_budget(&config, &noop_log);
         assert!(dropped.contains(&"aesthetics"));
+        assert!(!dropped.contains(&"yolo"));
+    }
+
+    #[test]
+    fn budget_accounts_for_pool_duplication() {
+        // CLIP loads 4 sessions by default (~2.3 GiB resident), so a 2 GiB
+        // budget must drop it even though a single copy (~580 MiB) would fit.
+        let config = config_with("2048", &["clip", "yolo"]);
+        let dropped = dropped_over_budget(&config, &noop_log);
+        assert!(dropped.contains(&"clip"));
         assert!(!dropped.contains(&"yolo"));
     }
 

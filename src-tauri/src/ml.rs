@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -18,6 +19,24 @@ struct TauriCallbacks {
     sync_tx: Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<SyncMessage>>>>,
     last_progress_emit: Mutex<Instant>,
     last_activity_emit: Mutex<Instant>,
+    /// Most recent measured EWMA of per-photo wall time, in milliseconds, stored
+    /// as `f64` bits. Updated by `on_progress` from the worker; used to compute a
+    /// real ETA instead of a hardcoded flat estimate.
+    progress_avg_ms: AtomicU64,
+}
+
+impl TauriCallbacks {
+    /// Estimated milliseconds until `remaining` photos are done, using the
+    /// measured EWMA per-photo time. Clamped to a sane minimum so the dialog
+    /// never flashes a zero/negative "done" state while photos remain.
+    fn eta_ms(&self, remaining: usize) -> f64 {
+        let avg_ms = f64::from_bits(self.progress_avg_ms.load(Ordering::Relaxed));
+        if avg_ms.is_finite() && avg_ms > 0.0 {
+            (remaining as f64) * avg_ms
+        } else {
+            0.0
+        }
+    }
 }
 
 impl AnalysisCallbacks for TauriCallbacks {
@@ -49,7 +68,7 @@ impl AnalysisCallbacks for TauriCallbacks {
                 );
                 let _ = self.app.emit(
                     "indexing-eta",
-                    serde_json::json!({ "eta": (remaining as f64) * 1000.0 }),
+                    serde_json::json!({ "eta": self.eta_ms(remaining) }),
                 );
             }
             drop(last);
@@ -100,7 +119,7 @@ impl AnalysisCallbacks for TauriCallbacks {
             );
             let _ = self.app.emit(
                 "indexing-eta",
-                serde_json::json!({ "eta": (remaining as f64) * 1000.0 }),
+                serde_json::json!({ "eta": self.eta_ms(remaining) }),
             );
         }
 
@@ -148,6 +167,16 @@ impl AnalysisCallbacks for TauriCallbacks {
     }
 
     fn on_scan_complete(&self) {
+        let avg_ms = f64::from_bits(self.progress_avg_ms.load(Ordering::Relaxed));
+        emit_log(
+            &self.app,
+            if avg_ms.is_finite() && avg_ms > 0.0 {
+                format!("Indexing finished (avg {avg_ms:.0} ms per photo).")
+            } else {
+                "Indexing finished.".to_string()
+            },
+        );
+
         let db = self.db.lock().unwrap_or_else(|e| e.into_inner());
         let pending: i64 = db
             .connection
@@ -187,7 +216,11 @@ impl AnalysisCallbacks for TauriCallbacks {
         }
     }
 
-    fn on_progress(&self, completed: usize, total: usize, _avg_ms: f64) {
+    fn on_progress(&self, completed: usize, total: usize, avg_ms: f64) {
+        if avg_ms.is_finite() && avg_ms > 0.0 {
+            self.progress_avg_ms
+                .store(avg_ms.to_bits(), Ordering::Relaxed);
+        }
         let _ = self.app.emit(
             "indexing-job",
             serde_json::json!({
@@ -227,7 +260,10 @@ impl AnalysisCallbacks for TauriCallbacks {
     }
 
     fn on_log(&self, msg: &str) {
-        crate::common::debug_log(format!("ML Worker: {msg}"));
+        // Route through the app's debug log (persisted file + in-memory viewer +
+        // stderr) AND surface to the scan activity feed so the user sees what
+        // the pipeline is doing while it grinds through a large library.
+        crate::common::emit_log(&self.app, msg.to_string());
     }
 
     fn should_abort(&self) -> bool {
@@ -246,6 +282,8 @@ pub fn start_background_worker(
         sync_tx,
         last_progress_emit: Mutex::new(Instant::now()),
         last_activity_emit: Mutex::new(Instant::now()),
+        // Conservative 1000 ms default until the first real measurement lands.
+        progress_avg_ms: AtomicU64::new(1000f64.to_bits()),
     };
     siegu_core::ml_engine::worker::start_worker(callbacks, config_path, 32)
 }

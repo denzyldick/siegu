@@ -847,9 +847,13 @@ fn run_model(
     let data = input.into_raw_vec_and_offset().0;
     let tensor = ort::value::Value::from_array((shape, data)).map_err(|e| e.to_string())?;
     let mut lock = model.lock().map_err(|e| e.to_string())?;
-    let outputs = lock
-        .run(ort::inputs![input_name => tensor])
-        .map_err(|e| e.to_string())?;
+    let outputs = lock.run(ort::inputs![input_name => tensor]).map_err(|e| {
+        // Surface inference failures through the app's debug log (the Tauri
+        // `LogLayer` forwards every tracing event to `persist_log`), instead
+        // of silently skipping the model with no trace for the user.
+        tracing::warn!("AI inference failed (model output slot: {input_name}): {e}");
+        e.to_string()
+    })?;
     let mut results = Vec::new();
     for i in 0..outputs.len() {
         if let Ok((_shape, data)) = outputs[i].try_extract_tensor::<f32>() {
@@ -871,9 +875,10 @@ fn run_model_named(
     let data = input.into_raw_vec_and_offset().0;
     let tensor = ort::value::Value::from_array((shape, data)).map_err(|e| e.to_string())?;
     let mut lock = model.lock().map_err(|e| e.to_string())?;
-    let outputs = lock
-        .run(ort::inputs![input_name => tensor])
-        .map_err(|e| e.to_string())?;
+    let outputs = lock.run(ort::inputs![input_name => tensor]).map_err(|e| {
+        tracing::warn!("AI inference failed (model output slot: {input_name}): {e}");
+        e.to_string()
+    })?;
     let mut results = HashMap::new();
     for (name, output) in outputs {
         if let Ok((_shape, data)) = output.try_extract_tensor::<f32>() {

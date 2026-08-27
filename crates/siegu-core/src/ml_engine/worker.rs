@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -24,6 +24,37 @@ pub fn batch_delay_ms_from_config(config: &HashMap<String, String>) -> u64 {
         .and_then(|s| s.parse::<u64>().ok())
         .unwrap_or(0)
         .min(2000)
+}
+
+/// Share of the latest sample weight in the running EWMA of per-photo time.
+/// 10% keeps the estimate responsive to current machine load while damping
+/// single-photo spikes.
+const EWMA_ALPHA: f64 = 0.1;
+
+/// Fold a freshly measured per-photo wall time (microseconds) into the shared
+/// EWMA stored as `f64` bits in `slot`. Lock-free: retries on CAS contention
+/// between the rayon threads. Falls back to the current value if the arithmetic
+/// ever produces a non-finite result.
+fn update_avg_photo_time(slot: &AtomicU64, sample_us: u64) {
+    let sample = sample_us as f64;
+    loop {
+        let cur = f64::from_bits(slot.load(Ordering::Relaxed));
+        let next = cur * (1.0 - EWMA_ALPHA) + sample * EWMA_ALPHA;
+        if !next.is_finite() || next <= 0.0 {
+            return;
+        }
+        if slot
+            .compare_exchange_weak(
+                cur.to_bits(),
+                next.to_bits(),
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            )
+            .is_ok()
+        {
+            return;
+        }
+    }
 }
 
 /// Waits for the next analysis job, unloading the loaded models (freeing their
@@ -215,10 +246,14 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
         // next analysis without requiring an app restart.
         let scan_pool: ScanPool = Arc::new(Mutex::new(None));
 
-        let avg_photo_time_ms = 1000f64;
+        // Exponential moving average of measured per-photo wall time, stored as
+        // f64 microseconds bits so the rayon closure can update it lock-free.
+        // Initialised to a conservative 1000 ms so the first ETA shown is never
+        // zero, then converges to the real measurement after a few photos.
+        let avg_photo_time_us = Arc::new(AtomicU64::new(1_000_000f64.to_bits()));
+        let total_processed = Arc::new(AtomicUsize::new(0));
         let mut last_auto_job: Option<Instant> = None;
         let models = models_thread;
-        let total_processed = 0usize;
 
         while let Some(job) = recv_next_job(&mut rx, &models, &pending_count_clone, unload_idle) {
             let is_reload = matches!(job, Job::ReloadModels);
@@ -367,11 +402,9 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
             }
 
             let total_pending = increment_pending_count(&pending_count_clone, photo_ids.len());
-            callbacks.on_progress(
-                total_processed,
-                total_processed + total_pending,
-                avg_photo_time_ms,
-            );
+            let processed = total_processed.load(Ordering::Relaxed);
+            let avg_ms = f64::from_bits(avg_photo_time_us.load(Ordering::Relaxed)) / 1000.0;
+            callbacks.on_progress(processed, processed + total_pending, avg_ms);
 
             let is_bulk = !job.is_single();
             let batch_delay_ms = batch_delay_ms_from_config(&config);
@@ -386,11 +419,13 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
             let config_ref = config.clone();
             let models_ref = Arc::clone(&models);
             let callbacks_ref = Arc::clone(&callbacks);
+            let total_processed_ref = Arc::clone(&total_processed);
+            let avg_photo_time_us_ref = Arc::clone(&avg_photo_time_us);
 
             let scan_threads: usize = config
                 .get("scan_threads")
                 .and_then(|s| s.parse().ok())
-                .unwrap_or(2);
+                .unwrap_or(4);
             let pool = {
                 let mut pool_cell = scan_pool.lock().unwrap_or_else(|e| e.into_inner());
                 match pool_cell.as_ref() {
@@ -476,7 +511,12 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                                 .file_name()
                                 .map(|n| n.to_string_lossy().to_string())
                                 .unwrap_or_else(|| photo_entry.id.clone());
-                            callbacks.on_log(&format!("Analyzing {short_name}..."));
+                            // Per-photo "Analyzing..." is only surfaced in
+                            // single-photo mode; during bulk indexing the scan
+                            // feed would be flooded with one line per photo.
+                            if !is_bulk {
+                                callbacks.on_log(&format!("Analyzing {short_name}..."));
+                            }
 
                             let is_video = pipeline::is_video_file(&photo_entry.location);
 
@@ -493,6 +533,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                                 models.clone()
                             };
 
+                            let photo_start = Instant::now();
                             let mut result = if is_video {
                                 pipeline::analyze_video(
                                     &photo_entry.id,
@@ -514,6 +555,10 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                                     &faces_dir_ref,
                                 )
                             };
+
+                            // Update the running EWMA of per-photo wall time.
+                            let elapsed_us = photo_start.elapsed().as_micros() as u64;
+                            update_avg_photo_time(&avg_photo_time_us_ref, elapsed_us);
 
                             let new_people: Vec<(String, Vec<f32>)> = {
                                 let mut new_people = Vec::new();
@@ -567,6 +612,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                             );
 
                             pending_flush.push((photo_entry.id.clone(), result));
+                            total_processed_ref.fetch_add(1, Ordering::Relaxed);
                             if pending_flush.len() >= FLUSH_BATCH_SIZE {
                                 flush_pending(&mut pending_flush, &mut pending_people);
                             }
@@ -576,6 +622,15 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                     }
 
                     flush_pending(&mut pending_flush, &mut pending_people);
+
+                    // Refresh the live progress/ETA every batch: completed count
+                    // and the measured EWMA average are pushed to the callbacks so
+                    // the frontend ETA stays accurate while a job drains.
+                    let processed = total_processed_ref.load(Ordering::Relaxed);
+                    let pending = pending_count_ref.load(Ordering::Relaxed);
+                    let avg_ms =
+                        f64::from_bits(avg_photo_time_us_ref.load(Ordering::Relaxed)) / 1000.0;
+                    callbacks.on_progress(processed, processed + pending, avg_ms);
 
                     if batch_delay_ms > 0 {
                         std::thread::sleep(Duration::from_millis(batch_delay_ms));
@@ -626,5 +681,43 @@ mod tests {
         let mut config = HashMap::new();
         config.insert("batch_delay_ms".to_string(), "soon".to_string());
         assert_eq!(batch_delay_ms_from_config(&config), 0);
+    }
+
+    #[test]
+    fn ewma_starts_at_1s_default_then_converges() {
+        let slot = AtomicU64::new(1_000_000f64.to_bits());
+        // A single fast sample barely moves the initial 1s default.
+        update_avg_photo_time(&slot, 10_000); // 10ms
+        let ms = f64::from_bits(slot.load(Ordering::Relaxed)) / 1000.0;
+        assert!(ms > 100.0, "default should dominate the first sample: {ms}");
+        // Many fast samples pull it down toward ~10ms.
+        for _ in 0..200 {
+            update_avg_photo_time(&slot, 10_000);
+        }
+        let ms = f64::from_bits(slot.load(Ordering::Relaxed)) / 1000.0;
+        assert!(ms < 50.0, "EWMA should converge toward the sample: {ms}ms");
+    }
+
+    #[test]
+    fn ewma_tracks_a_faster_rate() {
+        let slot = AtomicU64::new(1_000_000f64.to_bits());
+        for _ in 0..5000 {
+            update_avg_photo_time(&slot, 5_000); // 5ms
+        }
+        let ms = f64::from_bits(slot.load(Ordering::Relaxed)) / 1000.0;
+        assert!(ms < 10.0, "should track a 5ms rate, got {ms}ms");
+    }
+
+    #[test]
+    fn ewma_folds_instant_sample_toward_zero() {
+        let slot = AtomicU64::new(50_000f64.to_bits()); // 50ms
+        for _ in 0..2000 {
+            update_avg_photo_time(&slot, 0); // instantaneous photo
+        }
+        let us = f64::from_bits(slot.load(Ordering::Relaxed));
+        assert!(
+            us < 50.0,
+            "instant photos should pull the average toward 0, got {us}us"
+        );
     }
 }

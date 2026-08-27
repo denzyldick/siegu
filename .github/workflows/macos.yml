@@ -50,24 +50,10 @@ jobs:
 
       - run: bun install
 
-      - run: bun run check:translations
-
-      - run: bun run typecheck
-
-      - run: bun run lint
-
-      - run: bun x prettier --check "src/**/*.{js,vue,ts,css,json}"
-
-      - run: bun run test:coverage
-
-      - run: cargo fmt --check
-        working-directory: src-tauri
-
-      - name: Install cargo-audit
-        run: cargo install cargo-audit
-
-      - name: Security audit
-        run: cargo audit
+      # Frontend checks (translations/typecheck/lint/prettier/test:coverage),
+      # `cargo fmt --check` and `cargo audit` are OS-independent and already
+      # run once in ubuntu.yml, so they are intentionally omitted here to avoid
+      # triple-running them on every PR (the main driver of long CI time).
 
       - run: cargo test
         working-directory: src-tauri
