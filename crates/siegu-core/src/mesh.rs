@@ -145,6 +145,12 @@ pub enum SyncMessage {
     },
     /// Viewer asks to browse the peer's library without any writes (#9).
     EnterViewOnly,
+    /// Guest asks to browse one shared album only (#16). The manifest is
+    /// scoped to album members and every media request is membership-checked.
+    EnterAlbumShare {
+        #[serde(default)]
+        album_id: String,
+    },
     /// Chunked manifest of the sharer's library, sent to a view-only client.
     ViewOnlyManifest {
         photos: Vec<PhotoSyncInfo>,
@@ -170,6 +176,26 @@ pub enum SyncMessage {
         mime: String,
         #[serde(with = "base64_bytes")]
         data: Vec<u8>,
+    },
+    /// Generic RPC envelope (#19): the browser guest invokes the same
+    /// `do_*` business functions the Tauri app calls, without a local
+    /// backend. One variant covers every command; results come back as
+    /// JSON values so the payload schema stays owned by the command.
+    CommandRequest {
+        id: u64,
+        name: String,
+        #[serde(default)]
+        payload: serde_json::Value,
+    },
+    /// Reply to a CommandRequest. Exactly one of `result`/`error` is set.
+    /// Errors are plain strings: safe to log, cheap to render.
+    CommandResponse {
+        id: u64,
+        ok: bool,
+        #[serde(default)]
+        result: Option<serde_json::Value>,
+        #[serde(default)]
+        error: Option<String>,
     },
 }
 
@@ -255,6 +281,16 @@ pub trait SyncEvent: Send + Sync {
     /// Called once when a view-only peer finishes receiving our manifest
     /// chunks (#9): the UI builds an ephemeral read-only gallery from it.
     fn on_view_manifest(&self, _photos: &[PhotoSyncInfo]) {}
+    /// Called when the connected peer answers one of our CommandRequests
+    /// (#19). Default no-op; drivers/clients override to await results.
+    fn on_command_response(
+        &self,
+        _id: u64,
+        _ok: bool,
+        _result: Option<&serde_json::Value>,
+        _error: Option<&str>,
+    ) {
+    }
     fn on_device_registered(&self, db: &Database);
     fn on_metadata_updated(
         &self,
@@ -746,6 +782,8 @@ impl MeshManager {
         mirror_completed: &Arc<std::sync::atomic::AtomicUsize>,
         mirror_total: &Arc<std::sync::atomic::AtomicUsize>,
         pending_view_manifest: &Arc<tokio::sync::Mutex<Vec<PhotoSyncInfo>>>,
+        share_mode: Option<crate::rpc::ShareMode>,
+        session_scope: &Arc<tokio::sync::Mutex<Option<crate::view_only::AlbumScope>>>,
     ) {
         match msg {
             SyncMessage::ManifestRequest => {
@@ -889,7 +927,7 @@ impl MeshManager {
                         let event_arc = Arc::clone(&event);
                         let config_path_clone = config_path.to_string();
                         let id_clone = id.clone();
-                        let semaphore = Arc::clone(&transfer_semaphore);
+                        let semaphore = Arc::clone(transfer_semaphore);
                         let completed_task = Arc::clone(items_completed);
                         let total_task = Arc::clone(items_total);
                         let mirror_completed_task = Arc::clone(mirror_completed);
@@ -1134,7 +1172,7 @@ impl MeshManager {
                     .load(std::sync::atomic::Ordering::SeqCst)
                 {
                     // Verify and cache in memory; nothing is persisted.
-                    let ok = view_state().complete(&id, |bytes| Self::compute_data_checksum(bytes));
+                    let ok = view_state().complete(&id, Self::compute_data_checksum);
                     if !ok {
                         event.on_sync_error(format!("Checksum mismatch for view-only media {id}"));
                     }
@@ -1174,15 +1212,13 @@ impl MeshManager {
                         return;
                     };
                     let _ = file.flush().await;
-                    drop(file);
 
                     let temp_path =
                         sync_temp_dir(config_path).join(sanitize_filename(&file_state.id));
 
-                    let received_checksum = match Self::compute_file_checksum(&temp_path).await {
-                        Ok(cs) => cs,
-                        Err(_) => String::new(),
-                    };
+                    let received_checksum = Self::compute_file_checksum(&temp_path)
+                        .await
+                        .unwrap_or_default();
 
                     if !checksum.is_empty() && received_checksum != checksum {
                         event.on_sync_error(format!(
@@ -1528,6 +1564,36 @@ impl MeshManager {
                     event.on_log(&format!("ERROR sending view-only manifest: {e}"));
                 }
             }
+            SyncMessage::EnterAlbumShare { album_id } => {
+                // Album-scoped share (#16): the guest only ever learns about
+                // (and can only fetch) photos that belong to this album.
+                view_state()
+                    .serving_view_only
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
+                let db = Database::new(config_path);
+                if db.get_album(&album_id).is_none() {
+                    event.on_log(&format!(
+                        "WARN album share rejected: unknown album {album_id}"
+                    ));
+                    return;
+                }
+                let photos = db.get_album_photo_sync_info(&album_id);
+                let members: std::collections::HashSet<String> =
+                    photos.iter().map(|p| p.id.clone()).collect();
+                // Scope is PER SESSION so concurrent guests don't grant or
+                // deny each other's fetches (#16).
+                *session_scope.lock().await = Some(crate::view_only::AlbumScope {
+                    members,
+                    album_id: album_id.clone(),
+                });
+                event.on_log(&format!(
+                    "DEBUG peer entered album share '{album_id}' ({} items)",
+                    photos.len()
+                ));
+                if let Err(e) = Self::send_manifest_view_only(dc, photos).await {
+                    event.on_log(&format!("ERROR sending album-share manifest: {e}"));
+                }
+            }
             SyncMessage::ViewOnlyManifest { photos, more } => {
                 let mut pending = pending_view_manifest.lock().await;
                 pending.extend(photos);
@@ -1547,12 +1613,27 @@ impl MeshManager {
                 thumbnail,
                 restore,
             } => {
+                // Album-scoped share (#16): refuse anything outside the
+                // shared album, or the link would leak the whole library to
+                // anyone guessing photo ids.
+                if let Some(scope) = session_scope.lock().await.clone() {
+                    if !scope.members.contains(&id) {
+                        event.on_log(&format!(
+                            "DENIED FetchMediaRequest {id}: not in shared album '{}'",
+                            scope.album_id
+                        ));
+                        return;
+                    }
+                }
                 if thumbnail {
                     // Small direct reply: DB-cached thumbnail or generate.
+                    // A photo that was scanned but never analyzed stores an
+                    // empty `encoded`, which decodes to a zero-byte vec —
+                    // treat that as "no cached thumbnail" and generate.
                     let db = Database::new(config_path);
                     let bytes = match db.get_photo_thumbnail_bytes(&id) {
-                        Some(b) => Some(b),
-                        None => db
+                        Some(b) if !b.is_empty() => Some(b),
+                        _ => db
                             .get_photo_location(&id)
                             .and_then(|loc| crate::thumbnail::generate_thumbnail_bytes(&loc)),
                     };
@@ -1633,6 +1714,63 @@ impl MeshManager {
                         mime,
                     },
                 );
+            }
+            SyncMessage::CommandRequest { id, name, payload } => {
+                // RPC from a browser guest (#19). Disabled unless the host
+                // session was created with an explicit share mode; the reply
+                // is generated off the message loop so slow SQLite work never
+                // blocks sync traffic.
+                let Some(mode) = share_mode else {
+                    let _ = Self::send_sync_message(
+                        dc,
+                        &SyncMessage::CommandResponse {
+                            id,
+                            ok: false,
+                            result: None,
+                            error: Some("RPC not enabled on this session".to_string()),
+                        },
+                    )
+                    .await;
+                    return;
+                };
+                event.on_log(&format!("DEBUG rpc request #{id} {name}"));
+                let dc = Arc::clone(dc);
+                let config_path = config_path.to_string();
+                tokio::spawn(async move {
+                    let ctx = crate::rpc::RpcContext {
+                        config_path: &config_path,
+                        mode,
+                    };
+                    let response = match crate::rpc::dispatch(&ctx, &name, &payload) {
+                        Ok(result) => SyncMessage::CommandResponse {
+                            id,
+                            ok: true,
+                            result: Some(result),
+                            error: None,
+                        },
+                        Err(error) => {
+                            event.on_log(&format!("ERROR rpc #{id} {name}: {error}"));
+                            SyncMessage::CommandResponse {
+                                id,
+                                ok: false,
+                                result: None,
+                                error: Some(error),
+                            }
+                        }
+                    };
+                    if let Err(e) = Self::send_sync_message(&dc, &response).await {
+                        event.on_log(&format!("ERROR sending CommandResponse #{id}: {e}"));
+                    }
+                });
+            }
+            // Guests consume these via on_command_response (default: ignore).
+            SyncMessage::CommandResponse {
+                id,
+                ok,
+                result,
+                error,
+            } => {
+                event.on_command_response(id, ok, result.as_ref(), error.as_deref());
             }
         }
     }

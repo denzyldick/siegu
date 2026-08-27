@@ -154,9 +154,11 @@ async fn serve_static(
         .map(move || warp::reply::json(&serde_json::json!({ "code": session_code })))
         .boxed();
 
+    // After matching the "assets" URL prefix the remaining path is the bare
+    // filename, so the fs root must be the bundle's assets directory.
     let assets = warp::get()
         .and(warp::path("assets"))
-        .and(warp::fs::dir(dist))
+        .and(warp::fs::dir(dist.join("assets")))
         .boxed();
 
     let bridge_signal = signal_url.clone();
@@ -191,6 +193,9 @@ async fn serve_static(
 pub struct WebOptions {
     pub http_port: u16,
     pub config: Option<String>,
+    /// RPC permission for connected browsers (#19). ReadOnly by default;
+    /// `--share-mode rw` lets guests mutate favorites/trash.
+    pub share_mode: siegu_core::ShareMode,
 }
 
 /// `siegu web`: share this machine's library as a view-only gallery in any
@@ -209,6 +214,7 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
     let signal = lan_server::start_with_config(ServerConfig {
         port: 0,
         token: Some(token.clone()),
+        web_dist: None,
     })
     .await;
     println!("Signalling server on port {}", signal.port);
@@ -216,6 +222,9 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
     let signal_url = format!("ws://127.0.0.1:{}/ws?token={}", signal.port, token);
     let code = create_room(&signal_url, &token).await?;
     println!("Session code: {code}");
+    // Greppable handle for CLI guests/e2e drivers: they need the full
+    // ws://…/ws?token=… URL to join a token-secured session.
+    println!("Signalling token: {token}");
 
     let hostname = std::env::var("HOSTNAME")
         .or_else(|_| std::env::var("COMPUTERNAME"))
@@ -225,6 +234,11 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
     let event = Arc::new(CliSyncEvent {
         config_path: config_path.clone(),
         sync_tx: Arc::clone(&sync_tx),
+        ready: Arc::new(tokio::sync::Notify::new()),
+        view_manifest: Arc::new(tokio::sync::Mutex::new(Vec::new())),
+        view_notify: Arc::new(tokio::sync::Notify::new()),
+        rpc_slot: Arc::new(tokio::sync::Mutex::new(None)),
+        rpc_notify: Arc::new(tokio::sync::Notify::new()),
     });
 
     let transport = MeshTransport::new(
@@ -236,33 +250,47 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
         hostname,
         Vec::new(),
         event,
-    );
+    )
+    .with_share_mode(opts.share_mode);
     let transport_handle = tokio::spawn(async move {
         if let Err(e) = transport.start().await {
             eprintln!("[siegu] transport stopped: {e}");
         }
     });
 
-    let http_addr = serve_static(
-        opts.http_port,
-        web_dist_dir(),
-        code.clone(),
-        signal_url.clone(),
-    )
-    .await?;
-    println!(
-        "\nOpen in a browser on this machine:\n  http://127.0.0.1:{}/#{}.{}",
-        http_addr.port(),
-        code,
-        token
-    );
-    if let Some(ip) = lan_ip() {
+    // CLI/e2e guests speak WebRTC only; SIEGU_WEB_NO_HTTP skips the static
+    // bundle requirement so a session can be hosted without building the
+    // browser client.
+    let http_addr = match std::env::var_os("SIEGU_WEB_NO_HTTP") {
+        Some(_) => {
+            println!("SIEGU_WEB_NO_HTTP is set - skipping static file server");
+            None
+        }
+        None => Some(
+            serve_static(
+                opts.http_port,
+                web_dist_dir(),
+                code.clone(),
+                signal_url.clone(),
+            )
+            .await?,
+        ),
+    };
+    if let Some(http_addr) = http_addr {
         println!(
-            "\nOr from another device on this network:\n  http://{ip}:{}/#{}.{}",
+            "\nOpen in a browser on this machine:\n  http://127.0.0.1:{}/#{}.{}",
             http_addr.port(),
             code,
             token
         );
+        if let Some(ip) = lan_ip() {
+            println!(
+                "\nOr from another device on this network:\n  http://{ip}:{}/#{}.{}",
+                http_addr.port(),
+                code,
+                token
+            );
+        }
     }
     println!("\nThe link expires when this command stops. Press Ctrl+C to end the session.");
 

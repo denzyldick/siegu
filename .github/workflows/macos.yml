@@ -32,6 +32,10 @@ jobs:
         with:
           node-version: 20
 
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
@@ -44,17 +48,17 @@ jobs:
         run: |
           brew install pkg-config nasm
 
-      - run: npm ci
+      - run: bun install
 
-      - run: npm run check:translations
+      - run: bun run check:translations
 
-      - run: npm run typecheck
+      - run: bun run typecheck
 
-      - run: npm run lint
+      - run: bun run lint
 
-      - run: npx prettier --check "src/**/*.{js,vue,ts,css,json}"
+      - run: bun x prettier --check "src/**/*.{js,vue,ts,css,json}"
 
-      - run: npm run test:coverage
+      - run: bun run test:coverage
 
       - run: cargo fmt --check
         working-directory: src-tauri
@@ -77,7 +81,7 @@ jobs:
         working-directory: src-tauri
 
       - name: Build Tauri App (no bundle)
-        run: npm run tauri build -- --no-bundle
+        run: bun run tauri build --no-bundle
 
       # ── Mesh sync over a real LAN signaling server, no ML models ─────────
       - name: Build CLI (release)
@@ -85,6 +89,10 @@ jobs:
 
       - name: Run mesh sync E2E (in-process signaling)
         run: bash scripts/e2e-sync.sh
+
+      # ── View-only browsing + RPC share modes over the same stack (#19) ──
+      - name: Run view-only + RPC E2E
+        run: bash scripts/e2e-view-only.sh
 
       # ── Full ONNX model inference on real photos/videos ────────────────
       - name: Cache AI test models

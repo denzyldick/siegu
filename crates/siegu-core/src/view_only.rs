@@ -22,6 +22,17 @@ pub struct RemoteMedia {
     pub mime: String,
 }
 
+/// An active album-scoped share (#16): requests are only served for
+/// member photos. The membership set is resolved once when the guest
+/// enters, so per-request checks are O(1) and rule changes mid-session
+/// cannot silently widen access. Held PER peer session (not globally) so
+/// concurrent guests neither grant nor deny each other's fetches (#16).
+#[derive(Clone)]
+pub struct AlbumScope {
+    pub album_id: String,
+    pub members: std::collections::HashSet<String>,
+}
+
 struct PartialMedia {
     checksum: String,
     filename: String,

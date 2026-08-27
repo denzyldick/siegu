@@ -775,6 +775,68 @@ impl Database {
         results
     }
 
+    /// Sync info for every photo in an album (#16): manual albums read
+    /// `album_item` rows; smart/trip albums resolve their stored rule through
+    /// the same filtered-query machinery the UI uses. Deleted photos are
+    /// excluded either way.
+    pub fn get_album_photo_sync_info(&self, album_id: &str) -> Vec<PhotoSyncInfo> {
+        let ids = self.album_photo_ids(album_id);
+        let mut out = Vec::with_capacity(ids.len());
+        for id in ids {
+            if let Ok(info) = self.get_photo_sync_info_by_id(&id) {
+                out.push(info);
+            }
+        }
+        out
+    }
+
+    /// Member photo ids of an album, ordered by created DESC (matching the
+    /// grid ordering guests see elsewhere).
+    pub fn album_photo_ids(&self, album_id: &str) -> Vec<String> {
+        let Some(album) = self.get_album(album_id) else {
+            return Vec::new();
+        };
+        let mut ids = Vec::new();
+        if album.kind == AlbumKind::Manual {
+            let sql = "SELECT ai.photo_id FROM album_item ai \
+                 JOIN photo p ON p.id = ai.photo_id \
+                 WHERE ai.album_id = ?1 AND p.deleted_at IS NULL \
+                 ORDER BY p.created DESC";
+            if let Ok(mut stmt) = self.connection.prepare(sql) {
+                if let Ok(iter) = stmt.query_map([album_id], |row| row.get::<_, String>(0)) {
+                    for id in iter.flatten() {
+                        ids.push(id);
+                    }
+                }
+            }
+        } else if let Some(filter) = Self::album_rule_filter(&album) {
+            // Page through the rule's matches: LIMIT ?2 with a huge single
+            // bound is fragile, and albums are small relative to libraries.
+            const PAGE: usize = 500;
+            loop {
+                let page = {
+                    let query = filter.query.as_deref().unwrap_or("");
+                    let videos = filter.videos.unwrap_or(false);
+                    let offset = ids.len();
+                    self.list_photos_filtered(query, offset, PAGE, false, videos, &filter, false)
+                        .into_iter()
+                        .map(|p| p.id)
+                        .collect::<Vec<_>>()
+                };
+                let done = page.len() < PAGE;
+                ids.extend(page);
+                if done {
+                    break;
+                }
+            }
+        }
+        // Created-timestamp ties can reorder rows across paged queries;
+        // drop any repeats while keeping first-seen (display) order.
+        let mut seen = std::collections::HashSet::new();
+        ids.retain(|id| seen.insert(id.clone()));
+        ids
+    }
+
     /// Get sync info for a single photo by its ID.
     pub fn get_photo_sync_info_by_id(&self, photo_id: &str) -> Result<PhotoSyncInfo, String> {
         let sql = "SELECT id, location, created, latitude, longitude, caption, aesthetics_score FROM photo WHERE id = ?1";
@@ -1982,7 +2044,7 @@ impl Database {
             });
         }
 
-        categories.sort_by(|a, b| b.count.cmp(&a.count));
+        categories.sort_by_key(|b| std::cmp::Reverse(b.count));
         categories
     }
 
@@ -3943,9 +4005,9 @@ impl Database {
             let mut all_params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
             for (i, trip) in trips.iter().enumerate() {
                 if let Some(filter) = Self::album_rule_filter(trip) {
-                    parts.push(format!(
-                        "SELECT ? AS idx, COUNT(*) AS cnt FROM photo p WHERE p.created >= ? AND p.created <= ?"
-                    ));
+                    parts.push(
+                        "SELECT ? AS idx, COUNT(*) AS cnt FROM photo p WHERE p.created >= ? AND p.created <= ?".to_string()
+                    );
                     all_params.push(Box::new(i as i64));
                     all_params.push(Box::new(filter.date_from.clone().unwrap_or_default()));
                     all_params.push(Box::new(filter.date_to.clone().unwrap_or_default()));
@@ -6323,6 +6385,86 @@ mod tests {
                 "{name} should reach index {index} but plan was:\n{plan}"
             );
         }
+    }
+
+    fn import_test_photo(db: &mut Database, id: &str, created: &str) {
+        db.import_photo(ImportedPhoto {
+            id,
+            location: Box::leak(format!("/tmp/{id}.jpg").into_boxed_str()),
+            created,
+            latitude: None,
+            longitude: None,
+            objects_json: "[]",
+            faces_json: "[]",
+            encoded: "",
+            caption: None,
+            aesthetics_score: None,
+            received: false,
+        });
+    }
+
+    #[test]
+    fn test_album_photo_sync_info_scopes_to_manual_album() {
+        let mut db = test_db();
+        import_test_photo(&mut db, "in_1", "2024-01-01 10:00:00");
+        import_test_photo(&mut db, "in_2", "2024-01-02 10:00:00");
+        import_test_photo(&mut db, "out", "2024-01-03 10:00:00");
+
+        let album = db.create_album("Shared").unwrap();
+        db.add_album_items(&album.id, &["in_1".into(), "in_2".into()])
+            .unwrap();
+
+        let infos = db.get_album_photo_sync_info(&album.id);
+        let mut ids: Vec<String> = infos.iter().map(|i| i.id.clone()).collect();
+        ids.sort();
+        assert_eq!(
+            ids,
+            vec!["in_1", "in_2"],
+            "must scope to album members only"
+        );
+
+        assert!(
+            db.get_album_photo_sync_info("missing-album").is_empty(),
+            "unknown album must yield an empty manifest"
+        );
+    }
+
+    #[test]
+    fn test_album_photo_ids_respect_smart_rule() {
+        let mut db = test_db();
+        import_test_photo(&mut db, "fav_1", "2024-01-01 10:00:00");
+        import_test_photo(&mut db, "fav_2", "2024-01-02 10:00:00");
+        import_test_photo(&mut db, "plain", "2024-01-03 10:00:00");
+        db.set_favorites(&["fav_1".to_string(), "fav_2".to_string()], true);
+
+        let rule = PhotoFilter {
+            favorite: true,
+            ..PhotoFilter::default()
+        };
+        let album = db
+            .create_smart_album("Favourites", &rule, AlbumKind::Smart)
+            .unwrap();
+
+        let mut ids = db.album_photo_ids(&album.id);
+        ids.sort();
+        assert_eq!(ids, vec!["fav_1", "fav_2"], "rule-based membership only");
+
+        // Membership is computed on demand: un-favouriting drops the photo.
+        db.set_favorites(&["fav_2".to_string()], false);
+        assert_eq!(db.album_photo_ids(&album.id), vec!["fav_1".to_string()]);
+    }
+
+    #[test]
+    fn test_album_photo_ids_skip_missing_photos() {
+        let mut db = test_db();
+        import_test_photo(&mut db, "alive", "2024-01-01 10:00:00");
+        let album = db.create_album("Stale").unwrap();
+        db.add_album_items(&album.id, &["alive".into(), "ghost-photo".into()])
+            .unwrap();
+
+        let ids = db.album_photo_ids(&album.id);
+        assert_eq!(ids, vec!["alive".to_string()]);
+        assert_eq!(db.get_album_photo_sync_info(&album.id).len(), 1);
     }
 
     fn db_explain(connection: &rusqlite::Connection, sql: &str) -> String {

@@ -28,6 +28,14 @@ struct WebRtcState {
         Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<transport::SyncMessage>>>>,
     connected: Arc<std::sync::atomic::AtomicBool>,
     lan_server: std::sync::Mutex<Option<siegu_core::lan_server::LanServer>>,
+    /// Populated when a LAN host session is active; used for share-link generation (#16).
+    host_info: std::sync::Mutex<Option<HostInfo>>,
+}
+
+#[derive(Clone)]
+struct HostInfo {
+    room_id: String,
+    port: u16,
 }
 
 struct ScanState {
@@ -227,6 +235,7 @@ pub fn run() {
                 sync_tx,
                 connected: Arc::new(std::sync::atomic::AtomicBool::new(false)),
                 lan_server: std::sync::Mutex::new(None),
+                host_info: std::sync::Mutex::new(None),
             });
 
             app.manage(ScanState {
@@ -338,6 +347,7 @@ pub fn run() {
             commands::sync::get_media_server_port,
             commands::sync::generate_pairing_codes,
             commands::sync::hash_pairing_code,
+            commands::sync::generate_album_share_url,
             commands::sync::auto_reconnect,
             commands::sync::clear_saved_session,
             commands::sync::list_peer_devices,

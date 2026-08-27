@@ -4,21 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>siegu — view only</title>
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+    <meta name="googlebot" content="noindex, nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <meta http-equiv="X-Robots-Tag" content="noindex, nofollow" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <header>
       <span class="brand">siegu</span>
       <span id="status" class="status">Starting…</span>
+      <span id="session-timer" class="session-timer" hidden></span>
     </header>
 
     <main id="app">
       <section id="gate">
         <h1>View-only session</h1>
         <p id="gate-msg">
-          Open the link printed by <code>siegu web</code>. Nothing you see here is
-          downloaded or stored: media streams straight from the other device and
-          disappears when the session ends.
+          Open the link printed by <code>siegu web</code> or shared by the
+          album owner. Nothing you see here is downloaded or stored: media
+          streams straight from the other device and disappears when the
+          session ends.
         </p>
       </section>
 

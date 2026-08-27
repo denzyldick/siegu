@@ -2,21 +2,20 @@
   <div class="connect-wrapper">
     <v-dialog v-model="dialog" width="auto" scrim="black" transition="dialog-bottom-transition">
       <template v-slot:activator="{ props }">
-        <v-btn
-          v-if="!embedded"
-          v-bind="props"
-          color="primary"
-          variant="flat"
-          class="px-6"
-          height="44"
-        >
-          <div class="d-flex align-center">
-            <v-avatar color="rgba(255,255,255,0.2)" size="32" class="mr-3">
-              <v-icon size="14">mdi-plus</v-icon>
-            </v-avatar>
-            <span class="font-weight-bold">{{ $t('devices.add_device') }}</span>
-          </div>
-        </v-btn>
+        <v-tooltip :text="$t('devices.add_device')" location="top">
+          <template v-slot:activator="{ props: tipProps }">
+            <v-btn
+              v-if="!embedded"
+              v-bind="{ ...props, ...tipProps }"
+              icon
+              color="primary"
+              variant="flat"
+              size="40"
+            >
+              <v-icon size="20">mdi-link-plus</v-icon>
+            </v-btn>
+          </template>
+        </v-tooltip>
       </template>
 
       <v-card
@@ -26,6 +25,15 @@
         min-width="350"
         max-width="440"
       >
+        <v-btn
+          v-if="showDisconnect"
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          class="position-absolute"
+          style="top: 12px; right: 12px"
+          @click="handleDisconnect"
+        ></v-btn>
         <div
           v-if="!confirmDialog && !(started && mode === 'host' && !isConnected)"
           class="d-flex justify-center mb-3"
@@ -74,7 +82,7 @@
                 @click="confirmStart('host')"
               >
                 <div class="d-flex align-center">
-                  <v-avatar color="rgba(255,255,255,0.2)" size="28" class="mr-2">
+                  <v-avatar color="rgba(var(--v-theme-on-primary), 0.2)" size="28" class="mr-2">
                     <v-icon size="14">mdi-laptop</v-icon>
                   </v-avatar>
                   <span class="font-weight-bold">{{ $t('connect.host') }}</span>
@@ -93,7 +101,7 @@
                 @click="confirmStart('join')"
               >
                 <div class="d-flex align-center">
-                  <v-avatar color="rgba(255,255,255,0.2)" size="28" class="mr-2">
+                  <v-avatar color="rgba(var(--v-theme-on-primary), 0.2)" size="28" class="mr-2">
                     <v-icon size="14">mdi-cellphone-link</v-icon>
                   </v-avatar>
                   <span class="font-weight-bold">{{ $t('connect.join') }}</span>
@@ -241,7 +249,7 @@
               @click="start('host')"
             >
               <div class="d-flex align-center">
-                <v-avatar color="rgba(255,255,255,0.2)" size="32" class="mr-2">
+                <v-avatar color="rgba(var(--v-theme-on-primary), 0.2)" size="32" class="mr-2">
                   <v-icon size="16">mdi-laptop</v-icon>
                 </v-avatar>
                 <span class="font-weight-bold">{{ $t('connect.host') }}</span>
@@ -260,7 +268,7 @@
               @click="start('join')"
             >
               <div class="d-flex align-center">
-                <v-avatar color="rgba(255,255,255,0.2)" size="32" class="mr-2">
+                <v-avatar color="rgba(var(--v-theme-on-primary), 0.2)" size="32" class="mr-2">
                   <v-icon size="16">mdi-cellphone-link</v-icon>
                 </v-avatar>
                 <span class="font-weight-bold">{{ $t('connect.join') }}</span>

@@ -216,6 +216,7 @@ mod tests {
         let server = crate::lan_server::start_with_config(crate::lan_server::ServerConfig {
             port: 0,
             token: Some("s3cret".to_string()),
+            web_dist: None,
         })
         .await;
         let port = server.port;

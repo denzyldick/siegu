@@ -160,6 +160,10 @@ jobs:
         with:
           node-version: 20
 
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
@@ -212,7 +216,7 @@ jobs:
           Write-Host "Prepending $bin to PATH"
           Add-Content $env:GITHUB_PATH $bin
 
-      - run: npm ci
+      - run: bun install
 
       - name: Prepare signing key
         shell: bash
@@ -293,6 +297,10 @@ jobs:
         with:
           node-version: 20
 
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
@@ -323,10 +331,10 @@ jobs:
           echo "Patching $BUILD_RS"
           python3 scripts/patch-ffmpeg-android.py "$BUILD_RS"
 
-      - run: npm ci
+      - run: bun install
 
       - name: Build frontend
-        run: yarn build
+        run: bun run build
 
       - name: Build Rust lib for aarch64
         run: |
@@ -415,6 +423,10 @@ jobs:
         with:
           node-version: 20
 
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-ios, x86_64-apple-ios, aarch64-apple-ios-sim
@@ -424,6 +436,6 @@ jobs:
           key: release-ios
           workspaces: src-tauri
 
-      - run: npm ci
+      - run: bun install
 
       - run: npm run tauri ios build || echo "iOS build skipped/failed. Please configure code signing."

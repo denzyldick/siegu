@@ -107,6 +107,23 @@ const mapFilterStore = useMapFilterStore();
 let leafletMap: LeafletMap | null = null;
 let clusterGroup: L.MarkerClusterGroup | null = null;
 
+function resolveThemeColor(varName: string): string {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  if (!raw) return '#3b82f6';
+  if (raw.startsWith('#')) return raw;
+  const m = raw.match(/[\d.]+/g);
+  if (m && m.length >= 3) return `rgb(${m[0]}, ${m[1]}, ${m[2]})`;
+  return '#3b82f6';
+}
+
+function themeTextColor(): string {
+  const bg = resolveThemeColor('--v-theme-info');
+  const m = bg.match(/[\d.]+/g);
+  if (!m || m.length < 3) return '#fff';
+  const lum = (0.299 * +m[0] + 0.587 * +m[1] + 0.114 * +m[2]) / 255;
+  return lum > 0.6 ? '#1a1a2e' : '#ffffff';
+}
+
 const GRID_CELL_DEG = 1;
 const pointGrid = new Map<string, MapPoint[]>();
 
@@ -203,8 +220,9 @@ async function loadMapData() {
       iconCreateFunction: (cluster: L.MarkerCluster) => {
         const count = cluster.getChildCount();
         const size = count < 10 ? 'sm' : count < 100 ? 'md' : 'lg';
+        const textColor = themeTextColor();
         return L.divIcon({
-          html: `<div class="cluster-icon cluster-${size}"><span>${count}</span></div>`,
+          html: `<div class="cluster-icon cluster-${size}" style="color: ${textColor}"><span>${count}</span></div>`,
           className: 'custom-cluster',
           iconSize: L.point(44, 44),
         });
@@ -212,10 +230,11 @@ async function loadMapData() {
     });
 
     const bounds: [number, number][] = [];
+    const markerFill = resolveThemeColor('--v-theme-info');
     for (const p of mapPoints.value) {
       const marker = L.circleMarker([p.latitude, p.longitude], {
         radius: 5,
-        fillColor: 'rgb(var(--v-theme-info))',
+        fillColor: markerFill,
         color: '#ffffff',
         weight: 1.5,
         opacity: 0.9,
@@ -400,7 +419,6 @@ watch(currentPhotoIndex, (idx) => {
   border-radius: 50%;
   font-weight: 600;
   font-size: 13px;
-  color: #fff;
   border: 2px solid rgba(255, 255, 255, 0.6);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }

@@ -3,24 +3,82 @@ use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
-use siegu_core::database::Database;
+use siegu_core::database::{Database, PhotoSyncInfo};
 use siegu_core::mesh_transport::MeshTransport;
 use siegu_core::scanner::ScanGuard;
-use siegu_core::{PeerDevice, SavedSession, SyncEvent, SyncProgress};
+use siegu_core::{PeerDevice, SavedSession, SyncEvent, SyncMessage, SyncProgress};
 
 mod analyze_tui;
 mod web;
 
+/// Wire shape of one RPC reply: (request id, ok, result, error).
+pub type RpcReply = (u64, bool, Option<serde_json::Value>, Option<String>);
+pub type SharedRpcSlot = Arc<tokio::sync::Mutex<Option<RpcReply>>>;
+pub type SharedSyncTx =
+    Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<SyncMessage>>>>;
+
 pub struct CliSyncEvent {
     pub config_path: String,
-    pub sync_tx: Arc<
-        tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<siegu_core::SyncMessage>>>,
-    >,
+    pub sync_tx: SharedSyncTx,
+    /// Signalled when the WebRTC data channel is ready (#19 e2e driver).
+    pub ready: Arc<tokio::sync::Notify>,
+    /// Last completed view-only manifest (#9 e2e driver).
+    pub view_manifest: Arc<tokio::sync::Mutex<Vec<PhotoSyncInfo>>>,
+    /// Signalled when `view_manifest` is complete.
+    pub view_notify: Arc<tokio::sync::Notify>,
+    /// Latest CommandResponse from the peer (#19 e2e driver).
+    pub rpc_slot: SharedRpcSlot,
+    /// Signalled whenever `rpc_slot` is updated.
+    pub rpc_notify: Arc<tokio::sync::Notify>,
+}
+
+impl CliSyncEvent {
+    pub fn new(config_path: &str) -> (Self, SharedSyncTx) {
+        let sync_tx = Arc::new(tokio::sync::Mutex::new(None));
+        let event = Self {
+            config_path: config_path.to_string(),
+            sync_tx: Arc::clone(&sync_tx),
+            ready: Arc::new(tokio::sync::Notify::new()),
+            view_manifest: Arc::new(tokio::sync::Mutex::new(Vec::new())),
+            view_notify: Arc::new(tokio::sync::Notify::new()),
+            rpc_slot: Arc::new(tokio::sync::Mutex::new(None)),
+            rpc_notify: Arc::new(tokio::sync::Notify::new()),
+        };
+        (event, sync_tx)
+    }
 }
 
 impl SyncEvent for CliSyncEvent {
     fn on_state_change(&self, state: &str) {
         println!("[sync] {state}");
+        // Initiators print "Secure Data Channel Ready"; receivers only get
+        // the plain "Connected" peer-state line (exact match - never the
+        // earlier "Connected to signaling...").
+        if state == "Secure Data Channel Ready" || state == "Connected" {
+            // notify_one parks a permit until a waiter shows up, so the
+            // driver never misses the signal even if it registers late.
+            self.ready.notify_one();
+        }
+    }
+
+    fn on_view_manifest(&self, photos: &[PhotoSyncInfo]) {
+        if let Ok(mut slot) = self.view_manifest.try_lock() {
+            *slot = photos.to_vec();
+        }
+        self.view_notify.notify_one();
+    }
+
+    fn on_command_response(
+        &self,
+        id: u64,
+        ok: bool,
+        result: Option<&serde_json::Value>,
+        error: Option<&str>,
+    ) {
+        if let Ok(mut slot) = self.rpc_slot.try_lock() {
+            *slot = Some((id, ok, result.cloned(), error.map(str::to_string)));
+        }
+        self.rpc_notify.notify_one();
     }
 
     fn on_log(&self, message: &str) {
@@ -178,11 +236,25 @@ enum Commands {
         port: u16,
         #[arg(short, long)]
         config: Option<String>,
+        /// Permission level for connected browsers (#19): ro (default) allows
+        /// browsing only; rw also allows favorites/trash mutations.
+        #[arg(long, default_value = "ro")]
+        share_mode: String,
     },
 }
 
 #[derive(Subcommand)]
 enum MeshAction {
+    /// Create a manual album from the first N photos and print its ID (#16).
+    /// Test helper for scripts/e2e-view-only.sh.
+    SeedAlbum {
+        /// Album name
+        #[arg(long, default_value = "E2E Shared")]
+        name: String,
+        /// Put the first N photos of the library into the album
+        #[arg(long, default_value = "1")]
+        take_first: usize,
+    },
     /// Start a LAN mesh host and wait for peers
     Host {
         #[arg(short, long, default_value = "0")]
@@ -193,6 +265,10 @@ enum MeshAction {
         /// Room ID to use when connecting via --server (required with --server)
         #[arg(long)]
         room: Option<String>,
+        /// Permission level for connected peers (#19): ro (default) allows
+        /// browsing only; rw also allows favorites/trash mutations.
+        #[arg(long, default_value = "ro")]
+        share_mode: String,
         #[arg(short, long)]
         config: Option<String>,
     },
@@ -200,6 +276,47 @@ enum MeshAction {
     Join {
         /// Room ID
         room: String,
+        /// Signaling server URL (defaults to ws://127.0.0.1:8080)
+        #[arg(long)]
+        server: Option<String>,
+        /// This peer creates the WebRTC offer (needed when joining a --server host)
+        #[arg(long)]
+        initiator: bool,
+        #[arg(short, long)]
+        config: Option<String>,
+    },
+    /// Browse a peer's library read-only (#9): enter view-only mode, verify
+    /// manifest + thumbnail + restore pull, then stay alive. Prints greppable
+    /// VIEWONLY markers for scripts/e2e-view-only.sh.
+    Browse {
+        /// Room ID
+        room: String,
+        /// Signaling server URL (defaults to ws://127.0.0.1:8080)
+        #[arg(long)]
+        server: Option<String>,
+        /// This peer creates the WebRTC offer (needed when joining a --server host)
+        #[arg(long)]
+        initiator: bool,
+        #[arg(short, long)]
+        config: Option<String>,
+        /// Enter album-share mode (#16): send EnterAlbumShare for this album
+        /// instead of EnterViewOnly and verify the host enforces membership.
+        #[arg(long)]
+        album: Option<String>,
+        /// Device name announced to the room (must be unique per guest).
+        #[arg(long, default_value = "siegu-browser")]
+        name: String,
+    },
+    /// Send a single CommandRequest to the peer and print its reply (#19).
+    /// Used by scripts/e2e-view-only.sh to exercise the RPC surface.
+    Rpc {
+        /// Room ID
+        room: String,
+        /// Command name, e.g. list_files or toggle_favorite
+        command: String,
+        /// JSON payload for the command
+        #[arg(default_value = "{}")]
+        payload: String,
         /// Signaling server URL (defaults to ws://127.0.0.1:8080)
         #[arg(long)]
         server: Option<String>,
@@ -356,14 +473,29 @@ async fn main() {
             }
         }
         Commands::Mesh { action } => match action {
+            MeshAction::SeedAlbum { name, take_first } => {
+                cmd_seed_album(
+                    &resolve_config_dir(&cli.config_dir, &None),
+                    name,
+                    *take_first,
+                );
+            }
             MeshAction::Host {
                 port,
                 server,
                 room,
+                share_mode,
                 config,
             } => {
                 let config_dir = resolve_config_dir(&cli.config_dir, config);
-                cmd_mesh_host(*port, server.as_deref(), room.as_deref(), &config_dir).await;
+                cmd_mesh_host(
+                    *port,
+                    server.as_deref(),
+                    room.as_deref(),
+                    share_mode,
+                    &config_dir,
+                )
+                .await;
             }
             MeshAction::Join {
                 room,
@@ -373,6 +505,44 @@ async fn main() {
             } => {
                 let config_dir = resolve_config_dir(&cli.config_dir, config);
                 cmd_mesh_join(room, server.as_deref(), *initiator, &config_dir).await;
+            }
+            MeshAction::Browse {
+                room,
+                server,
+                initiator,
+                config,
+                album,
+                name,
+            } => {
+                let config_dir = resolve_config_dir(&cli.config_dir, config);
+                cmd_mesh_browse(
+                    room,
+                    server.as_deref(),
+                    *initiator,
+                    &config_dir,
+                    album.clone(),
+                    name,
+                )
+                .await;
+            }
+            MeshAction::Rpc {
+                room,
+                command,
+                payload,
+                server,
+                initiator,
+                config,
+            } => {
+                let config_dir = resolve_config_dir(&cli.config_dir, config);
+                cmd_mesh_rpc(
+                    room,
+                    command,
+                    payload,
+                    server.as_deref(),
+                    *initiator,
+                    &config_dir,
+                )
+                .await;
             }
             MeshAction::Status { config } => {
                 let config_dir = resolve_config_dir(&cli.config_dir, config);
@@ -387,11 +557,22 @@ async fn main() {
                 cmd_mesh_quota(&config_dir);
             }
         },
-        Commands::Web { port, config } => {
-            let config_dir = resolve_config_dir(&cli.config_dir, &config);
+        Commands::Web {
+            port,
+            config,
+            share_mode,
+        } => {
+            let mode = siegu_core::rpc::ShareMode::parse(share_mode).unwrap_or_else(|| {
+                eprintln!(
+                    "invalid --share-mode '{share_mode}' (expected ro or rw), falling back to ro"
+                );
+                siegu_core::ShareMode::ReadOnly
+            });
+            let config_dir = resolve_config_dir(&cli.config_dir, config);
             if let Err(e) = web::run(web::WebOptions {
                 http_port: *port,
                 config: Some(config_dir.display().to_string()),
+                share_mode: mode,
             })
             .await
             {
@@ -791,7 +972,20 @@ fn cmd_config_keys() {
     }
 }
 
-async fn cmd_mesh_host(port: u16, server: Option<&str>, room: Option<&str>, config_dir: &Path) {
+async fn cmd_mesh_host(
+    port: u16,
+    server: Option<&str>,
+    room: Option<&str>,
+    share_mode: &str,
+    config_dir: &Path,
+) {
+    let share_mode = match siegu_core::ShareMode::parse(share_mode) {
+        Some(m) => m,
+        None => {
+            eprintln!("warning: unknown --share-mode '{share_mode}', defaulting to read-only");
+            siegu_core::ShareMode::ReadOnly
+        }
+    };
     let config_path = config_dir.display().to_string();
     let _ = std::fs::create_dir_all(config_dir);
     let db = Database::new(&config_path);
@@ -853,6 +1047,11 @@ async fn cmd_mesh_host(port: u16, server: Option<&str>, room: Option<&str>, conf
     let event = Arc::new(CliSyncEvent {
         config_path: config_path.clone(),
         sync_tx: Arc::clone(&sync_tx),
+        ready: Arc::new(tokio::sync::Notify::new()),
+        view_manifest: Arc::new(tokio::sync::Mutex::new(Vec::new())),
+        view_notify: Arc::new(tokio::sync::Notify::new()),
+        rpc_slot: Arc::new(tokio::sync::Mutex::new(None)),
+        rpc_notify: Arc::new(tokio::sync::Notify::new()),
     });
 
     let transport = MeshTransport::new(
@@ -864,7 +1063,8 @@ async fn cmd_mesh_host(port: u16, server: Option<&str>, room: Option<&str>, conf
         hostname.clone(),
         Vec::new(),
         event,
-    );
+    )
+    .with_share_mode(share_mode);
 
     println!("Waiting for peers... Press Ctrl+C to stop.");
 
@@ -905,6 +1105,11 @@ async fn cmd_mesh_join(room: &str, server: Option<&str>, initiator: bool, config
     let event = Arc::new(CliSyncEvent {
         config_path: config_path.clone(),
         sync_tx: Arc::clone(&sync_tx2),
+        ready: Arc::new(tokio::sync::Notify::new()),
+        view_manifest: Arc::new(tokio::sync::Mutex::new(Vec::new())),
+        view_notify: Arc::new(tokio::sync::Notify::new()),
+        rpc_slot: Arc::new(tokio::sync::Mutex::new(None)),
+        rpc_notify: Arc::new(tokio::sync::Notify::new()),
     });
 
     let transport = MeshTransport::new(
@@ -937,6 +1142,328 @@ async fn cmd_mesh_join(room: &str, server: Option<&str>, initiator: bool, config
     let _ = tokio::signal::ctrl_c().await;
     println!("Shutting down...");
     transport_handle.abort();
+}
+
+/// Handles for the one-shot mesh drivers (`mesh browse`, `mesh rpc`):
+/// everything needed to observe peer traffic from outside the transport.
+struct MeshDriver {
+    sync_tx: SharedSyncTx,
+    ready: Arc<tokio::sync::Notify>,
+    view_manifest: Arc<tokio::sync::Mutex<Vec<PhotoSyncInfo>>>,
+    view_notify: Arc<tokio::sync::Notify>,
+    rpc_slot: SharedRpcSlot,
+    rpc_notify: Arc<tokio::sync::Notify>,
+}
+
+impl MeshDriver {
+    /// Build the event sink, start the transport and wait until the WebRTC
+    /// channel reports "Secure Data Channel Ready".
+    async fn connect(
+        room: &str,
+        server: Option<&str>,
+        initiator: bool,
+        config_dir: &Path,
+        device_name: &str,
+    ) -> (Self, tokio::task::JoinHandle<()>) {
+        let config_path = config_dir.display().to_string();
+        let signaling_url = server
+            .map(|s| s.trim_end_matches('/').to_string())
+            .unwrap_or_else(|| "ws://127.0.0.1:8080".to_string());
+
+        let (event, sync_tx) = CliSyncEvent::new(&config_path);
+        let driver = Self {
+            ready: Arc::clone(&event.ready),
+            view_manifest: Arc::clone(&event.view_manifest),
+            view_notify: Arc::clone(&event.view_notify),
+            rpc_slot: Arc::clone(&event.rpc_slot),
+            rpc_notify: Arc::clone(&event.rpc_notify),
+            sync_tx: Arc::clone(&sync_tx),
+        };
+
+        let transport = MeshTransport::new(
+            room.to_string(),
+            initiator,
+            signaling_url.clone(),
+            config_path.clone(),
+            uuid::Uuid::new_v4().to_string(),
+            device_name.to_string(),
+            Vec::new(),
+            Arc::new(event),
+        )
+        .with_view_only_client(true)
+        .with_external_tx(Arc::clone(&sync_tx));
+
+        println!("Signaling: {signaling_url}");
+        let handle = tokio::spawn(async move {
+            if let Err(e) = transport.start().await {
+                eprintln!("WebRTC transport stopped: {e}");
+            }
+        });
+
+        if tokio::time::timeout(std::time::Duration::from_secs(90), driver.ready.notified())
+            .await
+            .is_err()
+        {
+            eprintln!("FAIL: data channel not ready within 90s");
+            handle.abort();
+            std::process::exit(1);
+        }
+        // Give VersionNegotiate/ManifestRequest a beat to settle on both sides.
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        (driver, handle)
+    }
+
+    async fn sender(&self) -> tokio::sync::mpsc::UnboundedSender<SyncMessage> {
+        match self.sync_tx.lock().await.as_ref() {
+            Some(tx) => tx.clone(),
+            None => {
+                eprintln!("FAIL: session sender not bound");
+                std::process::exit(1);
+            }
+        }
+    }
+}
+
+/// View-only e2e driver (#9/#10/#19): connect to a host, enter view-only
+/// mode and exercise the whole read-only surface — manifest, thumbnail
+/// fetch, sync-guard probe and a restore pull. Each stage prints a greppable
+/// `VIEWONLY ...` marker for scripts/e2e-view-only.sh; any stage failure
+/// exits non-zero so CI only needs the markers plus exit code.
+async fn cmd_mesh_browse(
+    room: &str,
+    server: Option<&str>,
+    initiator: bool,
+    config_dir: &Path,
+    album_id: Option<String>,
+    device_name: &str,
+) {
+    use std::time::Duration;
+
+    let _ = std::fs::create_dir_all(config_dir);
+    // Ensure schema exists so restore persistence has somewhere to land.
+    let _schema = Database::new(&config_dir.display().to_string());
+
+    println!("Browsing mesh room: {room}");
+    let (driver, handle) =
+        MeshDriver::connect(room, server, initiator, config_dir, device_name).await;
+    let tx = driver.sender().await;
+
+    // ── stage 1: EnterViewOnly / EnterAlbumShare → chunked manifest ───────
+    let entered = match &album_id {
+        Some(id) => tx.send(SyncMessage::EnterAlbumShare {
+            album_id: id.clone(),
+        }),
+        None => tx.send(SyncMessage::EnterViewOnly),
+    };
+    if entered.is_err() {
+        eprintln!("FAIL: could not send view-only/album-share entry");
+        std::process::exit(1);
+    }
+    if tokio::time::timeout(Duration::from_secs(60), driver.view_notify.notified())
+        .await
+        .is_err()
+    {
+        eprintln!("FAIL: view-only manifest did not arrive within 60s");
+        std::process::exit(1);
+    }
+    let photos = driver.view_manifest.lock().await.clone();
+    if photos.is_empty() {
+        eprintln!("FAIL: view-only manifest is empty (host library not scanned?)");
+        std::process::exit(1);
+    }
+    println!("VIEWONLY MANIFEST OK count={}", photos.len());
+    if album_id.is_some() {
+        println!("VIEWONLY ALBUM SCOPE OK count={}", photos.len());
+    }
+    let first_id = photos[0].id.clone();
+    let first_name = std::path::Path::new(&photos[0].location)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    // ── stage 2: thumbnail round-trip via the view-only cache ─────────────
+    let view = siegu_core::view_only::state();
+    if !view.request_media(&first_id, true) {
+        eprintln!("FAIL: could not request thumbnail");
+        std::process::exit(1);
+    }
+    match view
+        .wait_for(&format!("thumb:{first_id}"), Duration::from_secs(30))
+        .await
+    {
+        Some(media) => println!(
+            "VIEWONLY THUMB OK bytes={} mime={}",
+            media.bytes.len(),
+            media.mime
+        ),
+        None => {
+            eprintln!("FAIL: thumbnail for {first_id} did not arrive within 30s");
+            std::process::exit(1);
+        }
+    }
+
+    // ── stage 3: sync-guard probe — the sharer must IGNORE StartSync ──────
+    let _ = tx.send(SyncMessage::StartSync);
+    println!("VIEWONLY SYNC-GUARD PROBE SENT");
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // ── stage 3b (album share): membership enforcement (#16) ──────────────
+    // A photo outside the shared album must NOT be served; the host drops
+    // the FetchMediaRequest, so no media ever arrives for the bogus id.
+    if album_id.is_some() {
+        let bogus = "siegu-e2e-nonmember".to_string();
+        let _ = tx.send(SyncMessage::FetchMediaRequest {
+            id: bogus.clone(),
+            thumbnail: true,
+            restore: false,
+        });
+        println!("VIEWONLY ALBUM DENY PROBE SENT id={bogus}");
+        match view
+            .wait_for(&format!("thumb:{bogus}"), Duration::from_secs(5))
+            .await
+        {
+            Some(_) => {
+                eprintln!("FAIL: host served media for a photo outside the shared album");
+                std::process::exit(1);
+            }
+            None => println!("VIEWONLY ALBUM DENY OK id={bogus}"),
+        }
+    }
+
+    // ── stage 4: restore pull (#10) re-materializes the original locally ──
+    if tx
+        .send(SyncMessage::FetchMediaRequest {
+            id: first_id.clone(),
+            thumbnail: false,
+            restore: true,
+        })
+        .is_err()
+    {
+        eprintln!("FAIL: could not send restore FetchMediaRequest");
+        std::process::exit(1);
+    }
+    println!("VIEWONLY RESTORE REQUESTED id={first_id}");
+
+    let expected = config_dir.join("Siegu").join("siegu").join(&first_name);
+    let mut restored = false;
+    for _ in 0..120 {
+        if let Ok(meta) = std::fs::metadata(&expected) {
+            if meta.len() > 0 {
+                restored = true;
+                break;
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+    if !restored {
+        eprintln!(
+            "FAIL: restored original not found at {}",
+            expected.display()
+        );
+        std::process::exit(1);
+    }
+    println!("VIEWONLY RESTORE OK path={}", expected.display());
+    println!("VIEWONLY DONE");
+
+    handle.abort();
+}
+
+/// Test helper for scripts/e2e-view-only.sh (#16): build a manual album from
+/// the first N photos in this library and print its ID on stdout.
+fn cmd_seed_album(config_dir: &Path, name: &str, take_first: usize) {
+    let db = Database::new(&config_dir.display().to_string());
+    let ids: Vec<String> = db
+        .list_photos("", 0, take_first.max(1), false, false)
+        .iter()
+        .map(|p| p.id.clone())
+        .collect();
+    if ids.is_empty() {
+        eprintln!("FAIL: no photos in library to seed the album with");
+        std::process::exit(1);
+    }
+    let album = match db.create_album(name) {
+        Ok(a) => a,
+        Err(e) => {
+            eprintln!("FAIL: could not create album: {e}");
+            std::process::exit(1);
+        }
+    };
+    if let Err(e) = db.add_album_items(&album.id, &ids) {
+        eprintln!("FAIL: could not fill album: {e}");
+        std::process::exit(1);
+    }
+    println!("ALBUM ID {} photos={}", album.id, ids.len());
+}
+
+/// One-shot RPC driver (#19): connect, send a single CommandRequest and
+/// print the peer's reply as `RPC RESULT ok=<bool> <json>` / `RPC ERROR ...`.
+/// Exit code 0 on success, 3 when the command itself failed (ok=false).
+async fn cmd_mesh_rpc(
+    room: &str,
+    command: &str,
+    payload: &str,
+    server: Option<&str>,
+    initiator: bool,
+    config_dir: &Path,
+) {
+    use std::time::Duration;
+
+    let _ = std::fs::create_dir_all(config_dir);
+    let payload_value: serde_json::Value = match serde_json::from_str(payload) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("FAIL: payload is not valid JSON: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    println!("RPC mesh room: {room} command: {command}");
+    let (driver, handle) =
+        MeshDriver::connect(room, server, initiator, config_dir, "siegu-rpc-client").await;
+    let tx = driver.sender().await;
+
+    if tx
+        .send(SyncMessage::CommandRequest {
+            id: 1,
+            name: command.to_string(),
+            payload: payload_value,
+        })
+        .is_err()
+    {
+        eprintln!("FAIL: could not send CommandRequest");
+        std::process::exit(1);
+    }
+
+    if tokio::time::timeout(Duration::from_secs(45), driver.rpc_notify.notified())
+        .await
+        .is_err()
+    {
+        eprintln!("FAIL: no CommandResponse within 45s");
+        std::process::exit(1);
+    }
+    let (_id, ok, result, error) = match driver.rpc_slot.lock().await.take() {
+        Some(entry) => entry,
+        None => {
+            eprintln!("FAIL: response slot empty");
+            std::process::exit(1);
+        }
+    };
+    handle.abort();
+
+    if ok {
+        println!(
+            "RPC RESULT ok=true result={}",
+            result
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "null".into())
+        );
+    } else {
+        println!(
+            "RPC ERROR ok=false error={}",
+            error.unwrap_or_else(|| "unknown".into())
+        );
+        std::process::exit(3);
+    }
 }
 
 fn cmd_mesh_status(config_dir: &Path) {

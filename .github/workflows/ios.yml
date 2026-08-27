@@ -25,6 +25,10 @@ jobs:
         with:
           node-version: 20
 
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-ios, x86_64-apple-ios, aarch64-apple-ios-sim
@@ -34,7 +38,7 @@ jobs:
           key: ios
           workspaces: crates,src-tauri
 
-      - run: npm ci
+      - run: bun install
 
       - run: cargo fmt --check
         working-directory: src-tauri

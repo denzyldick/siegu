@@ -143,3 +143,84 @@ dialog#preview::backdrop {
   max-height: 74vh;
   object-fit: contain;
 }
+
+/* Session timer */
+.session-timer {
+  margin-left: auto;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.session-timer--warning {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.12);
+  animation: pulse-warn 1s ease-in-out infinite;
+}
+
+@keyframes pulse-warn {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Download Siegu upsell */
+.upsell-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 16px;
+  background: var(--panel);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 100;
+  backdrop-filter: blur(12px);
+}
+
+.upsell-inner {
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.upsell-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.upsell-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.upsell-text strong {
+  font-size: 0.9rem;
+}
+
+.upsell-text span {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.upsell-btn {
+  flex-shrink: 0;
+  padding: 6px 16px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+
+.upsell-btn:hover {
+  opacity: 0.85;
+}

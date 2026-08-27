@@ -30,8 +30,8 @@ function handleScanClick(): void {
       <v-col class="mx-2 flex-grow-1">
         <SearchBar />
       </v-col>
-      <v-col cols="auto" class="ml-2">
-        <div class="d-flex ga-1 align-center">
+      <v-col cols="auto" class="ml-2 flex-shrink-0">
+        <div class="d-flex ga-1 align-center" style="flex-wrap: nowrap">
           <v-tooltip location="top">
             <template #activator="{ props: tipProps }">
               <v-btn
@@ -48,7 +48,7 @@ function handleScanClick(): void {
                   indeterminate
                   size="16"
                   width="2"
-                  color="white"
+                  color="rgb(var(--v-theme-on-primary))"
                 />
                 <v-icon v-else size="16">mdi-magnify-scan</v-icon>
               </v-btn>

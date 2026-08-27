@@ -13,65 +13,47 @@
             class="viewer-nav-btn top-left"
             @click="close"
           ></v-btn>
+
           <template v-if="isMobile">
             <v-btn
-              icon="mdi-dots-vertical"
+              icon="mdi-share-variant-outline"
               variant="text"
-              color="rgba(var(--v-theme-on-surface), 0.6)"
-              class="viewer-nav-btn top-left-more"
-              @click="moreMenuOpen = true"
+              color="rgb(var(--v-theme-on-surface))"
+              class="viewer-nav-btn top-right"
+              @click="handleShare"
             ></v-btn>
-            <v-bottom-sheet v-model="moreMenuOpen">
+          </template>
+          <template v-else>
+            <v-menu location="bottom start" close-on-content-click>
+              <template v-slot:activator="{ props: menuProps }">
+                <v-btn
+                  v-bind="menuProps"
+                  icon="mdi-dots-vertical"
+                  variant="text"
+                  color="rgba(var(--v-theme-on-surface), 0.6)"
+                  class="viewer-nav-btn top-left-more"
+                ></v-btn>
+              </template>
               <v-list density="compact">
                 <v-list-item
                   v-for="item in moreItems"
                   :key="item.key"
-                  @click="closeMoreMenu(item.action)"
+                  @click="item.action()"
                   :prepend-icon="item.icon"
                 >
                   <v-list-item-title>{{ $t('media_viewer.' + item.key) }}</v-list-item-title>
                 </v-list-item>
               </v-list>
-            </v-bottom-sheet>
+            </v-menu>
+            <v-btn
+              v-if="!isVideo && !showInfo"
+              icon="mdi-information-outline"
+              variant="text"
+              color="rgba(var(--v-theme-on-surface), 0.6)"
+              class="viewer-nav-btn top-right"
+              @click="showInfo = !showInfo"
+            ></v-btn>
           </template>
-          <v-menu v-else location="bottom start" close-on-content-click>
-            <template v-slot:activator="{ props: menuProps }">
-              <v-btn
-                v-bind="menuProps"
-                icon="mdi-dots-vertical"
-                variant="text"
-                color="rgba(var(--v-theme-on-surface), 0.6)"
-                class="viewer-nav-btn top-left-more"
-              ></v-btn>
-            </template>
-            <v-list density="compact">
-              <v-list-item
-                v-for="item in moreItems"
-                :key="item.key"
-                @click="item.action()"
-                :prepend-icon="item.icon"
-              >
-                <v-list-item-title>{{ $t('media_viewer.' + item.key) }}</v-list-item-title>
-              </v-list-item>
-            </v-list>
-          </v-menu>
-          <v-btn
-            v-if="!isVideo && !showInfo"
-            icon="mdi-information-outline"
-            variant="text"
-            color="rgba(var(--v-theme-on-surface), 0.6)"
-            class="viewer-nav-btn top-right"
-            @click="showInfo = !showInfo"
-          ></v-btn>
-
-          <div
-            class="touch-overlay"
-            v-touch="{
-              left: () => next(),
-              right: () => prev(),
-              down: () => close(),
-            }"
-          ></div>
 
           <div class="viewer-content-container">
             <v-btn
@@ -80,28 +62,62 @@
               variant="text"
               color="rgb(var(--v-theme-on-surface))"
               size="x-large"
-              @click="prev"
+              @click="carouselAnimatePrev()"
               class="side-nav-btn left"
             ></v-btn>
 
-            <div class="media-wrapper" :class="{ interactive: isVideo }">
-              <img
-                v-if="currentPhoto && !isVideo"
-                :src="currentPhotoSrc"
-                class="viewer-image"
-                decoding="async"
-              />
-              <video
-                v-if="currentPhoto && isVideo && computedVideoUrl"
-                ref="videoPlayer"
-                :src="computedVideoUrl"
-                :type="videoType"
-                class="viewer-image"
-                controls
-                playsinline
-                preload="metadata"
-                @error="onVideoError($event)"
-              ></video>
+            <div
+              class="carousel-viewport"
+              @touchstart.passive="onCarouselTouchStart"
+              @touchmove.passive="onCarouselTouchMove"
+              @touchend="onCarouselTouchEnd"
+              @click="onCarouselClick"
+            >
+              <div
+                class="carousel-track"
+                :style="{
+                  transform: trackTransform,
+                  transition: isCarouselAnimating
+                    ? 'transform 300ms cubic-bezier(0.16, 1, 0.3, 1)'
+                    : 'none',
+                }"
+              >
+                <!-- Previous slide -->
+                <div class="carousel-slide">
+                  <template v-if="prevItem && !isItemVideo(prevItem)">
+                    <img :src="getItemSrc(prevItem)" class="viewer-image" decoding="async" />
+                  </template>
+                  <template v-else-if="prevItem && isItemVideo(prevItem)">
+                    <img :src="getItemThumbSrc(prevItem)" class="viewer-image" decoding="async" />
+                  </template>
+                </div>
+
+                <!-- Current slide -->
+                <div class="carousel-slide">
+                  <template v-if="currentPhoto && !isVideo">
+                    <img :src="currentPhotoSrc" class="viewer-image" decoding="async" />
+                  </template>
+                  <template v-else-if="currentPhoto && isVideo && computedVideoUrl">
+                    <VideoPlayer
+                      ref="videoPlayerRef"
+                      :src="computedVideoUrl"
+                      :type="videoType"
+                      :auto-play="true"
+                      @error="onVideoError($event)"
+                    />
+                  </template>
+                </div>
+
+                <!-- Next slide -->
+                <div class="carousel-slide">
+                  <template v-if="nextItem && !isItemVideo(nextItem)">
+                    <img :src="getItemSrc(nextItem)" class="viewer-image" decoding="async" />
+                  </template>
+                  <template v-else-if="nextItem && isItemVideo(nextItem)">
+                    <img :src="getItemThumbSrc(nextItem)" class="viewer-image" decoding="async" />
+                  </template>
+                </div>
+              </div>
             </div>
 
             <v-btn
@@ -110,12 +126,29 @@
               variant="text"
               color="rgb(var(--v-theme-on-surface))"
               size="x-large"
-              @click="next"
+              @click="carouselAnimateNext()"
               class="side-nav-btn right"
             ></v-btn>
           </div>
 
-          <div class="thumbnail-rail-container">
+          <!-- Time period overlay (mobile) -->
+          <transition name="fade">
+            <div v-if="timePeriodOverlayVisible" class="time-period-overlay">
+              {{ timePeriodOverlayLabel }}
+            </div>
+          </transition>
+
+          <!-- Heart pop animation (mobile) -->
+          <transition name="heart-pop">
+            <div v-if="heartPopping" class="heart-overlay">
+              <v-icon :color="isFavorited ? 'error' : 'rgba(255,255,255,0.7)'" size="80">
+                {{ isFavorited ? 'mdi-heart' : 'mdi-heart-outline' }}
+              </v-icon>
+            </div>
+          </transition>
+
+          <!-- Thumbnail rail (desktop only) -->
+          <div v-if="!isMobile" class="thumbnail-rail-container">
             <RecycleScroller
               ref="scrollerRef"
               class="thumbnail-rail"
@@ -131,6 +164,50 @@
               />
             </RecycleScroller>
           </div>
+
+          <!-- Mobile bottom bar -->
+          <div v-if="isMobile" class="mobile-bottom-bar">
+            <v-btn
+              icon
+              variant="text"
+              :color="isFavorited ? 'error' : 'rgb(var(--v-theme-on-surface))'"
+              @click="toggleFavorite"
+              size="small"
+            >
+              <v-icon>{{ isFavorited ? 'mdi-heart' : 'mdi-heart-outline' }}</v-icon>
+            </v-btn>
+            <v-btn
+              icon
+              variant="text"
+              color="rgb(var(--v-theme-on-surface))"
+              @click="showInfo = !showInfo"
+              size="small"
+            >
+              <v-icon>mdi-information-outline</v-icon>
+            </v-btn>
+            <v-btn
+              icon
+              variant="text"
+              color="rgb(var(--v-theme-on-surface))"
+              @click="moreMenuOpen = true"
+              size="small"
+            >
+              <v-icon>mdi-dots-vertical</v-icon>
+            </v-btn>
+          </div>
+
+          <v-bottom-sheet v-model="moreMenuOpen">
+            <v-list density="compact">
+              <v-list-item
+                v-for="item in moreItems"
+                :key="item.key"
+                @click="closeMoreMenu(item.action)"
+                :prepend-icon="item.icon"
+              >
+                <v-list-item-title>{{ $t('media_viewer.' + item.key) }}</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-bottom-sheet>
         </v-main>
 
         <v-navigation-drawer
@@ -417,10 +494,14 @@ import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { revealItemInDir, openPath } from '@tauri-apps/plugin-opener';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import MediaThumbnail from './MediaThumbnail.vue';
+import VideoPlayer from './VideoPlayer.vue';
 import { RecycleScroller } from 'vue-virtual-scroller';
 import AddToAlbumSheet from '@/components/albums/AddToAlbumSheet.vue';
 import { isVideo as checkIsVideo } from '@/composables/useMediaUtils';
 import { useMediaUrl } from '@/composables/useMediaUrl';
+import { useDoubleTap } from '@/composables/useDoubleTap';
+import { useTimePeriods } from '@/composables/useTimePeriods';
+import { useSwipeCarousel } from '@/composables/useSwipeCarousel';
 import { useI18n } from 'vue-i18n';
 import type { MediaItem } from '@/types/media';
 
@@ -454,6 +535,10 @@ const emit = defineEmits<{
   'navigate-to-person': [person: { id: string; name: string }];
 }>();
 
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+
 const showInfo = ref(false);
 const os = ref('');
 const moreMenuOpen = ref(false);
@@ -471,7 +556,7 @@ let unlistenEta: UnlistenFn | null = null;
 let unlistenResult: UnlistenFn | null = null;
 const snackbar = ref({ show: false, text: '', error: false });
 const downloadedModels = ref<string[]>([]);
-const videoPlayer = ref<HTMLVideoElement | null>(null);
+const videoPlayerRef = ref<InstanceType<typeof VideoPlayer> | null>(null);
 const scrollerRef = ref<{
   scrollToItem: (index: number, options?: ScrollToOptions) => void;
 } | null>(null);
@@ -487,6 +572,154 @@ const modelInfo = [
   { id: 'midas' },
   { id: 'whisper' },
 ];
+
+// ---------------------------------------------------------------------------
+// Time periods + touch gestures
+// ---------------------------------------------------------------------------
+
+const {
+  overlayLabel: timePeriodOverlayLabel,
+  overlayVisible: timePeriodOverlayVisible,
+  jumpToPrevious,
+  jumpToNext,
+} = useTimePeriods(() => props.photos);
+
+// ---------------------------------------------------------------------------
+// Carousel + touch gestures
+// ---------------------------------------------------------------------------
+
+const {
+  phase: carouselPhase,
+  isAnimating: isCarouselAnimating,
+  trackTransform,
+  getPrevIndex,
+  getNextIndex,
+  onTouchStart: carouselOnTouchStart,
+  onTouchMove: carouselOnTouchMove,
+  onTouchEnd: carouselOnTouchEnd,
+  animateNext: carouselAnimateNext,
+  animatePrev: carouselAnimatePrev,
+  reset: carouselReset,
+} = useSwipeCarousel({
+  totalItems: () => props.photos.length,
+  currentIndex: () => props.index,
+  onNavigate: (idx: number) => emit('update:index', idx),
+  onVerticalSwipe: (dir: 'up' | 'down') => {
+    if (dir === 'up') {
+      const target = jumpToPrevious(props.index);
+      if (target !== null) emit('update:index', target);
+    } else {
+      const target = jumpToNext(props.index);
+      if (target !== null) emit('update:index', target);
+    }
+  },
+});
+
+const {
+  handleTap,
+  heartPop: heartPopping,
+  cancelPending,
+} = useDoubleTap(
+  () => {
+    /* single tap: no-op in viewer (could toggle chrome) */
+  },
+  () => {
+    toggleFavorite();
+  },
+);
+
+function onCarouselTouchStart(e: TouchEvent): void {
+  carouselOnTouchStart(e);
+}
+
+function onCarouselTouchMove(e: TouchEvent): void {
+  const result = carouselOnTouchMove(e);
+  if (result.defaultPrevented) {
+    e.preventDefault();
+  }
+}
+
+function onCarouselTouchEnd(e: TouchEvent): void {
+  carouselOnTouchEnd(e);
+}
+
+function onCarouselClick(): void {
+  if (carouselPhase.value === 'idle') {
+    handleTap();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Favorites
+// ---------------------------------------------------------------------------
+
+const isFavorited = computed((): boolean => !!currentPhoto.value?.favorite);
+
+async function toggleFavorite(): Promise<void> {
+  if (!currentPhoto.value) return;
+  try {
+    const isNow = await invoke<boolean>('toggle_favorite', { id: currentPhoto.value.id });
+    emit('update:photo', { ...currentPhoto.value, favorite: isNow } as MediaItem);
+  } catch (e) {
+    console.error('Failed to toggle favorite', e);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Share
+// ---------------------------------------------------------------------------
+
+async function handleShare(): Promise<void> {
+  if (!currentPhoto.value) return;
+  const photo = currentPhoto.value;
+
+  // Try native OS share if available
+  if (navigator.share) {
+    try {
+      const ext = photo.location.split('.').pop()?.toLowerCase();
+      const mimeMap: Record<string, string> = {
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        png: 'image/png',
+        webp: 'image/webp',
+        heic: 'image/heic',
+        heif: 'image/heif',
+        mp4: 'video/mp4',
+        mov: 'video/quicktime',
+        webm: 'video/webm',
+      };
+      const mime = mimeMap[ext ?? ''] ?? 'application/octet-stream';
+
+      // Convert file to blob for sharing
+      if (!photo.view_only) {
+        const { convertFileSrc } = await import('@tauri-apps/api/core');
+        const url = convertFileSrc(photo.location);
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const file = new File([blob], photo.location.split('/').pop() ?? 'photo', { type: mime });
+
+        await navigator.share({
+          title: photo.caption ?? 'Photo from Siegu',
+          files: [file],
+        });
+        return;
+      }
+    } catch {
+      // User cancelled or share failed — fall through to upsell
+    }
+  }
+
+  // Fallback: show upsell dialog
+  snackbar.value = {
+    show: true,
+    text: t('media_viewer.share_upsell_hint'),
+    error: false,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Computed
+// ---------------------------------------------------------------------------
 
 const isMobile = computed(() => os.value === 'android' || os.value === 'ios');
 
@@ -509,7 +742,6 @@ const isViewOnly = computed((): boolean => !!currentPhoto.value?.view_only);
 
 const computedVideoUrl = computed(() => {
   if (!currentPhoto.value || !isVideo.value) return '';
-  // Evicted items stream from the peer through the media server (#10).
   if (isViewOnly.value) return remoteImageUrl(currentPhoto.value.id) ?? '';
   return buildVideoUrl(currentPhoto.value.location) ?? '';
 });
@@ -526,16 +758,11 @@ const videoType = computed(() => {
 
 const currentPhotoSrc = computed(() => {
   if (!currentPhoto.value || isVideo.value) return '';
-  // Evicted items: stream the original from the peer (#10).
   if (currentPhoto.value.view_only) {
     return remoteImageUrl(currentPhoto.value.id) ?? currentPhoto.value.encoded ?? '';
   }
   const ext = currentPhoto.value.location.split('.').pop()?.toLowerCase();
   if (['heic', 'heif'].includes(ext ?? '')) {
-    // Prefer the generated thumbnail; while it's still being produced, fall
-    // back to the media server's on-demand thumb (raw HEIC won't decode in
-    // the webview). The thumbnail-drain `photos-refreshed` upgrades this to
-    // the full generated image in a single reload.
     return (
       currentPhoto.value.encoded ||
       buildThumbUrl(currentPhoto.value.location) ||
@@ -628,6 +855,10 @@ const modelChips = computed(() => {
     }));
 });
 
+// ---------------------------------------------------------------------------
+// Analysis
+// ---------------------------------------------------------------------------
+
 function clearAnalysisListener(): void {
   if (unlistenResult) {
     unlistenResult();
@@ -646,12 +877,7 @@ function onVideoError(event: Event): void {
 }
 
 function stopVideo(): void {
-  const video = videoPlayer.value;
-  if (video) {
-    video.pause();
-    video.removeAttribute('src');
-    video.load();
-  }
+  videoPlayerRef.value?.pause();
 }
 
 async function fetchFaces(): Promise<void> {
@@ -822,7 +1048,9 @@ async function listenForEta(): Promise<void> {
 }
 
 function close(): void {
+  cancelPending();
   stopVideo();
+  carouselReset();
   visible.value = false;
 }
 
@@ -864,7 +1092,7 @@ function onAddedToAlbum(albumName: string): void {
   snackbar.value = {
     show: true,
     error: false,
-    text: t('albums.added_to_album', { album: albumName }),
+    text: t('albums.added_to_album', { collection: albumName }),
   };
 }
 
@@ -935,20 +1163,54 @@ function formatElapsed(start: number, tick: number): string {
   return `${m}m ${sec % 60}s`;
 }
 
-function next(): void {
-  if (props.photos.length === 0) return;
-  emit('update:index', (props.index + 1) % props.photos.length);
+// ---------------------------------------------------------------------------
+// Carousel item helpers
+// ---------------------------------------------------------------------------
+
+const prevItem = computed((): MediaItem | null => {
+  if (props.photos.length === 0) return null;
+  return props.photos[getPrevIndex()];
+});
+
+const nextItem = computed((): MediaItem | null => {
+  if (props.photos.length === 0) return null;
+  return props.photos[getNextIndex()];
+});
+
+function isItemVideo(item: MediaItem): boolean {
+  return checkIsVideo(item.location ?? '');
 }
 
-function prev(): void {
-  if (props.photos.length === 0) return;
-  emit('update:index', (props.index - 1 + props.photos.length) % props.photos.length);
+function getItemSrc(item: MediaItem): string {
+  if (item.view_only) return remoteImageUrl(item.id) ?? item.encoded ?? '';
+  const ext = item.location?.split('.').pop()?.toLowerCase();
+  if (['heic', 'heif'].includes(ext ?? '')) {
+    return item.encoded || buildThumbUrl(item.location) || convertFileSrc(item.location);
+  }
+  return convertFileSrc(item.location);
+}
+
+function getItemThumbSrc(item: MediaItem): string {
+  if (item.view_only) return remoteImageUrl(item.id) ?? '';
+  return buildThumbUrl(item.location) || convertFileSrc(item.location);
 }
 
 function handleKeydown(e: KeyboardEvent): void {
   if (!visible.value) return;
-  if (e.key === 'ArrowRight') next();
-  if (e.key === 'ArrowLeft') prev();
+  if (e.key === 'ArrowRight') {
+    carouselAnimateNext();
+  }
+  if (e.key === 'ArrowLeft') {
+    carouselAnimatePrev();
+  }
+  if (e.key === 'ArrowUp') {
+    const target = jumpToPrevious(props.index);
+    if (target !== null) emit('update:index', target);
+  }
+  if (e.key === 'ArrowDown') {
+    const target = jumpToNext(props.index);
+    if (target !== null) emit('update:index', target);
+  }
   if (e.key === 'Escape') close();
   if (e.key === 'i') showInfo.value = !showInfo.value;
 }
@@ -959,9 +1221,14 @@ function scrollToActiveThumb(): void {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Watchers
+// ---------------------------------------------------------------------------
+
 watch(
   () => props.index,
   () => {
+    cancelPending();
     stopVideo();
     isAnalyzing.value = false;
     isAnalyzingModel.value = null;
@@ -998,8 +1265,15 @@ watch(visible, (val) => {
     scrollToActiveThumb();
   } else {
     detectedFaces.value = [];
+    showInfo.value = false;
+    cancelPending();
+    carouselReset();
   }
 });
+
+// ---------------------------------------------------------------------------
+// Lifecycle
+// ---------------------------------------------------------------------------
 
 onMounted(async () => {
   window.addEventListener('keydown', handleKeydown);
@@ -1044,39 +1318,38 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.media-wrapper {
-  height: 100%;
+/* Carousel */
+.carousel-viewport {
   width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  touch-action: pan-y;
+}
+
+.carousel-track {
+  display: flex;
+  width: 300%;
+  height: 100%;
+  will-change: transform;
+}
+
+.carousel-slide {
+  width: 33.3333%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1;
-}
-
-/* Videos need the native controls clickable, which means stacking above the
-   swipe-gesture touch-overlay (z-index: 5). Images stay below it so swiping
-   between photos keeps working. */
-.media-wrapper.interactive {
-  position: relative;
-  z-index: 6;
+  flex-shrink: 0;
 }
 
 .viewer-image {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  transition: opacity 0.2s ease-in-out;
   user-select: none;
   -webkit-user-drag: none;
-}
-
-.touch-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 100px;
-  z-index: 5;
+  pointer-events: none;
 }
 
 .viewer-nav-btn {
@@ -1171,5 +1444,73 @@ onUnmounted(() => {
   100% {
     content: '';
   }
+}
+
+/* Mobile bottom bar */
+.mobile-bottom-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px 16px 20px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.4));
+  z-index: 100;
+}
+
+/* Time period overlay */
+.time-period-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(12px);
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding: 10px 24px;
+  border-radius: 24px;
+  z-index: 150;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Heart overlay */
+.heart-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 160;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+}
+
+/* Transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.heart-pop-enter-active {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.heart-pop-leave-active {
+  transition: opacity 0.4s ease;
+}
+.heart-pop-enter-from {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.5);
+}
+.heart-pop-leave-to {
+  opacity: 0;
 }
 </style>

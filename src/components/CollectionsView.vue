@@ -318,6 +318,13 @@
               >
                 <v-list-item-title>{{ $t('albums.edit_rules') }}</v-list-item-title>
               </v-list-item>
+              <v-list-item
+                v-if="currentSectionItem?.album?.kind === 'manual'"
+                @click="shareAlbum"
+                prepend-icon="mdi-share-variant-outline"
+              >
+                <v-list-item-title>{{ $t('albums.share_album') }}</v-list-item-title>
+              </v-list-item>
               <v-list-item @click="openRenameDialog" prepend-icon="mdi-pencil-outline">
                 <v-list-item-title>{{ $t('albums.rename_album') }}</v-list-item-title>
               </v-list-item>
@@ -480,6 +487,14 @@
 
     <v-dialog v-model="newAlbumDialog" max-width="420">
       <v-card class="rounded-xl pa-6" color="surface">
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          class="position-absolute"
+          style="top: 12px; right: 12px"
+          @click="newAlbumDialog = false"
+        ></v-btn>
         <h3 class="text-h6 font-weight-bold text-high-emphasis mb-4">
           {{ $t('albums.new_album') }}
         </h3>
@@ -507,6 +522,14 @@
 
     <v-dialog v-model="renameDialog" max-width="420">
       <v-card class="rounded-xl pa-6" color="surface">
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          class="position-absolute"
+          style="top: 12px; right: 12px"
+          @click="renameDialog = false"
+        ></v-btn>
         <h3 class="text-h6 font-weight-bold text-high-emphasis mb-4">
           {{ $t('albums.rename_album') }}
         </h3>
@@ -533,6 +556,14 @@
 
     <v-dialog v-model="confirmDelete" max-width="420">
       <v-card class="rounded-xl pa-6" color="surface">
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          class="position-absolute"
+          style="top: 12px; right: 12px"
+          @click="confirmDelete = false"
+        ></v-btn>
         <h3 class="text-h6 font-weight-bold text-high-emphasis mb-2">
           {{ $t('albums.delete_confirm_title') }}
         </h3>
@@ -542,6 +573,82 @@
           <v-btn variant="flat" color="error" @click="deleteCurrentAlbum">
             {{ $t('common.delete') }}
           </v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="shareDialog" max-width="520">
+      <v-card class="rounded-xl pa-6" color="surface">
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          class="position-absolute"
+          style="top: 12px; right: 12px"
+          @click="shareDialog = false"
+        ></v-btn>
+        <div class="d-flex align-center mb-4">
+          <v-avatar color="surface" size="40" class="mr-3">
+            <v-icon color="primary" size="20">mdi-link</v-icon>
+          </v-avatar>
+          <div>
+            <h3 class="text-h6 font-weight-bold text-high-emphasis">
+              {{ $t('albums.share_album') }}
+            </h3>
+            <p class="text-caption text-disabled mb-0">{{ $t('albums.share_album_subtitle') }}</p>
+          </div>
+        </div>
+
+        <v-alert
+          type="info"
+          variant="tonal"
+          color="primary"
+          border="start"
+          class="mb-4"
+          rounded="lg"
+        >
+          <div class="text-body-2 text-high-emphasis">
+            {{ $t('albums.share_requires_signalling') }}
+          </div>
+        </v-alert>
+
+        <v-alert type="info" variant="outlined" border="start" class="mb-4" rounded="lg">
+          <div class="text-body-2 text-high-emphasis font-weight-bold mb-1">
+            {{ $t('albums.share_how_it_works') }}
+          </div>
+          <div class="text-body-2 text-medium-emphasis">
+            {{ $t('albums.share_how_it_desc') }}
+          </div>
+        </v-alert>
+
+        <v-alert type="info" variant="tonal" color="info" border="start" rounded="lg" class="mb-0">
+          <div class="d-flex align-center">
+            <v-icon size="18" class="mr-2">mdi-cloud-outline</v-icon>
+            <div>
+              <div class="text-body-2 text-high-emphasis font-weight-bold">
+                {{ $t('signalling_upsell_title') }}
+              </div>
+              <div class="text-body-2 text-medium-emphasis">
+                {{ $t('signalling_upsell_desc') }}
+              </div>
+              <v-btn
+                variant="text"
+                color="primary"
+                size="small"
+                class="mt-2 px-0"
+                href="https://siegu.io/connect"
+                target="_blank"
+                rel="noopener"
+              >
+                {{ $t('signalling_upsell_cta') }}
+                <v-icon end size="14">mdi-open-in-new</v-icon>
+              </v-btn>
+            </div>
+          </div>
+        </v-alert>
+
+        <div class="d-flex justify-end mt-4">
+          <v-btn variant="text" @click="shareDialog = false">{{ $t('common.close') }}</v-btn>
         </div>
       </v-card>
     </v-dialog>
@@ -705,6 +812,9 @@ const creating = ref(false);
 const renameDialog = ref(false);
 const renameName = ref('');
 const confirmDelete = ref(false);
+const shareDialog = ref(false);
+const shareUrl = ref('');
+const shareLoading = ref(false);
 const snackbar = ref(false);
 const snackbarText = ref('');
 
@@ -1186,6 +1296,14 @@ function openRenameDialog(): void {
   if (!openedItem.value) return;
   renameName.value = openedItem.value.name;
   renameDialog.value = true;
+}
+
+async function shareAlbum(): Promise<void> {
+  const album = currentSectionItem.value?.album;
+  if (!album) return;
+  shareLoading.value = false;
+  shareDialog.value = true;
+  shareUrl.value = '';
 }
 
 async function renameCurrentAlbum(): Promise<void> {

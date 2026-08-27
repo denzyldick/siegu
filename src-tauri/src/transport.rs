@@ -268,7 +268,7 @@ async fn serve_remote_media(
                 .ok_or_else(warp::reject::not_found)?
         }
     };
-    Ok(warp::http::Response::builder()
+    warp::http::Response::builder()
         .header("Content-Type", media.mime)
         .header("Cache-Control", "no-store")
         .header("Content-Length", media.bytes.len())
@@ -277,7 +277,7 @@ async fn serve_remote_media(
         } else {
             (*media.bytes).clone()
         })
-        .map_err(|_| warp::reject::not_found())?)
+        .map_err(|_| warp::reject::not_found())
 }
 
 pub fn start_media_server(config_path: String) -> u16 {

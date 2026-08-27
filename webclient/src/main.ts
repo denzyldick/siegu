@@ -8,30 +8,13 @@
  * gallery and pulls media on demand. Nothing is persisted anywhere.
  */
 
-interface ViewPhoto {
-  id: string;
-  location: string;
-  created: string;
-  caption: string | null;
-}
+import { parseHash, inferMime, assembleChunks } from './lib';
+import type { ViewPhoto, SyncMsg } from './lib';
 
 type SignalMsg = Record<string, unknown> & { type: string };
 
-type SyncMsg =
-  | { type: 'ViewOnlyManifest'; photos: ViewPhoto[]; more: boolean }
-  | { type: 'ViewMedia'; id: string; mime: string; data: string }
-  | {
-      type: 'FileHeader';
-      id: string;
-      filename: string;
-      size: number;
-      checksum: string;
-    }
-  | { type: 'FileChunk'; id: string; index: number; data: number[] }
-  | { type: 'FileEnd'; id: string; checksum: string }
-  | { type: string; [k: string]: unknown };
-
 const statusEl = document.getElementById('status') as HTMLElement;
+const sessionTimerEl = document.getElementById('session-timer') as HTMLElement;
 const gateEl = document.getElementById('gate') as HTMLElement;
 const gateMsg = document.getElementById('gate-msg') as HTMLElement;
 const galleryEl = document.getElementById('gallery') as HTMLElement;
@@ -41,14 +24,6 @@ const previewBody = document.getElementById('preview-body') as HTMLElement;
 
 function setStatus(text: string): void {
   statusEl.textContent = text;
-}
-
-/** Parse "#CODE.TOKEN" from the URL fragment. */
-function parseHash(): { code: string; token: string } | null {
-  const raw = decodeURIComponent(window.location.hash.replace(/^#/, ''));
-  const [code, token] = raw.split('.');
-  if (!code || !token || code.includes('/') || token.includes('/')) return null;
-  return { code, token };
 }
 
 // ---------------------------------------------------------------------------
@@ -65,6 +40,31 @@ let pendingOriginal: {
   filename: string;
   chunks: Map<number, number[]>;
 } | null = null;
+
+/** Revoke a single blob URL and remove it from the cache. */
+function revokeObjectUrl(key: string): void {
+  const url = objectUrls.get(key);
+  if (url) {
+    URL.revokeObjectURL(url);
+    objectUrls.delete(key);
+  }
+}
+
+/** Revoke ALL blob URLs and clear every in-memory trace. */
+function destroyAllMedia(): void {
+  for (const url of objectUrls.values()) {
+    URL.revokeObjectURL(url);
+  }
+  objectUrls.clear();
+  inflightThumbs.clear();
+  pendingOriginal = null;
+  // Clear any img/video src attributes in the DOM
+  document.querySelectorAll<HTMLImageElement>('.tile img').forEach((img) => {
+    img.src = '';
+    img.removeAttribute('src');
+  });
+  previewBody.replaceChildren();
+}
 
 function cachedUrl(key: string): string | undefined {
   return objectUrls.get(key);
@@ -85,6 +85,7 @@ function storeBlobUrl(key: string, bytes: Uint8Array, mime: string): string {
 
 let dc: RTCDataChannel | null = null;
 let manifestPhotos: ViewPhoto[] = [];
+let currentSession: { code: string; token: string; albumId?: string } | null = null;
 
 function sendSync(msg: SyncMsg): void {
   if (!dc || dc.readyState !== 'open') return;
@@ -92,6 +93,10 @@ function sendSync(msg: SyncMsg): void {
   if (dc.bufferedAmount > 1_000_000) return;
   dc.send(JSON.stringify(msg));
 }
+
+// After sending EnterAlbumShare, if no ViewOnlyManifest arrives within this
+// window we assume the host denied the request (non-member or unsupported).
+let albumShareTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function requestThumb(id: string): void {
   if (cachedUrl(`thumb:${id}`) || inflightThumbs.has(id)) return;
@@ -108,8 +113,16 @@ function handleSync(msg: SyncMsg): void {
   switch (msg.type) {
     case 'ViewOnlyManifest': {
       const m = msg as Extract<SyncMsg, { type: 'ViewOnlyManifest' }>;
+      if (albumShareTimeout) {
+        clearTimeout(albumShareTimeout);
+        albumShareTimeout = null;
+      }
       manifestPhotos = manifestPhotos.concat(m.photos);
-      setStatus(`Loaded ${manifestPhotos.length} items…`);
+      setStatus(
+        m.more
+          ? `Loaded ${manifestPhotos.length} items…`
+          : `Loaded ${manifestPhotos.length} photos`,
+      );
       renderGallery();
       break;
     }
@@ -153,21 +166,9 @@ function finishOriginal(id: string): void {
   const orig = pendingOriginal;
   pendingOriginal = null;
   if (!orig || orig.id !== id) return;
-  const indexes = [...orig.chunks.keys()].sort((a, b) => a - b);
-  let len = 0;
-  for (const i of indexes) len += orig.chunks.get(i)!.length;
-  const bytes = new Uint8Array(len);
-  let offset = 0;
-  for (const i of indexes) {
-    bytes.set(orig.chunks.get(i)!, offset);
-    offset += orig.chunks.get(i)!.length;
-  }
-  const name = orig.filename.toLowerCase();
-  const mime = /\.(mp4|mov|m4v)$/.test(name)
-    ? 'video/mp4'
-    : /\.webm$/.test(name)
-      ? 'video/webm'
-      : 'image/jpeg';
+  const bytes = assembleChunks(orig.chunks);
+  if (!bytes) return;
+  const mime = inferMime(orig.filename);
   const url = storeBlobUrl(`original:${id}`, bytes, mime);
   showPreview(url, mime.startsWith('video/'));
 }
@@ -176,59 +177,86 @@ function finishOriginal(id: string): void {
 // Gallery
 // ---------------------------------------------------------------------------
 
-function renderGallery(): void {
-  if (galleryEl.childElementCount >= manifestPhotos.length) return;
-
-  const observer = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        const tile = entry.target as HTMLElement;
-        observer.unobserve(tile);
-        const id = tile.dataset.id!;
-        const cached = cachedUrl(`thumb:${id}`);
-        if (cached) applyThumb(id, cached);
-        else requestThumb(id);
-      }
-    },
-    { rootMargin: '300px' },
-  );
-
-  for (const photo of manifestPhotos) {
-    if (galleryEl.querySelector(`[data-id="${CSS.escape(photo.id)}"]`)) continue;
-    const tile = document.createElement('button');
-    tile.type = 'button';
-    tile.className = 'tile';
-    tile.dataset.id = photo.id;
-    tile.title = photo.caption ?? '';
-    tile.setAttribute(
-      'aria-label',
-      photo.caption ?? photo.location ?? photo.id,
-    );
-    tile.addEventListener('click', () => openFull(photo));
-
-    const img = document.createElement('img');
-    img.alt = photo.caption ?? '';
-    img.loading = 'lazy';
-    img.addEventListener('load', () => img.classList.add('loaded'));
-    tile.appendChild(img);
-
-    if (/\.(mp4|mov|avi|mkv|webm)$/i.test(photo.location)) {
-      const badge = document.createElement('span');
-      badge.className = 'badge';
-      badge.textContent = '▶';
-      tile.appendChild(badge);
+// One observer for the lifetime of the page: tiles ask it for thumbnails when
+// they approach the viewport. Recreating it per render leaked every instance.
+const galleryObserver = new IntersectionObserver(
+  (entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      const tile = entry.target as HTMLElement;
+      galleryObserver.unobserve(tile);
+      const id = tile.dataset.id!;
+      const cached = cachedUrl(`thumb:${id}`);
+      if (cached) applyThumb(id, cached);
+      else requestThumb(id);
     }
+  },
+  { rootMargin: '300px' },
+);
 
-    galleryEl.appendChild(tile);
-    observer.observe(tile);
+function buildTile(photo: ViewPhoto): HTMLElement {
+  const tile = document.createElement('button');
+  tile.type = 'button';
+  tile.className = 'tile';
+  tile.dataset.id = photo.id;
+  tile.title = photo.caption ?? '';
+  tile.setAttribute('aria-label', photo.caption ?? photo.location ?? photo.id);
+  tile.addEventListener('click', () => openFull(photo));
+
+  const img = document.createElement('img');
+  img.alt = photo.caption ?? '';
+  img.loading = 'lazy';
+  img.addEventListener('load', () => img.classList.add('loaded'));
+  tile.appendChild(img);
+
+  if (/\.(mp4|mov|avi|mkv|webm)$/i.test(photo.location)) {
+    const badge = document.createElement('span');
+    badge.className = 'badge';
+    badge.textContent = '▶';
+    tile.appendChild(badge);
+  }
+
+  galleryObserver.observe(tile);
+  return tile;
+}
+
+// Large libraries stream in as many manifest chunks; building the whole DOM
+// on every chunk (with a per-photo querySelector) crashed the tab around 9k
+// items. Grow instead: append one batch per call and let a sentinel element
+// pull in the next batch when the user scrolls near the end.
+const GALLERY_BATCH = 500;
+let renderedTiles = 0;
+const gallerySentinel = document.createElement('div');
+gallerySentinel.className = 'sentinel';
+
+function renderGallery(): void {
+  if (renderedTiles >= manifestPhotos.length) return;
+
+  const end = Math.min(renderedTiles + GALLERY_BATCH, manifestPhotos.length);
+  const frag = document.createDocumentFragment();
+  for (let i = renderedTiles; i < end; i++) {
+    frag.appendChild(buildTile(manifestPhotos[i]));
+  }
+  renderedTiles = end;
+
+  if (renderedTiles < manifestPhotos.length) {
+    galleryEl.appendChild(gallerySentinel);
+    galleryEl.appendChild(frag);
+  } else {
+    galleryEl.appendChild(frag);
+    gallerySentinel.remove();
   }
 }
 
+const sentinelObserver = new IntersectionObserver((entries) => {
+  for (const entry of entries) {
+    if (entry.isIntersecting) renderGallery();
+  }
+});
+sentinelObserver.observe(gallerySentinel);
+
 function applyThumb(id: string, url: string): void {
-  const img = galleryEl.querySelector<HTMLImageElement>(
-    `[data-id="${CSS.escape(id)}"] img`,
-  );
+  const img = galleryEl.querySelector<HTMLImageElement>(`[data-id="${CSS.escape(id)}"] img`);
   if (img) {
     img.src = url;
     img.classList.add('loaded');
@@ -269,7 +297,133 @@ function showPreview(url: string, video: boolean): void {
 document.getElementById('preview-close')?.addEventListener('click', () => {
   previewEl.close();
   previewBody.replaceChildren();
+  // Revoke the full-res blob to free memory
+  if (pendingOriginal) {
+    pendingOriginal = null;
+  }
 });
+
+// ---------------------------------------------------------------------------
+// Session timer (30 min auto-expiry)
+// ---------------------------------------------------------------------------
+
+const SESSION_MAX_MS = 30 * 60 * 1000; // 30 minutes
+let sessionStart = 0;
+let sessionTimerRaf = 0;
+
+function startSessionTimer(): void {
+  sessionStart = Date.now();
+  sessionTimerEl.hidden = false;
+  tickSessionTimer();
+}
+
+function tickSessionTimer(): void {
+  const elapsed = Date.now() - sessionStart;
+  const remaining = Math.max(0, SESSION_MAX_MS - elapsed);
+  const mins = Math.floor(remaining / 60_000);
+  const secs = Math.floor((remaining % 60_000) / 1000);
+  sessionTimerEl.textContent = `${mins}:${String(secs).padStart(2, '0')}`;
+  if (remaining <= 60_000) {
+    sessionTimerEl.classList.add('session-timer--warning');
+  }
+  if (remaining <= 0) {
+    sessionTimerEl.textContent = 'Session expired';
+    destroySession();
+    return;
+  }
+  sessionTimerRaf = requestAnimationFrame(tickSessionTimer);
+}
+
+// ---------------------------------------------------------------------------
+// Destructor — wipe all in-memory data
+// ---------------------------------------------------------------------------
+
+let destroyed = false;
+
+function destroySession(): void {
+  if (destroyed) return;
+  destroyed = true;
+
+  // Stop the timer
+  cancelAnimationFrame(sessionTimerRaf);
+
+  // Revoke every blob URL
+  destroyAllMedia();
+
+  // Close WebRTC
+  if (dc) {
+    try { dc.close(); } catch { /* ignore */ }
+    dc = null;
+  }
+  if (pc) {
+    try { pc.close(); } catch { /* ignore */ }
+    pc = null;
+  }
+
+  // Clear manifest
+  manifestPhotos = [];
+  renderedTiles = 0;
+
+  // Wipe gallery DOM
+  galleryEl.replaceChildren();
+
+  // Show end state
+  gateEl.hidden = false;
+  galleryEl.hidden = true;
+  gateMsg.textContent = 'This session has ended. All data has been cleared from your browser.';
+  setStatus('Session ended — data cleared');
+
+  // Clear URL hash so the session link can't be reloaded
+  if (window.location.hash) {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+}
+
+// Close session on page unload
+window.addEventListener('beforeunload', destroySession);
+
+// Close session on visibility change (user switches tabs for >5 min)
+let hiddenTimer: ReturnType<typeof setTimeout> | null = null;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    hiddenTimer = setTimeout(destroySession, 5 * 60 * 1000);
+  } else if (hiddenTimer) {
+    clearTimeout(hiddenTimer);
+    hiddenTimer = null;
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Download Siegu upsell
+// ---------------------------------------------------------------------------
+
+function renderUpsell(): void {
+  const el = document.createElement('div');
+  el.className = 'upsell-banner';
+  el.innerHTML = `
+    <div class="upsell-inner">
+      <span class="upsell-icon">📥</span>
+      <div class="upsell-text">
+        <strong>Get Siegu</strong>
+        <span>Browse your own library — fast, private, and offline.</span>
+      </div>
+      <a href="https://siegu.io" target="_blank" rel="noopener" class="upsell-btn">Download</a>
+    </div>
+  `;
+  document.body.appendChild(el);
+}
+
+// Show upsell after gallery loads
+let upsellShown = false;
+const origRenderGallery = renderGallery;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(renderGallery as any) = function patchedRenderGallery(this: any): void {
+  origRenderGallery.apply(this);
+  if (!upsellShown && renderedTiles > 0) {
+    upsellShown = true;
+    renderUpsell();
+  }
+};
 
 // ---------------------------------------------------------------------------
 // Signalling + WebRTC
@@ -281,7 +435,7 @@ function wsUrl(): string {
 }
 
 async function start(): Promise<void> {
-  const session = parseHash();
+  const session = parseHash(window.location.hash);
   if (!session) {
     setStatus('Missing session link');
     gateMsg.textContent =
@@ -290,6 +444,7 @@ async function start(): Promise<void> {
   }
 
   setStatus('Connecting…');
+  currentSession = session;
   const ws = new WebSocket(wsUrl());
 
   ws.addEventListener('open', () => {
@@ -305,6 +460,7 @@ async function start(): Promise<void> {
 
   ws.addEventListener('close', () => {
     setStatus('Session ended');
+    destroySession();
   });
 
   ws.addEventListener('error', () => {
@@ -332,7 +488,7 @@ async function start(): Promise<void> {
       case 'peer_disconnected':
       case 'room_closed':
         setStatus('Peer disconnected — session over');
-        if (dc) dc.close();
+        destroySession();
         break;
       default:
         break;
@@ -387,18 +543,38 @@ async function answerOffer(ws: WebSocket, sdpJson: string): Promise<void> {
     pc.ondatachannel = (ev) => {
       dc = ev.channel;
       dc.binaryType = 'arraybuffer';
+      console.log('[siegu-dc] channel', dc.label, dc.readyState);
       dc.onopen = () => {
+        console.log('[siegu-dc] open');
         setStatus('Connected — loading library…');
         gateEl.hidden = true;
         galleryEl.hidden = false;
         manifestPhotos = [];
-        sendSync({ type: 'EnterViewOnly' });
+        renderedTiles = 0;
+        startSessionTimer();
+        if (currentSession?.albumId) {
+          sendSync({ type: 'EnterAlbumShare', album_id: currentSession.albumId });
+          albumShareTimeout = setTimeout(() => {
+            if (manifestPhotos.length === 0) {
+              setStatus('Access denied — you are not a member of this album');
+              gateEl.hidden = false;
+              gateMsg.textContent =
+                'This link does not grant access to the requested album. Ask the owner to add you as a member.';
+            }
+          }, 8_000);
+        } else {
+          sendSync({ type: 'EnterViewOnly' });
+        }
       };
+      // webrtc-rs tags its outgoing frames as binary, so Chrome hands them
+      // to us as ArrayBuffers even though the payload is UTF-8 JSON.
+      const decoder = new TextDecoder();
       dc.onmessage = (me) => {
+        const text = typeof me.data === 'string' ? me.data : decoder.decode(me.data as ArrayBuffer);
         try {
-          handleSync(JSON.parse(me.data as string));
-        } catch {
-          /* ignore non-JSON frames */
+          handleSync(JSON.parse(text));
+        } catch (e) {
+          console.error('[siegu-dc] handle failed', e, text.slice(0, 120));
         }
       };
       dc.onclose = () => setStatus('Media channel closed');
