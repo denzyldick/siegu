@@ -51,6 +51,20 @@ jobs:
 
       - run: bun install
 
+      # Repo is Bun-only (bun.lock, no yarn.lock). The release build runs
+      # `tauri build` which executes beforeBuildCommand/beforeDevCommand, so a
+      # non-bun command there silently produced a release with no artifacts.
+      # Fail fast here instead of at release time.
+      - name: Verify Tauri build commands use Bun
+        run: |
+          for key in beforeBuildCommand beforeDevCommand; do
+            val=$(jq -r ".build.$key" src-tauri/tauri.conf.json)
+            case "$val" in
+              bun*) echo "OK: $key = $val" ;;
+              *) echo "::error::$key is '$val' — Bun repo requires bun commands (no yarn.lock); this previously caused a release with no artifacts."; exit 1 ;;
+            esac
+          done
+
       - run: bun run check:translations
 
       - run: bun run typecheck
