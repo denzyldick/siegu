@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -629,6 +630,10 @@ pub fn extract_photo_metadata(path: &Path) -> PhotoMetadata {
     let prefer_exif_created = meta.created.is_empty();
     fill_exif(&mut meta, path, prefer_exif_created);
 
+    if is_video_file(path) {
+        fill_video_gps(&mut meta, path);
+    }
+
     if meta.created.is_empty() {
         meta.created = created_from_mtime(path);
     }
@@ -750,6 +755,115 @@ fn clean_field_value(field: &exif::Field) -> String {
             .join(" "),
         _ => format!("{}", field.display_value()).trim().to_string(),
     }
+}
+
+/// Read GPS coordinates from a video file's container metadata.
+///
+/// Unlike images (EXIF), video location lives in MP4/MOV/QuickTime format tags.
+/// Most recorders store it as an ISO 6709 string (e.g. `+33.8600+151.2114/` or
+/// `+42.6977-064.5953/`) in the `location` or `com.apple.quicktime.location`
+/// tag. This is the only source that works for phone-captured videos that have
+/// no Google Takeout sidecar. It never overwrites sidecar coordinates (lat/lon
+/// are only filled when still 0.0).
+fn fill_video_gps(meta: &mut PhotoMetadata, path: &Path) {
+    if meta.latitude != 0.0 && meta.longitude != 0.0 {
+        return;
+    }
+    let output = Command::new("ffprobe")
+        .args([
+            "-v",
+            "quiet",
+            "-show_entries",
+            "format_tags=location,com.apple.quicktime.location",
+            "-of",
+            "json",
+        ])
+        .arg(path)
+        .output()
+        .ok()
+        .filter(|p| p.status.success());
+    let Some(output) = output else { return };
+    let Ok(v) = serde_json::from_slice::<serde_json::Value>(&output.stdout) else {
+        return;
+    };
+    let tags = v.pointer("/format/tags").and_then(|t| t.as_object());
+    let Some(tags) = tags else { return };
+    for key in ["location", "com.apple.quicktime.location"] {
+        let Some(raw) = tags.get(key).and_then(|s| s.as_str()) else {
+            continue;
+        };
+        if let Some((lat, lon)) = parse_location_string(raw) {
+            if meta.latitude == 0.0 {
+                meta.latitude = lat;
+            }
+            if meta.longitude == 0.0 {
+                meta.longitude = lon;
+            }
+            return;
+        }
+    }
+}
+
+/// Parse an ISO 6709 location string into `(latitude, longitude)`.
+///
+/// Handles the compact degree form used by most video containers, e.g.
+/// `+33.8600+151.2114/`, `-33.8600-151.2114/`, `+42.6977-064.5953/`, and the
+/// plain `lat,lon` (or `lat lon`) form. The first signed group is latitude
+/// (+, N or -, S) and the second is longitude (+, E or -, W), each in decimal
+/// degrees. A trailing `/` is ignored.
+fn parse_location_string(raw: &str) -> Option<(f64, f64)> {
+    let s = raw.trim();
+    if s.is_empty() {
+        return None;
+    }
+
+    // Form 1: ISO 6709 compact `+DD[.f]+DDD[.f]/` — two adjacent signed groups.
+    let sign_pos: Vec<usize> = s
+        .char_indices()
+        .filter_map(|(i, c)| if c == '+' || c == '-' { Some(i) } else { None })
+        .collect();
+    if sign_pos.len() >= 2 && sign_pos[1] > sign_pos[0] {
+        let first = &s[sign_pos[0]..sign_pos[1]];
+        let second = &s[sign_pos[1]..];
+        if let (Some(lat), Some(lon)) = (parse_signed_degrees(first), parse_signed_degrees(second))
+        {
+            return Some((lat, lon));
+        }
+    }
+
+    // Form 2: `lat,lon` or `lat lon`.
+    let separated = s.trim_end_matches('/');
+    let parts: Vec<&str> = separated
+        .split([',', ' ', '\t'])
+        .filter(|p| !p.is_empty())
+        .collect();
+    if parts.len() >= 2 {
+        if let (Some(lat), Some(lon)) = (
+            parse_signed_degrees(parts[0]),
+            parse_signed_degrees(parts[1]),
+        ) {
+            return Some((lat, lon));
+        }
+    }
+
+    None
+}
+
+/// Parse a single signed decimal-degree component like `+33.8600`, `-45.5`,
+/// `33.86`, or `+151.2114/`. A leading sign is optional (treated as positive)
+/// and a trailing `/` is ignored.
+fn parse_signed_degrees(s: &str) -> Option<f64> {
+    let s = s.trim().trim_end_matches('/').trim();
+    if s.is_empty() {
+        return None;
+    }
+    let (sign, rest) = match s.as_bytes()[0] {
+        b'+' => (1.0, &s[1..]),
+        b'-' => (-1.0, &s[1..]),
+        _ => (1.0, s),
+    };
+    let value: f64 = rest.trim().parse().ok()?;
+    Some(sign * value)
 }
 
 pub fn photo_from_metadata(path_str: &str, meta: &PhotoMetadata) -> Photo {
@@ -1166,5 +1280,49 @@ mod tests {
         std::fs::write(&media, "fake video bytes").unwrap();
         let meta = extract_photo_metadata(&media);
         assert_eq!(meta.created, "2023-01-01 12:00:00");
+    }
+
+    #[test]
+    fn test_parse_location_iso6709_northeast() {
+        assert_eq!(
+            parse_location_string("+33.8600+151.2114/"),
+            Some((33.86, 151.2114))
+        );
+    }
+
+    #[test]
+    fn test_parse_location_iso6709_southwest() {
+        assert_eq!(parse_location_string("-33.8-151.2"), Some((-33.8, -151.2)));
+    }
+
+    #[test]
+    fn test_parse_location_iso6709_mixed_signs() {
+        assert_eq!(
+            parse_location_string("+42.6977-064.5953/"),
+            Some((42.6977, -64.5953))
+        );
+        assert_eq!(
+            parse_location_string("-12.34+067.89/"),
+            Some((-12.34, 67.89))
+        );
+    }
+
+    #[test]
+    fn test_parse_location_comma_separated() {
+        assert_eq!(
+            parse_location_string("40.7306, -73.9352"),
+            Some((40.7306, -73.9352))
+        );
+        assert_eq!(
+            parse_location_string("-33.8688 151.2093"),
+            Some((-33.8688, 151.2093))
+        );
+    }
+
+    #[test]
+    fn test_parse_location_invalid() {
+        assert_eq!(parse_location_string(""), None);
+        assert_eq!(parse_location_string("no location here"), None);
+        assert_eq!(parse_location_string("+33.8600"), None);
     }
 }
