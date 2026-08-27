@@ -122,15 +122,13 @@ async function finishSetupAndScan(showTour = true): Promise<void> {
             height="56"
             class="mt-8"
             :loading="modelsStore.downloading"
-            :disabled="modelsStore.downloaded.length < 2 && !modelsStore.downloading"
             @click="goToStep('sync')"
           >
-            {{
-              modelsStore.downloaded.length < 2
-                ? t('onboarding.download_required')
-                : t('onboarding.continue')
-            }}
+            {{ t('onboarding.continue') }}
           </v-btn>
+          <div class="text-caption text-medium-emphasis text-center mt-2">
+            {{ t('onboarding.ai_optional') }}
+          </div>
         </v-card>
       </v-col>
     </v-row>
