@@ -42,11 +42,13 @@ if [ ! -d "$PHOTOS" ]; then
 fi
 
 sha256_of() {
+  local raw
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$1" | awk '{print $1}'
+    raw="$(sha256sum "$1")"
   else
-    shasum -a 256 "$1" | awk '{print $1}'
+    raw="$(shasum -a 256 "$1")"
   fi
+  echo "$raw" | tr -d '\r' | tr -d '\\' | tr '[:upper:]' '[:lower:]' | grep -oE '[0-9a-f]{64}' | head -n1
 }
 
 WORK="$(mktemp -d)"
@@ -147,7 +149,9 @@ FIRST_ID="$(grep -oE 'VIEWONLY RESTORE REQUESTED id=[^ ]+' "$WORK/browse.log" | 
 RESTORED_FILE="$(grep -oE 'VIEWONLY RESTORE OK path=.*' "$WORK/browse.log" | sed -E 's/VIEWONLY RESTORE OK path=//' | head -1)"
 
 echo "== verifying restored original is byte-identical =="
+[ -n "$EXPECTED_SHA" ] || { echo "FAIL: could not compute expected sha256" >&2; exit 1; }
 RECV_SHA="$(sha256_of "$RESTORED_FILE")"
+[ -n "$RECV_SHA" ] || { echo "FAIL: could not compute received sha256 for $RESTORED_FILE" >&2; exit 1; }
 if [ "$RECV_SHA" != "$EXPECTED_SHA" ]; then
   echo "FAIL: SHA-256 mismatch: expected $EXPECTED_SHA, got $RECV_SHA" >&2
   exit 1
