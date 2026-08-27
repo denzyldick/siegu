@@ -28,6 +28,7 @@ RUN npm ci --no-audit
 COPY webclient/ /app/webclient/
 RUN npx vite build
 
+WORKDIR /app
 COPY . .
 
 # Build only the signalling binary. siegu-core is built with default-features
