@@ -160,11 +160,16 @@ export const useSettingsStore = defineStore('settings', () => {
           const payload = event.payload;
           const level: LogLevel = normalizeLogLevel(payload.level);
           const log: LogEntry = {
-            time: new Date().toLocaleTimeString(
-              localStorage.getItem('siegu_language') || 'en',
-            ),
+            time: new Date().toLocaleTimeString(localStorage.getItem('siegu_language') || 'en'),
             message: payload.message,
-            type: level === 'error' || level === 'fatal' ? 'error' : level === 'warn' ? 'warn' : level === 'debug' || level === 'trace' ? 'debug' : 'info',
+            type:
+              level === 'error' || level === 'fatal'
+                ? 'error'
+                : level === 'warn'
+                  ? 'warn'
+                  : level === 'debug' || level === 'trace'
+                    ? 'debug'
+                    : 'info',
             level,
           };
           logs.value.unshift(log);
@@ -369,7 +374,14 @@ export const useSettingsStore = defineStore('settings', () => {
             localStorage.getItem('siegu_language') || 'en',
           ),
           message: l.message,
-          type: level === 'error' || level === 'fatal' ? 'error' : level === 'warn' ? 'warn' : level === 'debug' || level === 'trace' ? 'debug' : 'info',
+          type:
+            level === 'error' || level === 'fatal'
+              ? 'error'
+              : level === 'warn'
+                ? 'warn'
+                : level === 'debug' || level === 'trace'
+                  ? 'debug'
+                  : 'info',
           level,
         };
       });
