@@ -26,12 +26,12 @@ function handleScanClick(): void {
 
 <template>
   <v-app-bar elevation="0" color="surface" class="px-2">
-    <v-row class="px-2 align-center no-gutters">
-      <v-col class="mx-2 flex-grow-1">
+    <div class="toolbar-row">
+      <div class="toolbar-search">
         <SearchBar />
-      </v-col>
-      <v-col cols="auto" class="ml-2 flex-shrink-0">
-        <div class="d-flex ga-1 align-center" style="flex-wrap: nowrap">
+      </div>
+      <div class="toolbar-actions">
+        <div class="d-flex ga-1 align-center toolbar-btns">
           <v-tooltip location="top">
             <template #activator="{ props: tipProps }">
               <v-btn
@@ -72,7 +72,49 @@ function handleScanClick(): void {
             <span>{{ opt.label() }}</span>
           </v-tooltip>
         </div>
-      </v-col>
-    </v-row>
+      </div>
+    </div>
   </v-app-bar>
 </template>
+
+<style scoped>
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 16px;
+  width: 100%;
+  padding: 0 8px;
+}
+
+.toolbar-search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.toolbar-actions {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  .toolbar-row {
+    gap: 10px;
+  }
+}
+
+@media (max-width: 440px) {
+  .toolbar-row {
+    gap: 6px;
+    padding: 0 4px;
+  }
+
+  .toolbar-actions .toolbar-btns {
+    gap: 2px;
+  }
+
+  .toolbar-actions :deep(.v-btn) {
+    width: 36px;
+    height: 36px;
+  }
+}
+</style>
