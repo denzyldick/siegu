@@ -46,7 +46,7 @@ From `AndroidManifest.xml`:
 `scripts/run-android.sh` automates:
 
 1. Clean stale ffmpeg build artifacts
-2. `yarn build` — Build Vue frontend
+2. `bun run build` — Build Vue frontend
 3. `cargo ndk -t aarch64-linux-android build --release` — Cross-compile Rust
 4. Copy `libsiegu_lib.so` → `jniLibs/arm64-v8a/`
 5. `./gradlew assembleUniversalDebug` — Build universal APK
@@ -57,7 +57,7 @@ From `AndroidManifest.xml`:
 - Android SDK + NDK r27 (`~/Android/Sdk`)
 - `cargo-ndk` installed
 - Rust target: `rustup target add aarch64-linux-android`
-- Node/yarn deps installed
+- Bun/Node deps installed
 - Connected device or emulator with `adb`
 
 ## Custom Plugins

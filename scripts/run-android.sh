@@ -16,7 +16,7 @@
 #   - Android SDK + NDK r27 installed (default: ~/Android/Sdk)
 #   - cargo-ndk installed (cargo install cargo-ndk)
 #   - Rust targets: rustup target add aarch64-linux-android
-#   - yarn deps installed (yarn install)
+#   - Bun deps installed (bun install; npm works too)
 #   - Connected device or emulator with adb
 set -euo pipefail
 
@@ -29,7 +29,7 @@ PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 
 echo "=== Building frontend ==="
-yarn build
+bun run build
 
 # ffmpeg-sys-next resolves llvm-nm / llvm-strip via `clang/../llvm-nm`, which
 # fails on the clang FILE path. Patch its build.rs (idempotent) so the tools

@@ -45,7 +45,7 @@ bash scripts/run-android.sh
 ```
 
 The script:
-1. Builds the frontend (`yarn build`)
+1. Builds the frontend (`bun run build`)
 2. Cross-compiles Rust for `aarch64-linux-android` via `cargo-ndk`
 3. Copies `libsiegu_lib.so` into `jniLibs/arm64-v8a`
 4. Builds a universal debug APK via Gradle
@@ -55,7 +55,7 @@ The script:
 
 ```bash
 # 1. Build frontend
-yarn build
+bun run build
 
 # 2. Cross-compile Rust
 cargo ndk -t aarch64-linux-android -P 24 \

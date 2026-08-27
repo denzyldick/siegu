@@ -4,9 +4,9 @@
   "version": "0.1.10",
   "identifier": "io.denzyl.siegu",
   "build": {
-    "beforeDevCommand": "yarn dev -- --host",
+    "beforeDevCommand": "bun run dev -- --host",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "yarn build",
+    "beforeBuildCommand": "bun run build",
     "frontendDist": "../dist"
   },
   "app": {
