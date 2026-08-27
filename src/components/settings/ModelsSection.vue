@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div data-tour="settings-models">
     <div class="d-flex align-center justify-space-between mb-4">
       <div class="text-caption font-weight-bold text-disabled tracking-widest uppercase">
         {{ $t('settings.ai_models') }}

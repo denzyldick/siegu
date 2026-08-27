@@ -11,6 +11,7 @@
       @mouseleave="stopPreview"
     >
       <template v-if="isVisible">
+        <div class="media-card-shimmer" :class="{ 'is-hidden': imgLoaded }"></div>
         <video
           v-if="showHoverPreview"
           :src="computedVideoUrl"
@@ -29,6 +30,7 @@
           loading="lazy"
           :alt="$t('media_card.alt_photo')"
           class="media-card-img"
+          @load="onMainLoad"
           @error="onImageError"
         />
         <img
@@ -37,6 +39,7 @@
           loading="lazy"
           :alt="$t('media_card.alt_photo')"
           class="media-card-img"
+          @load="onMainLoad"
           @error="onPosterError"
         />
         <video
@@ -106,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useMediaUrl } from '@/composables/useMediaUrl';
 import { isVideo as checkIsVideo } from '@/composables/useMediaUtils';
 import type { MediaItem } from '@/types/media';
@@ -155,6 +158,12 @@ const videoType = computed(() => {
 });
 
 const posterFailed = ref(false);
+
+const imgLoaded = ref(false);
+
+function onMainLoad(): void {
+  imgLoaded.value = true;
+}
 
 const canHover = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover)').matches;
 const prefersReducedMotion =
@@ -205,6 +214,12 @@ const posterSrc = computed(() => {
   if (posterFailed.value || !isVideo.value || !props.path?.location) return undefined;
   if (isViewOnly.value) return remoteThumbUrl(props.path.id);
   return buildThumbUrl(props.path.location);
+});
+
+// Reset the loaded flag whenever the displayed source changes so a replaced
+// image (e.g. fav/thumb swap) re-shows the placeholder until it has loaded.
+watch([imageSrc, posterSrc], () => {
+  imgLoaded.value = false;
 });
 const notSynced = computed((): boolean => !!props.path?.sync_needed && !props.path?.received);
 
@@ -340,10 +355,41 @@ onUnmounted(() => {
 }
 
 .media-card-img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Shimmering skeleton shown until the thumbnail has loaded so the card keeps
+   a stable, pleasant sized square instead of a shrinking/flashing placeholder. */
+.media-card-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(var(--v-theme-primary), 0.06) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: media-card-shimmer 1.5s ease-in-out infinite;
+  transition: opacity 0.3s ease;
+}
+
+.media-card-shimmer.is-hidden {
+  opacity: 0;
+}
+
+@keyframes media-card-shimmer {
+  0% {
+    background-position: 130% 0;
+  }
+  100% {
+    background-position: -30% 0;
+  }
 }
 
 .scrim-overlay {

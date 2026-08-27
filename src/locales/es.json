@@ -444,7 +444,8 @@
     "done_desc": "¡Disfruta de Siegu! Tus fotos se están indexando en segundo plano. Vuelve a menudo a medida que tu biblioteca crezca.",
     "next": "Siguiente",
     "skip": "Saltar",
-    "done": "Listo"
+    "done": "Listo",
+    "help": "Ayuda"
   },
   "common": {
     "close": "Cerrar",
@@ -749,5 +750,39 @@
     "loading_models": "Preparando modelos de IA ...",
     "scan_button": "Escanear",
     "view_progress": "Ver progreso"
+  },
+  "settings_tour": {
+    "intro_title": "Resumen de los ajustes",
+    "intro_desc": "Aquí controlas todo: qué carpetas vigila Siegu, qué modelos de IA se usan, lo rápido que funciona la app, el aspecto, las copias de seguridad y mucho más. Pulsa ? aquí o en Siguiente para explorar cada sección.",
+    "folders_title": "Carpetas vigiladas",
+    "folders_desc": "Son las carpetas que Siegu escanea en busca de fotos y vídeos. Todo lo que añadas aquí se indexa y aparece en tu biblioteca y en los resultados de búsqueda.",
+    "folders_add_title": "Añadir una carpeta",
+    "folders_add_desc": "Toca «Añadir carpeta» para incluir una nueva ubicación en tu biblioteca. Después podrás eliminar una carpeta desde el menú o borrar por completo sus datos indexados.",
+    "ai_title": "IA y rendimiento",
+    "ai_desc": "Siegu usa IA en tu dispositivo para entender tus fotos: caras, objetos, texto, lugares y más. Aquí gestionas los modelos y ajustas cuánto debe trabajar la app.",
+    "models_title": "Modelos de IA",
+    "models_desc": "Cada modelo habilita una capacidad (caras, etiquetas, estética, etc.). Descarga los que quieras y activa o desactiva cada modelo descargado. Analiza las fotos existentes cuando quieras.",
+    "indexing_title": "Cuándo indexar",
+    "indexing_desc": "Elige cuándo se ejecuta la IA: en cuanto llegan fotos, solo cuando el equipo está inactivo, o manualmente con «Analizar ahora».",
+    "speed_title": "Ajustes de velocidad",
+    "speed_desc": "Bajo, Equilibrado o Completo controla cuántos núcleos y cuánta memoria usa la IA. Elige «Completo» para resultados más rápidos o «Bajo» para mantener el equipo ágil.",
+    "language_title": "Idioma",
+    "language_desc": "Cambia aquí toda la interfaz entre los idiomas disponibles.",
+    "appearance_title": "Apariencia",
+    "appearance_desc": "Elige Sistema, Claro u Oscuro según tu preferencia.",
+    "maintenance_title": "Mantenimiento",
+    "maintenance_desc": "Limpia y mantén tu biblioteca. Borrar la base de datos elimina los datos de IA indexados para poder reconstruirlos.",
+    "logs_title": "Registros del sistema",
+    "logs_desc": "La salida de registros en vivo ayuda a diagnosticar problemas. Copia los registros para compartirlos o bórralos desde esta vista.",
+    "storage_title": "Límite de almacenamiento",
+    "storage_desc": "Define un límite flexible de cuánto almacena este dispositivo para una biblioteca sincronizada y consulta el espacio ya utilizado.",
+    "signalling_title": "Servidor de señalización",
+    "signalling_desc": "Para sincronizar entre dispositivos, un servidor de señalización les ayuda a encontrarse. Configura la URL y el token y luego prueba y guarda.",
+    "update_title": "Actualizaciones",
+    "update_desc": "Comprueba aquí si hay una versión más reciente de Siegu y descárgala.",
+    "about_title": "Acerca de",
+    "about_desc": "Aquí están la información de versión y las licencias de código abierto que usa Siegu.",
+    "done_title": "¡Ya conoces los ajustes!",
+    "done_desc": "Eso cubre toda la página de ajustes. Explora con libertad: cada opción es opcional y se puede cambiar cuando quieras."
   }
 }

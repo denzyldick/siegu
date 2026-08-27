@@ -1,5 +1,11 @@
 <template>
-  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 overflow-hidden border">
+  <v-card
+    variant="flat"
+    color="surface"
+    rounded="xl"
+    class="mb-6 overflow-hidden border"
+    data-tour="settings-folders"
+  >
     <v-card-item class="py-4">
       <template v-slot:prepend>
         <v-avatar color="surface" size="32" class="mr-3">
@@ -73,6 +79,7 @@
         block
         height="48"
         class="rounded-xl"
+        data-tour="settings-folders-add"
       >
         <div class="d-flex align-center">
           <v-avatar color="rgba(255,255,255,0.2)" size="22" class="mr-2">

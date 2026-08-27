@@ -22,9 +22,12 @@ function retry(): void {
       >mdi-alert-circle-outline</v-icon
     >
     <h3 class="text-h6 font-weight-bold text-high-emphasis mb-2">Something went wrong</h3>
-    <p class="text-body-2 text-medium-emphasis mb-6 max-w-300">
+    <p class="text-body-2 text-medium-emphasis mb-4 max-w-300">
       {{ error.message || 'An unexpected error occurred.' }}
     </p>
+    <pre v-if="error.stack" class="error-stack text-caption text-disabled mb-6">{{
+      error.stack
+    }}</pre>
     <v-btn variant="flat" color="primary" class="" @click="retry"> Try Again </v-btn>
   </div>
   <slot v-else />
@@ -36,5 +39,17 @@ function retry(): void {
 }
 .max-w-300 {
   max-width: 300px;
+}
+.error-stack {
+  max-width: 560px;
+  max-height: 160px;
+  overflow: auto;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: rgb(var(--v-theme-surface-light));
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 0 auto;
 }
 </style>

@@ -444,7 +444,8 @@
     "done_desc": "Goditi Siegu! Le tue foto vengono indicizzate in background. Torna spesso mentre la tua libreria cresce.",
     "next": "Avanti",
     "skip": "Salta",
-    "done": "Fatto"
+    "done": "Fatto",
+    "help": "Aiuto"
   },
   "common": {
     "close": "Chiudi",
@@ -749,5 +750,39 @@
     "loading_models": "Preparazione dei modelli IA ...",
     "scan_button": "Scansiona",
     "view_progress": "Mostra avanzamento"
+  },
+  "settings_tour": {
+    "intro_title": "Panoramica delle impostazioni",
+    "intro_desc": "Qui controlli tutto: quali cartelle Siegu monitora, quali modelli IA vengono usati, quanto veloce lavora l’app, l’aspetto, i backup e altro ancora. Premi ? qui o su Avanti per esplorare ogni sezione.",
+    "folders_title": "Cartelle monitorate",
+    "folders_desc": "Sono le cartelle che Siegu analizza in cerca di foto e video. Tutto ciò che aggiungi qui viene indicizzato e appare nella tua libreria e nei risultati di ricerca.",
+    "folders_add_title": "Aggiungi una cartella",
+    "folders_add_desc": "Tocca «Aggiungi cartella» per includere una nuova posizione nella tua libreria. In seguito potrai rimuovere una cartella dal menu o cancellarne completamente i dati indicizzati.",
+    "ai_title": "IA e prestazioni",
+    "ai_desc": "Siegu usa l’IA sul tuo dispositivo per capire le tue foto: volti, oggetti, testo, luoghi e altro. Qui gestisci i modelli e regoli quanto deve lavorare l’app.",
+    "models_title": "Modelli IA",
+    "models_desc": "Ogni modello abilita una capacità (volti, tag, estetica, ecc.). Scarica quelli che vuoi e attiva o disattiva ogni modello scaricato. Analizza le foto esistenti quando preferisci.",
+    "indexing_title": "Quando indicizzare",
+    "indexing_desc": "Scegli quando esegue l’IA: subito all’arrivo delle foto, solo quando il computer è inattivo, oppure manualmente tramite «Analizza ora».",
+    "speed_title": "Preimpostazioni di velocità",
+    "speed_desc": "Basso, Bilanciato o Completo controlla quanti core e quanta memoria usa l’IA. Scegli «Completo» per i risultati più rapidi, o «Basso» per mantenere il PC reattivo.",
+    "language_title": "Lingua",
+    "language_desc": "Cambia qui l’intera interfaccia tra le lingue disponibili.",
+    "appearance_title": "Aspetto",
+    "appearance_desc": "Scegli Sistema, Chiaro o Scuro in base alla tua preferenza.",
+    "maintenance_title": "Manutenzione",
+    "maintenance_desc": "Ripulisci e mantieni la tua libreria. Cancellare il database rimuove i dati IA indicizzati, così da poterli ricostruire.",
+    "logs_title": "Registri di sistema",
+    "logs_desc": "L’output dei registri in tempo reale aiuta a diagnosticare i problemi. Copia i registri per condividerli o cancellali da questa vista.",
+    "storage_title": "Limite di archiviazione",
+    "storage_desc": "Imposta un limite flessibile di quanto questo dispositivo archivia per una libreria sincronizzata e controlla lo spazio già utilizzato.",
+    "signalling_title": "Server di segnalazione",
+    "signalling_desc": "Per la sincronizzazione tra dispositivi, un server di segnalazione aiuta i dispositivi a trovarsi. Imposta URL e token, poi prova e salva.",
+    "update_title": "Aggiornamenti",
+    "update_desc": "Controlla qui se è disponibile una versione più recente di Siegu e scaricala.",
+    "about_title": "Informazioni",
+    "about_desc": "Qui trovi le informazioni sulla versione e le licenze open source usate da Siegu.",
+    "done_title": "Ora conosci le impostazioni!",
+    "done_desc": "Hai visto l’intera pagina delle impostazioni. Esplora con calma: ogni opzione è facoltativa e modificabile in qualsiasi momento."
   }
 }

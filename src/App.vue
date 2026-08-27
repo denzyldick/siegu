@@ -23,6 +23,7 @@ import ErrorBoundary from '@/components/shared/ErrorBoundary.vue';
 import PersonMatchControls from '@/components/search/PersonMatchControls.vue';
 import ScanExperience from '@/components/ScanExperience.vue';
 import ProgressBanner from '@/components/layout/ProgressBanner.vue';
+import { settingsTourSteps } from '@/components/GuidedTourSteps';
 
 const { t } = useI18n();
 const appStore = useAppStore();
@@ -164,7 +165,7 @@ function removeFilterChip(index: number): void {
       <AppToolbar v-if="currentPage === 'home'" />
 
       <v-main>
-        <ErrorBoundary>
+        <ErrorBoundary :key="currentPage">
           <div data-tour="photos" class="w-100">
             <div
               v-if="currentPage === 'home' && searchStore.activeFilters.length"
@@ -206,7 +207,11 @@ function removeFilterChip(index: number): void {
           <CollectionsView v-if="currentPage === 'collections'" />
           <MapView v-if="currentPage === 'location'" />
           <DeviceList v-if="currentPage === 'devices'" />
-          <SettingsView v-if="currentPage === 'settings'" @done="uiStore.setPage('home')" />
+          <SettingsView
+            v-if="currentPage === 'settings'"
+            @done="uiStore.setPage('home')"
+            @start-tour="appStore.startSettingsTour()"
+          />
         </ErrorBoundary>
       </v-main>
 
@@ -229,6 +234,12 @@ function removeFilterChip(index: number): void {
       :active="appStore.showTour && !scanStore.showFullScreen"
       @finish="appStore.dismissTour()"
       @skip="appStore.dismissTour()"
+    />
+    <GuidedTour
+      :active="appStore.settingsShowTour && !scanStore.showFullScreen"
+      :steps="settingsTourSteps"
+      @finish="appStore.dismissSettingsTour()"
+      @skip="appStore.dismissSettingsTour()"
     />
   </v-app>
 </template>

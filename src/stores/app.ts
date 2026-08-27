@@ -14,6 +14,7 @@ export const useAppStore = defineStore('app', () => {
   const isNewInstall = ref(false);
   const onboardingStep = ref(0);
   const showTour = ref(false);
+  const settingsShowTour = ref(false);
   const os = ref('');
   const directories = ref<string[]>([]);
   const lastScanTime = ref<string>('Never');
@@ -74,11 +75,21 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function startTour(): void {
+    settingsShowTour.value = false;
     showTour.value = true;
   }
 
   function dismissTour(): void {
     showTour.value = false;
+  }
+
+  function startSettingsTour(): void {
+    showTour.value = false;
+    settingsShowTour.value = true;
+  }
+
+  function dismissSettingsTour(): void {
+    settingsShowTour.value = false;
   }
 
   void listenEvent('scan-progress', () => {
@@ -90,6 +101,7 @@ export const useAppStore = defineStore('app', () => {
     isNewInstall,
     onboardingStep,
     showTour,
+    settingsShowTour,
     os,
     directories,
     lastScanTime,
@@ -102,5 +114,7 @@ export const useAppStore = defineStore('app', () => {
     completeOnboarding,
     startTour,
     dismissTour,
+    startSettingsTour,
+    dismissSettingsTour,
   };
 });

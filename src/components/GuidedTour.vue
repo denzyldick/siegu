@@ -1,18 +1,22 @@
 <template>
   <div class="tour-overlay" v-if="props.active" @click="skip">
     <div class="tour-spotlight" :style="spotlightStyle" v-if="targetRect"></div>
-    <div class="tour-card" :class="cardPosition" @click.stop>
+    <div class="tour-card" :style="cardStyle" @click.stop>
       <div class="tour-card-inner">
         <v-icon size="32" color="primary" class="mb-3">{{ currentStep.icon }}</v-icon>
         <h3 class="text-h6 font-weight-bold text-high-emphasis mb-1">
           {{ $t(currentStep.titleKey) }}
         </h3>
         <p class="text-body-2 text-medium-emphasis mb-6">{{ $t(currentStep.descKey) }}</p>
-        <div class="d-flex align-center justify-space-between">
-          <v-btn variant="text" size="small" class="text-disabled font-weight-bold" @click="skip">{{
-            $t('guided_tour.skip')
-          }}</v-btn>
-          <div class="d-flex align-center ga-1">
+        <div class="d-flex align-center justify-space-between tour-footer">
+          <v-btn
+            variant="text"
+            size="small"
+            class="text-disabled font-weight-bold"
+            @click.stop="skip"
+            >{{ $t('guided_tour.skip') }}</v-btn
+          >
+          <div class="d-flex align-center ga-1 tour-dots">
             <span
               v-for="(_, i) in steps"
               :key="i"
@@ -26,7 +30,7 @@
             variant="flat"
             size="small"
             class="font-weight-bold px-6"
-            @click="next"
+            @click.stop="next"
           >
             {{ $t('guided_tour.next') }}
           </v-btn>
@@ -36,7 +40,7 @@
             variant="flat"
             size="small"
             class="font-weight-bold px-6"
-            @click="finish"
+            @click.stop="finish"
           >
             {{ $t('guided_tour.done') }}
           </v-btn>
@@ -48,22 +52,17 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onUnmounted } from 'vue';
-
-interface Step {
-  icon: string;
-  titleKey: string;
-  descKey: string;
-  target: string | null;
-  position: string;
-}
+import { defaultTourSteps, type Step } from './GuidedTourSteps';
 
 const props = withDefaults(
   defineProps<{
     active: boolean;
     target?: string;
+    steps?: Step[];
   }>(),
   {
     target: '',
+    steps: undefined,
   },
 );
 
@@ -76,67 +75,11 @@ const emit = defineEmits<{
 const step = ref(0);
 const targetRects = ref<Record<string, DOMRect>>({});
 const observer = ref<ResizeObserver | null>(null);
+let scrollSettledTimer: ReturnType<typeof setTimeout> | null = null;
 
-const steps: Step[] = [
-  {
-    icon: 'mdi-walk',
-    titleKey: 'guided_tour.welcome_title',
-    descKey: 'guided_tour.welcome_desc',
-    target: null,
-    position: 'bottom',
-  },
-  {
-    icon: 'mdi-magnify',
-    titleKey: 'guided_tour.search_title',
-    descKey: 'guided_tour.search_desc',
-    target: "[data-tour='search']",
-    position: 'top',
-  },
-  {
-    icon: 'mdi-image-multiple-outline',
-    titleKey: 'guided_tour.library_title',
-    descKey: 'guided_tour.library_desc',
-    target: "[data-tour='photos']",
-    position: 'bottom',
-  },
-  {
-    icon: 'mdi-progress-check',
-    titleKey: 'guided_tour.scan_progress_title',
-    descKey: 'guided_tour.scan_progress_desc',
-    target: "[data-tour='scan-progress']",
-    position: 'bottom',
-  },
-  {
-    icon: 'mdi-map-outline',
-    titleKey: 'guided_tour.map_title',
-    descKey: 'guided_tour.map_desc',
-    target: "[data-tour='dock-map']",
-    position: 'top',
-  },
-  {
-    icon: 'mdi-laptop',
-    titleKey: 'guided_tour.devices_title',
-    descKey: 'guided_tour.devices_desc',
-    target: "[data-tour='dock-devices']",
-    position: 'top',
-  },
-  {
-    icon: 'mdi-cog-outline',
-    titleKey: 'guided_tour.settings_title',
-    descKey: 'guided_tour.settings_desc',
-    target: "[data-tour='dock-settings']",
-    position: 'top',
-  },
-  {
-    icon: 'mdi-check-decagram',
-    titleKey: 'guided_tour.done_title',
-    descKey: 'guided_tour.done_desc',
-    target: null,
-    position: 'bottom',
-  },
-];
+const steps = computed<Step[]>(() => props.steps ?? defaultTourSteps);
 
-const currentStep = computed(() => steps[step.value]);
+const currentStep = computed(() => steps.value[step.value]);
 
 const targetRect = computed(() => {
   const t = currentStep.value.target;
@@ -156,8 +99,32 @@ const spotlightStyle = computed(() => {
   };
 });
 
-const cardPosition = computed(() => {
-  return currentStep.value.position === 'top' ? 'tour-card--top' : 'tour-card--bottom';
+const cardStyle = computed(() => {
+  const horizontal = { left: '12px', right: '12px', maxWidth: '420px', margin: '0 auto' };
+  const r = targetRect.value;
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 0;
+  if (!r) {
+    // Intro / done steps: show a clean centered card at the bottom.
+    return {
+      ...horizontal,
+      bottom: '24px',
+      top: 'auto',
+    };
+  }
+  const cardH = 260;
+  const gap = 16;
+  const below = vh - r.bottom - gap;
+  const above = r.top - gap;
+  if (above >= cardH) {
+    // Enough room above the target: place the card above the spotlight.
+    return { ...horizontal, bottom: `${vh - r.top + gap}px`, top: 'auto' };
+  }
+  if (below >= cardH) {
+    // Enough room below the target: place the card below the spotlight.
+    return { ...horizontal, top: `${r.bottom + gap}px`, bottom: 'auto' };
+  }
+  // Not enough room around a tall highlighted section: bottom sheet.
+  return { ...horizontal, bottom: '24px', top: 'auto' };
 });
 
 function measureTarget() {
@@ -167,6 +134,29 @@ function measureTarget() {
   if (el) {
     targetRects.value[t] = el.getBoundingClientRect();
   }
+}
+
+function scrollTargetIntoView() {
+  const t = currentStep.value.target;
+  if (!t) return;
+  const el = document.querySelector(t);
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function positionStep() {
+  scrollTargetIntoView();
+  measureTarget();
+  startObserver();
+  // Re-measure once the smooth scroll has settled so the spotlight and
+  // tooltip card end up at the correct on-screen position (smooth scroll is
+  // asynchronous, so the immediate measure reflects the pre-scroll layout).
+  if (scrollSettledTimer) clearTimeout(scrollSettledTimer);
+  scrollSettledTimer = setTimeout(() => {
+    measureTarget();
+    startObserver();
+  }, 500);
 }
 
 function stopObserver() {
@@ -188,7 +178,7 @@ function startObserver() {
 }
 
 function next() {
-  if (step.value < steps.length - 1) {
+  if (step.value < steps.value.length - 1) {
     step.value++;
   }
 }
@@ -205,8 +195,7 @@ function skip() {
 
 watch(step, () => {
   nextTick(() => {
-    measureTarget();
-    startObserver();
+    positionStep();
   });
 });
 
@@ -216,8 +205,7 @@ watch(
     if (val) {
       step.value = 0;
       nextTick(() => {
-        measureTarget();
-        startObserver();
+        positionStep();
       });
     } else {
       stopObserver();
@@ -227,6 +215,7 @@ watch(
 
 onUnmounted(() => {
   stopObserver();
+  if (scrollSettledTimer) clearTimeout(scrollSettledTimer);
 });
 </script>
 
@@ -249,20 +238,9 @@ onUnmounted(() => {
   transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .tour-card {
-  position: relative;
+  position: fixed;
   z-index: 10001;
-  width: 100%;
-  max-width: 420px;
-  margin: 16px;
   animation: tourSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.tour-card--top {
-  margin-top: 60px;
-  align-self: flex-start;
-}
-.tour-card--bottom {
-  margin-bottom: 80px;
-  align-self: flex-end;
 }
 .tour-card-inner {
   background: rgb(var(--v-theme-surface));
@@ -270,22 +248,24 @@ onUnmounted(() => {
   padding: 24px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
 }
-@media (max-width: 480px) {
-  .tour-card {
-    margin: 8px;
-    max-width: none;
-  }
-  .tour-card--top {
-    margin-top: 40px;
-  }
-  .tour-card--bottom {
-    margin-bottom: 70px;
-  }
-  .tour-card-inner {
-    padding: 20px;
-  }
+.tour-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
+
+.tour-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  flex-wrap: nowrap;
+}
+
 .tour-dot {
+  flex: 0 0 auto;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -295,6 +275,33 @@ onUnmounted(() => {
 .tour-dot--active {
   background: rgb(var(--v-theme-on-surface));
   transform: scale(1.3);
+}
+
+@media (max-width: 480px) {
+  .tour-card-inner {
+    padding: 20px;
+  }
+  .tour-footer {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .tour-dots {
+    order: 2;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: nowrap;
+  }
+  .tour-dot {
+    width: 7px;
+    height: 7px;
+    margin: 0 2px;
+  }
+  .tour-footer > .v-btn {
+    order: 3;
+  }
+  .tour-footer > .v-btn:first-child {
+    order: 1;
+  }
 }
 @keyframes tourSlideUp {
   from {

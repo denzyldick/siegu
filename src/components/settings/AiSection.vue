@@ -1,5 +1,11 @@
 <template>
-  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border overflow-hidden">
+  <v-card
+    variant="flat"
+    color="surface"
+    rounded="xl"
+    class="mb-6 border overflow-hidden"
+    data-tour="settings-ai"
+  >
     <v-card-item class="py-4">
       <template v-slot:prepend>
         <v-avatar color="on-surface" size="32" class="mr-3">
@@ -17,7 +23,7 @@
       <template v-if="!embedded">
         <v-divider class="my-6 border"></v-divider>
 
-        <div>
+        <div data-tour="settings-indexing">
           <div class="text-caption font-weight-bold text-disabled mb-4 tracking-widest uppercase">
             {{ $t('settings.indexing_when') }}
           </div>
@@ -65,7 +71,7 @@
 
         <v-divider class="my-6 border"></v-divider>
 
-        <div>
+        <div data-tour="settings-speed">
           <div class="text-caption font-weight-bold text-disabled mb-4 tracking-widest uppercase">
             {{ $t('settings.speed') }}
           </div>

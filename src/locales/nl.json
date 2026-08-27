@@ -444,7 +444,8 @@
     "done_desc": "Veel plezier met Siegu! Je foto's worden op de achtergrond geïndexeerd. Kom regelmatig terug.",
     "next": "Volgende",
     "skip": "Overslaan",
-    "done": "Gereed"
+    "done": "Gereed",
+    "help": "Help"
   },
   "common": {
     "close": "Sluiten",
@@ -749,5 +750,39 @@
     "loading_models": "AI-modellen worden voorbereid ...",
     "scan_button": "Scannen",
     "view_progress": "Voortgang bekijken"
+  },
+  "settings_tour": {
+    "intro_title": "Overzicht van de instellingen",
+    "intro_desc": "Hier regel je alles: welke mappen Siegu in de gaten houdt, welke AI-modellen worden gebruikt, hoe snel de app werkt, het uiterlijk, back-ups en meer. Druk hier op ? of op Volgende om elke sectie te verkennen.",
+    "folders_title": "Gevolgde mappen",
+    "folders_desc": "Dit zijn de mappen die Siegu scant op foto’s en video’s. Alles wat je hier toevoegt, wordt geïndexeerd en verschijnt in je bibliotheek en in de zoekresultaten.",
+    "folders_add_title": "Map toevoegen",
+    "folders_add_desc": "Tik op ‘Map toevoegen’ om een nieuwe locatie in je bibliotheek op te nemen. Je kunt een map later via het menu verwijderen, of de geïndexeerde gegevens volledig wissen.",
+    "ai_title": "AI en prestaties",
+    "ai_desc": "Siegu gebruikt AI op je apparaat om je foto’s te begrijpen: gezichten, objecten, tekst, plaatsen en meer. Hier beheer je de modellen en stem je af hoe hard de app mag werken.",
+    "models_title": "AI-modellen",
+    "models_desc": "Elk model schakelt een mogelijkheid in (gezichten, tags, esthetiek, enz.). Download de gewenste modellen en zet elk gedownload model aan of uit. Analyseer bestaande foto’s wanneer je maar wilt.",
+    "indexing_title": "Wanneer indexeren",
+    "indexing_desc": "Kies wanneer AI draait: direct zodra foto’s binnenkomen, alleen wanneer de computer inactief is, of handmatig via ‘Nu analyseren’.",
+    "speed_title": "Snelheidsvoorinstellingen",
+    "speed_desc": "Laag, Gebalanceerd of Volledig bepaalt hoeveel kernen en hoeveel geheugen AI gebruikt. Kies ‘Volledig’ voor de snelste resultaten, of ‘Laag’ als je de computer responsief wilt houden.",
+    "language_title": "Taal",
+    "language_desc": "Schakel hier de hele interface om tussen de beschikbare talen.",
+    "appearance_title": "Uiterlijk",
+    "appearance_desc": "Kies Systeem, Licht of Donker zodat het bij je voorkeur past.",
+    "maintenance_title": "Onderhoud",
+    "maintenance_desc": "Ruim op en onderhoud je bibliotheek. Door de database te wissen worden geïndexeerde AI-gegevens verwijderd, zodat ze opnieuw kunnen worden opgebouwd.",
+    "logs_title": "Systeemlogboeken",
+    "logs_desc": "Live loguitvoer helpt problemen op te sporen. Kopieer de logs om ze te delen, of wis ze vanuit deze weergave.",
+    "storage_title": "Opslaglimiet",
+    "storage_desc": "Stel een zachte limiet in voor hoeveel dit apparaat voor een gesynchroniseerde bibliotheek opslaat, en bekijk hoeveel ruimte er al wordt gebruikt.",
+    "signalling_title": "Signaleringsserver",
+    "signalling_desc": "Voor synchronisatie tussen apparaten helpt een signaleringsserver apparaten elkaar te vinden. Stel de URL en token in en test en sla daarna op.",
+    "update_title": "Updates",
+    "update_desc": "Controleer hier of er een nieuwere versie van Siegu beschikbaar is en download deze.",
+    "about_title": "Info",
+    "about_desc": "Hier vind je versie-informatie en de open-source licenties die Siegu gebruikt.",
+    "done_title": "Je kent de instellingen nu!",
+    "done_desc": "Dat was de hele instellingenpagina. Kijk gerust rond – elke optie is optioneel en kan op elk moment worden gewijzigd."
   }
 }

@@ -444,7 +444,8 @@
     "done_desc": "Profitez de Siegu ! Vos photos sont indexées en arrière-plan. Revenez régulièrement pour voir votre bibliothèque s'agrandir.",
     "next": "Suivant",
     "skip": "Passer",
-    "done": "Terminé"
+    "done": "Terminé",
+    "help": "Aide"
   },
   "common": {
     "close": "Fermer",
@@ -749,5 +750,39 @@
     "loading_models": "Préparation des modèles IA ...",
     "scan_button": "Scanner",
     "view_progress": "Voir la progression"
+  },
+  "settings_tour": {
+    "intro_title": "Aperçu des paramètres",
+    "intro_desc": "C’est ici que vous contrôlez tout : les dossiers que Siegu surveille, les modèles IA utilisés, la rapidité de l’application, l’apparence, les sauvegardes, etc. Appuyez sur ? ici ou sur Suivant pour explorer chaque section.",
+    "folders_title": "Dossiers surveillés",
+    "folders_desc": "Ce sont les dossiers que Siegu analyse pour trouver photos et vidéos. Tout ce que vous ajoutez ici est indexé et apparaît dans votre bibliothèque et dans les résultats de recherche.",
+    "folders_add_title": "Ajouter un dossier",
+    "folders_add_desc": "Touchez « Ajouter un dossier » pour inclure un nouvel emplacement dans votre bibliothèque. Vous pourrez ensuite supprimer un dossier via le menu, ou effacer complètement ses données indexées.",
+    "ai_title": "IA et performances",
+    "ai_desc": "Siegu utilise l’IA directement sur votre appareil pour comprendre vos photos : visages, objets, texte, lieux, etc. Ici, vous gérez les modèles et réglez l’intensité de travail de l’application.",
+    "models_title": "Modèles d’IA",
+    "models_desc": "Chaque modèle active une capacité (visages, mots-clés, esthétique, etc.). Téléchargez ceux que vous voulez et activez ou désactivez chaque modèle téléchargé. Analysez les photos existantes quand vous le souhaitez.",
+    "indexing_title": "Quand indexer",
+    "indexing_desc": "Choisissez quand l’IA s’exécute : immédiatement à l’arrivée des photos, uniquement quand l’ordinateur est inactif, ou manuellement via « Analyser maintenant ».",
+    "speed_title": "Préréglages de vitesse",
+    "speed_desc": "Faible, Équilibré ou Complet contrôle le nombre de cœurs et la mémoire utilisés par l’IA. Choisissez « Complet » pour les résultats les plus rapides, ou « Faible » pour garder la machine réactive.",
+    "language_title": "Langue",
+    "language_desc": "Changez ici toute l’interface entre les langues disponibles.",
+    "appearance_title": "Apparence",
+    "appearance_desc": "Choisissez Système, Clair ou Sombre selon vos préférences.",
+    "maintenance_title": "Maintenance",
+    "maintenance_desc": "Nettoyez et entretenez votre bibliothèque. Effacer la base de données supprime les données IA indexées afin qu’elles puissent être reconstruites.",
+    "logs_title": "Journaux système",
+    "logs_desc": "La sortie de journal en direct aide à diagnostiquer les problèmes. Copiez les journaux pour les partager, ou effacez-les depuis cette vue.",
+    "storage_title": "Limite de stockage",
+    "storage_desc": "Définissez une limite souple de stockage sur cet appareil pour une bibliothèque synchronisée et consultez l’espace déjà utilisé.",
+    "signalling_title": "Serveur de signalisation",
+    "signalling_desc": "Pour la synchronisation entre appareils, un serveur de signalisation aide les appareils à se trouver. Définissez l’URL et le jeton, puis testez et enregistrez.",
+    "update_title": "Mises à jour",
+    "update_desc": "Vérifiez ici si une version plus récente de Siegu est disponible et téléchargez-la.",
+    "about_title": "À propos",
+    "about_desc": "Les informations de version et les licences open source utilisées par Siegu se trouvent ici.",
+    "done_title": "Vous connaissez maintenant les paramètres !",
+    "done_desc": "Cela couvre toute la page des paramètres. Explorez librement : chaque option est facultative et modifiable à tout moment."
   }
 }

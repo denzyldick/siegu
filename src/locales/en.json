@@ -347,7 +347,7 @@
     "set_wallpaper": "Set as Wallpaper",
     "show_in_explorer": "Show in File Explorer",
     "open_with_app": "Open with Default App",
-    "add_to_album": "Add to Album",
+    "add_to_album": "Add to Collection",
     "wallpaper_set": "Wallpaper set successfully",
     "wallpaper_error": "Failed to set wallpaper",
     "opened_in_explorer": "Opened in file explorer",
@@ -360,8 +360,7 @@
     "restore_started": "Restoring original from your device...",
     "copy_failed": "Copy failed",
     "share_photo": "Share Photo",
-    "share_upsell_hint": "Share photos via Siegu's signalling server for secure, private sharing.",
-    "add_to_album": "Add to Collection"
+    "share_upsell_hint": "Share photos via Siegu's signalling server for secure, private sharing."
   },
   "folder_picker": {
     "select_folder": "Select Folder",
@@ -618,7 +617,8 @@
     "done_desc": "Enjoy Siegu! Your photos are being indexed in the background. Check back often as your library grows.",
     "next": "Next",
     "skip": "Skip",
-    "done": "Done"
+    "done": "Done",
+    "help": "Help"
   },
   "onboarding": {
     "greet_desc": "Your private, AI-powered photo library. No cloud, no uploads — just your memories, organized locally.",
@@ -750,5 +750,39 @@
     "loading_models": "Preparing AI models...",
     "scan_button": "Scan",
     "view_progress": "View progress"
+  },
+  "settings_tour": {
+    "intro_title": "Settings overview",
+    "intro_desc": "This is where you control everything: which folders Siegu watches, the AI models it uses, how fast it runs, appearance, backups and more. Press ? here or Next to explore each section.",
+    "folders_title": "Watched folders",
+    "folders_desc": "These are the folders Siegu scans for photos and videos. Anything you add here gets indexed so it appears in your library and search results.",
+    "folders_add_title": "Add a folder",
+    "folders_add_desc": "Tap Add Folder to include a new location in your library. You can remove a folder later with the menu button, or wipe its indexed data entirely.",
+    "ai_title": "AI & performance",
+    "ai_desc": "Siegu uses on-device AI to understand your photos: faces, objects, text, places and more. Here you manage models and tune how hard the app works.",
+    "models_title": "AI models",
+    "models_desc": "Each model enables a capability (faces, tags, aesthetics, etc.). Download the ones you want, and toggle any downloaded model on or off. Analyze existing photos whenever you like.",
+    "indexing_title": "When to index",
+    "indexing_desc": "Choose when AI runs: immediately as photos arrive, only when the computer is idle, or manually when you press Analyze Now.",
+    "speed_title": "Speed presets",
+    "speed_desc": "Low, Balanced or Full controls how many cores and how much memory AI uses. Pick Full for the fastest results, or Low if you want to keep the machine responsive.",
+    "language_title": "Language",
+    "language_desc": "Switch the entire interface between available languages here.",
+    "appearance_title": "Appearance",
+    "appearance_desc": "Choose System, Light or Dark theme to match your preference.",
+    "maintenance_title": "Maintenance",
+    "maintenance_desc": "Clean up and maintain your library. Clearing the database removes indexed AI data so it can be rebuilt.",
+    "logs_title": "System logs",
+    "logs_desc": "Live log output can help diagnose issues. Copy the logs to share them, or clear them from this view.",
+    "storage_title": "Storage cap",
+    "storage_desc": "Set a soft limit on how much this device stores for a synced library, and see how much space is currently used.",
+    "signalling_title": "Signalling server",
+    "signalling_desc": "For device-to-device sync, a signalling server helps devices find each other. Set the URL and token, then Test and Save.",
+    "update_title": "Updates",
+    "update_desc": "Check whether a newer version of Siegu is available and download it from here.",
+    "about_title": "About",
+    "about_desc": "Version info and the open-source licenses used by Siegu live here.",
+    "done_title": "You know the settings now!",
+    "done_desc": "That covers the whole settings page. Browse around — every option is optional and can be changed any time."
   }
 }

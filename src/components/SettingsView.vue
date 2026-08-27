@@ -3,7 +3,11 @@
     <PageLoading v-if="settingsLoading" class="py-16" />
     <v-row v-else justify="center">
       <v-col cols="12" :md="embedded ? 12 : 8" :lg="embedded ? 12 : 6">
-        <div v-if="!embedded" class="d-flex align-center justify-space-between mb-6">
+        <div
+          v-if="!embedded"
+          class="d-flex align-center justify-space-between mb-6"
+          data-tour="settings-help"
+        >
           <div>
             <div class="d-flex align-center mb-1">
               <v-icon color="rgb(var(--v-theme-on-surface))" size="28" class="mr-3"
@@ -15,6 +19,21 @@
             </div>
             <div class="text-subtitle-1 text-medium-emphasis">{{ $t('settings.desc') }}</div>
           </div>
+          <v-tooltip location="bottom">
+            <template #activator="{ props: tipProps }">
+              <v-btn
+                v-bind="tipProps"
+                icon
+                variant="text"
+                :aria-label="$t('guided_tour.help')"
+                data-tour="settings-help-trigger"
+                @click="emit('start-tour')"
+              >
+                <v-icon>mdi-help-circle-outline</v-icon>
+              </v-btn>
+            </template>
+            <span>{{ $t('guided_tour.help') }}</span>
+          </v-tooltip>
         </div>
 
         <FoldersSection
@@ -217,6 +236,7 @@ defineProps<{
 
 const emit = defineEmits<{
   'folder-added': [directories: unknown[]];
+  'start-tour': [];
 }>();
 
 const {

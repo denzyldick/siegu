@@ -1,5 +1,11 @@
 <template>
-  <v-card variant="flat" color="surface" rounded="xl" class="mb-6 border overflow-hidden">
+  <v-card
+    variant="flat"
+    color="surface"
+    rounded="xl"
+    class="mb-6 border overflow-hidden"
+    data-tour="settings-maintenance"
+  >
     <v-card-item class="py-4">
       <template v-slot:prepend>
         <v-avatar color="surface" size="32" class="mr-3">
@@ -45,6 +51,7 @@
         <v-sheet
           class="pa-4 rounded-lg overflow-y-auto border debug-logs-sheet mb-4"
           max-height="300"
+          data-tour="settings-logs"
         >
           <div
             v-for="(log, i) in logs"

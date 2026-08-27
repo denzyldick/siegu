@@ -444,7 +444,8 @@
     "done_desc": "Disfrutá Siegu! Bo fotonan ta ser indeksá na trasfondo. Bini bèk regularmente pa mira bo biblioteka crece.",
     "next": "Sigiente",
     "skip": "Sáltá",
-    "done": "Kla"
+    "done": "Kla",
+    "help": "Yudansa"
   },
   "common": {
     "close": "Sera",
@@ -749,5 +750,39 @@
     "loading_models": "Preparando modelnan di IA ...",
     "scan_button": "Scan",
     "view_progress": "Mira progreso"
+  },
+  "settings_tour": {
+    "intro_title": "Bista di e konfigurashonnan",
+    "intro_desc": "Aki bo ta kontrolá tur kos: ki karpeta Siegu ta vigilá, kua modelo di IA ta usa, kon lihé e app ta drun, aparensia, back-up i mas. Primi ? aki of na Siguiente pa explorá kada seccion.",
+    "folders_title": "Karpetanan vigilá",
+    "folders_desc": "Esakinan ta e karpetanan ku Siegu ta sken pa haña foto i video. Tur loke bo ta agregá aki ta wòrdu indeksá i ta aparesé den bo biblioteka i den e resultadonan di búskeda.",
+    "folders_add_title": "Agregá un karpeta",
+    "folders_add_desc": "Toca «Agregá karpeta» pa inkluí un lokalidat nobo den bo biblioteka. Despues bo por kita un karpeta via e menú, of borá su datonan indeksá completamente.",
+    "ai_title": "IA i rendimentu",
+    "ai_desc": "Siegu ta usa IA riba bo aparato pa komprendé bo fotonan: kara, opheto, teksto, lugánan i mas. Aki bo ta manehá e modelonan i ta husta kon duru e app mester traha.",
+    "models_title": "Modelo di IA",
+    "models_desc": "Kada modelo ta habilitá un kapasidat (kara, tag, estétika, etc.). Deskargá esnan ku bo ke i aktiva of desaktiva kada modelo deskargá. Analisá fotonan eksistente ora bo ke.",
+    "indexing_title": "Ki ora indeksá",
+    "indexing_desc": "Skohi ki ora IA ta drun: direktamente ora foto yega, solamente ora e kompûtadó no ta aktivo, of manualmente via «Analisá awor».",
+    "speed_title": "Preajustenan di velosidat",
+    "speed_desc": "Baha, Balansá of Kompleto ta kontrolá kuánto núcleo i kuánto memoria IA ta usa. Skohi «Kompleto» pa resulta di mas lihé, of «Baha» si bo ke mantené e kompûtadó responsivo.",
+    "language_title": "Idioma",
+    "language_desc": "Kambia aki henter e interfas entre e idiomannan disponibel.",
+    "appearance_title": "Aparensia",
+    "appearance_desc": "Skohi Sistema, Klaro of Skur segun bo preferensia.",
+    "maintenance_title": "Mantenimentu",
+    "maintenance_desc": "Límpia i mantené bo biblioteka. Bora e base di datu ta kita e datonan di IA indeksá, asina nan por wòrdu rekunstruí.",
+    "logs_title": "Log di sistema",
+    "logs_desc": "E salida di log na bibo ta yuda diagnostiká problemanan. Kopia e lognan pa kompartí nan, of bora nan desde e bista aki.",
+    "storage_title": "Limit di almacenamento",
+    "storage_desc": "Pone un limit fleksibel di kuánto e aparato aki ta almacená pa un biblioteka sinkronisá i wak kuánto spasio ya ta den uso.",
+    "signalling_title": "Servidor di señalisashon",
+    "signalling_desc": "Pa sinkronisashon entre aparatonan, un servidor di señalisashon ta yuda aparatonan haña otro. Pone e URL i token i despues probá i warda.",
+    "update_title": "Update",
+    "update_desc": "Verifiká aki si tin un vershon mas nobo di Siegu disponibel i deskargá e.",
+    "about_title": "Tokante di",
+    "about_desc": "E informashon di vershon i e lisensianan open source ku Siegu ta usa ta aki.",
+    "done_title": "Awor bo sa e konfigurashonnan!",
+    "done_desc": "Esénan ta kubrí henter e página di konfigurashon. Explorá na bo gustu: kada opcion ta opshonal i por wòrdu kambia na kualke momento."
   }
 }

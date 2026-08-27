@@ -444,7 +444,8 @@
     "done_desc": "Genieße Siegu! Deine Fotos werden im Hintergrund indiziert. Schau regelmäßig vorbei, während deine Bibliothek wächst.",
     "next": "Weiter",
     "skip": "Überspringen",
-    "done": "Fertig"
+    "done": "Fertig",
+    "help": "Hilfe"
   },
   "common": {
     "close": "Schließen",
@@ -749,5 +750,39 @@
     "loading_models": "KI-Modelle werden vorbereitet ...",
     "scan_button": "Scannen",
     "view_progress": "Fortschritt anzeigen"
+  },
+  "settings_tour": {
+    "intro_title": "Übersicht über die Einstellungen",
+    "intro_desc": "Hier steuerst du alles: welche Ordner Siegu überwacht, welche KI-Modelle verwendet werden, wie schnell die App läuft, das Erscheinungsbild, Sicherungen und mehr. Drücke hier auf ? oder auf Weiter, um jede Sektion zu erkunden.",
+    "folders_title": "Überwachte Ordner",
+    "folders_desc": "Dies sind die Ordner, die Siegu nach Fotos und Videos durchsucht. Alles, was du hier hinzufügst, wird indiziert und erscheint in deiner Bibliothek und in den Suchergebnissen.",
+    "folders_add_title": "Ordner hinzufügen",
+    "folders_add_desc": "Tippe auf „Ordner hinzufügen“, um einen neuen Speicherort in deine Bibliothek aufzunehmen. Einen Ordner kannst du später über das Menü entfernen oder seine indizierten Daten vollständig löschen.",
+    "ai_title": "KI und Leistung",
+    "ai_desc": "Siegu nutzt KI direkt auf deinem Gerät, um deine Fotos zu verstehen: Gesichter, Objekte, Text, Orte und mehr. Hier verwaltest du die Modelle und passt an, wie stark die App arbeiten soll.",
+    "models_title": "KI-Modelle",
+    "models_desc": "Jedes Modell ermöglicht eine Funktion (Gesichter, Schlagwörter, Ästhetik usw.). Lade die gewünschten Modelle herunter und schalte jedes heruntergeladene Modell einzeln ein oder aus. Analysiere vorhandene Fotos, wann immer du möchtest.",
+    "indexing_title": "Wann indiziert werden soll",
+    "indexing_desc": "Wähle, wann die KI läuft: sofort, wenn Fotos eintreffen, nur wenn der Computer im Leerlauf ist, oder manuell über „Jetzt analysieren“.",
+    "speed_title": "Geschwindigkeitsvorgaben",
+    "speed_desc": "Niedrig, Ausgewogen oder Voll steuert, wie viele Kerne und wie viel Speicher die KI nutzt. Wähle „Voll“ für die schnellsten Ergebnisse oder „Niedrig“, wenn dein Gerät reaktionsfähig bleiben soll.",
+    "language_title": "Sprache",
+    "language_desc": "Wechsle hier die gesamte Oberfläche zwischen den verfügbaren Sprachen.",
+    "appearance_title": "Erscheinungsbild",
+    "appearance_desc": "Wähle „System“, „Hell“ oder „Dunkel“, damit es deinen Vorlieben entspricht.",
+    "maintenance_title": "Wartung",
+    "maintenance_desc": "Räume auf und pflege deine Bibliothek. Durch das Löschen der Datenbank werden die indizierten KI-Daten entfernt, damit sie neu aufgebaut werden können.",
+    "logs_title": "Systemprotokolle",
+    "logs_desc": "Live-Protokollausgaben helfen bei der Diagnose von Problemen. Kopiere die Protokolle, um sie zu teilen, oder lösche sie aus dieser Ansicht.",
+    "storage_title": "Speicherlimit",
+    "storage_desc": "Lege eine weiche Obergrenze fest, wie viel dieses Gerät für eine synchronisierte Bibliothek speichert, und sieh nach, wie viel Speicherplatz bereits belegt ist.",
+    "signalling_title": "Signalisierungsserver",
+    "signalling_desc": "Für die Synchronisierung zwischen Geräten hilft ein Signalisierungsserver den Geräten, sich zu finden. Lege URL und Token fest und teste und speichere sie anschließend.",
+    "update_title": "Updates",
+    "update_desc": "Prüfe hier, ob eine neuere Version von Siegu verfügbar ist, und lade sie herunter.",
+    "about_title": "Info",
+    "about_desc": "Hier findest du Versionsinformationen und die von Siegu verwendeten Open-Source-Lizenzen.",
+    "done_title": "Du kennst jetzt die Einstellungen!",
+    "done_desc": "Das war die gesamte Einstellungsseite. Schau dich um – jede Option ist optional und jederzeit änderbar."
   }
 }
