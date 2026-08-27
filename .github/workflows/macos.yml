@@ -81,7 +81,7 @@ jobs:
         working-directory: src-tauri
 
       - name: Build Tauri App (no bundle)
-        run: bun run tauri build -- --no-bundle
+        run: bun run tauri build --no-bundle
 
       # ── Mesh sync over a real LAN signaling server, no ML models ─────────
       - name: Build CLI (release)
