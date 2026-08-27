@@ -18,3 +18,12 @@ pub fn emit_log(app: &tauri::AppHandle, message: String) {
 pub fn debug_log(message: String) {
     crate::log::persist_log(crate::log::infer_level(&message), &message);
 }
+
+/// Current UNIX time in milliseconds since the epoch.
+pub fn unix_now_ms() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}

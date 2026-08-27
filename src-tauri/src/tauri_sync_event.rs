@@ -33,6 +33,7 @@ impl SyncEvent for TauriSyncEvent {
     }
 
     fn on_sync_progress(&self, progress: SyncProgress) {
+        crate::notify::mark_sync_activity();
         // Per-file start events (carry filename + thumbnail) and completion
         // events always pass through; plain per-chunk updates are rate limited.
         let always_emit = progress.filename.is_some()
@@ -288,16 +289,8 @@ pub fn cancel_sync_paused(app: &tauri::AppHandle) {
 }
 
 pub fn notify_photos_ready(app: &tauri::AppHandle, pending: i64) {
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        use tauri_plugin_notification::NotificationExt;
-        let _ = app
-            .notification()
-            .builder()
-            .title("Siegu")
-            .body(format!(
-                "Scan complete — {pending} photo(s) ready to sync. Connect a device to sync them."
-            ))
-            .show();
-    });
+    crate::notify::notify_critical(
+        app,
+        format!("Scan complete — {pending} photo(s) ready to sync. Connect a device to sync them."),
+    );
 }

@@ -88,13 +88,10 @@ pub async fn start_watcher(app: tauri::AppHandle) {
                             continue;
                         }
 
-                        use tauri_plugin_notification::NotificationExt;
-                        let _ = app_clone
-                            .notification()
-                            .builder()
-                            .title("Siegu")
-                            .body("New media detected, scanning...")
-                            .show();
+                        crate::notify::notify_routine(
+                            &app_clone,
+                            "New media detected, scanning...".to_string(),
+                        );
 
                         crate::commands::scan::scan_files(app_clone.clone());
                     }

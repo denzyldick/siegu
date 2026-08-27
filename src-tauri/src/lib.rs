@@ -6,6 +6,7 @@ mod file;
 mod log;
 mod mdns_plugin;
 mod ml;
+mod notify;
 mod permission_plugin;
 mod startup;
 mod tauri_sync_event;
@@ -225,6 +226,8 @@ pub fn run() {
             );
             app.manage(ml_context);
 
+            let connected = Arc::new(std::sync::atomic::AtomicBool::new(false));
+
             let media_server_port = transport::start_media_server(config_path);
             app.manage(transport::MediaServerState {
                 port: media_server_port,
@@ -233,10 +236,13 @@ pub fn run() {
             app.manage(WebRtcState {
                 active_session: std::sync::Mutex::new(None),
                 sync_tx,
-                connected: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                connected: Arc::clone(&connected),
                 lan_server: std::sync::Mutex::new(None),
                 host_info: std::sync::Mutex::new(None),
             });
+
+            app.manage(notify::FocusState::default());
+            notify::spawn_backup_stall_monitor(app.handle(), connected);
 
             app.manage(ScanState {
                 guard: siegu_core::ScanGuard::new(),
@@ -259,10 +265,18 @@ pub fn run() {
 
             Ok(())
         })
-        .on_window_event(|_window, event| match event {
+        .on_window_event(|window, event| match event {
+            #[cfg(desktop)]
+            tauri::WindowEvent::Focused(focused) => {
+                if let Some(state) = window.try_state::<notify::FocusState>() {
+                    state
+                        .0
+                        .store(*focused, std::sync::atomic::Ordering::Relaxed);
+                }
+            }
             #[cfg(desktop)]
             tauri::WindowEvent::CloseRequested { api, .. } => {
-                if let Err(e) = _window.hide() {
+                if let Err(e) = window.hide() {
                     tracing::error!("failed to hide window on close requested: {e}");
                 }
                 api.prevent_close();

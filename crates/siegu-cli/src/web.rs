@@ -168,7 +168,7 @@ async fn serve_static(
             let url = bridge_signal.clone();
             ws.on_upgrade(move |browser| async move {
                 if let Err(e) = bridge_to_signal(browser, url).await {
-                    eprintln!("[siegu] ws bridge ended: {e}");
+                    crate::cli_warn!("[siegu] ws bridge ended: {e}");
                 }
             })
         })
@@ -217,14 +217,14 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
         web_dist: None,
     })
     .await;
-    println!("Signalling server on port {}", signal.port);
+    crate::cli_line!("Signalling server on port {}", signal.port);
 
     let signal_url = format!("ws://127.0.0.1:{}/ws?token={}", signal.port, token);
     let code = create_room(&signal_url, &token).await?;
-    println!("Session code: {code}");
+    crate::cli_line!("Session code: {code}");
     // Greppable handle for CLI guests/e2e drivers: they need the full
     // ws://…/ws?token=… URL to join a token-secured session.
-    println!("Signalling token: {token}");
+    crate::cli_line!("Signalling token: {token}");
 
     let hostname = std::env::var("HOSTNAME")
         .or_else(|_| std::env::var("COMPUTERNAME"))
@@ -254,7 +254,7 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
     .with_share_mode(opts.share_mode);
     let transport_handle = tokio::spawn(async move {
         if let Err(e) = transport.start().await {
-            eprintln!("[siegu] transport stopped: {e}");
+            crate::cli_warn!("[siegu] transport stopped: {e}");
         }
     });
 
@@ -263,7 +263,7 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
     // browser client.
     let http_addr = match std::env::var_os("SIEGU_WEB_NO_HTTP") {
         Some(_) => {
-            println!("SIEGU_WEB_NO_HTTP is set - skipping static file server");
+            crate::cli_info!("SIEGU_WEB_NO_HTTP is set - skipping static file server");
             None
         }
         None => Some(
@@ -292,10 +292,10 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
             );
         }
     }
-    println!("\nThe link expires when this command stops. Press Ctrl+C to end the session.");
+    crate::cli_info!("The link expires when this command stops. Press Ctrl+C to end the session.");
 
     let _ = tokio::signal::ctrl_c().await;
-    println!("\nShutting down...");
+    crate::cli_info!("Shutting down...");
     transport_handle.abort();
     signal.stop();
     Ok(())

@@ -10,10 +10,13 @@ export interface DirectoryEntry {
   value: string;
 }
 
+export type LogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
+
 export interface LogEntry {
   time: string;
   message: string;
-  type: 'error' | 'info';
+  type: 'error' | 'warn' | 'info' | 'debug';
+  level: LogLevel;
 }
 
 export interface DownloadProgressState {
