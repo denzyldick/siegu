@@ -533,7 +533,8 @@
     "status_connected": "Verbunden",
     "status_connecting_webrtc": "Sichere Verbindung wird aufgebaut...",
     "status_connection_failed": "Verbindung fehlgeschlagen",
-    "status_awaiting_connection": "Warten auf das andere Gerät..."
+    "status_awaiting_connection": "Warten auf das andere Gerät...",
+    "web_enter_host_hint": "LAN-Suche ist in der Desktop-App verfügbar. Öffnen Sie Siegu auf Ihrem anderen Gerät im Modus „Teilen“ oder nutzen Sie dessen Freigabe-Link zum Verbinden."
   },
   "media_viewer": {
     "metadata": "Metadaten",

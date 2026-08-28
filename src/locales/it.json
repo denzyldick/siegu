@@ -533,7 +533,8 @@
     "status_connected": "Connesso",
     "status_connecting_webrtc": "Connessione sicura in corso...",
     "status_connection_failed": "Connessione non riuscita",
-    "status_awaiting_connection": "In attesa dell'altro dispositivo..."
+    "status_awaiting_connection": "In attesa dell'altro dispositivo...",
+    "web_enter_host_hint": "Il rilevamento LAN è disponibile nell'app desktop. Apri Siegu sull'altro dispositivo in modalità Condividi o usa il suo link per connetterti."
   },
   "media_viewer": {
     "metadata": "Metadati",

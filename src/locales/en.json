@@ -308,7 +308,8 @@
     "status_connected": "Connected",
     "status_connecting_webrtc": "Establishing secure connection...",
     "status_connection_failed": "Connection failed",
-    "status_awaiting_connection": "Waiting for the other device..."
+    "status_awaiting_connection": "Waiting for the other device...",
+    "web_enter_host_hint": "LAN discovery is available in the desktop app. Open Siegu on your other device in Share mode, or use its Share link to connect."
   },
   "media_viewer": {
     "metadata": "Metadata",

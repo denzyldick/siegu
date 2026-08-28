@@ -533,7 +533,8 @@
     "status_connected": "Connecté",
     "status_connecting_webrtc": "Établissement d'une connexion sécurisée...",
     "status_connection_failed": "Échec de la connexion",
-    "status_awaiting_connection": "En attente de l'autre appareil..."
+    "status_awaiting_connection": "En attente de l'autre appareil...",
+    "web_enter_host_hint": "La découverte LAN est disponible dans l'application de bureau. Ouvrez Siegu sur votre autre appareil en mode Partager, ou utilisez son lien pour vous connecter."
   },
   "media_viewer": {
     "metadata": "Métadonnées",
