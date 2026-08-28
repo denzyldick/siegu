@@ -18,6 +18,9 @@ services:
     build:
       context: .
       dockerfile: deploy/host/Dockerfile
+      # BuildKit RUN steps (apt-get, cargo) need network; use host networking
+      # so the build doesn't require the Docker default bridge.
+      network: host
     restart: unless-stopped
     volumes:
       - ./data:/data
@@ -35,6 +38,7 @@ services:
     build:
       context: ./deploy/caddy
       dockerfile: Dockerfile
+      network: host
     restart: unless-stopped
     depends_on:
       - siegu-host
