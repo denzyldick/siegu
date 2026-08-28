@@ -225,10 +225,7 @@
               loading="lazy"
               class="tile-cover-img"
             />
-            <div
-              v-else
-              class="tile-cover-placeholder d-flex align-center justify-center"
-            >
+            <div v-else class="tile-cover-placeholder d-flex align-center justify-center">
               <v-icon size="44" color="rgba(var(--v-theme-on-surface), 0.25)">{{
                 itemIcon(item)
               }}</v-icon>

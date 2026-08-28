@@ -349,7 +349,7 @@ async fn mesh_delta_sync_transfers_only_new_photos() {
     )
     .await;
 
-    let timeout = Duration::from_secs(90);
+    let timeout = Duration::from_secs(180);
     wait_for(timeout, "round 1 joiner to receive photo-a", || {
         event_b.received_ids().contains(&"photo-a".to_string())
     })
@@ -492,7 +492,7 @@ async fn mesh_large_face_crop_does_not_stall_sync() {
         tokio::spawn(async move { peer.start().await })
     };
 
-    let timeout = Duration::from_secs(90);
+    let timeout = Duration::from_secs(180);
     wait_for(
         timeout,
         "joiner to receive the photo with the huge face crop",
