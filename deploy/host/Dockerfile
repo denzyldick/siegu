@@ -5,7 +5,7 @@
 # Only -p siegu-cli (+ its siegu-core dep) is built; src-tauri (Tauri) is a
 # workspace member but is deliberately excluded (native GUI toolchain).
 ###############################################################################
-FROM rust:1.85-slim AS rust
+FROM rust:1-slim AS rust
 WORKDIR /app
 
 # System deps for siegu-core (heic, ffmpeg-next, rusqlite bundled w/ cc, openssl).
