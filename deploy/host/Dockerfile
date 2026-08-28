@@ -53,7 +53,7 @@ RUN npm run build
 ###############################################################################
 # Stage 3 — runtime: the `siegu web` host + the Vue bundle.
 ###############################################################################
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
