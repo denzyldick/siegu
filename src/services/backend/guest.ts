@@ -29,7 +29,10 @@ export class GuestClient {
   >();
   private caches: Array<{ key: string; url: string }> = [];
   private assemblers = new Map<number | string, FileAssembler>();
-  private inflight = new Set<string>();
+  private inflight = new Map<
+    string,
+    { promise: Promise<string | null>; resolve: (u: string | null) => void }
+  >();
   private closed = false;
 
   constructor(
@@ -119,7 +122,7 @@ export class GuestClient {
 
   // ── Media ───────────────────────────────────────────────────────────────
 
-  /** Resolve a cached blob URL, or request + await it. Returns null if closed. */
+  /** Resolve a cached blob URL, or request it and await the transfer. */
   fetchThumb(id: number | string): Promise<string | null> {
     return this.fetchMedia(id, true);
   }
@@ -132,19 +135,31 @@ export class GuestClient {
     const key = `${thumbnail ? 'thumb' : 'original'}:${id}`;
     const cached = this.cachedUrl(key);
     if (cached) return Promise.resolve(cached);
-    if (this.inflight.has(key)) return Promise.resolve(null);
-    this.inflight.add(key);
+    const inflight = this.inflight.get(key);
+    if (inflight) return inflight.promise;
+    let resolve!: (u: string | null) => void;
+    const promise = new Promise<string | null>((r) => {
+      resolve = r;
+    });
+    this.inflight.set(key, { promise, resolve });
     this.assemblers.set(
       id,
       new FileAssembler(id, (blob) => {
         const url = URL.createObjectURL(blob);
         this.caches.push({ key, url });
-        this.inflight.delete(key);
+        this.resolveMedia(key, url);
         this.events.onMedia?.(id, key, url);
       }),
     );
     this.transport.send({ type: 'FetchMediaRequest', id, thumbnail });
-    return Promise.resolve(null); // caller awaits the onMedia event
+    return promise;
+  }
+
+  private resolveMedia(key: string, url: string | null): void {
+    const inflight = this.inflight.get(key);
+    if (!inflight) return;
+    this.inflight.delete(key);
+    inflight.resolve(url);
   }
 
   cachedUrl(key: string): string | undefined {
@@ -177,13 +192,13 @@ export class GuestClient {
       case 'ViewMedia': {
         // Mirror webclient/main.ts: base64 image delivered inline.
         const id = msg.id;
-        this.inflight.delete(`thumb:${id}`);
         const raw = atob(msg.data);
         const bytes = new Uint8Array(raw.length);
         for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
         const url = URL.createObjectURL(new Blob([bytes], { type: msg.mime }));
         const key = `thumb:${id}`;
         this.caches.push({ key, url });
+        this.resolveMedia(key, url);
         this.events.onMedia?.(id, key, url);
         break;
       }
@@ -203,6 +218,7 @@ export class GuestClient {
     for (const c of this.caches) URL.revokeObjectURL(c.url);
     this.caches = [];
     this.assemblers.clear();
+    for (const { resolve } of this.inflight.values()) resolve(null);
     this.inflight.clear();
   }
 }
