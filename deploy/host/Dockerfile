@@ -20,9 +20,11 @@ COPY crates/siegu-core/ crates/siegu-core/
 COPY crates/siegu-cli/ crates/siegu-cli/
 COPY crates/siegu-signal/ crates/siegu-signal/
 # src-tauri is a workspace member + provides the [patch] for esaxx-rs.
-# Only its manifest + vendor/ are needed so cargo can resolve the workspace;
-# `-p siegu-cli` never builds the Tauri GUI crates themselves.
+# Only its manifest, `src/` (declared siegu_lib + main targets), and vendor/
+# are needed so cargo can resolve the workspace; `-p siegu-cli` never builds
+# the Tauri GUI crates. gen/ + test_models/ (2GB) are deliberately excluded.
 COPY src-tauri/Cargo.toml src-tauri/Cargo.toml
+COPY src-tauri/src/ src-tauri/src/
 COPY src-tauri/vendor/ src-tauri/vendor/
 COPY shared/ shared/
 COPY crates/ crates/
@@ -34,18 +36,19 @@ RUN cp target/release/siegu /siegu
 ###############################################################################
 # Stage 2 — build the Vue client (the real desktop UI, reused as the web UI).
 ###############################################################################
-FROM oven/bun:1.2-slim AS ui
+FROM node:22-alpine AS ui
 WORKDIR /ui
-COPY package.json bun.lock ./
+COPY package.json package-lock.json* ./
 # --ignore-scripts: the repo's `prepare` script (git config core.hooksPath)
-# would otherwise run and fail (no git in this stage). --frozen-lockfile mirrors
-# `npm ci`: install exactly what bun.lock pins or fail.
-RUN bun install --frozen-lockfile --ignore-scripts
+# would otherwise run and fail (no git in this stage). `npm ci` installs
+# exactly what package-lock.json pins (the committed bun.lock is npm-format and
+# not bun-native, so --frozen-lockfile can't be used here).
+RUN npm ci --ignore-scripts --prefer-offline
 COPY index.html vite.config.ts tsconfig.json ./
 COPY src/ src/
 COPY public/ public/
 COPY branding/ branding/
-RUN bun run build
+RUN npm run build
 
 ###############################################################################
 # Stage 3 — runtime: the `siegu web` host + the Vue bundle.
