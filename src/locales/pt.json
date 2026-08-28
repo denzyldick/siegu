@@ -533,7 +533,8 @@
     "status_connected": "Ligado",
     "status_connecting_webrtc": "A estabelecer ligação segura...",
     "status_connection_failed": "Falha na ligação",
-    "status_awaiting_connection": "A aguardar o outro dispositivo..."
+    "status_awaiting_connection": "A aguardar o outro dispositivo...",
+    "web_enter_host_hint": "A descoberta de LAN está disponível no app de desktop. Abra o Siegu no outro dispositivo no modo Compartilhar ou use o link para se conectar."
   },
   "media_viewer": {
     "metadata": "Metadados",

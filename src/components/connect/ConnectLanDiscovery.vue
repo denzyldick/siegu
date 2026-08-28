@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue';
-import { discoverLanDevices, isAndroid, pingMdnsPlugin } from '@/services/tauri';
+import { discoverLanDevices, isAndroid, isTauri, pingMdnsPlugin } from '@/services/tauri';
 import type { DiscoveredHost } from '@/types/sync';
 
 const emit = defineEmits<{
@@ -9,6 +9,7 @@ const emit = defineEmits<{
 
 const hosts = ref<DiscoveredHost[]>([]);
 const scanning = ref(true);
+const webOnly = ref(!isTauri);
 const error = ref('');
 const elapsed = ref(0);
 let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -17,6 +18,13 @@ let elapsedTimer: ReturnType<typeof setInterval> | null = null;
 const noDevices = computed(() => elapsed.value >= 15 && hosts.value.length === 0); // Show the spinner for the first 15s
 
 async function initPlugin(): Promise<boolean> {
+  if (webOnly.value) {
+    // Plain browser build: mDNS LAN discovery is Tauri-only; stop here and
+    // surface the web hint instead of scanning/hanging.
+    error.value = '';
+    scanning.value = false;
+    return false;
+  }
   if (isAndroid) {
     try {
       await pingMdnsPlugin();
@@ -66,7 +74,14 @@ onUnmounted(() => {
       {{ $t('connect.select_device') }}
     </div>
 
-    <div v-if="scanning && hosts.length === 0" class="d-flex align-center justify-center py-6 ga-3">
+    <div v-if="webOnly" class="text-caption text-medium-emphasis text-center py-4 px-2">
+      {{ $t('connect.web_enter_host_hint') }}
+    </div>
+
+    <div
+      v-else-if="scanning && hosts.length === 0"
+      class="d-flex align-center justify-center py-6 ga-3"
+    >
       <v-progress-circular
         indeterminate
         color="rgba(var(--v-theme-on-surface), 0.7)"

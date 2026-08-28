@@ -379,15 +379,20 @@ function currentPlatform(): string | null {
   }
 }
 
+export const isTauri = currentPlatform() !== null;
 export const isAndroid = currentPlatform() === 'android';
 
 export async function pingMdnsPlugin(): Promise<boolean> {
-  if (!isAndroid) return false;
+  if (!isTauri || !isAndroid) return false;
   const r = await invoke<{ ok: boolean }>('plugin:mdns|ping');
   return r.ok;
 }
 
 export async function discoverLanDevices(timeoutSecs: number = 3): Promise<DiscoveredHost[]> {
+  // mDNS LAN discovery is Tauri-only (Rust command / Android NsdManager). In a
+  // plain-browser build there is no `invoke`, so return no hosts instead of
+  // throwing a 'Cannot read properties of undefined (reading invoke)' error.
+  if (!isTauri) return [];
   if (isAndroid) {
     const result = await invoke<{ hosts: string }>('plugin:mdns|discover', { timeoutSecs });
     return JSON.parse(result.hosts);

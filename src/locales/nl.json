@@ -533,7 +533,8 @@
     "status_connected": "Verbonden",
     "status_connecting_webrtc": "Beveiligde verbinding wordt tot stand gebracht...",
     "status_connection_failed": "Verbinding mislukt",
-    "status_awaiting_connection": "Wachten op het andere apparaat..."
+    "status_awaiting_connection": "Wachten op het andere apparaat...",
+    "web_enter_host_hint": "LAN-zoekopdracht is beschikbaar in de desktop-app. Open Siegu op je andere apparaat in deeltmodus, of gebruik de deel-link om te verbinden."
   },
   "media_viewer": {
     "metadata": "Metadata",
