@@ -37,7 +37,7 @@
       </div>
     </v-fade-transition>
 
-    <template v-if="!currentSectionItem && !trashView">
+    <template v-if="!currentSectionItem && !trashView && !isSectionOverview">
       <div class="d-flex align-center px-2 mb-4">
         <div>
           <h1 class="text-h5 font-weight-bold text-high-emphasis letter-spacing-tight">
@@ -90,7 +90,7 @@
             v-for="section in gridSections"
             :key="section.id"
             class="collection-tile"
-            @click="openSectionItem(section.items[0])"
+            @click="onSectionTileClick(section)"
           >
             <div class="tile-preview">
               <template v-if="section.items.length >= 4">
@@ -192,6 +192,53 @@
               <v-icon size="18" color="primary">{{ benefit.icon }}</v-icon>
               <span class="text-body-2 text-medium-emphasis">{{ benefit.text }}</span>
             </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template v-else-if="isSectionOverview && !currentSectionItem && !trashView">
+      <div class="d-flex align-center px-2 mb-4">
+        <v-btn icon variant="text" size="small" @click="closeSection">
+          <v-icon size="20">mdi-arrow-left</v-icon>
+        </v-btn>
+        <div class="ml-2">
+          <h1 class="text-h6 font-weight-bold text-high-emphasis letter-spacing-tight">
+            {{ sectionTitle(openedSection!.id) }}
+          </h1>
+          <p class="text-caption text-disabled">{{ openedSection!.items.length }}</p>
+        </div>
+      </div>
+
+      <div class="collections-grid mb-6">
+        <div
+          v-for="item in openedSection!.items"
+          :key="item.id"
+          class="collection-tile"
+          @click="openItemFromSection(item)"
+        >
+          <div class="tile-preview">
+            <img
+              v-if="tileSrc(item)"
+              :src="tileSrc(item)"
+              :alt="item.name"
+              loading="lazy"
+              class="tile-cover-img"
+            />
+            <div
+              v-else
+              class="tile-cover-placeholder d-flex align-center justify-center"
+            >
+              <v-icon size="44" color="rgba(var(--v-theme-on-surface), 0.25)">{{
+                itemIcon(item)
+              }}</v-icon>
+            </div>
+          </div>
+          <div class="tile-label d-flex flex-column align-center justify-center">
+            <span class="text-subtitle-2 font-weight-bold text-high-emphasis text-center">{{
+              item.name
+            }}</span>
+            <span class="text-caption text-disabled">{{ item.count }}</span>
           </div>
         </div>
       </div>
@@ -703,7 +750,7 @@ import { usePeople } from '@/composables/usePeople';
 import { toggleFavorite, listFiles } from '@/services/tauri';
 import { getFaceImageSrc } from '@/composables/useMediaUtils';
 import { useMediaUrl } from '@/composables/useMediaUrl';
-import type { Album, AlbumSectionItem } from '@/types/albums';
+import type { Album, AlbumSection, AlbumSectionItem } from '@/types/albums';
 import type { MediaItem } from '@/types/media';
 import type { ListFilesOptions } from '@/types/media';
 import type { Person, UnnamedFace } from '@/types/person';
@@ -732,6 +779,12 @@ const openedItem = ref<AlbumSectionItem | null>(null);
 const currentSectionItem = computed(() => openedItem.value);
 const isManualAlbum = computed(() => openedItem.value?.kind === 'manual');
 const isTrip = computed(() => openedItem.value?.kind === 'trip');
+
+// Collection sections whose tile opens an overview grid of every item
+// (People, Places, Trips, Albums) instead of diving straight into the first item.
+const OVERVIEW_SECTION_IDS = ['people', 'places', 'trips', 'albums'];
+const openedSection = ref<AlbumSection | null>(null);
+const isSectionOverview = computed(() => openedSection.value !== null);
 
 const tripDateRange = computed(() => {
   const album = currentSectionItem.value?.album;
@@ -960,6 +1013,21 @@ function tileIcon(kind: string): string {
   }
 }
 
+function itemIcon(item: AlbumSectionItem): string {
+  switch (item.kind) {
+    case 'person':
+      return 'mdi-account-circle';
+    case 'trip':
+      return 'mdi-airplane';
+    case 'smart':
+      return 'mdi-auto-fix';
+    case 'location':
+      return 'mdi-map-marker';
+    default:
+      return 'mdi-image-multiple-outline';
+  }
+}
+
 function kindLabel(kind: string): string {
   switch (kind) {
     case 'person':
@@ -1004,6 +1072,35 @@ function openSectionItem(item: AlbumSectionItem): void {
   albumsStore.currentAlbumId = item.id;
   resetContents();
   void loadContents();
+}
+
+function onSectionTileClick(section: AlbumSection): void {
+  if (OVERVIEW_SECTION_IDS.includes(section.id)) {
+    openSection(section);
+  } else {
+    openSectionItem(section.items[0]);
+  }
+}
+
+function openSection(section: AlbumSection): void {
+  openedSection.value = section;
+  openedItem.value = null;
+  albumsStore.currentAlbumId = null;
+  resetContents();
+}
+
+function openItemFromSection(item: AlbumSectionItem): void {
+  openedItem.value = item;
+  albumsStore.currentAlbumId = item.id;
+  resetContents();
+  void loadContents();
+}
+
+function closeSection(): void {
+  openedSection.value = null;
+  openedItem.value = null;
+  albumsStore.currentAlbumId = null;
+  resetContents();
 }
 
 function closeAlbum(): void {
