@@ -1,20 +1,54 @@
-services:
-  signalling:
-    image: ghcr.io/denzyldick/siegu-signal:latest
-    restart: unless-stopped
-    environment:
-      PORT: "8080"
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "--max-time", "4", "-o", "/dev/null", "http://127.0.0.1:8080/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
+name: siegu
 
-  webclient:
-    build: ./webclient
-    ports:
-      - "8080:8080"
+# Siegu web deployment.
+#
+#   siegu-host  — the Rust `siegu web` binary: serves the real desktop UI as
+#                 the web client, embedded signalling, and the /ws bridge.
+#   caddy       — edge: plain HTTP on :80 locally, or automatic HTTPS when
+#                 SIEGU_DOMAIN is set (VPS). No nginx.
+#
+# Usage:
+#   Local (HTTP):   docker compose up --build
+#   VPS  (HTTPS):   SIEGU_DOMAIN=photos.example.com docker compose up --build
+#
+# Mount your indexed Siegu library at ./data (it becomes the host's library).
+
+services:
+  siegu-host:
+    build:
+      context: .
+      dockerfile: deploy/host/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+    environment:
+      SIEGU_WEB_DIST: /srv/webui
+    # ro lets guests browse; set rw to allow favorites/trash.
+    command: ["siegu", "web", "--port", "8787", "--config", "/data", "--share-mode", "ro"]
+    expose:
+      - "8787"
+    # Optional direct LAN port (bypasses Caddy). Uncomment to also publish:
+    # ports:
+    #   - "8787:8787"
+
+  caddy:
+    build:
+      context: ./deploy/caddy
+      dockerfile: Dockerfile
+    restart: unless-stopped
     depends_on:
-      signalling:
-        condition: service_healthy
+      - siegu-host
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Empty (default) -> plain HTTP on :80 (localhost / LAN).
+      # Set a real domain on a VPS -> automatic HTTPS via Caddy's Let's Encrypt.
+      SIEGU_DOMAIN: ${SIEGU_DOMAIN:-}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
