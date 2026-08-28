@@ -35,7 +35,17 @@ export interface Backend {
   close(): void;
 }
 
-export type BackendMode = 'tauri' | 'guest';
+export type BackendMode = 'tauri' | 'webHost' | 'guest';
+
+/**
+ * The three runtime UI modes (#24):
+ *  - `tauri`    — native desktop Tauri app (unchanged behavior)
+ *  - `webHost`  — browser is the OWNER of a library mounted on a `siegu web`
+ *                 instance (Mode A); full GUI over HTTP/RPC, no pairing
+ *  - `guest`    — browser PAIRS by code + token with a remote/desktop Siegu
+ *                 and streams media over WebRTC (Mode B, web.whatsapp.com model)
+ */
+export type RuntimeMode = 'onboarding' | BackendMode;
 
 /** Media cache key used by `cachedMediaUrl`/`mediaUrl`. */
 export function mediaCacheKey(id: number | string, kind: MediaKind): string {

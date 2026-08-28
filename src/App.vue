@@ -8,6 +8,7 @@ import { useModelsStore } from '@/stores/models';
 import { useUiStore } from '@/stores/ui';
 import { useSyncStore } from '@/stores/sync';
 import { useSearchStore } from '@/stores/search';
+import { useRuntimeStore } from '@/stores/runtime';
 import { autoReconnect, discoverLanDevices } from '@/services/tauri';
 import AppDock from '@/components/layout/AppDock.vue';
 import AppToolbar from '@/components/layout/AppToolbar.vue';
@@ -50,6 +51,8 @@ const mediaFilters = computed(() => ({
   folder: null,
 }));
 
+const runtimeStore = useRuntimeStore();
+
 const openedFile = ref<string | null>(null);
 const fileSnackbar = ref(false);
 
@@ -59,11 +62,26 @@ function openedFileName(path: string): string {
 }
 
 onMounted(async () => {
-  listen<string>('file-opened', (event) => {
-    openedFile.value = event.payload;
-    fileSnackbar.value = true;
-    uiStore.setPage('home');
-  });
+  await runtimeStore.initRuntime();
+
+  if (runtimeStore.isDesktop) {
+    listen<string>('file-opened', (event) => {
+      openedFile.value = event.payload;
+      fileSnackbar.value = true;
+      uiStore.setPage('home');
+    });
+  }
+
+  // In browser modes there is no local Tauri library to interrogate:
+  //  - webHost: the mounted host library behind `/session` is already initialized
+  //  - guest:   media is streamed from the remote Siegu once paired
+  //  - onboarding: nothing initialized yet
+  // Only `tauri` (desktop) runs the local boot sequence (which on failure would
+  // otherwise trip `isNewInstall` and show the desktop OnboardingFlow in a browser).
+  if (!runtimeStore.isDesktop) {
+    appStore.completeOnboarding();
+    return;
+  }
 
   try {
     await appStore.checkInitialized();
