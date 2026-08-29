@@ -80,6 +80,9 @@ onMounted(async () => {
   // otherwise trip `isNewInstall` and show the desktop OnboardingFlow in a browser).
   if (!runtimeStore.isDesktop) {
     appStore.completeOnboarding();
+    if (runtimeStore.isGuest) {
+      void runtimeStore.maybeConnectGuest();
+    }
     return;
   }
 
