@@ -23,6 +23,8 @@ export const useRuntimeStore = defineStore('runtime', () => {
   const mode = shallowRef<RuntimeMode | null>(null);
   /** The detected guest session (`#code.token`), present when mode is guest. */
   const session = shallowRef<DetectedMode['session']>(undefined);
+  /** The host-issued webHost data-plane token, present when mode is webHost. */
+  const webHostToken = shallowRef<DetectedMode['webHostToken']>(undefined);
 
   /** For guest Mode B: the paired `GuestClient`, once connected. */
   const guestClient = shallowRef<GuestClient | null>(null);
@@ -44,7 +46,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
       if (client) return createBackend('guest', client);
     }
     if (mode.value === 'webHost') {
-      return createBackend('webHost');
+      return createBackend('webHost', undefined, webHostToken.value);
     }
     return createBackend('tauri');
   });
@@ -55,6 +57,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
     const detected = await detectMode();
     mode.value = detected.mode;
     session.value = detected.session;
+    webHostToken.value = detected.webHostToken;
   }
 
   /**
@@ -116,6 +119,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
   return {
     mode,
     session,
+    webHostToken,
     guestClient,
     guestConnection,
     guestError,
