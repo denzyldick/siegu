@@ -35,3 +35,23 @@ export async function pingSignalling(url: string): Promise<PingResult> {
   const raw = await invoke<string>('ping_signaling', { url });
   return JSON.parse(raw) as PingResult;
 }
+
+/**
+ * Browser-safe signalling *base* ("host[:port]") for a Mode B guest. A guest is
+ * allowed to pair by code + token against a remote `wss://` signaler, not just
+ * the CLI host that served the page. Resolution order (enables the "pair from
+ * anywhere" web.whatsapp.com goal, Phase 4):
+ *
+ *   1. `window.sieguSignalingHost` (injected by the host when it wants guests to
+ *      use a hosted relay instead of its own local `/ws` bridge);
+ *   2. `VITE_SIGNALING_HOST` (build-time);
+ *   3. fall back to the serving origin's `/ws` bridge (`window.location.host`).
+ *
+ * Unlike {@link getConfiguredSignalingUrl}, this never touches the Tauri IPC, so
+ * it works in a plain browser tab.
+ */
+export function resolveSignalingBase(): string {
+  const injected = (window as { sieguSignalingHost?: string }).sieguSignalingHost;
+  if (injected?.trim()) return injected.trim();
+  return import.meta.env.VITE_SIGNALING_HOST || window.location.host;
+}
