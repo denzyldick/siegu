@@ -22,27 +22,54 @@ export interface DetectedMode {
   mode: RuntimeMode;
   /** Present only when mode === 'guest'. */
   session?: GuestSession;
+  /** Present only when mode === 'webHost': the host-issued data-plane token
+   *  that authorizes `/rpc`, `/thumb`, `/media` (#28). */
+  webHostToken?: string;
 }
 
 const WEBHOST_PROBE_TIMEOUT_MS = 1500;
 
 /**
  * Probe the `webHost` `/session` endpoint (web.rs `serve_static`). Resolves true
- * when the host answers `{ code }` with a non-empty code. Bounded + non-blocking.
+ * when the host answers `{ code }` with a non-empty code, and caches the host's
+ * data-plane `webToken` for later authorized data requests. Bounded + non-blocking.
  */
 export async function isWebHost(): Promise<boolean> {
+  const outcome = await probeWebHost();
+  if (outcome.ok && outcome.webToken) lastWebHostToken = outcome.webToken;
+  return outcome.ok;
+}
+
+/** Result of a single webHost `/session` probe. */
+interface WebHostProbe {
+  ok: boolean;
+  webToken?: string;
+}
+
+let lastWebHostToken: string | undefined;
+
+async function probeWebHost(): Promise<WebHostProbe> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), WEBHOST_PROBE_TIMEOUT_MS);
   try {
     const res = await fetch('/session', { signal: controller.signal });
-    if (!res.ok) return false;
-    const body = (await res.json()) as { code?: string };
-    return typeof body.code === 'string' && body.code.length > 0;
+    if (!res.ok) return { ok: false };
+    const body = (await res.json()) as { code?: string; webToken?: string };
+    const ok = typeof body.code === 'string' && body.code.length > 0;
+    return { ok, webToken: typeof body.webToken === 'string' ? body.webToken : undefined };
   } catch {
-    return false;
+    return { ok: false };
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * The data-plane token obtained from the last successful webHost probe, or
+ * undefined. Used to authorize `/rpc`/`/thumb`/`/media` from the webHost mode.
+ */
+export function webHostToken(): string | undefined {
+  return lastWebHostToken;
 }
 
 /** Parse a `#CODE.TOKEN[.ALBUM_ID]` session from the URL fragment, if present. */
@@ -56,7 +83,7 @@ export async function detectMode(): Promise<DetectedMode> {
     return { mode: 'tauri' };
   }
   if (await isWebHost()) {
-    return { mode: 'webHost' };
+    return { mode: 'webHost', webHostToken: webHostToken() };
   }
   const session = guestSessionFromHash();
   if (session) {

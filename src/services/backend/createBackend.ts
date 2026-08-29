@@ -11,10 +11,14 @@ import type { Backend, BackendMode } from './interface';
  *  - `guest`   — browser pairing to a remote Siegu over WebRTC (Mode B); needs a
  *                connected `GuestClient`
  */
-export function createBackend(mode: BackendMode, client?: GuestClient): Backend {
+export function createBackend(
+  mode: BackendMode,
+  client?: GuestClient,
+  webHostToken?: string,
+): Backend {
   switch (mode) {
     case 'webHost':
-      return webHostBackend();
+      return webHostBackend(webHostToken);
     case 'guest':
       return client ? guestBackend(client) : tauriBackend();
     case 'tauri':

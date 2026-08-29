@@ -71,4 +71,24 @@ describe('webHostBackend (Mode A over HTTP/RPC)', () => {
     expect(backend.cachedMediaUrl(7, 'original')).toBeUndefined();
     void mediaCacheKey; // parity with other backends
   });
+
+  it('sends the webHost token as a Bearer header on /rpc', async () => {
+    mockFetchOnce({ ok: true, result: [] });
+    const backend = webHostBackend('secret-token');
+    await backend.listFiles({});
+    const fetchMock = vi.mocked(fetch);
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/rpc',
+      expect.objectContaining({
+        headers: { 'content-type': 'application/json', authorization: 'Bearer secret-token' },
+      }),
+    );
+  });
+
+  it('appends ?token= to thumb and media URLs when a webHost token is present', async () => {
+    const backend = webHostBackend('secret-token');
+    expect(await backend.mediaUrl(7, 'thumb')).toBe('/thumb/7?token=secret-token');
+    expect(await backend.mediaUrl('abc', 'original')).toBe('/media/abc?token=secret-token');
+    expect(backend.cachedMediaUrl(7, 'thumb')).toBe('/thumb/7?token=secret-token');
+  });
 });

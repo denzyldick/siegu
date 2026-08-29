@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { detectMode, guestSessionFromHash } from '@/services/runtime';
 
 describe('runtime mode detection', () => {
@@ -32,5 +32,25 @@ describe('runtime mode detection', () => {
     // In happy-dom (no Tauri, no /session route) the hash is the only trigger.
     expect(result.mode).toBe('guest');
     expect(result.session?.code).toBe('ABC123456789');
+  });
+
+  it('detects webHost mode and captures the host-issued data-plane token', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ code: 'AAA111', webToken: 'data-T0ken' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    );
+    try {
+      window.location.hash = '';
+      const result = await detectMode();
+      expect(result.mode).toBe('webHost');
+      expect(result.webHostToken).toBe('data-T0ken');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

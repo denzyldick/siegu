@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::net::{SocketAddr, UdpSocket};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -186,6 +187,27 @@ fn mime_for(path: &Path) -> &'static str {
     }
 }
 
+/// A uniform 404 reply for denied webHost data requests: never reveals that the
+/// protected surface exists (#28). Body type `Vec<u8>` matches the media/thumb
+/// handlers so the reply type unifies.
+fn denied_response() -> warp::http::Response<Vec<u8>> {
+    warp::http::Response::builder()
+        .status(warp::http::StatusCode::NOT_FOUND)
+        .body(Vec::new())
+        .unwrap()
+}
+
+/// True when the caller presented the webHost session token. `Authorization:
+/// Bearer <token>` is used by `POST /rpc`; media is served to `<img>` tags which
+/// can't set headers, so those routes require `?token=<token>` instead.
+fn token_matches_auth(header: &Option<String>, expected_token: &str) -> bool {
+    header.as_deref() == Some(format!("Bearer {expected_token}").as_str())
+}
+
+fn token_matches_query(query: &HashMap<String, String>, expected_token: &str) -> bool {
+    query.get("token").map(|s| s.as_str()) == Some(expected_token)
+}
+
 async fn serve_static(
     port: u16,
     dist: PathBuf,
@@ -193,7 +215,9 @@ async fn serve_static(
     signal_url: String,
     config_path: String,
     share_mode: ShareMode,
+    web_token: String,
 ) -> Result<SocketAddr, String> {
+    use warp::reply::Reply as _;
     use warp::Filter;
 
     if !dist.join("index.html").exists() {
@@ -221,8 +245,14 @@ async fn serve_static(
         .boxed();
 
     let session_code = code.clone();
+    let session_web_token = web_token.clone();
     let session = warp::path!("session")
-        .map(move || warp::reply::json(&serde_json::json!({ "code": session_code })))
+        .map(move || {
+            warp::reply::json(&serde_json::json!({
+                "code": session_code,
+                "webToken": session_web_token,
+            }))
+        })
         .boxed();
 
     // After matching the "assets" URL prefix the remaining path is the bare
@@ -252,13 +282,19 @@ async fn serve_static(
 
     let rpc_config = config_path.clone();
     let rpc_mode = share_mode;
+    let rpc_web_token = web_token.clone();
     let rpc = warp::path("rpc")
         .and(warp::post())
+        .and(warp::header::optional::<String>("authorization"))
         .and(warp::body::json())
-        .then(move |body: serde_json::Value| {
+        .then(move |auth: Option<String>, body: serde_json::Value| {
             let config = rpc_config.clone();
             let mode = rpc_mode;
+            let expected_token = rpc_web_token.clone();
             async move {
+                if !token_matches_auth(&auth, &expected_token) {
+                    return denied_response().into_response();
+                }
                 let name = body
                     .get("name")
                     .and_then(|v| v.as_str())
@@ -274,7 +310,7 @@ async fn serve_static(
                     dispatch(&ctx, &name, &payload)
                 })
                 .await;
-                match result {
+                let reply = match result {
                     Ok(Ok(value)) => warp::reply::json(&serde_json::json!({
                         "ok": true, "result": value
                     })),
@@ -284,19 +320,26 @@ async fn serve_static(
                     Err(_) => warp::reply::json(&serde_json::json!({
                         "ok": false, "error": "rpc task panicked"
                     })),
-                }
+                };
+                reply.into_response()
             }
         })
         .boxed();
 
     let thumb_config = config_path.clone();
+    let thumb_web_token = web_token.clone();
     let thumb = warp::get()
         .and(warp::path("thumb"))
         .and(warp::path::param::<String>())
         .and(warp::path::end())
-        .then(move |id: String| {
+        .and(warp::query::<HashMap<String, String>>())
+        .then(move |id: String, query: HashMap<String, String>| {
             let config = thumb_config.clone();
+            let expected_token = thumb_web_token.clone();
             async move {
+                if !token_matches_query(&query, &expected_token) {
+                    return denied_response();
+                }
                 // Prefer the DB-cached thumbnail; else generate from the file.
                 let bytes = {
                     let db = Database::new(&config);
@@ -334,12 +377,15 @@ async fn serve_static(
         .boxed();
 
     let media_config = config_path.clone();
+    let media_web_token = web_token.clone();
     let media = warp::get()
         .and(warp::path("media"))
         .and(warp::path::param::<String>())
         .and(warp::path::end())
-        .then(move |id: String| {
+        .and(warp::query::<HashMap<String, String>>())
+        .then(move |id: String, query: HashMap<String, String>| {
             let config = media_config.clone();
+            let expected_token = media_web_token.clone();
             async move {
                 let response_for = |status: warp::http::StatusCode, body: Vec<u8>| {
                     warp::http::Response::builder()
@@ -347,6 +393,9 @@ async fn serve_static(
                         .body(body)
                         .unwrap_or_else(|_| warp::http::Response::new(Vec::new()))
                 };
+                if !token_matches_query(&query, &expected_token) {
+                    return denied_response();
+                }
                 let Some(path) = photo_path(&config, &id) else {
                     return response_for(warp::http::StatusCode::NOT_FOUND, Vec::new());
                 };
@@ -408,8 +457,12 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
     std::fs::create_dir_all(&config_path)?;
     let config_path = config_path.display().to_string();
 
-    // Distinct token for the signalling plane; the static plane serves no data.
+    // Distinct token for the signalling plane (WebRTC room join).
     let token = uuid::Uuid::new_v4().to_string();
+    // Distinct token for the webHost (Mode A) HTTP data plane: `/rpc`, `/thumb`,
+    // `/media` are gated behind it so serving media now (since #26) doesn't make
+    // the static plane read the library to anyone who can reach the port.
+    let web_token = uuid::Uuid::new_v4().to_string();
     let signal = lan_server::start_with_config(ServerConfig {
         port: 0,
         token: Some(token.clone()),
@@ -473,6 +526,7 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
                 signal_url.clone(),
                 config_path.clone(),
                 opts.share_mode,
+                web_token.clone(),
             )
             .await?,
         ),
@@ -562,5 +616,24 @@ mod tests {
         std::fs::write(&trap, b"z").unwrap();
         assert!(!path_within_roots(&[root.clone()], &trap));
         let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn bearer_matches_only_exact_token() {
+        let none = None;
+        assert!(!token_matches_auth(&none, "tk"));
+        assert!(!token_matches_auth(&Some("tk".into()), "tk")); // wrong scheme
+        assert!(!token_matches_auth(&Some("Bearer wrong".into()), "tk"));
+        assert!(token_matches_auth(&Some("Bearer tk".into()), "tk"));
+    }
+
+    #[test]
+    fn query_token_matches_only_exact_token() {
+        let empty = HashMap::new();
+        assert!(!token_matches_query(&empty, "tk"));
+        let bad = HashMap::from([("token".to_string(), "nope".to_string())]);
+        assert!(!token_matches_query(&bad, "tk"));
+        let good = HashMap::from([("token".to_string(), "tk".to_string())]);
+        assert!(token_matches_query(&good, "tk"));
     }
 }
