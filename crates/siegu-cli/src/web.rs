@@ -444,6 +444,10 @@ pub struct WebOptions {
     /// RPC permission for connected browsers (#19). ReadOnly by default;
     /// `--share-mode rw` lets guests mutate favorites/trash.
     pub share_mode: siegu_core::ShareMode,
+    /// Optional hosted signalling server (`wss://…`) to pair through instead of
+    /// the embedded loopback one (#27, Phase 4). Lets guests connect from any
+    /// network by code + token.
+    pub server: Option<String>,
 }
 
 /// `siegu web`: share this machine's library as a view-only gallery in any
@@ -463,15 +467,28 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
     // `/media` are gated behind it so serving media now (since #26) doesn't make
     // the static plane read the library to anyone who can reach the port.
     let web_token = uuid::Uuid::new_v4().to_string();
-    let signal = lan_server::start_with_config(ServerConfig {
-        port: 0,
-        token: Some(token.clone()),
-        web_dist: None,
-    })
-    .await;
-    crate::cli_line!("Signalling server on port {}", signal.port);
 
-    let signal_url = format!("ws://127.0.0.1:{}/ws?token={}", signal.port, token);
+    // Signalling: either embed our own loopback server (default) or, with
+    // `--server <wss://…>`, connect to a hosted signaler shared across devices
+    // so a guest can pair by code + token from anywhere (Phase 4).
+    let mut signal: Option<_> = None;
+    let signal_url = if let Some(server) = opts.server.clone() {
+        let url = server.trim_end_matches('/').to_string();
+        crate::cli_info!("Connecting to hosted signaling server: {url}");
+        url
+    } else {
+        let s = lan_server::start_with_config(ServerConfig {
+            port: 0,
+            token: Some(token.clone()),
+            web_dist: None,
+        })
+        .await;
+        let port = s.port;
+        crate::cli_line!("Signalling server on port {port}");
+        signal = Some(s);
+        format!("ws://127.0.0.1:{port}/ws?token={token}")
+    };
+
     let code = create_room(&signal_url, &token).await?;
     crate::cli_line!("Session code: {code}");
     // Greppable handle for CLI guests/e2e drivers: they need the full
@@ -552,7 +569,9 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
     let _ = tokio::signal::ctrl_c().await;
     crate::cli_info!("Shutting down...");
     transport_handle.abort();
-    signal.stop();
+    if let Some(s) = signal {
+        s.stop();
+    }
     Ok(())
 }
 

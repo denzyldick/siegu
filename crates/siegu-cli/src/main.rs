@@ -241,6 +241,10 @@ enum Commands {
         /// browsing only; rw also allows favorites/trash mutations.
         #[arg(long, default_value = "ro")]
         share_mode: String,
+        /// Hosted signalling server (`wss://…`) to pair through (Phase 4/#27).
+        /// When set, guests on other networks can connect by code + token.
+        #[arg(long)]
+        server: Option<String>,
     },
 }
 
@@ -560,6 +564,7 @@ async fn main() {
             port,
             config,
             share_mode,
+            server,
         } => {
             let mode = siegu_core::rpc::ShareMode::parse(share_mode).unwrap_or_else(|| {
                 eprintln!(
@@ -572,6 +577,7 @@ async fn main() {
                 http_port: *port,
                 config: Some(config_dir.display().to_string()),
                 share_mode: mode,
+                server: server.clone(),
             })
             .await
             {
