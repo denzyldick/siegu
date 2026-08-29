@@ -1,11 +1,14 @@
 use std::net::{SocketAddr, UdpSocket};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use futures_util::{SinkExt, StreamExt};
+use siegu_core::database::Database;
 use siegu_core::lan_server::{self, ServerConfig};
 use siegu_core::mesh_transport::MeshTransport;
+use siegu_core::rpc::{dispatch, RpcContext, ShareMode};
 use siegu_core::signal::SignalMessage;
+use siegu_core::thumbnail::generate_thumbnail_bytes;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
 
 use crate::CliSyncEvent;
@@ -117,11 +120,79 @@ async fn bridge_to_signal(
     Ok(())
 }
 
+/// Root directories (monitored photo folders) the static file server is allowed
+/// to read. Mirrors the media-server roots in `src-tauri/src/transport.rs`: only
+/// scanned library directories are reachable, never the whole filesystem.
+fn allowed_roots(config_path: &str) -> Vec<PathBuf> {
+    let db = Database::new(config_path);
+    db.list_directories()
+        .into_iter()
+        .map(PathBuf::from)
+        // Keep only roots that actually exist so canonicalize can resolve them.
+        .filter(|p| p.is_dir())
+        .collect()
+}
+
+/// True when `candidate` canonicalizes to an existing file that lives inside one
+/// of the allowed roots (defends against `etc/passwd`-style reads and symlink
+/// escapes, mirroring `transport.rs::path_within_roots`).
+fn path_within_roots(roots: &[PathBuf], candidate: &Path) -> bool {
+    let Ok(canon) = std::fs::canonicalize(candidate) else {
+        return false;
+    };
+    if !canon.is_file() {
+        return false;
+    }
+    roots.iter().any(|root| {
+        std::fs::canonicalize(root)
+            .map(|r| canon.starts_with(&r))
+            .unwrap_or(false)
+    })
+}
+
+/// Map a photo id to a servable, root-scoped absolute file path (or None).
+fn photo_path(config_path: &str, id: &str) -> Option<PathBuf> {
+    let db = Database::new(config_path);
+    let location = db.get_photo_location(id)?;
+    let p = PathBuf::from(location);
+    let roots = allowed_roots(config_path);
+    // Refuse to serve when the location isn't inside a monitored directory.
+    if !path_within_roots(&roots, &p) {
+        return None;
+    }
+    Some(p)
+}
+
+/// Small extension→MIME map so originals get sane `Content-Type` without pulling
+/// `mime_guess` into the CLI crate. Images/videos default to application/octet-stream.
+fn mime_for(path: &Path) -> &'static str {
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .unwrap_or_default();
+    match ext.as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "heic" | "heif" => "image/heic",
+        "mp4" => "video/mp4",
+        "webm" => "video/webm",
+        "mov" => "video/quicktime",
+        "mkv" => "video/x-matroska",
+        "m4v" => "video/mp4",
+        _ => "application/octet-stream",
+    }
+}
+
 async fn serve_static(
     port: u16,
     dist: PathBuf,
     code: String,
     signal_url: String,
+    config_path: String,
+    share_mode: ShareMode,
 ) -> Result<SocketAddr, String> {
     use warp::Filter;
 
@@ -174,6 +245,126 @@ async fn serve_static(
         })
         .boxed();
 
+    // ── webHost (Mode A) HTTP surface ──────────────────────────────────────
+    // Owner of a mounted library reaches the same business functions + media
+    // over HTTP instead of WebRTC (#26). `POST /rpc` mirrors the RPC dispatch;
+    // `/thumb/{id}` and `/media/{id}` serve bytes by photo id, root-scoped.
+
+    let rpc_config = config_path.clone();
+    let rpc_mode = share_mode;
+    let rpc = warp::path("rpc")
+        .and(warp::post())
+        .and(warp::body::json())
+        .then(move |body: serde_json::Value| {
+            let config = rpc_config.clone();
+            let mode = rpc_mode;
+            async move {
+                let name = body
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let payload = body.get("payload").cloned().unwrap_or_default();
+                let cfg = config.clone();
+                let result = tokio::task::spawn_blocking(move || {
+                    let ctx = RpcContext {
+                        config_path: &cfg,
+                        mode,
+                    };
+                    dispatch(&ctx, &name, &payload)
+                })
+                .await;
+                match result {
+                    Ok(Ok(value)) => warp::reply::json(&serde_json::json!({
+                        "ok": true, "result": value
+                    })),
+                    Ok(Err(error)) => warp::reply::json(&serde_json::json!({
+                        "ok": false, "error": error
+                    })),
+                    Err(_) => warp::reply::json(&serde_json::json!({
+                        "ok": false, "error": "rpc task panicked"
+                    })),
+                }
+            }
+        })
+        .boxed();
+
+    let thumb_config = config_path.clone();
+    let thumb = warp::get()
+        .and(warp::path("thumb"))
+        .and(warp::path::param::<String>())
+        .and(warp::path::end())
+        .then(move |id: String| {
+            let config = thumb_config.clone();
+            async move {
+                // Prefer the DB-cached thumbnail; else generate from the file.
+                let bytes = {
+                    let db = Database::new(&config);
+                    let cached = db.get_photo_thumbnail_bytes(&id);
+                    if let Some(b) = cached.filter(|b| !b.is_empty()) {
+                        Some(b)
+                    } else {
+                        let path = photo_path(&config, &id);
+                        let p = path.clone();
+                        tokio::task::spawn_blocking(move || {
+                            p.and_then(|p| p.to_str().and_then(|s| generate_thumbnail_bytes(s)))
+                        })
+                        .await
+                        .ok()
+                        .flatten()
+                    }
+                };
+                match bytes {
+                    Some(body) => warp::http::Response::builder()
+                        .status(warp::http::StatusCode::OK)
+                        .header("content-type", "image/jpeg")
+                        .header("cache-control", "public, max-age=31536000, immutable")
+                        .body(body)
+                        .unwrap_or_else(|_| {
+                            warp::http::Response::new(Vec::new()) // empty 200 on builder err
+                        }),
+                    None => {
+                        let mut res = warp::http::Response::new(Vec::<u8>::new());
+                        *res.status_mut() = warp::http::StatusCode::NOT_FOUND;
+                        res
+                    }
+                }
+            }
+        })
+        .boxed();
+
+    let media_config = config_path.clone();
+    let media = warp::get()
+        .and(warp::path("media"))
+        .and(warp::path::param::<String>())
+        .and(warp::path::end())
+        .then(move |id: String| {
+            let config = media_config.clone();
+            async move {
+                let response_for = |status: warp::http::StatusCode, body: Vec<u8>| {
+                    warp::http::Response::builder()
+                        .status(status)
+                        .body(body)
+                        .unwrap_or_else(|_| warp::http::Response::new(Vec::new()))
+                };
+                let Some(path) = photo_path(&config, &id) else {
+                    return response_for(warp::http::StatusCode::NOT_FOUND, Vec::new());
+                };
+                let mime = mime_for(&path);
+                match tokio::fs::read(&path).await {
+                    Ok(body) => {
+                        let mut res = response_for(warp::http::StatusCode::OK, body);
+                        if let Ok(mime) = mime.parse() {
+                            res.headers_mut().insert("content-type", mime);
+                        }
+                        res
+                    }
+                    Err(_) => response_for(warp::http::StatusCode::NOT_FOUND, Vec::new()),
+                }
+            }
+        })
+        .boxed();
+
     let addr: SocketAddr = ([0, 0, 0, 0], port).into();
     let listener = tokio::net::TcpListener::bind(addr)
         .await
@@ -182,10 +373,18 @@ async fn serve_static(
         .local_addr()
         .map_err(|e| format!("failed to read bound address: {e}"))?;
     tokio::spawn(async move {
-        warp::serve(index.or(session).or(assets).or(ws_bridge))
-            .incoming(listener)
-            .run()
-            .await;
+        warp::serve(
+            index
+                .or(session)
+                .or(assets)
+                .or(ws_bridge)
+                .or(rpc)
+                .or(thumb)
+                .or(media),
+        )
+        .incoming(listener)
+        .run()
+        .await;
     });
     Ok(bound)
 }
@@ -272,6 +471,8 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
                 web_dist_dir(),
                 code.clone(),
                 signal_url.clone(),
+                config_path.clone(),
+                opts.share_mode,
             )
             .await?,
         ),
@@ -312,4 +513,54 @@ fn web_dist_dir() -> PathBuf {
         return local;
     }
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../webclient/dist")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mime_for_common_extensions() {
+        assert_eq!(mime_for(Path::new("pic.JPG")), "image/jpeg");
+        assert_eq!(mime_for(Path::new("x.png")), "image/png");
+        assert_eq!(mime_for(Path::new("v.mp4")), "video/mp4");
+        assert_eq!(mime_for(Path::new("a.heic")), "image/heic");
+        assert_eq!(mime_for(Path::new("noext")), "application/octet-stream");
+    }
+
+    #[test]
+    fn path_within_roots_allows_inside_and_rejects_outside() {
+        let base = std::env::temp_dir().join(format!("siegu-web-test-{}", std::process::id()));
+        let root = base.join("photos");
+        let outside = base.join("other");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        let in_file = root.join("a.jpg");
+        std::fs::write(&in_file, b"x").unwrap();
+        let out_file = outside.join("b.jpg");
+        std::fs::write(&out_file, b"y").unwrap();
+
+        let roots = vec![root.clone()];
+        assert!(path_within_roots(&roots, &in_file));
+        // A file outside the allowed root must be rejected (security).
+        assert!(!path_within_roots(&roots, &out_file));
+        // A non-existent path must be rejected.
+        assert!(!path_within_roots(&roots, &root.join("missing.jpg")));
+
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn path_within_roots_rejects_path_traversal_like_prefix() {
+        let base = std::env::temp_dir().join(format!("siegu-web-prefix-{}", std::process::id()));
+        let root = base.join("a");
+        let sibling = base.join("ab");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::create_dir_all(&sibling).unwrap();
+        // `ab/x` must NOT be considered inside root `a` (component-wise compare).
+        let trap = sibling.join("x.jpg");
+        std::fs::write(&trap, b"z").unwrap();
+        assert!(!path_within_roots(&[root.clone()], &trap));
+        let _ = std::fs::remove_dir_all(base);
+    }
 }
