@@ -9,11 +9,15 @@
  * mode-sensitive logic runs; mode is `null` until then.
  */
 import { defineStore } from 'pinia';
-import { shallowRef, computed } from 'vue';
+import { shallowRef, ref, computed } from 'vue';
 import { detectMode, type DetectedMode } from '@/services/runtime';
+import { bootGuest, type GuestBootEvents } from '@/services/backend/bootGuest';
 import { createBackend } from '@/services/backend/createBackend';
 import type { GuestClient } from '@/services/backend/guest';
+import type { PeerTransport } from '@/services/backend/peer';
 import type { Backend, RuntimeMode } from '@/services/backend/interface';
+
+export type GuestConnectionState = 'idle' | 'connecting' | 'connected' | 'closed' | 'error';
 
 export const useRuntimeStore = defineStore('runtime', () => {
   const mode = shallowRef<RuntimeMode | null>(null);
@@ -22,11 +26,17 @@ export const useRuntimeStore = defineStore('runtime', () => {
 
   /** For guest Mode B: the paired `GuestClient`, once connected. */
   const guestClient = shallowRef<GuestClient | null>(null);
+  const guestConnection = ref<GuestConnectionState>('idle');
+  const guestError = ref('');
 
   const isDesktop = computed(() => mode.value === 'tauri');
   const isWebHost = computed(() => mode.value === 'webHost');
   const isGuest = computed(() => mode.value === 'guest');
   const isOnboarding = computed(() => mode.value === 'onboarding');
+
+  const isGuestConnected = computed(
+    () => mode.value === 'guest' && guestConnection.value === 'connected',
+  );
 
   const backend = computed<Backend>(() => {
     if (mode.value === 'guest') {
@@ -47,7 +57,58 @@ export const useRuntimeStore = defineStore('runtime', () => {
     session.value = detected.session;
   }
 
-  /** Set the guest client once Mode B pairing succeeds (see PHASE-2). */
+  /**
+   * Initiate guest Mode B pairing using the detected session. Used from App boot
+   * and from the connect screen when a code is entered manually.
+   */
+  async function connectGuest(
+    s: DetectedMode['session'],
+    events: GuestBootEvents = {},
+    transportOverride?: PeerTransport,
+  ): Promise<GuestClient> {
+    if (!s) throw new Error('No guest session to connect with');
+    guestConnection.value = 'connecting';
+    guestError.value = '';
+
+    const { client } = bootGuest(
+      s,
+      {
+        onOpen: () => {
+          guestConnection.value = 'connected';
+          events.onOpen?.();
+        },
+        onClose: () => {
+          if (guestConnection.value === 'connected') guestConnection.value = 'closed';
+          events.onClose?.();
+        },
+        onError: (m) => {
+          guestConnection.value = 'error';
+          guestError.value = m;
+          events.onError?.(m);
+        },
+        onMedia: (id, key, url) => events.onMedia?.(id, key, url),
+      },
+      transportOverride,
+    );
+
+    guestClient.value = client;
+    return client;
+  }
+
+  /**
+   * If this boot resolves to guest mode, connect automatically (used by App.vue).
+   */
+  async function maybeConnectGuest(autoEvents: GuestBootEvents = {}): Promise<void> {
+    const s = session.value;
+    if (mode.value !== 'guest' || !s) return;
+    try {
+      await connectGuest(s, autoEvents);
+    } catch (e) {
+      guestConnection.value = 'error';
+      guestError.value = e instanceof Error ? e.message : String(e);
+    }
+  }
+
   function setGuestClient(client: GuestClient | null): void {
     guestClient.value = client;
   }
@@ -55,12 +116,18 @@ export const useRuntimeStore = defineStore('runtime', () => {
   return {
     mode,
     session,
+    guestClient,
+    guestConnection,
+    guestError,
     isDesktop,
     isWebHost,
     isGuest,
+    isGuestConnected,
     isOnboarding,
     backend,
     initRuntime,
+    connectGuest,
+    maybeConnectGuest,
     setGuestClient,
   };
 });
