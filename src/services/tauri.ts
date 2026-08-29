@@ -372,7 +372,8 @@ export async function startLanHost(
 
 function currentPlatform(): string | null {
   try {
-    return platform();
+    const p = platform();
+    return p && p.length > 0 ? p : null;
   } catch {
     // Not running with the Tauri OS plugin available (e.g. plain browser preview).
     return null;

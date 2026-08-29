@@ -15,5 +15,6 @@ export { parseHash, inferMime, assembleChunks, FileAssembler } from './protocol'
 export type { GuestSession, GuestInbound, GuestOutbound } from './protocol';
 export { tauriBackend } from './tauriBackend';
 export { guestBackend } from './guestBackend';
-export type { Backend, BackendMode, MediaKind } from './interface';
+export { webHostBackend } from './webHostBackend';
+export type { Backend, BackendMode, MediaKind, RuntimeMode } from './interface';
 export { mediaCacheKey } from './interface';
