@@ -9,6 +9,8 @@
 export { createBackend } from './createBackend';
 export { GuestClient } from './guest';
 export type { GuestEvents } from './guest';
+export { bootGuest } from './bootGuest';
+export type { GuestBoot, GuestBootEvents } from './bootGuest';
 export { createPeerTransport } from './peer';
 export type { PeerTransport } from './peer';
 export { parseHash, inferMime, assembleChunks, FileAssembler } from './protocol';
