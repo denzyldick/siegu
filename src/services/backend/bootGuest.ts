@@ -16,7 +16,7 @@ import { GuestClient } from './guest';
 import { createPeerTransport } from './peer';
 import type { PeerTransport } from './peer';
 import type { GuestSession } from './protocol';
-
+import { resolveSignalingBase } from '@/services/signalling';
 export interface GuestBootEvents {
   onOpen?: () => void;
   onClose?: () => void;
@@ -31,14 +31,19 @@ export interface GuestBoot {
 
 /**
  * Build a connected guest session. Pass `transportOverride` in tests to avoid
- * constructing a real WebSocket/RTCPeerConnection.
+ * constructing a real WebSocket/RTCPeerConnection. `signalingBase` is the
+ * `host[:port]` of the signaler the guest connects to: pass a remote one (e.g.
+ * `siegu.io`) to pair via a hosted `wss://` relay (Phase 4); when omitted in a
+ * browser the default resolves to the serving origin's `/ws` bridge.
  */
 export function bootGuest(
   session: GuestSession,
   events: GuestBootEvents = {},
   transportOverride?: PeerTransport,
+  signalingBase?: string,
 ): GuestBoot {
-  const transport = transportOverride ?? createPeerTransport(window.location.host, session);
+  const base = signalingBase ?? resolveSignalingBase();
+  const transport = transportOverride ?? createPeerTransport(base, session);
 
   const client = new GuestClient(transport, {
     onOpen: () => events.onOpen?.(),
