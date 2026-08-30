@@ -8,6 +8,10 @@
 //!
 //! Sessions are read-only unless the host opted into `--share-mode rw`;
 //! mutating commands are rejected at the door in that case.
+//!
+//! The authoritative list of commands, their capability tier, stringify flag
+//! and argument keys lives in [`crate::rpc_catalog`]; this module derives its
+//! allowlists from it and is the only consumer path that runs the handlers.
 
 use std::path::Path;
 
@@ -16,8 +20,15 @@ use serde_json::{json, Value};
 
 use crate::database::{Album, AlbumKind, Database, PhotoFilter, SearchSuggestion};
 use crate::library;
+use crate::rpc_catalog::{self, Tier};
 
 /// Permission level of a web-share session.
+///
+/// `ReadOnly` and `ReadWrite` map to the public `--share-mode ro|rw` flags a
+/// self-hoster sets for guests. `Owner` is the configured-owner capability: a
+/// client authenticated to its own host (docker-compose / CLI `web_token`)
+/// may additionally run heavy host work (ML, sync/session/device) — see
+/// [`Tier`] and issue #42.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ShareMode {
     /// Guests may browse and read only. Default.
@@ -25,6 +36,8 @@ pub enum ShareMode {
     ReadOnly,
     /// Guests may also mutate (favorites, trash). Opt-in via CLI flag.
     ReadWrite,
+    /// Owner: full capability including ML + sync/session/device control.
+    Owner,
 }
 
 impl ShareMode {
@@ -32,7 +45,17 @@ impl ShareMode {
         match s.to_ascii_lowercase().as_str() {
             "ro" | "read-only" | "readonly" => Some(Self::ReadOnly),
             "rw" | "read-write" | "readwrite" => Some(Self::ReadWrite),
+            "owner" => Some(Self::Owner),
             _ => None,
+        }
+    }
+
+    /// The lowest `Tier` this share mode unlocks.
+    pub fn tier(&self) -> Tier {
+        match self {
+            ShareMode::ReadOnly => Tier::ReadOnly,
+            ShareMode::ReadWrite => Tier::ReadWrite,
+            ShareMode::Owner => Tier::Owner,
         }
     }
 }
@@ -45,86 +68,14 @@ pub struct RpcContext<'a> {
     pub mode: ShareMode,
 }
 
-/// Commands that never mutate: allowed in every share mode.
-const READ_ONLY_COMMANDS: &[&str] = &[
-    // library browsing
-    "list_files",
-    "get_photo_by_id",
-    "get_photos_by_ids",
-    "get_photo_encoded_batch",
-    "get_photo_ocr",
-    "get_heatmap_data",
-    "day_counts",
-    // search, facets, tags, geo
-    "get_search_facets",
-    "search_facets",
-    "get_top_tags",
-    "list_objects",
-    "get_location_names",
-    // albums
-    "list_albums",
-    "get_album",
-    "get_album_sections",
-    "get_album_contents",
-    "get_clip_categories",
-    // people
-    "get_people",
-    "get_unnamed_faces",
-    "get_person_photos",
-    "get_person_faces",
-    "get_faces_for_photo",
-    // directories / config / status / models / storage
-    "list_directories",
-    "is_initialized",
-    "get_config",
-    "get_last_scan_time",
-    "get_unindexed_count",
-    "get_max_photo_rowid",
-    "get_indexing_status",
-    "storage_usage",
-    "check_models",
-    "get_model_capabilities",
-    // trash
-    "count_trash",
-    "list_trash",
-];
-
-/// Commands that change host state: require `--share-mode rw`.
-const READ_WRITE_COMMANDS: &[&str] = &[
-    // favorites / trash
-    "toggle_favorite",
-    "set_favorites",
-    "trash_photo",
-    "restore_photo",
-    "empty_trash",
-    "delete_photo_permanently",
-    // albums
-    "create_album",
-    "create_smart_album",
-    "update_smart_album_rule",
-    "rename_album",
-    "delete_album",
-    "clear_dismissed_trips",
-    "sync_trips",
-    "add_album_items",
-    "remove_album_items",
-    "reorder_album",
-    // people
-    "assign_name_to_face",
-    "delete_face",
-    "merge_people",
-    "rename_person",
-    // config, directories, housekeeping
-    "save_config",
-    "add_directory",
-    "remove_directory",
-    "remove_directory_full",
-    "mark_onboarding_complete",
-    "cleanup_database",
-];
-
+/// Commands allowed at a given capability level, derived from the catalog
+/// (single source of truth: [`crate::rpc_catalog::CATALOG`]).
 fn is_mutation(name: &str) -> bool {
-    READ_WRITE_COMMANDS.contains(&name)
+    rpc_catalog::is_mutation(name)
+}
+
+fn is_owner_only(name: &str) -> bool {
+    rpc_catalog::is_owner_only(name)
 }
 
 // ── payload extraction helpers ────────────────────────────────────────────
@@ -225,16 +176,25 @@ fn to_json<T: Serialize>(value: &T, fallback: Value) -> Value {
 /// Run one command. Returns the JSON result or a plain error string safe to
 /// send back as `CommandResponse.error` and to log.
 pub fn dispatch(ctx: &RpcContext, name: &str, payload: &Value) -> Result<Value, String> {
-    if is_mutation(name) && ctx.mode == ShareMode::ReadOnly {
+    let mode_tier = ctx.mode.tier();
+
+    if !rpc_catalog::is_known(name) {
+        return Err(format!("unknown command '{name}'"));
+    }
+
+    if is_owner_only(name) && mode_tier != Tier::Owner {
+        return Err(format!(
+            "command '{name}' is owner-only; authenticate as the owner to run it"
+        ));
+    }
+
+    if is_mutation(name) && mode_tier == Tier::ReadOnly {
         return Err(format!(
             "command '{name}' mutates the host library; restart with --share-mode rw to allow it"
         ));
     }
 
     let mut db = Database::new(ctx.config_path);
-    if !READ_ONLY_COMMANDS.contains(&name) && !is_mutation(name) {
-        return Err(format!("unknown command '{name}'"));
-    }
 
     match name {
         // ── library browsing ──────────────────────────────────────────────

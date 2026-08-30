@@ -16,6 +16,7 @@ pub mod ml_engine;
 pub mod ml_worker;
 pub mod model_manager;
 pub mod rpc;
+pub mod rpc_catalog;
 pub mod scanner;
 pub mod server;
 pub mod shutdown;

@@ -15,6 +15,7 @@ import { listen as tauriListen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { Backend } from '@/services/backend/interface';
 import { activeMediaBackend } from '@/services/backend/mediaRegistry';
 import type { ListFilesOptions } from '@/types/media';
+import { STRINGIFY_RESULT } from 'shared/generated/rpc-commands';
 
 /** Mirrors the `isTauri` check from `@/services/tauri` without importing it
  *  (that module imports `invoke` from here, so importing it would cycle). */
@@ -106,40 +107,6 @@ function normalizeListArgs(args?: InvokeArgs): Partial<ListFilesOptions> {
     albumId: typeof a.albumId === 'string' ? a.albumId : undefined,
   };
 }
-
-/** Commands whose resolved raw value must be JSON-stringified for the caller
- *  (the Rust/Tauri commands return JSON strings and `@/services/tauri.ts`
- *  re-parses them with `parseJsonArray`/`parseJsonObject`). */
-const STRINGIFY_RESULT: ReadonlySet<string> = new Set([
-  'list_files',
-  'get_photo_by_id',
-  'get_photos_by_ids',
-  'get_photo_encoded_batch',
-  'get_search_facets',
-  'search_facets',
-  'list_trash',
-  'get_heatmap_data',
-  'get_faces_for_photo',
-  'get_person_photos',
-  'list_directories',
-  'get_config',
-  'get_people',
-  'get_unnamed_faces',
-  'get_person_faces',
-  'get_album_sections',
-  'get_clip_categories',
-  'get_storage_usage',
-  'list_albums',
-  'get_album',
-  'get_album_contents',
-  'get_top_tags',
-  'list_objects',
-  'check_models',
-  'get_model_capabilities',
-  'day_counts',
-  'create_album',
-  'create_smart_album',
-]);
 
 /**
  * Generic backend command dispatch for the browser data plane. Resolves the

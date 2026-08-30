@@ -24,6 +24,7 @@ export default defineConfig(async () => ({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
+      shared: resolve(__dirname, 'shared'),
     },
   },
 
