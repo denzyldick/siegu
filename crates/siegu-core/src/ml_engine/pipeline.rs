@@ -1486,4 +1486,92 @@ mod tests {
         assert!(r.completed_models.is_empty());
         assert!(r.model_timings.is_empty());
     }
+
+    #[test]
+    fn flush_reverse_geocodes_gps_into_location_name() {
+        let dir = std::env::temp_dir().join(format!("siegu-geocode-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut db = crate::database::Database::new(&dir.display().to_string());
+
+        let photo = crate::database::Photo {
+            id: "geo-1".to_string(),
+            location: format!("{}/pic.jpg", dir.display()),
+            encoded: String::new(),
+            created: "2024-01-01".to_string(),
+            objects: Default::default(),
+            properties: Default::default(),
+            latitude: 40.7128,
+            longitude: -74.0060, // New York
+            favorite: false,
+            indexed: 1,
+            caption: None,
+            aesthetics_score: None,
+            ai_status: AiStatus::default(),
+            sync_needed: false,
+            received: false,
+            view_only: false,
+            last_opened: 0,
+        };
+        db.store_photo_batch(&[photo]).unwrap();
+
+        let result = PhotoResult::default();
+        flush_results_statements(&db, "geo-1", &result, None).unwrap();
+
+        let value: Option<String> = db
+            .connection
+            .query_row(
+                "SELECT value FROM properties WHERE photo_id='geo-1' AND key='location_name'",
+                [],
+                |row| row.get(0),
+            )
+            .ok();
+        assert_eq!(value.as_deref(), Some("New York, United States"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn flush_skips_location_when_photo_has_no_gps() {
+        let dir = std::env::temp_dir().join(format!("siegu-geocode-none-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut db = crate::database::Database::new(&dir.display().to_string());
+
+        let photo = crate::database::Photo {
+            id: "geo-0".to_string(),
+            location: format!("{}/pic.jpg", dir.display()),
+            encoded: String::new(),
+            created: "2024-01-01".to_string(),
+            objects: Default::default(),
+            properties: Default::default(),
+            latitude: 0.0,
+            longitude: 0.0,
+            favorite: false,
+            indexed: 1,
+            caption: None,
+            aesthetics_score: None,
+            ai_status: AiStatus::default(),
+            sync_needed: false,
+            received: false,
+            view_only: false,
+            last_opened: 0,
+        };
+        db.store_photo_batch(&[photo]).unwrap();
+
+        let result = PhotoResult::default();
+        flush_results_statements(&db, "geo-0", &result, None).unwrap();
+
+        let count: i64 = db
+            .connection
+            .query_row(
+                "SELECT COUNT(*) FROM properties WHERE photo_id='geo-0' AND key='location_name'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
