@@ -11,6 +11,7 @@
  */
 import type { ListFilesOptions, MediaItem } from '@/types/media';
 import type { SearchFacetsData } from '@/types/search';
+import type { CommandOrString } from './rpcCasing';
 
 export type MediaKind = 'thumb' | 'original';
 
@@ -35,11 +36,13 @@ export interface Backend {
 
   /**
    * Generic command dispatch (mirrors the host RPC surface). `name` is the
-   * Tauri/RPC command name; `payload` its args. Implementations return the raw
-   * resolved value as-is. UI code typically reaches here through
-   * `@/services/invoke`, which re-wraps JSON-string command results.
+   * Tauri/RPC command name (autocompleted from the generated Rust catalog);
+   * `payload` its args (camelCase allowed — transports snake-case them).
+   * Implementations return the raw resolved value as-is. UI code typically
+   * reaches here through `@/services/invoke`, which re-wraps JSON-string
+   * command results.
    */
-  request<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T>;
+  request<T = unknown>(name: CommandOrString, payload?: Record<string, unknown>): Promise<T>;
 
   // ── media (by id → src URL) ────────────────────────────────────────────
   /** Resolve (and cache) a media src URL for a photo. */

@@ -50,6 +50,25 @@ describe('webHostBackend (Mode A over HTTP/RPC)', () => {
     );
   });
 
+  it('snake-cases camelCase payload keys in the /rpc POST body', async () => {
+    // The Rust host reads snake_case (favorites_only, album_id, person_ids …);
+    // the webHost transport converts camelCase keys via the shared helper.
+    mockFetchOnce({ ok: true, result: [] });
+    const backend = webHostBackend();
+    await backend.listFiles({ favoritesOnly: true, albumId: 'alb1', personIds: ['p1'] });
+    const fetchMock = vi.mocked(fetch);
+    const body = (fetchMock.mock.calls[0][1] as RequestInit).body as string;
+    const parsed = JSON.parse(body);
+    expect(parsed.payload).toMatchObject({
+      favorites_only: true,
+      album_id: 'alb1',
+      person_ids: ['p1'],
+    });
+    expect(parsed.payload).not.toHaveProperty('albumId');
+    expect(parsed.payload).not.toHaveProperty('favoritesOnly');
+    expect(parsed.payload).not.toHaveProperty('personIds');
+  });
+
   it('rejects when the host /rpc endpoint is unreachable', async () => {
     mockFetchNetworkError();
     const backend = webHostBackend();

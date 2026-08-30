@@ -83,6 +83,20 @@ describe('GuestClient', () => {
     expect(sent.payload.query).toBe('beach');
   });
 
+  it('snake-cases camelCase payload keys before sending over WebRTC', async () => {
+    // The host's `dispatch` reads snake_case (album_id, favorites_only …). A
+    // camelCase key passed verbatim would silently default / fail, so the guest
+    // transport must translate it like the webHost transport does.
+    void client.listFiles({ favoritesOnly: true, albumId: 'alb1' });
+    void client.request('set_favorites', { ids: ['a'], favorite: true });
+    const files = transport.outbound[0] as Extract<GuestOutbound, { type: 'CommandRequest' }>;
+    expect(files.payload).toMatchObject({ favorites_only: true, album_id: 'alb1' });
+    expect(files.payload).not.toHaveProperty('albumId');
+    expect(files.payload).not.toHaveProperty('favoritesOnly');
+    const favs = transport.outbound[1] as Extract<GuestOutbound, { type: 'CommandRequest' }>;
+    expect(favs.payload).toEqual({ ids: ['a'], favorite: true });
+  });
+
   it('assembles media chunks into a cached blob URL and notifies onMedia', async () => {
     const onMedia = vi.fn();
     client = new GuestClient(transport, { onMedia });

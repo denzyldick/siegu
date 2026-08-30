@@ -21,6 +21,7 @@ import type { MediaItem, ListFilesOptions } from '@/types/media';
 import type { SearchFacetsData } from '@/types/search';
 import type { Backend, MediaKind } from './interface';
 import { mediaCacheKey } from './interface';
+import { toSnakeCaseKeys } from './rpcCasing';
 
 const RPC_PATH = '/rpc';
 const THUMB_PATH = '/thumb';
@@ -66,28 +67,6 @@ async function rpc<T>(
     throw new RpcError(body.error ?? `RPC ${name} failed on host`);
   }
   return body.result as T;
-}
-
-/**
- * The Tauri IPC bridge converts camelCase JS args to snake_case Rust fields
- * automatically (e.g. `albumId` → `album_id`). The webHost `/rpc` transport has
- * no such bridge, so to keep a payload 1:1 with what the Rust RPC expects we
- * normalize keys here. Already-snake_case keys (e.g. `date_from`, `favorites_only`)
- * and single-word keys (`id`, `name`, `query`, `limit`) are left untouched.
- */
-function toSnakeCaseKeys(payload: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(payload)) {
-    if (key === '') {
-      out[key] = value;
-    } else if (key.includes('_')) {
-      // already snake_case (or a self-contained id like `photo_id`/`face_id`)
-      out[key] = value;
-    } else {
-      out[key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)] = value;
-    }
-  }
-  return out;
 }
 
 /**

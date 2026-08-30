@@ -11,6 +11,7 @@ import { FileAssembler } from './protocol';
 import type { GuestInbound, GuestOutbound } from './protocol';
 import type { MediaItem, ListFilesOptions } from '@/types/media';
 import type { SearchFacetsData } from '@/types/search';
+import { toSnakeCaseKeys } from './rpcCasing';
 
 /** A peer that has been handed an offer to answer. */
 export interface GuestEvents {
@@ -61,7 +62,14 @@ export class GuestClient {
       if (this.closed) return reject(new Error('Session ended'));
       const id = ++this.idCounter;
       this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
-      this.transport.send({ type: 'CommandRequest', id, name, payload });
+      // The host's `dispatch` reads snake_case keys, so translate any camelCase
+      // payload keys (matching the webHost transport and the Tauri IPC bridge).
+      this.transport.send({
+        type: 'CommandRequest',
+        id,
+        name,
+        payload: toSnakeCaseKeys(payload),
+      });
     });
   }
 
