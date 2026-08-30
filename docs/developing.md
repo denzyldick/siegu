@@ -1,11 +1,28 @@
 # Developing
 
+## The contract-first loop
+
+Siegu's rule: **Rust defines the command contract; frontends consume it.** So the
+most important dev workflow is the one you use whenever you touch a command:
+
+1. Edit the catalog: `crates/siegu-core/src/rpc_catalog.rs` → `spec(name, tier, stringify, args)`.
+2. Regenerate the TS contract: `cargo build -p siegu-core` (build.rs rewrites
+   `shared/generated/rpc-commands.ts`; keep it in the diff).
+3. Implement the `dispatch` arm in `crates/siegu-core/src/rpc.rs`, putting shared
+   logic in `library.rs` (or `ml_commands.rs`) and delegating from the Tauri
+   wrappers.
+4. Test at the facade (`rpc.rs::tests`), plus `ml_sec_tests` for boundary changes.
+5. Confirm `generated_ts_matches_catalog` passes.
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full contributor guide.
+
 ## Dev Setup
 
 ```bash
 git clone https://github.com/denzyldick/siegu.git
 cd siegu
 npm install
+cargo build            # builds workspace + regenerates the TS contract
 npm run tauri dev
 ```
 
@@ -17,7 +34,7 @@ Pre-commit hooks in `.githooks/pre-commit`:
 
 1. **Rust formatting**: Runs `cargo fmt` on all workspace `.rs` files and re-stages changes
 2. **JS/Vue formatting**: Runs `prettier --write` on staged `.js`, `.vue`, `.ts`, `.css`, `.json` files
-3. **Translation check**: Runs `node scripts/check-translations.js` to verify all locale files have matching keys
+3. **Translation check**: Runs `node scripts/check-translations.js` to verify all locale files have matching keys (English is canonical)
 
 Enable hooks manually:
 ```bash
@@ -38,26 +55,15 @@ GitHub Actions workflows in `.github/workflows/` (details in `docs/ci.md`):
 ### Formatting
 
 CI enforces:
-- **Rust**: `cargo fmt --check` (in `src-tauri/`)
+- **Rust**: `cargo fmt --check`
 - **JS/Vue**: `npm run format:check` (prettier)
 - **Translations**: `npm run check:translations`
 
 Run locally:
 ```bash
-npm run format    # Fix formatting
-npm run format:check  # Check only
+npm run format            # Fix formatting (Rust + frontend)
+npm run format:check      # Check only
 ```
-
-## Neovim Debugging
-
-The repo includes `.nvim.lua` with DAP configuration for debugging the Tauri backend with CodeLLDB:
-
-```vim
-:SieguTauriDev        " Start Tauri dev session
-:SieguDebugAttach     " Attach CodeLLDB to the backend
-```
-
-Requires: `nvim-dap`, `codelldb` on PATH, Neovim with `exrc` enabled.
 
 ## Project Scripts
 
@@ -76,27 +82,63 @@ Requires: `nvim-dap`, `codelldb` on PATH, Neovim with `exrc` enabled.
 ## Rust Test Commands
 
 ```bash
-# Run all tests (from src-tauri/)
-cargo test
+# Core library tests (from the workspace root) — includes the catalog
+# drift-guard (generated_ts_matches_catalog), ml_sec_tests, and rpc facade tests
+cargo test -p siegu-core --lib
 
-# Run core library tests
-cargo test -p siegu-core
+# Run a single rpc test module / test
+cargo test -p siegu-core --lib rpc::tests::top_tags_and_location_names_report_seeded_library
 
-# Run ignored (integration) tests
-cargo test -- --ignored test_full_inference_on_sample
-cargo test -- --ignored test_whisper_smoke
-
-# Run the mesh sync E2E (Rust-level, no models needed)
+# Integration tests (real mesh/sync transport)
 cargo test -p siegu-core --test sync_e2e
-cargo test -p siegu-core --test mesh_e2e    # join --initiator, delta sync, mDNS
+cargo test -p siegu-core --test mesh_e2e
 
-# Run the CLI-level sync E2E (builds + exercises two real processes)
-bash scripts/e2e-sync.sh
+# Full peer-level E2E drivers (build the CLI first)
+cargo build --release -p siegu-cli
+scripts/e2e-view-only.sh     # view-only + sync guard + restore pull + RPC ro/rw ladder
+scripts/e2e-sync.sh          # two-process mesh sync
 
-# Run lint
+# Tauri wrapper compile check only (heavy: full recompile)
+cargo check -p siegu --manifest-path src-tauri/Cargo.toml
+
+# Lint
 cargo clippy -- -D warnings
+
+# Formatting
+cargo fmt --all -- --check
 ```
+
+> The old "run `cargo test` from `src-tauri/`" habit is superseded: shared
+> business logic now lives in `siegu-core`, so run `cargo test -p siegu-core`.
+
+## Neovim Debugging
+
+The repo includes `.nvim.lua` with DAP configuration for debugging the Tauri backend with CodeLLDB:
+
+```vim
+:SieguTauriDev        " Start Tauri dev session
+:SieguDebugAttach     " Attach CodeLLDB to the backend
+```
+
+Requires: `nvim-dap`, `codelldb` on PATH, Neovim with `exrc` enabled.
+
+## Web host dev tips
+
+```bash
+# Serve a seeded library over HTTP (no ML by default)
+siegu web --port 8788 --config-path ./dev-scratch --share-mode rw
+
+# Enable owner-tier ML for the web bearer (starts the live worker)
+siegu web --port 8788 --config-path ./dev-scratch --owner-mode
+
+# The guest path pairs by code+token; use a --server signaler for cross-network
+```
+
+The browser SPA reaches the host through `src/services/backend/webHostBackend.ts`
+(`fetch /rpc`), which is one of three `Backend` implementations
+(`interface.ts`) selected at runtime by `src/services/runtime.ts`.
 
 ## Architecture
 
-See `docs/architecture.md` for workspace layout and module documentation.
+See `docs/architecture.md` for the workspace layout, the RPC facade, and the
+tiered capability model — and `docs/e2e.md` for the test pyramid across modes.

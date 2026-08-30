@@ -107,6 +107,7 @@ deep technical detail:
 
 | For you | Docs |
 |---------|------|
+| **Contributors** | [CONTRIBUTING.md](CONTRIBUTING.md), [Developing](docs/developing.md), [End-to-End testing](docs/e2e.md) |
 | **New users** | [Getting Started](docs/getting-started.md), [Configuration](docs/configuration.md), [Sharing with friends](docs/sharing.md), [Web client](docs/webclient.md) |
 | **Builders / developers** | [Build](docs/build.md), [Architecture](docs/architecture.md), [ML engine](docs/ml-engine.md), [Frontend](docs/frontend.md), [Backend](docs/backend.md), [Database](docs/database.md) |
 | **Advanced** | [CLI](docs/cli.md), [Sync](docs/sync.md), [Mesh networking](docs/mesh-protocol.md), [Security](docs/security.md), [Android](docs/android.md), [iOS](docs/ios.md) |
