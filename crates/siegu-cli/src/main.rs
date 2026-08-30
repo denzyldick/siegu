@@ -261,6 +261,12 @@ enum Commands {
         /// When set, guests on other networks can connect by code + token.
         #[arg(long)]
         server: Option<String>,
+        /// Treat the bearer of the printed `web_token` as the library Owner on
+        /// this host: full capability including ML analysis/indexing (issue #19
+        /// follow-up). Off by default so `--share-mode` still caps the web
+        /// bearer. `--owner-mode` implies `--share-mode rw` for the web host.
+        #[arg(long)]
+        owner_mode: bool,
     },
 }
 
@@ -589,6 +595,7 @@ async fn main() {
             config,
             share_mode,
             server,
+            owner_mode,
         } => {
             let mode = siegu_core::rpc::ShareMode::parse(share_mode).unwrap_or_else(|| {
                 eprintln!(
@@ -602,6 +609,7 @@ async fn main() {
                 config: Some(config_dir.display().to_string()),
                 share_mode: mode,
                 server: server.clone(),
+                owner_mode: *owner_mode,
             })
             .await
             {

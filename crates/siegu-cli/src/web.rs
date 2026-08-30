@@ -215,6 +215,8 @@ async fn serve_static(
     signal_url: String,
     config_path: String,
     share_mode: ShareMode,
+    owner_mode: bool,
+    ml: Option<std::sync::Arc<siegu_core::ml_worker::MlContext>>,
     web_token: String,
 ) -> Result<SocketAddr, String> {
     use warp::reply::Reply as _;
@@ -282,6 +284,8 @@ async fn serve_static(
 
     let rpc_config = config_path.clone();
     let rpc_mode = share_mode;
+    let rpc_owner_mode = owner_mode;
+    let rpc_ml = ml;
     let rpc_web_token = web_token.clone();
     let rpc = warp::path("rpc")
         .and(warp::post())
@@ -290,6 +294,8 @@ async fn serve_static(
         .then(move |auth: Option<String>, body: serde_json::Value| {
             let config = rpc_config.clone();
             let mode = rpc_mode;
+            let owner_mode = rpc_owner_mode;
+            let ml = rpc_ml.clone();
             let expected_token = rpc_web_token.clone();
             async move {
                 if !token_matches_auth(&auth, &expected_token) {
@@ -303,10 +309,14 @@ async fn serve_static(
                 let payload = body.get("payload").cloned().unwrap_or_default();
                 let cfg = config.clone();
                 let result = tokio::task::spawn_blocking(move || {
+                    // The bearer of the printed web_token is the host owner when
+                    // `--owner-mode` is set: full capability incl. ML. Otherwise
+                    // the web /rpc is capped at the `--share-mode` of the share.
+                    let effective_mode = if owner_mode { ShareMode::Owner } else { mode };
                     let ctx = RpcContext {
                         config_path: &cfg,
-                        mode,
-                        ml: None,
+                        mode: effective_mode,
+                        ml: ml.as_deref(),
                     };
                     dispatch(&ctx, &name, &payload)
                 })
@@ -449,6 +459,10 @@ pub struct WebOptions {
     /// the embedded loopback one (#27, Phase 4). Lets guests connect from any
     /// network by code + token.
     pub server: Option<String>,
+    /// When true, the bearer of the printed `web_token` is the library Owner on
+    /// this host (full capability incl. ML). `share_mode` then only caps the
+    /// WebRTC guest share.
+    pub owner_mode: bool,
 }
 
 /// `siegu web`: share this machine's library as a view-only gallery in any
@@ -531,6 +545,24 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
     // CLI/e2e guests speak WebRTC only; SIEGU_WEB_NO_HTTP skips the static
     // bundle requirement so a session can be hosted without building the
     // browser client.
+
+    // `--owner-mode` makes the bearer of the printed web_token the host owner
+    // on the /rpc plane (full capability incl. ML). Start a worker so owner ML
+    // commands resolve; models load lazily on first use. Guests (WebRTC share /
+    // default mode) never see this handle: their mesh RpcContext stays ml: None.
+    let ml_worker = if opts.owner_mode {
+        crate::cli_info!("--owner-mode: bearer of web_token is the library owner (ML enabled)");
+        Some(std::sync::Arc::new(
+            siegu_core::ml_engine::worker::start_worker(
+                siegu_core::ml_engine::worker::NoopCallbacks,
+                config_path.clone(),
+                32,
+            ),
+        ))
+    } else {
+        None
+    };
+
     let http_addr = match std::env::var_os("SIEGU_WEB_NO_HTTP") {
         Some(_) => {
             crate::cli_info!("SIEGU_WEB_NO_HTTP is set - skipping static file server");
@@ -544,6 +576,8 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
                 signal_url.clone(),
                 config_path.clone(),
                 opts.share_mode,
+                opts.owner_mode,
+                ml_worker.clone(),
                 web_token.clone(),
             )
             .await?,
