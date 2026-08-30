@@ -1,5 +1,6 @@
 import { resolve } from 'path'
 import { defineConfig } from 'vitest/config'
+import { configDefaults } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
@@ -13,6 +14,7 @@ export default defineConfig({
     environment: 'happy-dom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
+    exclude: [...configDefaults.exclude, 'e2e/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary'],

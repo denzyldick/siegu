@@ -127,7 +127,10 @@ const emit = defineEmits<{
   select: [id: string | number];
 }>();
 
-const { videoUrl: buildVideoUrl, thumbUrl: buildThumbUrl, remoteThumbUrl } = useMediaUrl();
+const { mediaSrcRef, remoteThumbUrl } = useMediaUrl();
+const pathRef = computed(() => props.path);
+const thumbRef = mediaSrcRef(pathRef, 'thumb');
+const videoSrcRef = mediaSrcRef(pathRef, 'original');
 
 const containerRef = ref<HTMLElement | null>(null);
 const isVisible = ref(false);
@@ -144,7 +147,7 @@ const computedVideoUrl = computed(() => {
   if (!props.path?.location || !isVideo.value) return '';
   // Evicted items have no local bytes; hover preview would just 404.
   if (isViewOnly.value) return '';
-  return buildVideoUrl(props.path.location) ?? '';
+  return videoSrcRef.value ?? '';
 });
 
 const videoType = computed(() => {
@@ -201,11 +204,9 @@ const imageSrc = computed(() => {
   // Evicted items: stream the thumbnail from the peer, fall back to the
   // inline copy that arrived with the manifest.
   if (isViewOnly.value) {
-    return remoteThumbUrl(props.path.id) || props.path.encoded || undefined;
+    return thumbRef.value || remoteThumbUrl(props.path.id) || props.path.encoded || undefined;
   }
-  const thumb = buildThumbUrl(props.path.location);
-  if (thumb) return thumb;
-  return props.path.encoded || undefined;
+  return thumbRef.value || props.path.encoded || undefined;
 });
 
 // Prefer a generated poster (320px thumb from ffmpeg) over mounting a video
@@ -213,7 +214,7 @@ const imageSrc = computed(() => {
 const posterSrc = computed(() => {
   if (posterFailed.value || !isVideo.value || !props.path?.location) return undefined;
   if (isViewOnly.value) return remoteThumbUrl(props.path.id);
-  return buildThumbUrl(props.path.location);
+  return thumbRef.value || undefined;
 });
 
 // Reset the loaded flag whenever the displayed source changes so a replaced

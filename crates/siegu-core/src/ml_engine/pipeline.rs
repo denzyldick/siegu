@@ -3,6 +3,7 @@ use std::time::Instant;
 
 use crate::database::{AiStatus, Face};
 use crate::face_detector;
+use crate::geocode;
 use crate::ml_worker::should_run_model;
 use crate::thumbnail;
 
@@ -958,6 +959,19 @@ fn flush_results_statements(
         "INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES(?1, 'face_count', ?2)",
         (photo_id, &result.face_count.to_string()),
     );
+
+    // Reverse-geocode GPS → a human-readable place name ("City, Country") so the
+    // Locations facet populates. Offline nearest-city lookup (geocode.rs); only
+    // writes when the photo carries valid coordinates near a known city. The
+    // photo's lat/long are read from the DB (analysis results don't carry them).
+    if let Some(photo) = db.get_photo_by_id(photo_id) {
+        if let Some((city, country)) = geocode::find_nearest_city(photo.latitude, photo.longitude) {
+            let _ = db.connection.execute(
+                "INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES(?1, 'location_name', ?2)",
+                (photo_id, format!("{city}, {country}")),
+            );
+        }
+    }
 
     for face_info in &result.faces {
         db.store_face(Face {

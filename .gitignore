@@ -14,6 +14,7 @@ dist-ssr
 
 # AI model binaries (downloaded by CI/the app, never committed)
 src-tauri/test_models/
+test_models/
 
 # AI session logs
 session-*.md
@@ -31,3 +32,7 @@ session-*.md
 ~
 target
 coverage
+
+# Playwright test artifacts (generated output, never committed)
+test-results/
+playwright-report/

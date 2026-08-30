@@ -85,10 +85,10 @@
                 <!-- Previous slide -->
                 <div class="carousel-slide">
                   <template v-if="prevItem && !isItemVideo(prevItem)">
-                    <img :src="getItemSrc(prevItem)" class="viewer-image" decoding="async" />
+                    <img :src="prevFull" class="viewer-image" decoding="async" />
                   </template>
                   <template v-else-if="prevItem && isItemVideo(prevItem)">
-                    <img :src="getItemThumbSrc(prevItem)" class="viewer-image" decoding="async" />
+                    <img :src="prevThumb" class="viewer-image" decoding="async" />
                   </template>
                 </div>
 
@@ -111,10 +111,10 @@
                 <!-- Next slide -->
                 <div class="carousel-slide">
                   <template v-if="nextItem && !isItemVideo(nextItem)">
-                    <img :src="getItemSrc(nextItem)" class="viewer-image" decoding="async" />
+                    <img :src="nextFull" class="viewer-image" decoding="async" />
                   </template>
                   <template v-else-if="nextItem && isItemVideo(nextItem)">
-                    <img :src="getItemThumbSrc(nextItem)" class="viewer-image" decoding="async" />
+                    <img :src="nextThumb" class="viewer-image" decoding="async" />
                   </template>
                 </div>
               </div>
@@ -490,9 +490,10 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
-import { invoke, convertFileSrc } from '@tauri-apps/api/core';
+import { invoke } from '@/services/invoke';
 import { revealItemInDir, openPath } from '@tauri-apps/plugin-opener';
-import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import type { UnlistenFn } from '@tauri-apps/api/event';
+import { listen } from '@/services/invoke';
 import MediaThumbnail from './MediaThumbnail.vue';
 import VideoPlayer from './VideoPlayer.vue';
 import { RecycleScroller } from 'vue-virtual-scroller';
@@ -506,12 +507,7 @@ import { useI18n } from 'vue-i18n';
 import type { MediaItem } from '@/types/media';
 
 const { t } = useI18n();
-const {
-  ensurePort,
-  videoUrl: buildVideoUrl,
-  thumbUrl: buildThumbUrl,
-  remoteImageUrl,
-} = useMediaUrl();
+const { mediaSrcRef, ensurePort } = useMediaUrl();
 
 interface DetectedFace {
   photo_id: string;
@@ -733,6 +729,10 @@ const currentPhoto = computed(() => {
   return props.photos[props.index];
 });
 
+const currentPhotoRef = computed(() => currentPhoto.value);
+const currentThumb = mediaSrcRef(currentPhotoRef, 'thumb');
+const currentOriginal = mediaSrcRef(currentPhotoRef, 'original');
+
 const isVideo = computed(() => {
   if (!currentPhoto.value?.location) return false;
   return checkIsVideo(currentPhoto.value.location);
@@ -742,8 +742,7 @@ const isViewOnly = computed((): boolean => !!currentPhoto.value?.view_only);
 
 const computedVideoUrl = computed(() => {
   if (!currentPhoto.value || !isVideo.value) return '';
-  if (isViewOnly.value) return remoteImageUrl(currentPhoto.value.id) ?? '';
-  return buildVideoUrl(currentPhoto.value.location) ?? '';
+  return currentOriginal.value ?? '';
 });
 
 const videoType = computed(() => {
@@ -759,17 +758,18 @@ const videoType = computed(() => {
 const currentPhotoSrc = computed(() => {
   if (!currentPhoto.value || isVideo.value) return '';
   if (currentPhoto.value.view_only) {
-    return remoteImageUrl(currentPhoto.value.id) ?? currentPhoto.value.encoded ?? '';
+    return currentOriginal.value || currentPhoto.value.encoded || '';
   }
   const ext = currentPhoto.value.location.split('.').pop()?.toLowerCase();
   if (['heic', 'heif'].includes(ext ?? '')) {
     return (
       currentPhoto.value.encoded ||
-      buildThumbUrl(currentPhoto.value.location) ||
-      convertFileSrc(currentPhoto.value.location)
+      currentThumb.value ||
+      currentOriginal.value ||
+      ''
     );
   }
-  return convertFileSrc(currentPhoto.value.location);
+  return currentOriginal.value || currentPhoto.value.encoded || '';
 });
 
 interface ExifData {
@@ -1181,19 +1181,10 @@ function isItemVideo(item: MediaItem): boolean {
   return checkIsVideo(item.location ?? '');
 }
 
-function getItemSrc(item: MediaItem): string {
-  if (item.view_only) return remoteImageUrl(item.id) ?? item.encoded ?? '';
-  const ext = item.location?.split('.').pop()?.toLowerCase();
-  if (['heic', 'heif'].includes(ext ?? '')) {
-    return item.encoded || buildThumbUrl(item.location) || convertFileSrc(item.location);
-  }
-  return convertFileSrc(item.location);
-}
-
-function getItemThumbSrc(item: MediaItem): string {
-  if (item.view_only) return remoteImageUrl(item.id) ?? '';
-  return buildThumbUrl(item.location) || convertFileSrc(item.location);
-}
+const prevFull = mediaSrcRef(prevItem, 'original');
+const prevThumb = mediaSrcRef(prevItem, 'thumb');
+const nextFull = mediaSrcRef(nextItem, 'original');
+const nextThumb = mediaSrcRef(nextItem, 'thumb');
 
 function handleKeydown(e: KeyboardEvent): void {
   if (!visible.value) return;

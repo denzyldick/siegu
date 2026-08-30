@@ -70,12 +70,17 @@ pub fn is_video_ext(path: &str) -> bool {
 }
 
 pub fn generate_thumbnail(path: &str) -> Option<String> {
-    generate_thumbnail_bytes(path).map(|bytes| {
-        format!(
-            "data:image/jpeg;base64,{}",
-            base64::engine::general_purpose::STANDARD.encode(bytes)
-        )
-    })
+    generate_thumbnail_bytes(path).map(|bytes| encode_thumbnail_data_url(&bytes))
+}
+
+/// Base64 JPEG data-URL in the same format `generate_thumbnail` returns, for
+/// code paths that already hold raw image bytes (e.g. a pre-made poster JPEG
+/// used as a video's library thumbnail).
+pub fn encode_thumbnail_data_url(bytes: &[u8]) -> String {
+    format!(
+        "data:image/jpeg;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    )
 }
 
 /// Raw JPEG thumbnail bytes for an image or a video poster frame. Used by the

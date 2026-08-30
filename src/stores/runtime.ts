@@ -13,6 +13,7 @@ import { shallowRef, ref, computed } from 'vue';
 import { detectMode, type DetectedMode } from '@/services/runtime';
 import { bootGuest, type GuestBootEvents } from '@/services/backend/bootGuest';
 import { createBackend } from '@/services/backend/createBackend';
+import { registerMediaBackend } from '@/services/backend/mediaRegistry';
 import type { GuestClient } from '@/services/backend/guest';
 import type { PeerTransport } from '@/services/backend/peer';
 import type { Backend, RuntimeMode } from '@/services/backend/interface';
@@ -58,6 +59,12 @@ export const useRuntimeStore = defineStore('runtime', () => {
     mode.value = detected.mode;
     session.value = detected.session;
     webHostToken.value = detected.webHostToken;
+    // Expose the active backend to the media composable registry once the mode
+    // is known, so `useMediaUrl` resolves webHost/guest/tauri media through the
+    // one seam without importing this store (avoids circular deps + Pinia-absent
+    // test contexts). See `mediaRegistry.ts`.
+    const backendRef = backend;
+    registerMediaBackend(() => backendRef.value);
   }
 
   /**

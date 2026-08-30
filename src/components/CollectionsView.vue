@@ -97,8 +97,8 @@
                 <div class="tile-mosaic">
                   <template v-for="(mosaicItem, i) in section.items.slice(0, 4)" :key="i">
                     <img
-                      v-if="tileSrc(mosaicItem)"
-                      :src="tileSrc(mosaicItem)"
+                      v-if="tileSrcVal(mosaicItem)"
+                      :src="tileSrcVal(mosaicItem)"
                       :alt="mosaicItem.name"
                       loading="lazy"
                       class="mosaic-img"
@@ -113,8 +113,8 @@
               </template>
               <template v-else-if="section.items.length > 0">
                 <img
-                  v-if="tileSrc(section.items[0])"
-                  :src="tileSrc(section.items[0])"
+                  v-if="tileSrcVal(section.items[0])"
+                  :src="tileSrcVal(section.items[0])"
                   :alt="section.items[0].name"
                   loading="lazy"
                   class="tile-cover-img"
@@ -219,8 +219,8 @@
         >
           <div class="tile-preview">
             <img
-              v-if="tileSrc(item)"
-              :src="tileSrc(item)"
+              v-if="tileSrcVal(item)"
+              :src="tileSrcVal(item)"
               :alt="item.name"
               loading="lazy"
               class="tile-cover-img"
@@ -727,11 +727,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, type Ref } from 'vue';
 import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller';
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
 import { useI18n } from 'vue-i18n';
-import { listen } from '@tauri-apps/api/event';
+import { listen } from '@/services/invoke';
 import MediaCard from '@/components/MediaCard.vue';
 import MediaViewer from '@/components/MediaViewer.vue';
 import PeopleManagePanel from '@/components/people/PeopleManagePanel.vue';
@@ -756,7 +756,7 @@ const { t } = useI18n();
 const albumsStore = useAlbumsStore();
 const searchStore = useSearchStore();
 const uiStore = useUiStore();
-const { thumbUrl: buildThumbUrl } = useMediaUrl();
+const { mediaSrcRef } = useMediaUrl();
 const {
   people,
   unnamedFaces,
@@ -937,7 +937,7 @@ async function handleRestorePhoto(id: string): Promise<void> {
 }
 
 async function handleDeleteForever(id: string): Promise<void> {
-  const { invoke } = await import('@tauri-apps/api/core');
+  const { invoke } = await import('@/services/invoke');
   await invoke('delete_photo_permanently', { id });
   trashPhotos.value = trashPhotos.value.filter((p) => String(p.id) !== id);
   await albumsStore.loadSections();
@@ -981,10 +981,37 @@ function sectionTitle(sectionId: string): string {
   return t(`albums.section_${sectionId}`);
 }
 
-function tileSrc(item: AlbumSectionItem): string {
-  if (item.kind === 'person') return getFaceImageSrc(item.cover_crop, item.cover_encoded);
-  if (item.cover_location) return buildThumbUrl(item.cover_location) ?? '';
-  return item.cover_encoded ?? '';
+const tileSrcCache = new Map<string, Ref<string | undefined>>();
+
+/** Reactive `<img>` src for a collection tile. Resolves via the mode-aware
+ *  media seam (webHost/guest/tauri) keyed by cover id; falls back to inline
+ *  encoded bytes / face crop for people tiles. */
+function tileSrcRef(item: AlbumSectionItem): Ref<string | undefined> {
+  const existing = tileSrcCache.get(item.id);
+  if (existing) return existing;
+  let ref_: Ref<string | undefined>;
+  if (item.kind === 'person') {
+    ref_ = ref(getFaceImageSrc(item.cover_crop, item.cover_encoded) || undefined);
+  } else if (item.album?.cover_photo_id) {
+    // Album tiles key on the album's cover *photo* id, not the album id, so the
+    // media seam resolves `/thumb|/media/{photoId}?token=` (webHost) correctly.
+    const photoRef = computed(() => {
+      if (!item.album?.cover_photo_id) return null;
+      return { id: item.album.cover_photo_id } as unknown as MediaItem;
+    });
+    ref_ = mediaSrcRef(photoRef as unknown as Ref<MediaItem | null | undefined>, 'thumb');
+  } else {
+    const itemRef = computed(() => item);
+    ref_ = mediaSrcRef(itemRef as unknown as Ref<MediaItem | null | undefined>, 'thumb');
+  }
+  tileSrcCache.set(item.id, ref_);
+  return ref_;
+}
+
+/** Sync read for templates: returns the current resolved src (reactive — the
+ *  ref's async resolution re-renders this component, re-reading `.value`). */
+function tileSrcVal(item: AlbumSectionItem): string | undefined {
+  return tileSrcRef(item).value;
 }
 
 function tileIcon(kind: string): string {
@@ -1446,8 +1473,18 @@ onUnmounted(() => {
 
 <style scoped>
 .albums-container {
-  max-width: 980px;
+  width: 100%;
   margin: 0 auto;
+}
+
+/* Use the full available width on desktop so collections (incl. New Faces /
+   PeopleManagePanel) span the window on maximized screens, matching the
+   gallery. On very wide/ultrawide layouts keep the tiles from stretching too
+   far by capping the content, but leave it generous vs. the old 980px band. */
+@media (min-width: 1600px) {
+  .albums-container {
+    max-width: 1560px;
+  }
 }
 
 .collections-grid {

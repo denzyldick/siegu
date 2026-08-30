@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@/services/invoke';
 import { getConfig } from '@/services/tauri';
 
 export const DEFAULT_SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL || 'wss://siegu.io/ws';

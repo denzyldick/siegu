@@ -26,6 +26,21 @@ export interface Backend {
   restorePhoto(id: number | string): Promise<boolean>;
   emptyTrash(): Promise<number>;
 
+  // Batch reads/mutations used by the gallery: mirrors the host RPCs
+  // `get_photos_by_ids`, `get_photo_encoded_batch`, `set_favorites` so the
+  // browser data plane (`@/services/invoke`) can serve them in webHost/guest.
+  getPhotosByIds(ids: Array<string | number>): Promise<MediaItem[]>;
+  getPhotoEncodedBatch(ids: number[]): Promise<Record<number, string>>;
+  setFavorites(ids: Array<string | number>, favorite: boolean): Promise<number>;
+
+  /**
+   * Generic command dispatch (mirrors the host RPC surface). `name` is the
+   * Tauri/RPC command name; `payload` its args. Implementations return the raw
+   * resolved value as-is. UI code typically reaches here through
+   * `@/services/invoke`, which re-wraps JSON-string command results.
+   */
+  request<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T>;
+
   // ── media (by id → src URL) ────────────────────────────────────────────
   /** Resolve (and cache) a media src URL for a photo. */
   mediaUrl(id: number | string, kind: MediaKind): Promise<string | null>;

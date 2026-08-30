@@ -5,15 +5,19 @@
  */
 import {
   getPhotoById,
+  getPhotosByIds,
+  getPhotoEncodedBatch,
   listFiles,
   searchFacets,
   countTrash,
   listTrash,
   toggleFavorite,
+  setFavorites,
   trashPhoto,
   restorePhoto,
   emptyTrash,
 } from '@/services/tauri';
+import { invoke as tauriInvoke } from '@tauri-apps/api/core';
 import { useMediaUrl } from '@/composables/useMediaUrl';
 import type { Backend, MediaKind } from './interface';
 import { mediaCacheKey } from './interface';
@@ -25,10 +29,13 @@ export function tauriBackend(): Backend {
   return {
     listFiles,
     getPhotoById,
+    getPhotosByIds,
+    getPhotoEncodedBatch,
     searchFacets,
     countTrash,
     listTrash,
     toggleFavorite,
+    setFavorites,
     trashPhoto,
     restorePhoto,
     emptyTrash: async () => {
@@ -36,6 +43,8 @@ export function tauriBackend(): Backend {
       mediaCache.clear();
       return n;
     },
+
+    request: (name, payload = {}) => tauriInvoke(name, payload),
 
     mediaUrl: async (id, kind: MediaKind) => {
       const key = mediaCacheKey(id, kind);

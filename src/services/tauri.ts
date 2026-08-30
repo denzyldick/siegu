@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@/services/invoke';
 import { platform } from '@tauri-apps/plugin-os';
 import type { MediaItem, ListFilesOptions } from '@/types/media';
 import type { Person, UnnamedFace } from '@/types/person';

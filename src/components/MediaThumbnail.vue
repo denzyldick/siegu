@@ -1,10 +1,10 @@
 <template>
   <div class="rail-item" ref="container" :class="{ active: active }" @click="$emit('click')">
     <template v-if="isVisible">
-      <img v-if="thumbSrc" :src="thumbSrc" :alt="$t('media_thumbnail.alt_thumb')" />
+      <img v-if="thumbSrcRef" :src="thumbSrcRef" :alt="$t('media_thumbnail.alt_thumb')" />
       <video
         v-else-if="isVideo && !photo.encoded"
-        :src="videoUrl"
+        :src="videoSrcRef"
         :type="videoType"
         :alt="$t('media_thumbnail.alt_thumb')"
         muted
@@ -33,21 +33,22 @@ defineEmits<{
   click: [];
 }>();
 
-const { isVideo: checkIsVideo, videoUrl: buildVideoUrl, thumbUrl: buildThumbUrl } = useMediaUrl();
+const { mediaSrcRef, isVideo: checkIsVideo } = useMediaUrl();
 
 const isVisible = ref(false);
 const container = ref<HTMLElement | null>(null);
 let observer: IntersectionObserver | null = null;
+
+const photoRef = computed(() => props.photo);
 
 const isVideo = computed(() => {
   if (!props.photo?.location) return false;
   return checkIsVideo(props.photo.location);
 });
 
-const videoUrl = computed(() => {
-  if (!props.photo?.location || !isVideo.value) return '';
-  return buildVideoUrl(props.photo.location) ?? '';
-});
+const videoSrcRef = mediaSrcRef(photoRef, 'original');
+
+const thumbSrcRef = mediaSrcRef(photoRef, 'thumb');
 
 const videoType = computed(() => {
   const ext = props.photo?.location?.split('.').pop()?.toLowerCase();
@@ -57,12 +58,6 @@ const videoType = computed(() => {
   if (ext === 'mkv') return 'video/x-matroska';
   if (ext === 'm4v') return 'video/mp4';
   return undefined;
-});
-
-const thumbSrc = computed(() => {
-  if (!props.photo?.location) return '';
-  if (props.photo.encoded) return props.photo.encoded;
-  return buildThumbUrl(props.photo.location) ?? '';
 });
 
 onMounted(() => {

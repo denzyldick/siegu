@@ -18,6 +18,10 @@ pub type SharedRpcSlot = Arc<tokio::sync::Mutex<Option<RpcReply>>>;
 pub type SharedSyncTx =
     Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<SyncMessage>>>>;
 
+/// Default demo categories (subdirectory names under the demo root, including
+/// the synthetic `videos/` clips whose posters are the library thumbnails).
+const ALL_DEMOS: &str = "landscapes,people,cities,food,videos";
+
 pub struct CliSyncEvent {
     pub config_path: String,
     pub sync_tx: SharedSyncTx,
@@ -230,6 +234,18 @@ enum Commands {
         #[command(subcommand)]
         action: MeshAction,
     },
+    /// Seed the library with bundled demo datasets (one album per category) so
+    /// the landing page can open the web app pre-loaded with a demo (#7/#8).
+    SeedDemo {
+        /// Comma-separated category directories under the demo root to seed
+        #[arg(long, default_value = ALL_DEMOS)]
+        demos: String,
+        /// Root that contains the `demos/<category>` asset directories
+        #[arg(long)]
+        demos_root: Option<PathBuf>,
+        #[arg(short, long)]
+        config: Option<String>,
+    },
     /// Share this library as a view-only gallery in a browser (#11)
     Web {
         /// Port for the static web client (signalling picks its own port)
@@ -418,6 +434,14 @@ async fn main() {
         Commands::Scan { folder, config } => {
             let config_dir = resolve_config_dir(&cli.config_dir, config);
             cmd_scan(&config_dir, folder.as_deref()).await;
+        }
+        Commands::SeedDemo {
+            demos,
+            demos_root,
+            config,
+        } => {
+            let config_dir = resolve_config_dir(&cli.config_dir, config);
+            cmd_seed_demo(&config_dir, demos, demos_root.as_deref());
         }
         Commands::Analyze { action } => {
             let config_dir = resolve_config_dir(&cli.config_dir, &None);
@@ -1400,6 +1424,344 @@ fn cmd_seed_album(config_dir: &Path, name: &str, take_first: usize) {
     cli_line!("ALBUM ID {} photos={}", album.id, ids.len());
 }
 
+/// Resolve the directory that holds the `demos/<category>` asset folders.
+/// Order: `--demos-root` flag, `SIEGU_DEMO_ROOT` env, then the repo-relative
+/// `demos/` from the crate build path (`<CARGO_MANIFEST_DIR>/../../demos`).
+fn resolve_demo_root(flag: Option<&Path>) -> Option<PathBuf> {
+    if let Some(p) = flag {
+        return Some(p.to_path_buf());
+    }
+    if let Ok(p) = std::env::var("SIEGU_DEMO_ROOT") {
+        if !p.is_empty() {
+            return Some(PathBuf::from(p));
+        }
+    }
+    Some(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../demos")
+            .canonicalize()
+            .ok()?,
+    )
+}
+
+/// Seed the library with the bundled demo datasets (#7/#8). For each category
+/// it copies `demos/<category>/*.{jpg,jpeg,png,mp4,...}` into
+/// `<config>/demo/<category>/`, indexes them into `siegu.db`, registers the
+/// demo root as a watched directory, and creates one album per category plus a
+/// combined "My Photos" album holding every seeded asset. Re-running is
+/// idempotent: existing albums are reused instead of duplicated.
+///
+/// To make the demo library feel like a real camera roll, each seeded photo is
+/// stamped with a curated GPS coordinate (written as a Takeout-style
+/// `<file>.json` sidecar, which `extract_photo_metadata` reads back) so the
+/// offline reverse-geocoder can label it with a real city — populating the
+/// Locations facet the same way real photos with EXIF GPS do.
+///
+/// Video clips (`.mp4`/`.mov`/...) get their sibling `<stem>_poster.jpg`
+/// stored as the photo thumbnail, since the CLI does not build video
+/// thumbnails itself. Poster files (`*_poster.jpg`) are skipped when
+/// collecting source media so they are never indexed as photos.
+///
+/// Curated per-category city data accompanying each `1..N` file, so the demo
+/// surfaces a healthy Locations facet with several distinct cities.
+fn demo_gps(cat: &str, index: usize) -> Option<(f64, f64)> {
+    // (lat, lon) buckets per category; profile repeats cyclically to give each
+    // file a distinct-but-plausible city within the category's theme.
+    let table: &[((f64, f64), &str)] = &[
+        // landscapes
+        ((46.5586, 8.5616), "landscapes"),    // Swiss Alps
+        ((37.8651, -119.5383), "landscapes"), // Yosemite
+        ((40.4890, -105.5500), "landscapes"), // Rocky Mountains
+        ((47.5612, 7.5905), "landscapes"),    // Basel, Switzerland
+        ((46.9480, 7.4474), "landscapes"),    // Bern, Switzerland
+        ((36.1069, -112.1129), "landscapes"), // Grand Canyon
+        // people
+        ((40.7128, -74.0060), "people"),  // New York
+        ((34.0522, -118.2437), "people"), // Los Angeles
+        ((41.8781, -87.6298), "people"),  // Chicago
+        ((51.5074, -0.1278), "people"),   // London
+        // cities
+        ((40.7128, -74.0060), "cities"),  // New York
+        ((35.6762, 139.6503), "cities"),  // Tokyo
+        ((48.8566, 2.3522), "cities"),    // Paris
+        ((51.5074, -0.1278), "cities"),   // London
+        ((33.8688, 151.2093), "cities"),  // Sydney
+        ((41.9028, 12.4964), "cities"),   // Rome
+        ((37.7749, -122.4194), "cities"), // San Francisco
+        ((52.5200, 13.4050), "cities"),   // Berlin
+        ((40.4168, -3.7038), "cities"),   // Madrid
+        ((43.6532, -79.3832), "cities"),  // Toronto
+        // food
+        ((48.8566, 2.3522), "food"),   // Paris
+        ((40.7128, -74.0060), "food"), // New York
+        ((35.6762, 139.6503), "food"), // Tokyo
+        // videos
+        ((40.7128, -74.0060), "videos"),  // New York
+        ((48.8566, 2.3522), "videos"),    // Paris
+        ((35.6762, 139.6503), "videos"),  // Tokyo
+        ((51.5074, -0.1278), "videos"),   // London
+        ((37.7749, -122.4194), "videos"), // San Francisco
+    ];
+    let matches: Vec<(f64, f64)> = table
+        .iter()
+        .filter(|(_, c)| *c == cat)
+        .map(|(p, _)| *p)
+        .collect();
+    if matches.is_empty() {
+        return None;
+    }
+    Some(matches[index % matches.len()])
+}
+
+/// Write a Google-Takeout-style sidecar (`<file>.json`) next to a seeded media
+/// file carrying a curated GPS coordinate. `extract_photo_metadata` reads the
+/// `geoData` block so the photo's lat/long populate, which the reverse-geocoder
+/// later turns into a `location_name` ("City, Country"). No-op for no match.
+fn write_demo_gps_sidecar(cat: &str, index: usize, dest_path: &Path) {
+    let Some((lat, lon)) = demo_gps(cat, index) else {
+        return;
+    };
+    // Takeout convention: sidecar is the full media filename (with extension)
+    // plus `.json` (e.g. `1.jpg.json`), which is what `sidecar_candidates`
+    // looks for. `with_extension` would drop the `.jpg`, so append instead.
+    let sidecar = dest_path.with_file_name(format!(
+        "{}.json",
+        dest_path
+            .file_name()
+            .map(|n| n.to_string_lossy())
+            .unwrap_or_default()
+    ));
+    let json = format!(
+        r#"{{"geoData":{{"latitude":{lat},"longitude":{lon}}}}}"#,
+        lat = lat,
+        lon = lon
+    );
+    if std::fs::write(&sidecar, json).is_ok() {
+        cli_line!("demo sidecar {} -> {lat},{lon}", sidecar.display());
+    }
+}
+
+fn cmd_seed_demo(config_dir: &Path, demos: &str, demos_root_flag: Option<&Path>) {
+    let root = match resolve_demo_root(demos_root_flag) {
+        Some(r) => r,
+        None => {
+            cli_err!("could not locate demo assets (use --demos-root or SIEGU_DEMO_ROOT)");
+            std::process::exit(1);
+        }
+    };
+
+    let categories: Vec<String> = demos
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect();
+    if categories.is_empty() {
+        cli_err!("no demo categories selected");
+        std::process::exit(1);
+    }
+
+    std::fs::create_dir_all(config_dir).expect("create config dir");
+    let mut db = Database::new(&config_dir.display().to_string());
+    let demo_root = config_dir.join("demo");
+    std::fs::create_dir_all(&demo_root).expect("create demo dir");
+    db.add_directory(&demo_root.display().to_string());
+
+    // Already-indexed absolute paths (random photo ids make INSERT OR IGNORE
+    // keyed on `id` insufficient, so guard on `location` like cmd_scan does).
+    let mut existing_paths =
+        siegu_core::scanner::load_existing_paths(&config_dir.display().to_string());
+
+    // Map existing album names -> id for idempotency.
+    let mut albums: std::collections::HashMap<String, String> = db
+        .list_albums()
+        .into_iter()
+        .filter_map(|a| Some((a.name.clone(), a.id.clone())))
+        .collect();
+
+    let mut added = 0usize;
+    // Ids of every newly-indexed photo (across all categories): these fill the
+    // combined "My Photos" album so the library reads like one camera roll.
+    let mut all_photo_ids: Vec<String> = Vec::new();
+    for cat in &categories {
+        let asset_dir = root.join(cat);
+        if !asset_dir.is_dir() {
+            cli_warn!(
+                "demo category not found, skipping: {cat} ({})",
+                asset_dir.display()
+            );
+            continue;
+        }
+        let dest = demo_root.join(cat);
+        std::fs::create_dir_all(&dest).expect("create demo category dir");
+
+        let mut photos: Vec<std::path::PathBuf> = Vec::new();
+        let mut read = match std::fs::read_dir(&asset_dir) {
+            Ok(r) => r,
+            Err(e) => {
+                cli_warn!("cannot read demo category {cat}: {e}");
+                continue;
+            }
+        };
+        while let Some(Ok(entry)) = read.next() {
+            let p = entry.path();
+            if p.is_file() && siegu_core::scanner::is_media_file(&p) && !is_demo_poster_file(&p) {
+                photos.push(p.clone());
+            }
+        }
+        photos.sort();
+
+        let mut photo_ids: Vec<String> = Vec::new();
+        for (index, src) in photos.iter().enumerate() {
+            let file_name = src
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "img.jpg".to_string());
+            let dest_path = dest.join(&file_name);
+            if let Err(e) = std::fs::copy(src, &dest_path) {
+                cli_warn!("could not copy {}: {e}", src.display());
+                continue;
+            }
+            // Stamp a curated GPS sidecar so the demo populates the Locations
+            // facet (reverse-geocoded via geocode.rs) like real EXIF photos do.
+            write_demo_gps_sidecar(cat, index, &dest_path);
+            let path_str = dest_path.display().to_string();
+            // Re-running seed-demo re-copies to the same destination paths, so
+            // anything already indexed is skipped (the album is reused as-is).
+            if existing_paths.contains(&path_str) {
+                continue;
+            }
+            let meta = siegu_core::scanner::extract_photo_metadata(&dest_path);
+            let photo = siegu_core::scanner::photo_from_metadata(&path_str, &meta);
+            if let Err(e) = db.store_photo_batch(&[photo.clone()]) {
+                cli_warn!("could not index {}: {e}", path_str);
+                continue;
+            }
+            if photo.encoded.is_empty() {
+                let thumb = siegu_core::thumbnail::generate_thumbnail(&path_str).or_else(|| {
+                    // Video clips have no embedded thumbnail; use the bundled
+                    // `<stem>_poster.jpg` sibling (in the source category dir)
+                    // as the library thumbnail.
+                    poster_data_url_for(src)
+                });
+                if let Some(t) = thumb {
+                    db.update_photo_thumbnail(&photo.id, &t);
+                }
+            }
+            existing_paths.insert(path_str);
+            photo_ids.push(photo.id.clone());
+            all_photo_ids.push(photo.id.clone());
+            added += 1;
+        }
+
+        if photo_ids.is_empty() {
+            cli_warn!("no images seeded for demo category: {cat}");
+            continue;
+        }
+
+        let album_name = pretty_category(cat);
+        let album_id = match albums.get(album_name) {
+            Some(id) => id.clone(),
+            None => {
+                let album = match db.create_album(album_name) {
+                    Ok(a) => a,
+                    Err(e) => {
+                        cli_warn!("could not create album for {cat}: {e}");
+                        continue;
+                    }
+                };
+                albums.insert(album_name.to_string(), album.id.clone());
+                album.id
+            }
+        };
+        if let Err(e) = db.add_album_items(&album_id, &photo_ids) {
+            cli_warn!("could not fill album for {cat}: {e}");
+            continue;
+        }
+        cli_line!("SEEDED {cat} album={album_id} photos={}", photo_ids.len());
+    }
+
+    // Combined "My Photos" album = every photo in the library (idempotent via
+    // INSERT OR IGNORE). Backfill from the DB rather than only this run's
+    // `added` set so older seeds gain the combined album on re-seed too.
+    const COMBINED_ALBUM: &str = "My Photos";
+    let library_ids: Vec<String> = db
+        .list_photos("", 0, 1_000_000, false, false)
+        .into_iter()
+        .map(|p| p.id)
+        .collect();
+    if !library_ids.is_empty() {
+        let combined_id = match albums.get(COMBINED_ALBUM) {
+            Some(id) => id.clone(),
+            None => {
+                let album = match db.create_album(COMBINED_ALBUM) {
+                    Ok(a) => {
+                        albums.insert(COMBINED_ALBUM.to_string(), a.id.clone());
+                        a
+                    }
+                    Err(e) => {
+                        cli_warn!("could not create combined album: {e}");
+                        return;
+                    }
+                };
+                album.id
+            }
+        };
+        if let Err(e) = db.add_album_items(&combined_id, &library_ids) {
+            cli_warn!("could not fill combined album: {e}");
+        } else {
+            cli_line!(
+                "SEEDED-COMBINED album={combined_id} name={COMBINED_ALBUM} photos={}",
+                library_ids.len()
+            );
+        }
+    }
+
+    cli_line!(
+        "DEMO SEED DONE categories={} photos_added={added}",
+        categories.len()
+    );
+}
+
+/// Human-readable album title from a category directory slug (e.g. ``
+/// -> `Landscapes`).
+fn pretty_category(cat: &str) -> &str {
+    match cat {
+        "landscapes" => "Landscapes",
+        "people" => "People & Faces",
+        "cities" => "Cities & Travel",
+        "food" => "Food & Still Life",
+        "videos" => "Videos",
+        _ => cat,
+    }
+}
+
+/// True for the `<stem>_poster.jpg` counterparts of the bundled video clips.
+/// They exist only to give clips a library thumbnail and must never be seeded
+/// as standalone photos.
+fn is_demo_poster_file(path: &Path) -> bool {
+    path.file_name()
+        .map(|n| {
+            let s = n.to_string_lossy();
+            let lower = s.to_lowercase();
+            lower.ends_with("_poster.jpg") || lower.ends_with("_poster.jpeg")
+        })
+        .unwrap_or(false)
+}
+
+/// The `<stem>_poster.jpg` sibling of a copied media path (e.g. `1.mp4`
+/// -> `1_poster.jpg`), base64-encoded as a library thumbnail. Returns `None`
+/// when the poster does not exist.
+fn poster_data_url_for(media_path: &Path) -> Option<String> {
+    let stem = media_path.file_stem()?.to_string_lossy();
+    let poster = media_path.with_file_name(format!("{stem}_poster.jpg"));
+    if !poster.is_file() {
+        return None;
+    }
+    let bytes = std::fs::read(&poster).ok()?;
+    Some(siegu_core::thumbnail::encode_thumbnail_data_url(&bytes))
+}
+
 /// One-shot RPC driver (#19): connect, send a single CommandRequest and
 /// print the peer's reply as `RPC RESULT ok=<bool> <json>` / `RPC ERROR ...`.
 /// Exit code 0 on success, 3 when the command itself failed (ok=false).
@@ -1535,5 +1897,44 @@ fn cmd_mesh_quota(config_dir: &Path) {
 
     if pct > 90.0 {
         println!("  WARNING: Storage nearly full!");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pretty_category_maps_recognised_slugs() {
+        assert_eq!(pretty_category("landscapes"), "Landscapes");
+        assert_eq!(pretty_category("people"), "People & Faces");
+        assert_eq!(pretty_category("cities"), "Cities & Travel");
+        assert_eq!(pretty_category("food"), "Food & Still Life");
+        assert_eq!(pretty_category("videos"), "Videos");
+        // Unknown slugs pass through as-is.
+        assert_eq!(pretty_category("dogs"), "dogs");
+    }
+
+    #[test]
+    fn demos_flag_splits_and_trims_categories() {
+        let cats: Vec<String> = " landscapes,people ,,food "
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect();
+        assert_eq!(cats, vec!["landscapes", "people", "food"]);
+    }
+
+    #[test]
+    fn resolve_demo_root_prefers_explicit_flag() {
+        let root = Path::new("/tmp/opencode/my-demos");
+        // With a flag provided it must be returned as-is (no disk access).
+        let got = resolve_demo_root(Some(root)).expect("flag root");
+        assert_eq!(got, root.to_path_buf());
+        // None + absent env resolves via the repo-relative path (exists in a
+        // normal checkout); skip asserting the exact value, just that it works.
+        let _ = std::env::remove_var("SIEGU_DEMO_ROOT");
+        assert!(resolve_demo_root(None).is_some());
     }
 }

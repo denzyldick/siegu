@@ -42,5 +42,16 @@ export default defineConfig(async () => ({
     watch: {
       ignored: ['**/src-tauri/**'],
     },
+    // Browser (webHost) dev ergonomics: proxy the Rust host's data-plane routes
+    // so the full app in a browser resolves /session, /rpc, /thumb and /media
+    // same-origin (Mode A, #24/#26/#28). Desktop (Tauri) is unaffected.
+    proxy: process.env.SIEGU_WEB_HOST
+      ? {
+          '/session': { target: process.env.SIEGU_WEB_HOST },
+          '/rpc': { target: process.env.SIEGU_WEB_HOST },
+          '/thumb': { target: process.env.SIEGU_WEB_HOST },
+          '/media': { target: process.env.SIEGU_WEB_HOST },
+        }
+      : undefined,
   },
 }))

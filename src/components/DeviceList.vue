@@ -373,7 +373,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { listen } from '@/services/invoke';
+import type { UnlistenFn } from '@tauri-apps/api/event';
 import ConnectView from './ConnectView.vue';
 import PageLoading from './shared/PageLoading.vue';
 import { useSyncStore } from '@/stores/sync';

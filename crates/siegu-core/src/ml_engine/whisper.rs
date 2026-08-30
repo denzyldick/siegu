@@ -755,7 +755,7 @@ mod tests {
         let dec = std::sync::Arc::new(super::super::models::SessionPool::new(vec![dec]));
 
         let videos = [
-            "/home/denzyl/Pictures/takeout-20260428T162732Z-3-001/Takeout/Google Photos/Moved to van der hoevenplein /VID_20171010_123456.mp4",
+            "/home/denzyl/Pictures/Takeout/Google Photos/Moved to van der hoevenplein /VID_20171010_123456.mp4",
         ];
         for path in &videos {
             if !std::path::Path::new(path).exists() {

@@ -69,6 +69,28 @@ async function rpc<T>(
 }
 
 /**
+ * The Tauri IPC bridge converts camelCase JS args to snake_case Rust fields
+ * automatically (e.g. `albumId` → `album_id`). The webHost `/rpc` transport has
+ * no such bridge, so to keep a payload 1:1 with what the Rust RPC expects we
+ * normalize keys here. Already-snake_case keys (e.g. `date_from`, `favorites_only`)
+ * and single-word keys (`id`, `name`, `query`, `limit`) are left untouched.
+ */
+function toSnakeCaseKeys(payload: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (key === '') {
+      out[key] = value;
+    } else if (key.includes('_')) {
+      // already snake_case (or a self-contained id like `photo_id`/`face_id`)
+      out[key] = value;
+    } else {
+      out[key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)] = value;
+    }
+  }
+  return out;
+}
+
+/**
  * Build an HTTP media URL for `id`. The host resolves id → file bytes, and
  * (once #28 land) requires the `?token=` query since `<img>` can't send headers.
  */
@@ -80,7 +102,7 @@ function mediaUrlFor(id: number | string, kind: MediaKind, webHostToken?: string
 export function webHostBackend(webHostToken?: string): Backend {
   const cache = new Map<string, string>();
   const rpcCall = <T>(name: string, payload: Record<string, unknown> = {}) =>
-    rpc<T>(name, payload, webHostToken);
+    rpc<T>(name, toSnakeCaseKeys(payload), webHostToken);
 
   return {
     listFiles: (options: Partial<ListFilesOptions> = {}) =>
@@ -105,6 +127,16 @@ export function webHostBackend(webHostToken?: string): Backend {
 
     getPhotoById: (id) => rpcCall<MediaItem | null>('get_photo_by_id', { id: String(id) }),
 
+    getPhotosByIds: (ids) =>
+      rpcCall<MediaItem[]>('get_photos_by_ids', {
+        ids: ids.map((id) => String(id)),
+      }),
+
+    getPhotoEncodedBatch: (ids) =>
+      rpcCall<Record<number, string>>('get_photo_encoded_batch', {
+        ids: ids.map((id) => String(id)),
+      }),
+
     searchFacets: () => rpcCall<SearchFacetsData>('get_search_facets'),
 
     countTrash: () => rpcCall<number>('count_trash'),
@@ -113,11 +145,20 @@ export function webHostBackend(webHostToken?: string): Backend {
 
     toggleFavorite: (id) => rpcCall<boolean>('toggle_favorite', { id: String(id) }),
 
+    setFavorites: (ids, favorite) =>
+      rpcCall<number>('set_favorites', {
+        ids: ids.map((id) => String(id)),
+        favorite,
+      }),
+
     trashPhoto: (id) => rpcCall<boolean>('trash_photo', { id: String(id) }),
 
     restorePhoto: (id) => rpcCall<boolean>('restore_photo', { id: String(id) }),
 
     emptyTrash: () => rpcCall<number>('empty_trash'),
+
+    request: <T = unknown>(name: string, payload: Record<string, unknown> = {}) =>
+      rpcCall<T>(name, payload),
 
     mediaUrl: async (id, kind) => {
       const key = mediaCacheKey(id, kind);

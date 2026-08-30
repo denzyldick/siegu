@@ -238,7 +238,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@/services/invoke';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller';
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
@@ -248,7 +248,7 @@ import AddToAlbumSheet from '@/components/albums/AddToAlbumSheet.vue';
 import { useAlbumsStore } from '@/stores/albums';
 import { useSyncStore } from '@/stores/sync';
 import { useScanStore } from '@/stores/scan';
-import { getPhotosByIds, setFavorites } from '@/services/tauri';
+import { getPhotosByIds, setFavorites, isTauri } from '@/services/tauri';
 import { useI18n } from 'vue-i18n';
 
 import type { MediaItem } from '@/types/media';
@@ -696,28 +696,32 @@ onMounted(async () => {
   // result (e.g. a late thumbnail) must not start a `getPhotosByIds` storm
   // while indexing is still churning. Single-photo manual analysis keeps
   // flowing because it only ever produces one event at a time.
-  unlistenAnalysisResult = await listen<{ id: string | number }>(
-    'photo-analysis-result',
-    (event) => {
-      const id = event.payload.id;
-      if (!id) return;
-      if (scanStore.status === 'indexing' || scanStore.indexingCount > 0) return;
-      queueAnalysisResult(id);
-    },
-  );
+  // Tauri-only live events; the webHost/guest data plane has no event bus,
+  // and `listen` itself throws in a plain browser.
+  if (isTauri) {
+    unlistenAnalysisResult = await listen<{ id: string | number }>(
+      'photo-analysis-result',
+      (event) => {
+        const id = event.payload.id;
+        if (!id) return;
+        if (scanStore.status === 'indexing' || scanStore.indexingCount > 0) return;
+        queueAnalysisResult(id);
+      },
+    );
 
-  unlistenPhotoReceived = await listen<MediaItem>('photo-received', (event) => {
-    if (event.payload?.id) {
-      updateGroups([event.payload]);
-    }
-    if (photoReceivedTimer) clearTimeout(photoReceivedTimer);
-    photoReceivedTimer = setTimeout(() => scheduleReload({ preserveScroll: true }), 500);
-  });
+    unlistenPhotoReceived = await listen<MediaItem>('photo-received', (event) => {
+      if (event.payload?.id) {
+        updateGroups([event.payload]);
+      }
+      if (photoReceivedTimer) clearTimeout(photoReceivedTimer);
+      photoReceivedTimer = setTimeout(() => scheduleReload({ preserveScroll: true }), 500);
+    });
 
-  unlistenRefreshed = await listen('photos-refreshed', () => {
-    scheduleReload({ preserveScroll: true });
-    void albumsStore.loadSections();
-  });
+    unlistenRefreshed = await listen('photos-refreshed', () => {
+      scheduleReload({ preserveScroll: true });
+      void albumsStore.loadSections();
+    });
+  }
 
   void albumsStore.loadSections();
   updateColumns();

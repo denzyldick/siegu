@@ -78,7 +78,7 @@ if (typeof window !== 'undefined') {
 }
 import 'leaflet.markercluster';
 import { ref, computed, nextTick, watch, onUnmounted } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@/services/invoke';
 import type { Map as LeafletMap } from 'leaflet';
 import MediaViewer from './MediaViewer.vue';
 import { useMediaUrl } from '@/composables/useMediaUrl';
@@ -101,7 +101,7 @@ const viewerOpen = ref(false);
 const viewerPhotos = ref<MediaItem[]>([]);
 const currentPhotoIndex = ref(0);
 
-const { thumbUrl } = useMediaUrl();
+const { mediaSrc } = useMediaUrl();
 const mapFilterStore = useMapFilterStore();
 
 let leafletMap: LeafletMap | null = null;
@@ -243,20 +243,23 @@ async function loadMapData() {
       marker.on('click', () => openCarouselForPoint(p));
       marker.on('mouseover', () => {
         const thumbnailDiv = L.DomUtil.create('div', 'map-thumb-popup');
-        const thumb = thumbUrl(p.location);
-        thumbnailDiv.innerHTML = thumb
-          ? `<img src="${thumb}" class="thumb-img" decoding="async" loading="lazy">`
-          : '<div class="thumb-loading"></div>';
+        thumbnailDiv.innerHTML = '<div class="thumb-loading"></div>';
+        void mediaSrc(
+          { id: p.id, location: p.location, encoded: null } as unknown as MediaItem,
+          'thumb',
+        ).then((thumb) => {
+          if (thumb && thumbnailDiv.isConnected) {
+            thumbnailDiv.innerHTML = `<img src="${thumb}" class="thumb-img" decoding="async" loading="lazy">`;
+            marker.setRadius(7);
+            marker.setStyle({ fillOpacity: 0.8 });
+          }
+        });
         marker
           .bindPopup(thumbnailDiv, {
             closeButton: false,
             offset: L.point(0, -10),
           })
           .openPopup();
-        if (thumb) {
-          marker.setRadius(7);
-          marker.setStyle({ fillOpacity: 0.8 });
-        }
       });
       marker.on('mouseout', () => {
         marker.closePopup();

@@ -3921,6 +3921,39 @@ impl Database {
         count
     }
 
+    /// Permanently delete one photo row (and its extracted data + file),
+    /// bypassing trash. Used by the trash UI's "delete forever" action.
+    pub fn purge_photo(&self, photo_id: &str) -> Result<(), String> {
+        let location: Option<String> = self
+            .connection
+            .query_row(
+                "SELECT location FROM photo WHERE id = ?1",
+                rusqlite::params![photo_id],
+                |row| row.get(0),
+            )
+            .ok();
+        for sql in [
+            "DELETE FROM object WHERE photo_id = ?1",
+            "DELETE FROM ocr WHERE photo_id = ?1",
+            "DELETE FROM faces WHERE photo_id = ?1",
+            "DELETE FROM properties WHERE photo_id = ?1",
+            "DELETE FROM ai_status WHERE photo_id = ?1",
+            "DELETE FROM album_item WHERE photo_id = ?1",
+        ] {
+            let _ = self.connection.execute(sql, rusqlite::params![photo_id]);
+        }
+        self.connection
+            .execute(
+                "DELETE FROM photo WHERE id = ?1",
+                rusqlite::params![photo_id],
+            )
+            .map_err(|e| e.to_string())?;
+        if let Some(path) = location {
+            let _ = std::fs::remove_file(&path);
+        }
+        Ok(())
+    }
+
     /// Count photos currently in trash.
     pub fn count_trash(&self) -> i64 {
         self.connection

@@ -1,10 +1,9 @@
 import { ref, reactive, computed } from 'vue';
 import { defineStore } from 'pinia';
 import { useI18n } from 'vue-i18n';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, listen } from '@/services/invoke';
 import { open } from '@tauri-apps/plugin-dialog';
 import { platform } from '@tauri-apps/plugin-os';
-import { listen } from '@tauri-apps/api/event';
 import { check } from '@tauri-apps/plugin-updater';
 import { AI_MODEL_IDS } from '@/types/models';
 import type { ModelCapability } from '@/types/models';
