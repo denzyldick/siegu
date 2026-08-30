@@ -11,6 +11,8 @@ pub mod mdns;
 pub mod mesh;
 pub mod mesh_transport;
 #[cfg(feature = "ml")]
+pub mod ml_commands;
+#[cfg(feature = "ml")]
 pub mod ml_engine;
 #[cfg(feature = "ml")]
 pub mod ml_worker;

@@ -1740,6 +1740,7 @@ impl MeshManager {
                     let ctx = crate::rpc::RpcContext {
                         config_path: &config_path,
                         mode,
+                        ml: None,
                     };
                     let response = match crate::rpc::dispatch(&ctx, &name, &payload) {
                         Ok(result) => SyncMessage::CommandResponse {

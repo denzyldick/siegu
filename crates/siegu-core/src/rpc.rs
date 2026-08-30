@@ -60,12 +60,27 @@ impl ShareMode {
     }
 }
 
+/// A handle to the host's live ML worker, if one is running. Exists per-request
+/// so a guest request (which must never run ML) simply carries `None`, and a
+/// CLI/web host that hasn't spawned a worker also carries `None`.
+///
+/// Kept as a plain `Option<&MlContext>` so the [`RpcContext`] struct literal is
+/// identical whether or not the `ml` feature is enabled (only the referent type
+/// differs).
+#[cfg(feature = "ml")]
+pub type MlWorkerRef<'a> = Option<&'a crate::ml_worker::MlContext>;
+#[cfg(not(feature = "ml"))]
+pub type MlWorkerRef<'a> = Option<&'a ()>;
+
 /// Everything a command handler needs. Cheap to build per request; the
 /// database opens its own short-lived SQLite connection like the Tauri
 /// commands do.
 pub struct RpcContext<'a> {
     pub config_path: &'a str,
     pub mode: ShareMode,
+    /// Live ML worker handle, if this request is allowed to drive analysis.
+    /// `Owner`-only; a guest/read/rw share never carries one.
+    pub ml: MlWorkerRef<'a>,
 }
 
 /// Commands allowed at a given capability level, derived from the catalog
@@ -493,6 +508,75 @@ pub fn dispatch(ctx: &RpcContext, name: &str, payload: &Value) -> Result<Value, 
             Ok(Value::Null)
         }
 
+        // ── ML analysis / indexing (owner-only) ───────────────────────────
+        // Reached only when `ctx.mode == Owner` (owner-only gate above). The
+        // host must also be running an ML worker; a guest/read/rw RpcContext
+        // never carries one, so these resolve to a clear error.
+        #[cfg(feature = "ml")]
+        "analyze_photo" => {
+            let ml = crate::ml_commands::require_worker(ctx.ml, name)?;
+            let id = payload.must_str("id")?;
+            crate::ml_commands::do_analyze_photo_sync(&ml.abort, &ml.tx, &id)?;
+            Ok(Value::Null)
+        }
+        #[cfg(feature = "ml")]
+        "analyze_photo_model" => {
+            let ml = crate::ml_commands::require_worker(ctx.ml, name)?;
+            let id = payload.must_str("id")?;
+            let model_id = payload.must_str("model_id")?;
+            crate::ml_commands::do_analyze_photo_model_sync(&ml.abort, &ml.tx, &id, &model_id)?;
+            Ok(Value::Null)
+        }
+        #[cfg(feature = "ml")]
+        "analyze_model" => {
+            let ml = crate::ml_commands::require_worker(ctx.ml, name)?;
+            let model_id = payload.must_str("model_id")?;
+            crate::ml_commands::do_analyze_model_sync(&ml.tx, &model_id)?;
+            Ok(Value::Null)
+        }
+        #[cfg(feature = "ml")]
+        "index_faces" => {
+            let ml = crate::ml_commands::require_worker(ctx.ml, name)?;
+            crate::ml_commands::do_index_faces(&db)?;
+            crate::ml_commands::do_index_faces_sync(&ml.tx)?;
+            Ok(Value::Null)
+        }
+        #[cfg(feature = "ml")]
+        "abort_indexing" => {
+            let ml = crate::ml_commands::require_worker(ctx.ml, name)?;
+            crate::ml_commands::do_abort_indexing(&ml.abort, &ml.pending_count, &ml.paused)?;
+            Ok(Value::Null)
+        }
+        #[cfg(feature = "ml")]
+        "pause_indexing" => {
+            let ml = crate::ml_commands::require_worker(ctx.ml, name)?;
+            crate::ml_commands::do_pause_indexing(&ml.paused)?;
+            Ok(Value::Null)
+        }
+        #[cfg(feature = "ml")]
+        "resume_indexing" => {
+            let ml = crate::ml_commands::require_worker(ctx.ml, name)?;
+            crate::ml_commands::do_resume_indexing(&ml.paused)?;
+            Ok(Value::Null)
+        }
+        #[cfg(feature = "ml")]
+        "reload_models" => {
+            let ml = crate::ml_commands::require_worker(ctx.ml, name)?;
+            crate::ml_commands::do_reload_models_sync(&ml.tx)?;
+            Ok(Value::Null)
+        }
+        #[cfg(feature = "ml")]
+        "unload_models" => {
+            let ml = crate::ml_commands::require_worker(ctx.ml, name)?;
+            crate::ml_commands::do_unload_models(&ml.models)?;
+            Ok(Value::Null)
+        }
+        #[cfg(feature = "ml")]
+        "get_models_loaded" => {
+            let ml = crate::ml_commands::require_worker(ctx.ml, name)?;
+            Ok(json!(crate::ml_commands::do_get_models_loaded(&ml.models)))
+        }
+
         _ => Err(format!("unknown command '{name}'")),
     }
 }
@@ -588,6 +672,7 @@ mod tests {
         RpcContext {
             config_path: path.as_str(),
             mode,
+            ml: None,
         }
     }
 
@@ -914,5 +999,111 @@ mod tests {
             json!(0)
         );
         assert!(dispatch(&c, "check_models", &json!({})).unwrap().is_array());
+    }
+}
+
+/// Security tests for the ML capability boundary (issue #19 / #42): a guest
+/// principal (read-only or rw share, `ml: None`) must never run owner/ML
+/// commands, while the owner principal (with a live worker) can.
+#[cfg(all(test, feature = "ml"))]
+mod ml_sec_tests {
+    use super::*;
+    use crate::ml_worker::MlContext;
+    use std::sync::atomic::{AtomicBool, AtomicUsize};
+
+    const GUEST_ERR: &str = "authenticate as the owner";
+    const NO_WORKER_ERR: &str = "needs a live ML worker";
+
+    static LOCAL_COUNTER: AtomicUsize = AtomicUsize::new(9000);
+
+    fn guest(mode: ShareMode) -> RpcContext<'static> {
+        let id = LOCAL_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let dir =
+            std::env::temp_dir().join(format!("siegu_rpc_mlsec_{}_{}", std::process::id(), id));
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::create_dir_all(&dir);
+        let path: &'static String = Box::leak(Box::new(dir.display().to_string()));
+        RpcContext {
+            config_path: path.as_str(),
+            mode,
+            ml: None,
+        }
+    }
+
+    fn owner_with_worker() -> RpcContext<'static> {
+        let id = LOCAL_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let dir = std::env::temp_dir().join(format!(
+            "siegu_rpc_mlsec_owner_{}_{}",
+            std::process::id(),
+            id
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::create_dir_all(&dir);
+        let path: &'static String = Box::leak(Box::new(dir.display().to_string()));
+        let (tx, rx) = tokio::sync::mpsc::channel(crate::ml_worker::JOB_CHANNEL_CAPACITY);
+        // Keep the receiver alive (as a real worker task would); otherwise the
+        // channel closes and `try_send` in the facade reports a dead worker.
+        Box::leak(Box::new(rx));
+        let worker = Box::leak(Box::new(MlContext {
+            tx,
+            pending_count: std::sync::Arc::new(AtomicUsize::new(0)),
+            abort: std::sync::Arc::new(AtomicBool::new(false)),
+            paused: std::sync::Arc::new(AtomicBool::new(false)),
+            models: std::sync::Arc::new(std::sync::Mutex::new(None)),
+        }));
+        RpcContext {
+            config_path: path.as_str(),
+            mode: ShareMode::Owner,
+            ml: Some(worker),
+        }
+    }
+
+    #[test]
+    fn guest_cannot_run_any_ml_command() {
+        for mode in [ShareMode::ReadOnly, ShareMode::ReadWrite] {
+            let c = guest(mode);
+            for cmd in [
+                "analyze_photo",
+                "analyze_photo_model",
+                "analyze_model",
+                "index_faces",
+                "abort_indexing",
+                "reload_models",
+                "unload_models",
+                "get_models_loaded",
+            ] {
+                let err = dispatch(&c, cmd, &json!({})).unwrap_err();
+                assert!(
+                    err.contains(GUEST_ERR),
+                    "guest mode {mode:?} should be blocked for {cmd}: {err}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn owner_without_worker_gets_clear_error() {
+        // An RpcContext carrying no worker handle must fail with an explicit
+        // "no live ML worker" message rather than a confusing unknown command.
+        let mut c = owner_with_worker();
+        c.ml = None;
+        let err = dispatch(&c, "analyze_photo", &json!({"id": "p1"})).unwrap_err();
+        assert!(err.contains(NO_WORKER_ERR), "{err}");
+    }
+
+    #[test]
+    fn owner_with_worker_can_run_analyze() {
+        let c = owner_with_worker();
+        // No DB write is needed: a local photo id is accepted by the facade.
+        let res = dispatch(&c, "analyze_photo", &json!({"id": "p1"})).unwrap();
+        assert!(res.is_null());
+    }
+
+    #[test]
+    fn owner_can_pause_and_resume_worker() {
+        let c = owner_with_worker();
+        dispatch(&c, "pause_indexing", &json!({})).unwrap();
+        dispatch(&c, "resume_indexing", &json!({})).unwrap();
+        assert!(dispatch(&c, "get_models_loaded", &json!({})).unwrap() == json!(false));
     }
 }

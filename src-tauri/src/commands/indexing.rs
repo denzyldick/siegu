@@ -1,110 +1,19 @@
-use crate::common::get_config_path;
+//! Tauri command wrappers for ML analysis / indexing.
+//!
+//! The business logic lives in `siegu_core::ml_commands` (single source of
+//! truth shared with the RPC facade, issue #42). These `#[tauri::command]`
+//! functions only add the Tauri-shell concerns: pulling the config path and
+//! emitting host-UI log lines. Names are part of the frontend contract
+//! (`src/services/tauri.ts`) and must not change.
+
+use crate::common::{emit_log, get_config_path};
 use crate::database;
 use crate::ml;
-use std::sync::atomic::{AtomicBool, AtomicUsize};
-
-/// Pure business logic — reads pending count from atomic, clamps to 0 if unreasonably high.
-pub fn do_get_indexing_status(pending_count: &AtomicUsize) -> usize {
-    let count = pending_count.load(std::sync::atomic::Ordering::SeqCst);
-    if count > 1_000_000 {
-        0
-    } else {
-        count
-    }
-}
-
-/// Pure business logic — counts photos not yet fully indexed.
-pub fn do_get_unindexed_count(db: &database::Database) -> usize {
-    let count: i64 = db
-        .connection
-        .query_row("SELECT COUNT(*) FROM photo WHERE indexed < 2", [], |r| {
-            r.get(0)
-        })
-        .unwrap_or(0);
-    count as usize
-}
-
-/// Pure business logic — sets indexing mode to "immediate".
-pub fn do_index_faces(db: &database::Database) -> Result<(), String> {
-    use std::collections::HashMap;
-    let mut state_map = HashMap::new();
-    state_map.insert("indexing_mode".to_string(), "immediate".to_string());
-    db.set_state(state_map);
-    Ok(())
-}
-
-/// Sends the face-indexing job on the worker channel.
-async fn send_index_faces_job(tx: &tokio::sync::mpsc::Sender<ml::Job>) -> Result<(), String> {
-    tx.send(ml::Job::ProcessModel("face".to_string()))
-        .await
-        .map_err(|e| e.to_string())
-}
-
-/// Pure business logic — sets abort flag and sends AnalyzeSingle job.
-pub async fn do_analyze_photo(
-    abort: &AtomicBool,
-    tx: &tokio::sync::mpsc::Sender<ml::Job>,
-    id: &str,
-) -> Result<(), String> {
-    abort.store(true, std::sync::atomic::Ordering::SeqCst);
-    tx.send(ml::Job::AnalyzeSingle(id.to_string()))
-        .await
-        .map_err(|e| e.to_string())
-}
-
-/// Pure business logic — sets abort flag and sends AnalyzeSingleWithModel job.
-pub async fn do_analyze_photo_model(
-    abort: &AtomicBool,
-    tx: &tokio::sync::mpsc::Sender<ml::Job>,
-    id: &str,
-    model_id: &str,
-) -> Result<(), String> {
-    abort.store(true, std::sync::atomic::Ordering::SeqCst);
-    tx.send(ml::Job::AnalyzeSingleWithModel(
-        id.to_string(),
-        model_id.to_string(),
-    ))
-    .await
-    .map_err(|e| e.to_string())
-}
-
-/// Pure business logic — sends ProcessModel job.
-pub async fn do_analyze_model(
-    tx: &tokio::sync::mpsc::Sender<ml::Job>,
-    model_id: &str,
-) -> Result<(), String> {
-    tx.send(ml::Job::ProcessModel(model_id.to_string()))
-        .await
-        .map_err(|e| e.to_string())
-}
-
-/// Pure business logic — sets abort flag and resets pending count to 0.
-pub fn do_abort_indexing(
-    abort: &AtomicBool,
-    pending_count: &AtomicUsize,
-    paused: &AtomicBool,
-) -> Result<(), String> {
-    abort.store(true, std::sync::atomic::Ordering::SeqCst);
-    pending_count.store(0, std::sync::atomic::Ordering::SeqCst);
-    paused.store(false, std::sync::atomic::Ordering::SeqCst);
-    Ok(())
-}
-
-/// Pure business logic — pauses indexing without aborting.
-pub fn do_pause_indexing(paused: &AtomicBool) -> Result<(), String> {
-    paused.store(true, std::sync::atomic::Ordering::SeqCst);
-    Ok(())
-}
-
-/// Pure business logic — resumes paused indexing.
-pub fn do_resume_indexing(paused: &AtomicBool) -> Result<(), String> {
-    paused.store(false, std::sync::atomic::Ordering::SeqCst);
-    Ok(())
-}
+use siegu_core::ml_commands;
 
 #[tauri::command]
 pub fn get_indexing_status(state: tauri::State<'_, ml::MlContext>) -> usize {
-    do_get_indexing_status(&state.pending_count)
+    ml_commands::do_get_indexing_status(&state.pending_count)
 }
 
 #[tauri::command]
@@ -114,7 +23,7 @@ pub fn get_unindexed_count(app: tauri::AppHandle) -> usize {
         return 0;
     }
     let db = database::Database::new(&path);
-    do_get_unindexed_count(&db)
+    ml_commands::do_get_unindexed_count(&db)
 }
 
 /// Snapshot of the photo table's highest rowid, stored as the cutoff when the
@@ -134,15 +43,14 @@ pub async fn index_faces(
     app: tauri::AppHandle,
     state: tauri::State<'_, ml::MlContext>,
 ) -> Result<(), String> {
-    use crate::common::emit_log;
     emit_log(&app, "Looking for faces in your photos…".to_string());
     let path = get_config_path(&app);
     if path.is_empty() {
         return Err("Config error".to_string());
     }
     let db = database::Database::new(&path);
-    do_index_faces(&db)?;
-    send_index_faces_job(&state.tx).await
+    ml_commands::do_index_faces(&db)?;
+    ml_commands::send_index_faces_job(&state.tx).await
 }
 
 #[tauri::command]
@@ -150,7 +58,7 @@ pub async fn analyze_photo(
     state: tauri::State<'_, ml::MlContext>,
     id: String,
 ) -> Result<(), String> {
-    do_analyze_photo(&state.abort, &state.tx, &id).await
+    ml_commands::do_analyze_photo(&state.abort, &state.tx, &id).await
 }
 
 #[tauri::command]
@@ -159,7 +67,7 @@ pub async fn analyze_photo_model(
     id: String,
     model_id: String,
 ) -> Result<(), String> {
-    do_analyze_photo_model(&state.abort, &state.tx, &id, &model_id).await
+    ml_commands::do_analyze_photo_model(&state.abort, &state.tx, &id, &model_id).await
 }
 
 #[tauri::command]
@@ -167,35 +75,22 @@ pub async fn analyze_model(
     state: tauri::State<'_, ml::MlContext>,
     model_id: String,
 ) -> Result<(), String> {
-    do_analyze_model(&state.tx, &model_id).await
+    ml_commands::do_analyze_model(&state.tx, &model_id).await
 }
 
 #[tauri::command]
 pub async fn abort_indexing(state: tauri::State<'_, ml::MlContext>) -> Result<(), String> {
-    do_abort_indexing(&state.abort, &state.pending_count, &state.paused)
+    ml_commands::do_abort_indexing(&state.abort, &state.pending_count, &state.paused)
 }
 
 #[tauri::command]
 pub async fn pause_indexing(state: tauri::State<'_, ml::MlContext>) -> Result<(), String> {
-    do_pause_indexing(&state.paused)
+    ml_commands::do_pause_indexing(&state.paused)
 }
 
 #[tauri::command]
 pub async fn resume_indexing(state: tauri::State<'_, ml::MlContext>) -> Result<(), String> {
-    do_resume_indexing(&state.paused)
-}
-
-/// Pure business logic — clears the loaded-models cache so the worker drops
-/// all ONNX sessions (freeing their RAM). Models reload lazily before the
-/// next analysis job.
-pub fn do_unload_models(models: &siegu_core::ml_worker::LoadedModelsHandle) -> Result<(), String> {
-    // try_lock so we never block: the worker may hold the models mutex for a
-    // whole analysis batch, and unloading mid-inference is never wanted anyway.
-    let mut m = models.try_lock().map_err(|_| {
-        "AI models are in use right now — try again once the current analysis finishes.".to_string()
-    })?;
-    *m = None;
-    Ok(())
+    ml_commands::do_resume_indexing(&state.paused)
 }
 
 #[tauri::command]
@@ -203,8 +98,7 @@ pub async fn unload_models(
     app: tauri::AppHandle,
     state: tauri::State<'_, ml::MlContext>,
 ) -> Result<(), String> {
-    use crate::common::emit_log;
-    do_unload_models(&state.models)?;
+    ml_commands::do_unload_models(&state.models)?;
     emit_log(
         &app,
         "AI features paused. They'll start again with your next analysis.".to_string(),
@@ -212,21 +106,12 @@ pub async fn unload_models(
     Ok(())
 }
 
-/// Pure business logic — enqueues a model-reload job. The worker owns the
-/// models mutex, so unlike `do_unload_models` this can never race or fail.
-pub async fn do_reload_models(tx: &tokio::sync::mpsc::Sender<ml::Job>) -> Result<(), String> {
-    tx.send(ml::Job::ReloadModels)
-        .await
-        .map_err(|e| e.to_string())
-}
-
 #[tauri::command]
 pub async fn reload_models(
     app: tauri::AppHandle,
     state: tauri::State<'_, ml::MlContext>,
 ) -> Result<(), String> {
-    use crate::common::emit_log;
-    do_reload_models(&state.tx).await?;
+    ml_commands::do_reload_models(&state.tx).await?;
     emit_log(
         &app,
         "Updating AI features with your new settings…".to_string(),
@@ -234,198 +119,7 @@ pub async fn reload_models(
     Ok(())
 }
 
-/// True when the worker currently holds loaded models in memory.
-///
-/// Must never block the UI thread: the worker may hold the models mutex while
-/// loading (30s+) or during inference, so this polls with `try_lock` and
-/// reports "in use" as loaded.
 #[tauri::command]
 pub async fn get_models_loaded(state: tauri::State<'_, ml::MlContext>) -> Result<bool, String> {
-    Ok(match state.models.try_lock() {
-        Ok(m) => m.is_some(),
-        Err(_) => true,
-    })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::test_helpers::*;
-    use std::sync::atomic::{AtomicBool, AtomicUsize};
-    use std::sync::{Arc, Mutex};
-
-    #[test]
-    fn get_indexing_status_zero() {
-        let count = AtomicUsize::new(0);
-        assert_eq!(do_get_indexing_status(&count), 0);
-    }
-
-    #[test]
-    fn get_indexing_status_normal() {
-        let count = AtomicUsize::new(42);
-        assert_eq!(do_get_indexing_status(&count), 42);
-    }
-
-    #[test]
-    fn get_indexing_status_overflow_clamps_to_zero() {
-        let count = AtomicUsize::new(2_000_000);
-        assert_eq!(do_get_indexing_status(&count), 0);
-    }
-
-    #[test]
-    fn get_unindexed_count_empty_db() {
-        let (db, _dir) = test_db();
-        assert_eq!(do_get_unindexed_count(&db), 0);
-    }
-
-    #[test]
-    fn get_unindexed_count_with_new_photo() {
-        let (mut db, _dir) = test_db();
-        db.store_photo_batch(&[make_photo("ph1", "/a.jpg")])
-            .unwrap();
-        assert_eq!(do_get_unindexed_count(&db), 1);
-    }
-
-    #[test]
-    fn get_unindexed_count_fully_indexed() {
-        let (mut db, _dir) = test_db();
-        db.store_photo_batch(&[make_photo("ph1", "/a.jpg")])
-            .unwrap();
-        db.update_photo_indexed("ph1", 2);
-        assert_eq!(do_get_unindexed_count(&db), 0);
-    }
-
-    #[tokio::test]
-    async fn index_faces_sends_process_model_job() {
-        let (tx, mut rx) = tokio::sync::mpsc::channel(siegu_core::ml_worker::JOB_CHANNEL_CAPACITY);
-        send_index_faces_job(&tx).await.unwrap();
-        let job = rx.try_recv().unwrap();
-        assert!(matches!(job, ml::Job::ProcessModel(ref m) if m == "face"));
-    }
-
-    #[test]
-    fn index_faces_sets_indexing_mode() {
-        let (db, _dir) = test_db();
-        do_index_faces(&db).unwrap();
-        let config = db.get_state();
-        assert_eq!(config.get("indexing_mode").unwrap(), "immediate");
-    }
-
-    #[tokio::test]
-    async fn analyze_photo_sends_job_and_sets_abort() {
-        let abort = AtomicBool::new(false);
-        let (tx, mut rx) = tokio::sync::mpsc::channel(siegu_core::ml_worker::JOB_CHANNEL_CAPACITY);
-        do_analyze_photo(&abort, &tx, "photo1").await.unwrap();
-        assert!(abort.load(std::sync::atomic::Ordering::SeqCst));
-        let job = rx.try_recv().unwrap();
-        assert!(matches!(job, ml::Job::AnalyzeSingle(ref id) if id == "photo1"));
-    }
-
-    #[tokio::test]
-    async fn analyze_photo_model_sends_correct_job() {
-        let abort = AtomicBool::new(false);
-        let (tx, mut rx) = tokio::sync::mpsc::channel(siegu_core::ml_worker::JOB_CHANNEL_CAPACITY);
-        do_analyze_photo_model(&abort, &tx, "photo1", "clip")
-            .await
-            .unwrap();
-        assert!(abort.load(std::sync::atomic::Ordering::SeqCst));
-        let job = rx.try_recv().unwrap();
-        assert!(
-            matches!(job, ml::Job::AnalyzeSingleWithModel(ref id, ref model) if id == "photo1" && model == "clip")
-        );
-    }
-
-    #[tokio::test]
-    async fn analyze_model_sends_process_model() {
-        let (tx, mut rx) = tokio::sync::mpsc::channel(siegu_core::ml_worker::JOB_CHANNEL_CAPACITY);
-        do_analyze_model(&tx, "yolo").await.unwrap();
-        let job = rx.try_recv().unwrap();
-        assert!(matches!(job, ml::Job::ProcessModel(ref m) if m == "yolo"));
-    }
-
-    #[test]
-    fn abort_indexing_sets_flags() {
-        let abort = AtomicBool::new(false);
-        let pending = AtomicUsize::new(100);
-        let paused = AtomicBool::new(true);
-        do_abort_indexing(&abort, &pending, &paused).unwrap();
-        assert!(abort.load(std::sync::atomic::Ordering::SeqCst));
-        assert_eq!(pending.load(std::sync::atomic::Ordering::SeqCst), 0);
-        assert!(!paused.load(std::sync::atomic::Ordering::SeqCst));
-    }
-
-    #[test]
-    fn abort_indexing_when_already_zero() {
-        let abort = AtomicBool::new(true);
-        let pending = AtomicUsize::new(0);
-        let paused = AtomicBool::new(false);
-        do_abort_indexing(&abort, &pending, &paused).unwrap();
-        assert!(abort.load(std::sync::atomic::Ordering::SeqCst));
-        assert_eq!(pending.load(std::sync::atomic::Ordering::SeqCst), 0);
-    }
-
-    #[tokio::test]
-    async fn reload_models_sends_reload_job() {
-        let (tx, mut rx) = tokio::sync::mpsc::channel(siegu_core::ml_worker::JOB_CHANNEL_CAPACITY);
-        do_reload_models(&tx).await.unwrap();
-        let job = rx.try_recv().unwrap();
-        assert!(matches!(job, ml::Job::ReloadModels));
-    }
-
-    #[test]
-    fn unload_models_clears_cache() {
-        let models: siegu_core::ml_worker::LoadedModelsHandle =
-            Arc::new(Mutex::new(Some(dummy_loaded_models())));
-        assert!(models.lock().unwrap().is_some());
-        do_unload_models(&models).unwrap();
-        assert!(models.lock().unwrap().is_none());
-    }
-
-    #[test]
-    fn unload_models_when_already_empty() {
-        let models: siegu_core::ml_worker::LoadedModelsHandle = Arc::new(Mutex::new(None));
-        do_unload_models(&models).unwrap();
-        assert!(models.lock().unwrap().is_none());
-    }
-
-    /// A minimal `LoadedModels` used to prove the cache can be populated and
-    /// then cleared without needing any real ONNX sessions.
-    fn dummy_loaded_models() -> siegu_core::ml_engine::models::LoadedModels {
-        siegu_core::ml_engine::models::LoadedModels {
-            clip_visual: None,
-            clip_text: None,
-            text_embeddings: Vec::new(),
-            face_detector: None,
-            arcface: None,
-            ocr_det: None,
-            ocr_rec: None,
-            ocr_alphabet: Vec::new(),
-            nsfw: None,
-            aesthetics: None,
-            yolo: None,
-            blip: None,
-            blip_decoder: None,
-            blip_tokenizer: None,
-            midas: None,
-            whisper_encoder: None,
-            whisper_decoder: None,
-            whisper_tokenizer: None,
-            known_people: Vec::new(),
-            known_people_named: 0,
-            selected_ep: String::new(),
-        }
-    }
-
-    #[test]
-    fn get_unindexed_count_partial_indexed() {
-        let (mut db, _dir) = test_db();
-        db.store_photo_batch(&[
-            make_photo("ph1", "/a.jpg"),
-            make_photo("ph2", "/b.jpg"),
-            make_photo("ph3", "/c.jpg"),
-        ])
-        .unwrap();
-        db.update_photo_indexed("ph1", 2);
-        assert_eq!(do_get_unindexed_count(&db), 2);
-    }
+    Ok(ml_commands::do_get_models_loaded(&state.models))
 }

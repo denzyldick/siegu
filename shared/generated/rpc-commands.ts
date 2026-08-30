@@ -71,6 +71,16 @@ export const RPC_COMMANDS: RpcCommandSpec[] = [
   { name: "remove_directory_full", tier: "write", stringify: false, args: ["path"] },
   { name: "mark_onboarding_complete", tier: "write", stringify: false, args: [] },
   { name: "cleanup_database", tier: "write", stringify: false, args: ["confirm"] },
+  { name: "analyze_photo", tier: "owner", stringify: false, args: ["id"] },
+  { name: "analyze_photo_model", tier: "owner", stringify: false, args: ["id", "model_id"] },
+  { name: "analyze_model", tier: "owner", stringify: false, args: ["model_id"] },
+  { name: "index_faces", tier: "owner", stringify: false, args: [] },
+  { name: "abort_indexing", tier: "owner", stringify: false, args: [] },
+  { name: "pause_indexing", tier: "owner", stringify: false, args: [] },
+  { name: "resume_indexing", tier: "owner", stringify: false, args: [] },
+  { name: "reload_models", tier: "owner", stringify: false, args: [] },
+  { name: "unload_models", tier: "owner", stringify: false, args: [] },
+  { name: "get_models_loaded", tier: "owner", stringify: false, args: [] },
 ];
 
 /** Command names in each tier. */

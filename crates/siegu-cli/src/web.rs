@@ -306,6 +306,7 @@ async fn serve_static(
                     let ctx = RpcContext {
                         config_path: &cfg,
                         mode,
+                        ml: None,
                     };
                     dispatch(&ctx, &name, &payload)
                 })

@@ -195,6 +195,24 @@ pub const CATALOG: &[CommandSpec] = &[
     spec("remove_directory_full", Tier::ReadWrite, false, &["path"]),
     spec("mark_onboarding_complete", Tier::ReadWrite, false, &[]),
     spec("cleanup_database", Tier::ReadWrite, false, &["confirm"]),
+    // ── ML analysis / indexing (owner-only) ────────────────────────────────
+    // These drive the host's live ML worker. They are `Owner`-tier: a guest
+    // (WebRTC share) must never trigger heavy analysis/indexing on the host.
+    spec("analyze_photo", Tier::Owner, false, &["id"]),
+    spec(
+        "analyze_photo_model",
+        Tier::Owner,
+        false,
+        &["id", "model_id"],
+    ),
+    spec("analyze_model", Tier::Owner, false, &["model_id"]),
+    spec("index_faces", Tier::Owner, false, &[]),
+    spec("abort_indexing", Tier::Owner, false, &[]),
+    spec("pause_indexing", Tier::Owner, false, &[]),
+    spec("resume_indexing", Tier::Owner, false, &[]),
+    spec("reload_models", Tier::Owner, false, &[]),
+    spec("unload_models", Tier::Owner, false, &[]),
+    spec("get_models_loaded", Tier::Owner, false, &[]),
 ];
 
 /// Build a [`CommandSpec`] from a name + args, using a derived stringify flag
@@ -402,11 +420,30 @@ mod tests {
     }
 
     #[test]
-    fn every_dispatch_verified_no_owner_commands_yet() {
-        // No Owner-tier commands have been added yet (Part B will add ML +
-        // sync/session). Sanity check the tier plumbing.
-        assert!(CATALOG.iter().all(|c| c.tier != Tier::Owner));
-        assert!(is_owner_only("analyze_model") == false);
+    fn ml_commands_are_owner_tier() {
+        // The ML-trigger commands must be Owner-tier so a guest can never run
+        // them (security guard at the dispatch + transport boundary).
+        for name in [
+            "analyze_photo",
+            "analyze_photo_model",
+            "analyze_model",
+            "index_faces",
+            "abort_indexing",
+            "pause_indexing",
+            "resume_indexing",
+            "reload_models",
+            "unload_models",
+            "get_models_loaded",
+        ] {
+            assert!(
+                is_owner_only(name),
+                "{name} must be Owner-only (guest must never run ML)"
+            );
+            assert!(is_known(name));
+        }
+        // Doc reads stay accessible to read-only principals.
+        assert!(!is_owner_only("get_indexing_status"));
+        assert!(!is_owner_only("get_unindexed_count"));
     }
 
     #[test]
