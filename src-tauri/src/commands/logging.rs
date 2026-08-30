@@ -71,18 +71,7 @@ pub fn do_resolve_photo_locations(db: &Database) -> usize {
 
 /// Pure business logic — testable without Tauri.
 pub fn do_get_location_names(db: &Database) -> Vec<String> {
-    let mut names = Vec::new();
-    if let Ok(mut stmt) = db
-        .connection
-        .prepare("SELECT DISTINCT value FROM properties WHERE key = 'location_name' ORDER BY value")
-    {
-        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
-            for row in rows.flatten() {
-                names.push(row);
-            }
-        }
-    }
-    names
+    siegu_core::library::do_get_location_names(db)
 }
 
 #[tauri::command]

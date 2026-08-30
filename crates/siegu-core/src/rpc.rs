@@ -18,7 +18,7 @@ use std::path::Path;
 use serde::Serialize;
 use serde_json::{json, Value};
 
-use crate::database::{Album, AlbumKind, Database, PhotoFilter, SearchSuggestion};
+use crate::database::{Album, AlbumKind, Database, PhotoFilter};
 use crate::library;
 use crate::rpc_catalog::{self, Tier};
 
@@ -309,7 +309,7 @@ pub fn dispatch(ctx: &RpcContext, name: &str, payload: &Value) -> Result<Value, 
             let photo_id = payload.must_str("photo_id")?;
             Ok(to_json(&db.get_faces_for_photo(&photo_id), json!([])))
         }
-        "get_top_tags" => Ok(to_json(&top_tags(&db), json!([]))),
+        "get_top_tags" => Ok(to_json(&library::do_get_top_tags(&db), json!([]))),
 
         // ── search / geo / extraction extras (read) ──────────────────────
         "get_photo_ocr" => {
@@ -326,7 +326,7 @@ pub fn dispatch(ctx: &RpcContext, name: &str, payload: &Value) -> Result<Value, 
             let query = payload.opt_str("query")?.unwrap_or_default();
             Ok(to_json(&db.list_objects(&query), json!([])))
         }
-        "get_location_names" => Ok(to_json(&location_names(&db), json!([]))),
+        "get_location_names" => Ok(to_json(&library::do_get_location_names(&db), json!([]))),
         // The Tauri command is `search_facets`; the host dispatch also accepts
         // it under the `get_search_facets` name above.
         "search_facets" => Ok(to_json(&library::do_get_search_facets(&db), json!({}))),
@@ -338,11 +338,21 @@ pub fn dispatch(ctx: &RpcContext, name: &str, payload: &Value) -> Result<Value, 
         )),
         "get_config" => Ok(to_json(&db.get_state(), json!({}))),
         "get_last_scan_time" => Ok(to_json(&db.get_last_scan_time(), json!(null))),
-        "get_unindexed_count" => Ok(json!(db.get_unindexed_photos().len())),
+        "get_unindexed_count" => Ok(json!(library::do_get_unindexed_count(&db))),
         "get_max_photo_rowid" => Ok(json!(db.max_photo_rowid())),
-        // The host has no live ML job queue; "pending work" is the count of
-        // photos that still need analysis.
-        "get_indexing_status" => Ok(json!(db.get_unindexed_photos().len())),
+        // When the host runs a live ML worker (webHost `--owner-mode`) the
+        // pending-work metric is the worker's in-flight queue depth, matching
+        // the desktop command. Otherwise (read/rw guest, no worker) fall back to
+        // the uncapped library count of photos still needing analysis.
+        "get_indexing_status" => {
+            #[cfg(feature = "ml")]
+            if let Some(ml) = ctx.ml {
+                return Ok(json!(crate::ml_commands::do_get_indexing_status(
+                    &ml.pending_count
+                )));
+            }
+            Ok(json!(library::do_get_unindexed_count(&db)))
+        }
         "storage_usage" => {
             let quota = crate::mesh::MeshManager::get_storage_quota(ctx.config_path);
             let used = crate::mesh::MeshManager::get_storage_used(ctx.config_path);
@@ -455,9 +465,7 @@ pub fn dispatch(ctx: &RpcContext, name: &str, payload: &Value) -> Result<Value, 
         }
         "delete_face" => {
             let face_id = payload.must_str("face_id")?;
-            let _ = db
-                .connection
-                .execute("DELETE FROM faces WHERE face_id = ?1", [&face_id]);
+            library::do_delete_face(&db, &face_id);
             Ok(Value::Null)
         }
         "merge_people" => {
@@ -586,71 +594,6 @@ pub fn dispatch(ctx: &RpcContext, name: &str, payload: &Value) -> Result<Value, 
 fn parse_photo_filter(payload: &Value) -> Result<PhotoFilter, String> {
     let rule = payload.opt_str("rule")?.unwrap_or_else(|| "{}".to_string());
     serde_json::from_str(&rule).map_err(|e| format!("invalid album rule: {e}"))
-}
-
-/// Top tag/location/person search suggestions (mirrors the Tauri
-/// `people::get_top_tags` command).
-fn top_tags(db: &Database) -> Vec<SearchSuggestion> {
-    let mut suggestions: Vec<SearchSuggestion> = Vec::new();
-
-    if let Ok(mut stmt) = db
-        .connection
-        .prepare("SELECT class FROM object GROUP BY class ORDER BY COUNT(*) DESC LIMIT 5")
-    {
-        if let Ok(iter) = stmt.query_map([], |row| {
-            Ok(SearchSuggestion {
-                title: row.get(0)?,
-                suggestion_type: "tag".to_string(),
-            })
-        }) {
-            suggestions.extend(iter.flatten());
-        }
-    }
-
-    if let Ok(mut stmt) = db.connection.prepare(
-        "SELECT value FROM properties WHERE key = 'location_name' \
-         GROUP BY value ORDER BY COUNT(*) DESC LIMIT 5",
-    ) {
-        if let Ok(iter) = stmt.query_map([], |row| {
-            Ok(SearchSuggestion {
-                title: row.get(0)?,
-                suggestion_type: "location".to_string(),
-            })
-        }) {
-            suggestions.extend(iter.flatten());
-        }
-    }
-
-    if let Ok(mut stmt) = db.connection.prepare(
-        "SELECT name FROM people WHERE name IS NOT NULL GROUP BY name \
-         ORDER BY COUNT(*) DESC LIMIT 5",
-    ) {
-        if let Ok(iter) = stmt.query_map([], |row| {
-            Ok(SearchSuggestion {
-                title: row.get(0)?,
-                suggestion_type: "person".to_string(),
-            })
-        }) {
-            suggestions.extend(iter.flatten());
-        }
-    }
-
-    suggestions
-}
-
-/// Distinct location names in the library (mirrors the Tauri
-/// `logging::get_location_names` command).
-fn location_names(db: &Database) -> Vec<String> {
-    let mut names = Vec::new();
-    if let Ok(mut stmt) = db
-        .connection
-        .prepare("SELECT DISTINCT value FROM properties WHERE key = 'location_name' ORDER BY value")
-    {
-        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
-            names.extend(rows.flatten());
-        }
-    }
-    names
 }
 
 #[cfg(test)]
@@ -999,6 +942,70 @@ mod tests {
             json!(0)
         );
         assert!(dispatch(&c, "check_models", &json!({})).unwrap().is_array());
+    }
+
+    fn make_unindexed_photo(id: &str, location: &str) -> Photo {
+        let mut p = make_photo(id, location);
+        p.indexed = 0;
+        p
+    }
+
+    // Part D contract freeze: the RPC facade must report the library-wide
+    // unindexed count (uncapped), not the LIMIT-50 snapshot used internally.
+    #[test]
+    fn unindexed_count_and_status_report_full_library() {
+        let c = test_ctx(ShareMode::ReadOnly);
+        let photos: Vec<Photo> = (0..55)
+            .map(|i| make_unindexed_photo(&format!("u{i:03}"), &format!("/a/{i:03}.jpg")))
+            .collect();
+        Database::new(c.config_path)
+            .store_photo_batch(&photos)
+            .unwrap();
+        assert_eq!(
+            dispatch(&c, "get_unindexed_count", &json!({})).unwrap(),
+            json!(55)
+        );
+        // With no live worker (read-only principal) get_indexing_status falls
+        // back to the same uncapped library count.
+        assert_eq!(
+            dispatch(&c, "get_indexing_status", &json!({})).unwrap(),
+            json!(55)
+        );
+    }
+
+    // Part D contract freeze: get_top_tags / get_location_names surface the
+    // library's real tags and locations over the facade, not just empty arrays.
+    #[test]
+    fn top_tags_and_location_names_report_seeded_library() {
+        let c = test_ctx(ShareMode::ReadOnly);
+        let mut photo = make_photo("p1", "/a.jpg");
+        photo
+            .properties
+            .insert("location_name".to_string(), "Paris".to_string());
+        Database::new(c.config_path)
+            .store_photo_batch(&[photo])
+            .unwrap();
+        {
+            let seed = Database::new(c.config_path);
+            seed.connection
+                .execute(
+                    "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
+                    ["p1", "beach", "0.9"],
+                )
+                .unwrap();
+        }
+        let tags = dispatch(&c, "get_top_tags", &json!({})).unwrap();
+        let names = tags
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["title"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert!(names.contains(&"beach"), "tag 'beach' missing: {tags}");
+        assert_eq!(
+            dispatch(&c, "get_location_names", &json!({})).unwrap(),
+            json!(["Paris"])
+        );
     }
 }
 

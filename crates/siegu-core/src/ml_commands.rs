@@ -27,15 +27,10 @@ pub fn do_get_indexing_status(pending_count: &AtomicUsize) -> usize {
     }
 }
 
-/// Count of photos not yet fully indexed (indexed < 2).
+/// Count of photos not yet fully indexed (indexed < 2). Uncapped; pure over the
+/// DB, so it lives with the other shared library helpers.
 pub fn do_get_unindexed_count(db: &Database) -> usize {
-    let count: i64 = db
-        .connection
-        .query_row("SELECT COUNT(*) FROM photo WHERE indexed < 2", [], |r| {
-            r.get(0)
-        })
-        .unwrap_or(0);
-    count as usize
+    crate::library::do_get_unindexed_count(db)
 }
 
 /// Sets indexing mode to "immediate" so the worker picks up new library items.

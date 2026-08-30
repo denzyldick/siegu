@@ -7,7 +7,7 @@
 
 use serde::Serialize;
 
-use crate::database::{Database, Photo};
+use crate::database::{Database, Photo, SearchSuggestion};
 
 /// Pure business logic — testable without Tauri.
 #[allow(dead_code)]
@@ -249,4 +249,94 @@ pub fn do_get_search_facets(db: &Database) -> SearchFacets {
         recent_photos: db.get_recent_photos(8),
         stats: db.get_search_stats(),
     }
+}
+
+/// Count of photos not yet fully indexed (`indexed < 2`). Uncapped — callers
+/// must not use `get_unindexed_photos()` (which has an internal LIMIT 50) when
+/// they want the true library-wide count for a status report.
+pub fn do_get_unindexed_count(db: &Database) -> usize {
+    let count: i64 = db
+        .connection
+        .query_row("SELECT COUNT(*) FROM photo WHERE indexed < 2", [], |r| {
+            r.get(0)
+        })
+        .unwrap_or(0);
+    count as usize
+}
+
+/// Top tag/location/person search suggestions for the search box.
+pub fn do_get_top_tags(db: &Database) -> Vec<SearchSuggestion> {
+    let mut suggestions: Vec<SearchSuggestion> = Vec::new();
+
+    if let Ok(mut stmt) = db
+        .connection
+        .prepare("SELECT class FROM object GROUP BY class ORDER BY COUNT(*) DESC LIMIT 5")
+    {
+        if let Ok(iter) = stmt.query_map([], |row| {
+            Ok(SearchSuggestion {
+                title: row.get(0)?,
+                suggestion_type: "tag".to_string(),
+            })
+        }) {
+            for item in iter.flatten() {
+                suggestions.push(item);
+            }
+        }
+    }
+
+    if let Ok(mut stmt) = db
+        .connection
+        .prepare("SELECT value FROM properties WHERE key = 'location_name' GROUP BY value ORDER BY COUNT(*) DESC LIMIT 5")
+    {
+        if let Ok(iter) = stmt.query_map([], |row| {
+            Ok(SearchSuggestion {
+                title: row.get(0)?,
+                suggestion_type: "location".to_string(),
+            })
+        }) {
+            for item in iter.flatten() {
+                suggestions.push(item);
+            }
+        }
+    }
+
+    if let Ok(mut stmt) = db
+        .connection
+        .prepare("SELECT name FROM people WHERE name IS NOT NULL GROUP BY name ORDER BY COUNT(*) DESC LIMIT 5")
+    {
+        if let Ok(iter) = stmt.query_map([], |row| {
+            Ok(SearchSuggestion {
+                title: row.get(0)?,
+                suggestion_type: "person".to_string(),
+            })
+        }) {
+            for item in iter.flatten() {
+                suggestions.push(item);
+            }
+        }
+    }
+
+    suggestions
+}
+
+/// Distinct location names in the library, alphabetically (for the map filter).
+pub fn do_get_location_names(db: &Database) -> Vec<String> {
+    let mut names = Vec::new();
+    if let Ok(mut stmt) = db
+        .connection
+        .prepare("SELECT DISTINCT value FROM properties WHERE key = 'location_name' ORDER BY value")
+    {
+        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
+            names.extend(rows.flatten());
+        }
+    }
+    names
+}
+
+/// Delete a single face row by id. Silent on a nonexistent id (matches the
+/// desktop behavior; the caller is expected to have looked the face up first).
+pub fn do_delete_face(db: &Database, face_id: &str) {
+    let _ = db
+        .connection
+        .execute("DELETE FROM faces WHERE face_id = ?1", [face_id]);
 }

@@ -40,64 +40,12 @@ pub fn do_get_faces_for_photo(db: &Database, photo_id: &str) -> Vec<FaceWithPers
 
 /// Pure business logic — testable without Tauri.
 pub fn do_delete_face(db: &Database, face_id: &str) {
-    let _ = db
-        .connection
-        .execute("DELETE FROM faces WHERE face_id = ?1", [face_id]);
+    siegu_core::library::do_delete_face(db, face_id);
 }
 
 /// Pure business logic — testable without Tauri.
 pub fn do_get_top_tags(db: &Database) -> Vec<SearchSuggestion> {
-    let mut suggestions: Vec<SearchSuggestion> = Vec::new();
-
-    if let Ok(mut stmt) = db
-        .connection
-        .prepare("SELECT class FROM object GROUP BY class ORDER BY COUNT(*) DESC LIMIT 5")
-    {
-        if let Ok(iter) = stmt.query_map([], |row| {
-            Ok(SearchSuggestion {
-                title: row.get(0)?,
-                suggestion_type: "tag".to_string(),
-            })
-        }) {
-            for item in iter.flatten() {
-                suggestions.push(item);
-            }
-        }
-    }
-
-    if let Ok(mut stmt) = db
-        .connection
-        .prepare("SELECT value FROM properties WHERE key = 'location_name' GROUP BY value ORDER BY COUNT(*) DESC LIMIT 5")
-    {
-        if let Ok(iter) = stmt.query_map([], |row| {
-            Ok(SearchSuggestion {
-                title: row.get(0)?,
-                suggestion_type: "location".to_string(),
-            })
-        }) {
-            for item in iter.flatten() {
-                suggestions.push(item);
-            }
-        }
-    }
-
-    if let Ok(mut stmt) = db
-        .connection
-        .prepare("SELECT name FROM people WHERE name IS NOT NULL GROUP BY name ORDER BY COUNT(*) DESC LIMIT 5")
-    {
-        if let Ok(iter) = stmt.query_map([], |row| {
-            Ok(SearchSuggestion {
-                title: row.get(0)?,
-                suggestion_type: "person".to_string(),
-            })
-        }) {
-            for item in iter.flatten() {
-                suggestions.push(item);
-            }
-        }
-    }
-
-    suggestions
+    siegu_core::library::do_get_top_tags(db)
 }
 
 /// Pure business logic — testable without Tauri.
