@@ -34,7 +34,7 @@
       <v-text-field
         v-model="url"
         :label="$t('settings.signalling_url')"
-        placeholder="wss://siegu.io/ws"
+        :placeholder="defaultUrl"
         variant="outlined"
         density="comfortable"
         hide-details
@@ -134,7 +134,7 @@
             size="small"
             variant="flat"
             color="primary"
-            href="https://siegu.io/connect"
+            :href="APP_CONNECT_URL"
             target="_blank"
             class="text-none font-weight-bold"
           >
@@ -147,8 +147,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import type { PingResult } from '@/services/signalling';
+import { DEFAULT_SIGNALING_URL, APP_CONNECT_URL } from '@/services/appConfig';
+
+const defaultUrl = computed(() => DEFAULT_SIGNALING_URL);
 
 const props = defineProps<{
   modelValue: string;

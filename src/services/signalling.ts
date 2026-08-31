@@ -1,7 +1,9 @@
 import { invoke } from '@/services/invoke';
 import { getConfig } from '@/services/tauri';
+import { DEFAULT_SIGNALING_URL } from '@/services/appConfig';
 
-export const DEFAULT_SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL || 'wss://siegu.io/ws';
+/** Re-export so existing callers keep a stable import. */
+export { DEFAULT_SIGNALING_URL };
 
 export interface PingResult {
   ok: boolean;

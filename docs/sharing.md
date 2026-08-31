@@ -40,6 +40,16 @@ The easiest option: [siegu.io/connect](https://siegu.io/connect)
 
 Run your own signalling server. See [SIGNALLING.md](SIGNALLING.md) for setup instructions.
 
+## Desktop App (local, for now)
+
+The desktop app's **Share Collection** action (`… → Share Collection`) starts a
+local signalling + web server and generates a browser share link
+(`http://127.0.0.1:PORT/#CODE.TOKEN.ALBUM`). Opening it loads the view-only web
+client and shows only that collection; granting/copying/stopping happens right
+in the dialog. For now the link works on the same computer — cross-network
+sharing via the hosted `siegu.io` relay is the upcoming default (see
+`src/services/appConfig.ts` for the single base-domain switch).
+
 ## What the Viewer Can See
 
 - **Only the shared collection** — the viewer cannot access other photos or collections

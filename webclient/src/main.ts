@@ -18,6 +18,7 @@ const sessionTimerEl = document.getElementById('session-timer') as HTMLElement;
 const gateEl = document.getElementById('gate') as HTMLElement;
 const gateMsg = document.getElementById('gate-msg') as HTMLElement;
 const galleryEl = document.getElementById('gallery') as HTMLElement;
+const introEl = document.getElementById('intro') as HTMLElement;
 const previewEl = document.getElementById('preview') as HTMLDialogElement;
 const previewTitle = document.getElementById('preview-title') as HTMLElement;
 const previewBody = document.getElementById('preview-body') as HTMLElement;
@@ -85,7 +86,13 @@ function storeBlobUrl(key: string, bytes: Uint8Array, mime: string): string {
 
 let dc: RTCDataChannel | null = null;
 let manifestPhotos: ViewPhoto[] = [];
-let currentSession: { code: string; token: string; albumId?: string } | null = null;
+let currentSession: {
+  code: string;
+  token: string;
+  albumId?: string;
+  minutes?: number;
+  oneTime?: boolean;
+} | null = null;
 
 function sendSync(msg: SyncMsg): void {
   if (!dc || dc.readyState !== 'open') return;
@@ -307,11 +314,14 @@ document.getElementById('preview-close')?.addEventListener('click', () => {
 // Session timer (30 min auto-expiry)
 // ---------------------------------------------------------------------------
 
-const SESSION_MAX_MS = 30 * 60 * 1000; // 30 minutes
+const DEFAULT_SESSION_MS = 30 * 60 * 1000; // 30 minutes
+let sessionMaxMs = DEFAULT_SESSION_MS;
 let sessionStart = 0;
 let sessionTimerRaf = 0;
 
 function startSessionTimer(): void {
+  sessionMaxMs = ((currentSession?.minutes ?? 30) % 60) * 60 * 1000;
+  if (sessionMaxMs <= 0) sessionMaxMs = DEFAULT_SESSION_MS;
   sessionStart = Date.now();
   sessionTimerEl.hidden = false;
   tickSessionTimer();
@@ -319,7 +329,7 @@ function startSessionTimer(): void {
 
 function tickSessionTimer(): void {
   const elapsed = Date.now() - sessionStart;
-  const remaining = Math.max(0, SESSION_MAX_MS - elapsed);
+  const remaining = Math.max(0, sessionMaxMs - elapsed);
   const mins = Math.floor(remaining / 60_000);
   const secs = Math.floor((remaining % 60_000) / 1000);
   sessionTimerEl.textContent = `${mins}:${String(secs).padStart(2, '0')}`;
@@ -424,6 +434,22 @@ const origRenderGallery = renderGallery;
     renderUpsell();
   }
 };
+
+// ---------------------------------------------------------------------------
+// Guest intro card (blurs the library until the guest taps "Go watch")
+// ---------------------------------------------------------------------------
+
+function showIntro(): void {
+  introEl.hidden = false;
+  document.body.classList.add('intro-blur');
+}
+
+function hideIntro(): void {
+  introEl.hidden = true;
+  document.body.classList.remove('intro-blur');
+}
+
+document.getElementById('intro-go')?.addEventListener('click', hideIntro);
 
 // ---------------------------------------------------------------------------
 // Signalling + WebRTC
@@ -552,6 +578,7 @@ async function answerOffer(ws: WebSocket, sdpJson: string): Promise<void> {
         manifestPhotos = [];
         renderedTiles = 0;
         startSessionTimer();
+        showIntro();
         if (currentSession?.albumId) {
           sendSync({ type: 'EnterAlbumShare', album_id: currentSession.albumId });
           albumShareTimeout = setTimeout(() => {

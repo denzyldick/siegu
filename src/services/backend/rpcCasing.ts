@@ -8,10 +8,7 @@
  * The Tauri IPC bridge does this conversion automatically; the browser transports
  * do not, so both webHost and guest funnel through `toSnakeCaseKeys`.
  */
-import {
-  RPC_COMMANDS,
-  type RpcCommandSpec,
-} from 'shared/generated/rpc-commands';
+import { RPC_COMMANDS, type RpcCommandSpec } from 'shared/generated/rpc-commands';
 
 /** Union of every command the Rust host catalog knows (typed seam). */
 export type CommandName = RpcCommandSpec['name'];
@@ -23,9 +20,7 @@ export type CommandName = RpcCommandSpec['name'];
 export type CommandOrString = CommandName | (string & {});
 
 /** All command names known to the Rust host (indexed set). */
-export const RPC_NAMES: ReadonlySet<string> = new Set(
-  RPC_COMMANDS.map((c) => c.name),
-);
+export const RPC_NAMES: ReadonlySet<string> = new Set(RPC_COMMANDS.map((c) => c.name));
 
 /** catalog command name -> its snake_case arg keys (source of truth). */
 export const RPC_ARGS_BY_NAME: ReadonlyMap<string, readonly string[]> = new Map(

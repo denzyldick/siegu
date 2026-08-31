@@ -10,6 +10,7 @@ export interface Album {
   kind: AlbumKind;
   rule: string | null;
   updated_at: string | null;
+  share_count: number;
 }
 
 export interface AlbumSectionItem {

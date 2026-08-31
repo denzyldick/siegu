@@ -22,16 +22,7 @@ defineEmits<{
     </div>
 
     <v-row class="ga-y-6">
-      <v-col
-        cols="6"
-        sm="4"
-        md="3"
-        lg="3"
-        xl="2"
-        xxl="2"
-        v-for="group in faces"
-        :key="group.id"
-      >
+      <v-col cols="6" sm="4" md="3" lg="3" xl="2" xxl="2" v-for="group in faces" :key="group.id">
         <v-card
           class="unnamed-card-reimagined overflow-hidden border"
           variant="flat"

@@ -236,6 +236,13 @@
               item.name
             }}</span>
             <span class="text-caption text-disabled">{{ item.count }}</span>
+            <span
+              v-if="item.album?.share_count"
+              class="text-caption text-primary d-flex align-center ga-1"
+            >
+              <v-icon size="12">mdi-eye-outline</v-icon>
+              {{ item.album.share_count }}
+            </span>
           </div>
         </div>
       </div>
@@ -656,6 +663,32 @@
           </div>
         </v-alert>
 
+        <v-alert type="info" variant="tonal" color="info" border="start" rounded="lg" class="mb-4">
+          <div class="d-flex align-center">
+            <v-icon size="18" class="mr-2">mdi-account-network-outline</v-icon>
+            <div>
+              <div class="text-body-2 text-high-emphasis font-weight-bold">
+                {{ $t('albums.share_upsell_title') }}
+              </div>
+              <div class="text-body-2 text-medium-emphasis">
+                {{ $t('albums.share_upsell_desc') }}
+              </div>
+              <v-btn
+                variant="text"
+                color="primary"
+                size="small"
+                class="mt-2 px-0"
+                :href="APP_CONNECT_URL"
+                target="_blank"
+                rel="noopener"
+              >
+                {{ $t('albums.share_upsell_cta') }}
+                <v-icon end size="14">mdi-open-in-new</v-icon>
+              </v-btn>
+            </div>
+          </div>
+        </v-alert>
+
         <v-alert type="info" variant="outlined" border="start" class="mb-4" rounded="lg">
           <div class="text-body-2 text-high-emphasis font-weight-bold mb-1">
             {{ $t('albums.share_how_it_works') }}
@@ -665,31 +698,106 @@
           </div>
         </v-alert>
 
-        <v-alert type="info" variant="tonal" color="info" border="start" rounded="lg" class="mb-0">
-          <div class="d-flex align-center">
-            <v-icon size="18" class="mr-2">mdi-cloud-outline</v-icon>
-            <div>
-              <div class="text-body-2 text-high-emphasis font-weight-bold">
-                {{ $t('signalling_upsell_title') }}
-              </div>
-              <div class="text-body-2 text-medium-emphasis">
-                {{ $t('signalling_upsell_desc') }}
-              </div>
-              <v-btn
-                variant="text"
-                color="primary"
-                size="small"
-                class="mt-2 px-0"
-                href="https://siegu.io/connect"
-                target="_blank"
-                rel="noopener"
-              >
-                {{ $t('signalling_upsell_cta') }}
-                <v-icon end size="14">mdi-open-in-new</v-icon>
-              </v-btn>
-            </div>
+        <v-divider class="my-1"></v-divider>
+
+        <template v-if="shareLoading">
+          <div class="d-flex align-center text-medium-emphasis pa-2">
+            <v-progress-circular size="18" indeterminate class="mr-3" />
+            <span class="text-body-2">{{ $t('albums.share_creating') }}</span>
           </div>
-        </v-alert>
+        </template>
+
+        <template v-else-if="shareUrl">
+          <v-text-field
+            :model-value="shareUrl"
+            :label="$t('albums.share_link')"
+            variant="outlined"
+            density="comfortable"
+            readonly
+            class="mb-1"
+            :prepend-inner-icon="'mdi-link-variant'"
+          ></v-text-field>
+          <div class="text-caption text-medium-emphasis mb-3">
+            {{
+              shareMode === 'one_time'
+                ? $t('albums.share_one_time_hint')
+                : $t('albums.share_timed_hint', { minutes: shareDuration })
+            }}
+          </div>
+          <v-alert type="warning" variant="tonal" border="start" rounded="lg" class="mb-3">
+            <div class="text-body-2 text-medium-emphasis">
+              {{ $t('albums.share_guests_same_network') }}
+            </div>
+          </v-alert>
+          <div class="d-flex ga-2 align-center">
+            <v-btn
+              size="small"
+              variant="flat"
+              color="primary"
+              class="px-4 text-none"
+              :prepend-icon="'mdi-content-copy'"
+              @click="copyShareLink"
+            >
+              {{ $t('albums.copy_link') }}
+            </v-btn>
+            <v-btn
+              size="small"
+              variant="flat"
+              color="primary"
+              class="px-4 text-none"
+              :prepend-icon="'mdi-open-in-new'"
+              @click="openShareLink"
+            >
+              {{ $t('albums.open_link') }}
+            </v-btn>
+            <v-spacer></v-spacer>
+            <v-btn size="small" variant="text" color="error" class="text-none" @click="stopSharing">
+              {{ $t('albums.stop_sharing') }}
+            </v-btn>
+          </div>
+        </template>
+
+        <template v-else>
+          <div class="mt-3 mb-1">
+            <div class="text-body-2 font-weight-bold mb-1">{{ $t('albums.share_mode') }}</div>
+            <v-btn-toggle v-model="shareMode" variant="outlined" density="comfortable" divided>
+              <v-btn value="timed" class="text-none">
+                {{ $t('albums.share_timed_mode') }}
+              </v-btn>
+              <v-btn value="one_time" class="text-none">
+                {{ $t('albums.share_one_time_mode') }}
+              </v-btn>
+            </v-btn-toggle>
+          </div>
+
+          <div v-if="shareMode === 'timed'" class="mb-2">
+            <div class="text-body-2 font-weight-bold mb-1">{{ $t('albums.share_duration') }}</div>
+            <v-btn-toggle v-model="shareDuration" variant="outlined" density="comfortable" divided>
+              <v-btn v-for="m in [15, 30, 45]" :key="m" :value="m" class="text-none">
+                {{ $t('albums.share_minutes', { minutes: m }) }}
+              </v-btn>
+            </v-btn-toggle>
+          </div>
+
+          <v-alert type="warning" variant="tonal" border="start" rounded="lg" class="my-2">
+            <div class="text-body-2 text-medium-emphasis">
+              {{ $t('albums.share_laptop_off_warning') }}
+            </div>
+          </v-alert>
+
+          <div class="d-flex justify-end mt-3">
+            <v-btn
+              variant="flat"
+              color="primary"
+              class="text-none"
+              :loading="shareLoading"
+              :prepend-icon="'mdi-link-plus'"
+              @click="createShare"
+            >
+              {{ $t('albums.create_share_link') }}
+            </v-btn>
+          </div>
+        </template>
 
         <div class="d-flex justify-end mt-4">
           <v-btn variant="text" @click="shareDialog = false">{{ $t('common.close') }}</v-btn>
@@ -744,7 +852,8 @@ import { useSearchStore } from '@/stores/search';
 import { useUiStore } from '@/stores/ui';
 import { useMapFilterStore } from '@/stores/mapFilter';
 import { usePeople } from '@/composables/usePeople';
-import { toggleFavorite, listFiles } from '@/services/tauri';
+import { toggleFavorite, listFiles, startAlbumShare, stopAlbumShare } from '@/services/tauri';
+import { APP_CONNECT_URL } from '@/services/appConfig';
 import { getFaceImageSrc } from '@/composables/useMediaUtils';
 import { useMediaUrl } from '@/composables/useMediaUrl';
 import type { Album, AlbumSection, AlbumSectionItem } from '@/types/albums';
@@ -865,6 +974,8 @@ const confirmDelete = ref(false);
 const shareDialog = ref(false);
 const shareUrl = ref('');
 const shareLoading = ref(false);
+const shareMode = ref<'timed' | 'one_time'>('timed');
+const shareDuration = ref(15);
 const snackbar = ref(false);
 const snackbarText = ref('');
 
@@ -1423,8 +1534,51 @@ async function shareAlbum(): Promise<void> {
   const album = currentSectionItem.value?.album;
   if (!album) return;
   shareLoading.value = false;
-  shareDialog.value = true;
+  shareMode.value = 'timed';
+  shareDuration.value = 15;
   shareUrl.value = '';
+  shareDialog.value = true;
+}
+
+async function createShare(): Promise<void> {
+  const album = currentSectionItem.value?.album;
+  if (!album || shareLoading.value) return;
+  shareLoading.value = true;
+  shareUrl.value = '';
+  try {
+    const info = await startAlbumShare(album.id, shareMode.value, shareDuration.value);
+    shareUrl.value = info.url;
+  } catch (error) {
+    showMessage(`${t('albums.share_error')}: ${error}`);
+  } finally {
+    shareLoading.value = false;
+  }
+}
+
+async function copyShareLink(): Promise<void> {
+  if (!shareUrl.value) return;
+  try {
+    await navigator.clipboard.writeText(shareUrl.value);
+    showMessage(t('albums.share_link_copied'));
+  } catch {
+    showMessage(t('media_viewer.copy_failed'));
+  }
+}
+
+function openShareLink(): void {
+  if (shareUrl.value) window.open(shareUrl.value, '_blank', 'noopener');
+}
+
+async function stopSharing(): Promise<void> {
+  shareLoading.value = true;
+  try {
+    await stopAlbumShare();
+    shareUrl.value = '';
+  } catch (error) {
+    showMessage(`${t('albums.share_error')}: ${error}`);
+  } finally {
+    shareLoading.value = false;
+  }
 }
 
 async function renameCurrentAlbum(): Promise<void> {
@@ -1454,6 +1608,7 @@ function computeColumns(): void {
 }
 
 let unlistenRefreshed: (() => void) | null = null;
+let unlistenShareOneTime: (() => void) | null = null;
 
 onMounted(async () => {
   computeColumns();
@@ -1462,12 +1617,29 @@ onMounted(async () => {
   unlistenRefreshed = await listen('photos-refreshed', () => {
     void albumsStore.loadSections();
   });
+  unlistenShareOneTime = await listen('share-one-time-done', () => {
+    void (async () => {
+      try {
+        await stopAlbumShare();
+      } catch {
+        // ignore
+      }
+      shareUrl.value = '';
+      showMessage(t('albums.share_one_time_ended'));
+    })();
+  });
+  // Re-query sections when a guest views a shared album so its tile count
+  // stays fresh.
+  void listen('album-share-viewed', () => {
+    void albumsStore.loadSections();
+  });
 });
 
 onUnmounted(() => {
   window.removeEventListener('resize', computeColumns);
   if (searchTimer) clearTimeout(searchTimer);
   unlistenRefreshed?.();
+  unlistenShareOneTime?.();
 });
 </script>
 

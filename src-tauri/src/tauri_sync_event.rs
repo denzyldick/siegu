@@ -21,6 +21,9 @@ pub struct TauriSyncEvent {
     pub active_peer: Arc<tokio::sync::Mutex<Option<String>>>,
     /// Timestamp of the last emitted "sync-progress" event, for rate limiting.
     pub last_sync_progress: std::sync::Mutex<Option<Instant>>,
+    /// When set, the share is a one-time view: close it as soon as the last
+    /// guest's session ends so the link can't be opened again.
+    pub one_time_share: Arc<AtomicBool>,
 }
 
 impl SyncEvent for TauriSyncEvent {
@@ -153,6 +156,12 @@ impl SyncEvent for TauriSyncEvent {
             self.on_log("Peer offline: sync paused until device reconnects");
             notify_sync_paused(&self.app, &self.config_path);
         }
+        // One-time share: the guest's session ended, so the link can't be
+        // opened again. Signal the frontend to close the whole share.
+        if self.one_time_share.swap(false, Ordering::SeqCst) {
+            self.on_log("One-time share: guest session ended — closing share");
+            let _ = self.app.emit("share-one-time-done", ());
+        }
     }
 
     fn on_peer_library_stats(&self, photo_count: i64, video_count: i64) {
@@ -187,6 +196,24 @@ impl SyncEvent for TauriSyncEvent {
         self.on_log(&format!("Peer disconnected: {peer_id}"));
         let _ = self.app.emit("webrtc-state", "Peer Disconnected");
         let _ = self.app.emit("peer-disconnected", &peer_id);
+    }
+
+    fn on_album_viewed(&self, album_id: &str, album_name: &str) {
+        let db = Database::new(&self.config_path);
+        let count = db.increment_album_share_count(album_id);
+        self.on_log(&format!(
+            "Album share viewed: '{album_name}' ({count} total view{})",
+            if count == 1 { "" } else { "s" }
+        ));
+        let _ = self.app.emit(
+            "album-share-viewed",
+            serde_json::json!({ "albumId": album_id, "count": count }),
+        );
+        let _ = self.app.emit("refresh-albums", ());
+        crate::notify::notify_routine(
+            &self.app,
+            format!("Someone is viewing your collection '{album_name}'"),
+        );
     }
 
     fn on_device_registered(&self, db: &Database) {

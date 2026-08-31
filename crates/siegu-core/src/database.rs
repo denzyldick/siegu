@@ -198,6 +198,8 @@ pub struct Album {
     pub rule: Option<String>,
     /// Last modification timestamp (used to order trip albums).
     pub updated_at: Option<String>,
+    /// Number of times this album has been viewed through a share link.
+    pub share_count: i64,
 }
 
 /// One tile inside an Albums-view section: a person, a place, or a persisted
@@ -1173,6 +1175,10 @@ impl Database {
         let _ = conn.execute("ALTER TABLE album ADD COLUMN rule TEXT;", ());
         let _ = conn.execute(
             "ALTER TABLE album ADD COLUMN updated_at TEXT DEFAULT (datetime('now'));",
+            (),
+        );
+        let _ = conn.execute(
+            "ALTER TABLE album ADD COLUMN share_count INTEGER NOT NULL DEFAULT 0;",
             (),
         );
         let _ = conn.execute(
@@ -4010,6 +4016,7 @@ impl Database {
             kind: AlbumKind::parse(&row.get::<_, String>(6).unwrap_or_default()),
             rule: row.get(7)?,
             updated_at: row.get(8)?,
+            share_count: row.get(9).unwrap_or(0),
         })
     }
 
@@ -4112,7 +4119,7 @@ impl Database {
         let sql = "SELECT a.id, a.name, a.created_at, a.cover_photo_id, a.sort_order, \
             CASE WHEN a.kind IN ('smart','trip') THEN 0 \
             ELSE (SELECT COUNT(*) FROM album_item WHERE album_id = a.id) END AS item_count, \
-            a.kind, a.rule, a.updated_at \
+            a.kind, a.rule, a.updated_at, a.share_count \
             FROM album a ORDER BY a.sort_order ASC, a.created_at ASC";
         let mut albums = Vec::new();
         if let Ok(mut stmt) = self.connection.prepare(sql) {
@@ -4131,7 +4138,7 @@ impl Database {
         let sql = "SELECT a.id, a.name, a.created_at, a.cover_photo_id, a.sort_order, \
             CASE WHEN a.kind IN ('smart','trip') THEN 0 \
             ELSE (SELECT COUNT(*) FROM album_item WHERE album_id = a.id) END AS item_count, \
-            a.kind, a.rule, a.updated_at \
+            a.kind, a.rule, a.updated_at, a.share_count \
             FROM album a WHERE a.id = ?1";
         let mut album = self
             .connection
@@ -4142,6 +4149,22 @@ impl Database {
             self.resolve_album_metrics(slice);
         }
         album
+    }
+
+    /// Bump the number of times an album has been viewed through a share link.
+    /// No-op if the album doesn't exist.
+    pub fn increment_album_share_count(&self, album_id: &str) -> i64 {
+        let _ = self.connection.execute(
+            "UPDATE album SET share_count = share_count + 1 WHERE id = ?1",
+            rusqlite::params![album_id],
+        );
+        self.connection
+            .query_row(
+                "SELECT share_count FROM album WHERE id = ?1",
+                rusqlite::params![album_id],
+                |r| r.get::<_, i64>(0),
+            )
+            .unwrap_or(0)
     }
 
     /// Create a rule-based album. `kind` must be Smart or Trip (Manual albums
@@ -4201,7 +4224,7 @@ impl Database {
         let sql = "SELECT a.id, a.name, a.created_at, a.cover_photo_id, a.sort_order, \
             CASE WHEN a.kind IN ('smart','trip') THEN 0 \
             ELSE (SELECT COUNT(*) FROM album_item WHERE album_id = a.id) END AS item_count, \
-            a.kind, a.rule, a.updated_at \
+            a.kind, a.rule, a.updated_at, a.share_count \
             FROM album a WHERE a.kind = ?1 \
             ORDER BY a.sort_order ASC, a.created_at ASC";
         let mut albums = Vec::new();
@@ -6498,6 +6521,27 @@ mod tests {
         let ids = db.album_photo_ids(&album.id);
         assert_eq!(ids, vec!["alive".to_string()]);
         assert_eq!(db.get_album_photo_sync_info(&album.id).len(), 1);
+    }
+
+    #[test]
+    fn test_album_share_count_starts_zero_and_increments() {
+        let mut db = test_db();
+        let album = db.create_album("Views").unwrap();
+        assert_eq!(db.get_album(&album.id).unwrap().share_count, 0);
+        assert_eq!(db.increment_album_share_count(&album.id), 1);
+        assert_eq!(db.increment_album_share_count(&album.id), 2);
+        assert_eq!(db.get_album(&album.id).unwrap().share_count, 2);
+
+        // Unknown album increments to 0 (no-op) without error.
+        assert_eq!(db.increment_album_share_count("missing-album"), 0);
+        assert_eq!(
+            db.list_albums()
+                .iter()
+                .find(|a| a.id == album.id)
+                .unwrap()
+                .share_count,
+            2
+        );
     }
 
     fn db_explain(connection: &rusqlite::Connection, sql: &str) -> String {

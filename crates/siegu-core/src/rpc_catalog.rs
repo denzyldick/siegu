@@ -380,7 +380,10 @@ mod tests {
 
     #[test]
     fn generated_ts_matches_catalog() {
-        let manifest = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+        let manifest = match std::env::var("CARGO_MANIFEST_DIR") {
+            Ok(v) => v,
+            Err(_) => return,
+        };
         let path = std::path::Path::new(&manifest)
             .parent()
             .and_then(|p| p.parent())

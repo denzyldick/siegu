@@ -370,6 +370,26 @@ export async function startLanHost(
   return call<{ ip: string; port: number }>('start_lan_host', { roomId, isInitiator });
 }
 
+export interface AlbumShareInfo {
+  url: string;
+  room_id: string;
+  port: number;
+  mode: string;
+  duration_min: number;
+}
+
+export async function startAlbumShare(
+  albumId: string,
+  mode: 'timed' | 'one_time',
+  durationMin: number,
+): Promise<AlbumShareInfo> {
+  return call<AlbumShareInfo>('start_album_share', { albumId, mode, durationMin });
+}
+
+export async function stopAlbumShare(): Promise<void> {
+  await call<unknown>('stop_album_share');
+}
+
 function currentPlatform(): string | null {
   try {
     const p = platform();

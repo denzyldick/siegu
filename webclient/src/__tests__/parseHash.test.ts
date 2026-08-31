@@ -54,4 +54,30 @@ describe('parseHash', () => {
       albumId: undefined,
     });
   });
+
+  it('parses a numeric duration flag as minutes', () => {
+    expect(parseHash('#CODE.TOKEN.ALBUM1.15')).toEqual({
+      code: 'CODE',
+      token: 'TOKEN',
+      albumId: 'ALBUM1',
+      minutes: 15,
+    });
+  });
+
+  it('parses the "once" flag', () => {
+    expect(parseHash('#CODE.TOKEN.ALBUM1.once')).toEqual({
+      code: 'CODE',
+      token: 'TOKEN',
+      albumId: 'ALBUM1',
+      oneTime: true,
+    });
+  });
+
+  it('ignores an unrecognized 4th part', () => {
+    expect(parseHash('#CODE.TOKEN.ALBUM1.abc')).toEqual({
+      code: 'CODE',
+      token: 'TOKEN',
+      albumId: 'ALBUM1',
+    });
+  });
 });

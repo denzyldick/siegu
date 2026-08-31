@@ -281,6 +281,9 @@ pub trait SyncEvent: Send + Sync {
     /// Called once when a view-only peer finishes receiving our manifest
     /// chunks (#9): the UI builds an ephemeral read-only gallery from it.
     fn on_view_manifest(&self, _photos: &[PhotoSyncInfo]) {}
+    /// Called when a guest enters an album share (#share). Lets the host
+    /// notify the sharer and record a per-album view.
+    fn on_album_viewed(&self, _album_id: &str, _album_name: &str) {}
     /// Called when the connected peer answers one of our CommandRequests
     /// (#19). Default no-op; drivers/clients override to await results.
     fn on_command_response(
@@ -1571,12 +1574,14 @@ impl MeshManager {
                     .serving_view_only
                     .store(true, std::sync::atomic::Ordering::SeqCst);
                 let db = Database::new(config_path);
-                if db.get_album(&album_id).is_none() {
+                let Some(album) = db.get_album(&album_id) else {
                     event.on_log(&format!(
                         "WARN album share rejected: unknown album {album_id}"
                     ));
                     return;
-                }
+                };
+                let album_name = album.name.clone();
+                event.on_album_viewed(&album_id, &album_name);
                 let photos = db.get_album_photo_sync_info(&album_id);
                 let members: std::collections::HashSet<String> =
                     photos.iter().map(|p| p.id.clone()).collect();

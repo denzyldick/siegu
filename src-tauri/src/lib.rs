@@ -31,6 +31,12 @@ struct WebRtcState {
     lan_server: std::sync::Mutex<Option<siegu_core::lan_server::LanServer>>,
     /// Populated when a LAN host session is active; used for share-link generation (#16).
     host_info: std::sync::Mutex<Option<HostInfo>>,
+    /// Abort handle for the running share's expiry timer (timed mode). Cleared
+    /// when the share stops or the timer fires.
+    share_expiry: std::sync::Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
+    /// One-time-share flag shared with the transport event; set true for a
+    /// one-time view so the host closes the share when its guest leaves.
+    one_time_share: Arc<std::sync::atomic::AtomicBool>,
 }
 
 #[derive(Clone)]
@@ -239,6 +245,8 @@ pub fn run() {
                 connected: Arc::clone(&connected),
                 lan_server: std::sync::Mutex::new(None),
                 host_info: std::sync::Mutex::new(None),
+                share_expiry: std::sync::Mutex::new(None),
+                one_time_share: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             });
 
             app.manage(notify::FocusState::default());
@@ -362,6 +370,8 @@ pub fn run() {
             commands::sync::generate_pairing_codes,
             commands::sync::hash_pairing_code,
             commands::sync::generate_album_share_url,
+            commands::sync::start_album_share,
+            commands::sync::stop_album_share,
             commands::sync::auto_reconnect,
             commands::sync::clear_saved_session,
             commands::sync::list_peer_devices,

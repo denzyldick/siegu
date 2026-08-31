@@ -415,6 +415,33 @@ pub fn create_transport(
     >,
     connected: Option<Arc<std::sync::atomic::AtomicBool>>,
 ) -> MeshTransport {
+    create_transport_with_one_time(
+        room_id,
+        is_initiator,
+        signaling_url,
+        config_path,
+        app,
+        external_tx,
+        connected,
+        None,
+    )
+}
+
+/// Variant of [`create_transport`] that also accepts a one-time-share flag.
+/// The flag is set on the created event so that `on_peer_offline` closes the
+/// share when its single guest's session ends (one-time view).
+pub fn create_transport_with_one_time(
+    room_id: String,
+    is_initiator: bool,
+    signaling_url: String,
+    config_path: String,
+    app: tauri::AppHandle,
+    external_tx: Option<
+        Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<SyncMessage>>>>,
+    >,
+    connected: Option<Arc<std::sync::atomic::AtomicBool>>,
+    one_time_share: Option<Arc<std::sync::atomic::AtomicBool>>,
+) -> MeshTransport {
     let device_id = get_or_create_device_id(&config_path);
     let db = database::Database::new(&config_path);
     let state = db.get_state();
@@ -440,6 +467,8 @@ pub fn create_transport(
         connected: connected.unwrap_or_default(),
         active_peer: Arc::new(tokio::sync::Mutex::new(None)),
         last_sync_progress: std::sync::Mutex::new(None),
+        one_time_share: one_time_share
+            .unwrap_or_else(|| Arc::new(std::sync::atomic::AtomicBool::new(false))),
     });
 
     let mut transport = MeshTransport::new(

@@ -762,12 +762,7 @@ const currentPhotoSrc = computed(() => {
   }
   const ext = currentPhoto.value.location.split('.').pop()?.toLowerCase();
   if (['heic', 'heif'].includes(ext ?? '')) {
-    return (
-      currentPhoto.value.encoded ||
-      currentThumb.value ||
-      currentOriginal.value ||
-      ''
-    );
+    return currentPhoto.value.encoded || currentThumb.value || currentOriginal.value || '';
   }
   return currentOriginal.value || currentPhoto.value.encoded || '';
 });

@@ -366,10 +366,18 @@ pub fn dispatch(ctx: &RpcContext, name: &str, payload: &Value) -> Result<Value, 
             ))
         }
         "get_model_capabilities" => {
-            let models_dir = Path::new(ctx.config_path).join("models");
-            let config = db.get_state();
-            let feas = crate::ml_engine::models::model_feasibility(&models_dir, &config, &|_| {});
-            Ok(to_json(&feas, json!([])))
+            #[cfg(feature = "ml")]
+            {
+                let models_dir = Path::new(ctx.config_path).join("models");
+                let config = db.get_state();
+                let feas =
+                    crate::ml_engine::models::model_feasibility(&models_dir, &config, &|_| {});
+                Ok(to_json(&feas, json!([])))
+            }
+            #[cfg(not(feature = "ml"))]
+            {
+                Ok(json!([]))
+            }
         }
 
         // ── mutations (rw sessions only) ─────────────────────────────────

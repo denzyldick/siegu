@@ -3,6 +3,7 @@ use crate::database;
 use crate::transport;
 
 use crate::common::emit_log;
+use rand::RngCore;
 use siegu_core::{PeerDevice, SavedSession};
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
@@ -351,6 +352,323 @@ pub async fn generate_album_share_url(
         "http://{}:{}/#{}.{}",
         ip, hi.port, hi.room_id, album_id
     ))
+}
+
+/// Result of starting a collection share.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct AlbumShareInfo {
+    /// Browser URL the recipient opens (`http://<origin>/#CODE.TOKEN.ALBUM_ID[.MIN]`).
+    pub url: String,
+    pub room_id: String,
+    pub port: u16,
+    /// Sharing mode: `"timed"` or `"one_time"`.
+    pub mode: String,
+    /// Chosen duration in minutes (`timed` mode only).
+    pub duration_min: u32,
+}
+
+/// Locate the view-only webclient bundle (`index.html` + `assets/`) that is
+/// served to browser guests on the share URL. Resolution: `SIEGU_WEB_DIST`
+/// (packaged deployment), `./webclient/dist` (crate cwd), then the workspace
+/// path relative to `src-tauri`. Returns `None` when no bundle is present.
+fn webclient_dist_dir() -> Option<std::path::PathBuf> {
+    if let Ok(dir) = std::env::var("SIEGU_WEB_DIST") {
+        let p = std::path::PathBuf::from(dir);
+        if p.join("index.html").exists() {
+            return Some(p);
+        }
+    }
+    let local = std::path::PathBuf::from("webclient/dist");
+    if local.join("index.html").exists() {
+        return Some(local);
+    }
+    let rel = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../webclient/dist");
+    if rel.join("index.html").exists() {
+        return Some(rel);
+    }
+    None
+}
+
+/// Start sharing a collection over a browser link.
+///
+/// Two modes:
+/// - `timed`: the share auto-closes after `duration_min` minutes.
+/// - `one_time`: a single guest session is served; once that guest leaves, the
+///   share closes so the link can't be opened again.
+///
+/// The signalling origin is either the user's configured LAN signaler (from
+/// Settings → Signalling, a plain `ws://host:port`) or, when empty, an embedded
+/// server bound to all interfaces serving the view-only webclient. The guest
+/// link points at that origin and only exposes the specified album
+/// (`EnterAlbumShare`).
+#[tauri::command]
+pub async fn start_album_share(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::WebRtcState>,
+    album_id: String,
+    mode: String,
+    duration_min: u32,
+) -> Result<AlbumShareInfo, String> {
+    let config_path = get_config_path(&app);
+    if config_path.is_empty() {
+        return Err("Config error".to_string());
+    }
+    let mode = match mode.as_str() {
+        "one_time" => "one_time",
+        _ => "timed",
+    };
+    let duration_min = match duration_min {
+        5..=480 if mode == "timed" => duration_min,
+        _ => 15,
+    };
+
+    let db = database::Database::new(&config_path);
+    if db.get_album(&album_id).is_none() {
+        return Err("Album not found".to_string());
+    }
+
+    let codes = siegu_core::generate_pairing_codes()?;
+    let room_id = siegu_core::hash_pairing_code(codes.uuid)?;
+
+    // Signalling-plane token carried by the share link (`#code.token.album`).
+    // With an embedded server this gates joins (secure by default); with a
+    // configured LAN signaler it must match that signaler's token.
+    let mut buf = [0u8; 16];
+    rand::rngs::OsRng.fill_bytes(&mut buf);
+    let own_token = hex::encode(buf);
+
+    // Read the user's configured signalling server from Settings.
+    let configured_url = db
+        .get_state()
+        .get("signaling_url")
+        .cloned()
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    let configured_token = db
+        .get_state()
+        .get("signaling_token")
+        .cloned()
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+
+    // LAN-style configured signaler (plain `ws://host:port` that serves the
+    // webclient + /ws) is preferred. Remote `/ws`/`wss://` signalers
+    // (siegu.io, paid) are the future extension point.
+    let is_remote = configured_url.contains("wss://") || configured_url.trim_end().ends_with("/ws");
+    let use_configured = !configured_url.is_empty() && !is_remote;
+
+    let (signaling_url, guest_origin, signaler_token, port) = if use_configured {
+        let base = configured_url.trim_end_matches('/').to_string();
+        let ws_url = if is_remote {
+            base.clone()
+        } else {
+            // A bare `ws://host:port` — the `/ws` socket is what browsers use.
+            format!("{base}/ws")
+        };
+        let token = if configured_token.is_empty() {
+            own_token.clone()
+        } else {
+            configured_token.clone()
+        };
+        let origin = ws_url
+            .replace("ws://", "http://")
+            .replace("wss://", "https://");
+        (
+            format!("{ws_url}?token={token}"),
+            origin,
+            token,
+            configured_url
+                .split(':')
+                .nth(2)
+                .and_then(|p| p.trim_end_matches('/').parse::<u16>().ok())
+                .unwrap_or(0),
+        )
+    } else {
+        // Auto-start an embedded signaler bound to all interfaces.
+        if let Ok(mut ls) = state.lan_server.lock() {
+            if let Some(prev) = ls.take() {
+                prev.stop();
+            }
+        }
+        let dist = webclient_dist_dir().ok_or_else(|| {
+            "Web client bundle not found — build webclient/ or set SIEGU_WEB_DIST".to_string()
+        })?;
+        let server =
+            siegu_core::lan_server::start_with_config(siegu_core::lan_server::ServerConfig {
+                port: 0,
+                token: Some(own_token.clone()),
+                web_dist: Some(dist),
+            })
+            .await;
+        let port = server.port;
+        if let Ok(mut ls) = state.lan_server.lock() {
+            *ls = Some(server);
+        }
+
+        let lan_ip = get_local_ip().unwrap_or_else(|| "127.0.0.1".to_string());
+        // Firewall self-check so the sharer knows if guests on the LAN can reach it.
+        if lan_ip != "127.0.0.1" {
+            let addr: std::net::SocketAddr = format!("{lan_ip}:{port}")
+                .parse()
+                .map_err(|e| format!("invalid LAN address {lan_ip}:{port}: {e}"))?;
+            match std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_secs(2)) {
+                Ok(_) => emit_log(&app, format!("TCP self-check OK — {addr} reachable")),
+                Err(e) => emit_log(
+                    &app,
+                    format!(
+                        "WARNING: Cannot reach own LAN address {addr}. Firewall may block incoming connections: {e}"
+                    ),
+                ),
+            }
+        }
+
+        (
+            format!("ws://{lan_ip}:{port}"),
+            format!("http://{lan_ip}:{port}"),
+            own_token.clone(),
+            port,
+        )
+    };
+
+    if let Ok(mut hi) = state.host_info.lock() {
+        *hi = Some(crate::HostInfo {
+            room_id: room_id.clone(),
+            port,
+        });
+    }
+
+    let sync_tx = Arc::clone(&state.sync_tx);
+    let connected = Arc::clone(&state.connected);
+    let app_handle = app.clone();
+    let one_time = mode == "one_time";
+    if one_time {
+        state
+            .one_time_share
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    if let Ok(mut session) = state.active_session.lock() {
+        if let Some(handle) = session.take() {
+            emit_log(&app, "Aborting previous WebRTC session".to_string());
+            handle.abort();
+        }
+
+        let config_path_for_session = config_path.clone();
+        let room_id_for_session = room_id.clone();
+        let signaling_url_for_session = signaling_url.clone();
+        let one_time_flag = Arc::clone(&state.one_time_share);
+        let handle = tauri::async_runtime::spawn(async move {
+            let transport = if one_time {
+                transport::create_transport_with_one_time(
+                    room_id_for_session,
+                    true,
+                    signaling_url_for_session,
+                    config_path_for_session,
+                    app_handle.clone(),
+                    Some(sync_tx),
+                    Some(connected),
+                    Some(one_time_flag),
+                )
+            } else {
+                transport::create_transport(
+                    room_id_for_session.clone(),
+                    true,
+                    signaling_url_for_session,
+                    config_path_for_session,
+                    app_handle.clone(),
+                    Some(sync_tx),
+                    Some(connected),
+                )
+            };
+            if let Err(e) = transport.start().await {
+                emit_log(&app_handle, format!("Album share WebRTC failed: {e}"));
+            }
+        });
+        *session = Some(handle);
+    }
+
+    // Timed mode: schedule automatic shutdown after the chosen duration.
+    if mode == "timed" {
+        let expiry_app = app.clone();
+        let handle = tauri::async_runtime::spawn(async move {
+            let minutes = duration_min;
+            tokio::time::sleep(std::time::Duration::from_secs(minutes as u64 * 60)).await;
+            let st = expiry_app.state::<crate::WebRtcState>();
+            emit_log(
+                &expiry_app,
+                format!("Share expired after {minutes} minutes"),
+            );
+            let _ = do_stop_album_share(&expiry_app, &st).await;
+        });
+        if let Ok(mut exp) = state.share_expiry.lock() {
+            if let Some(prev) = exp.take() {
+                prev.abort();
+            }
+            *exp = Some(handle);
+        }
+    }
+
+    let fragment = if mode == "one_time" {
+        format!("{room_id}.{signaler_token}.{album_id}.once")
+    } else {
+        format!("{room_id}.{signaler_token}.{album_id}.{duration_min}")
+    };
+    Ok(AlbumShareInfo {
+        url: format!("{guest_origin}/#{fragment}"),
+        room_id,
+        port,
+        mode: mode.to_string(),
+        duration_min,
+    })
+}
+
+/// Shared teardown for stopping a share. Closes the WebRTC session, cancels
+/// the expiry timer, clears the one-time flag and stops the embedded server.
+async fn do_stop_album_share(
+    app: &tauri::AppHandle,
+    state: &crate::WebRtcState,
+) -> Result<(), String> {
+    if let Ok(mut session) = state.active_session.lock() {
+        if let Some(handle) = session.take() {
+            emit_log(app, "Stopping album share session".to_string());
+            handle.abort();
+        }
+    }
+    if let Ok(mut exp) = state.share_expiry.lock() {
+        if let Some(handle) = exp.take() {
+            handle.abort();
+        }
+    }
+    state
+        .one_time_share
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+    {
+        let mut tx = state.sync_tx.lock().await;
+        *tx = None;
+    }
+    siegu_core::view_only::state().reset_session();
+    if let Ok(mut ls) = state.lan_server.lock() {
+        if let Some(server) = ls.take() {
+            server.stop();
+            emit_log(app, "Album share server stopped".to_string());
+        }
+    }
+    if let Ok(mut hi) = state.host_info.lock() {
+        *hi = None;
+    }
+    Ok(())
+}
+
+/// Stop a running album share: abort the WebRTC session and close the
+/// signalling + web server so the shared port is released.
+#[tauri::command]
+pub async fn stop_album_share(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::WebRtcState>,
+) -> Result<(), String> {
+    do_stop_album_share(&app, &state).await
 }
 
 #[tauri::command]

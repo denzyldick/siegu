@@ -24,17 +24,28 @@ export type SyncMsg =
   | { type: 'FileEnd'; id: string; checksum: string }
   | { type: string; [k: string]: unknown };
 
-/** Parse "#CODE.TOKEN[.ALBUM_ID]" from the URL fragment. */
+/** Parse "#CODE.TOKEN[.ALBUM_ID][.MIN|.once]" from the URL fragment. */
 export function parseHash(
   hash: string,
-): { code: string; token: string; albumId?: string } | null {
+): { code: string; token: string; albumId?: string; minutes?: number; oneTime?: boolean } | null {
   const raw = decodeURIComponent(hash.replace(/^#/, ''));
   const parts = raw.split('.');
   if (parts.length < 2) return null;
-  const [code, token, albumId] = parts;
+  const [code, token, albumId, flag] = parts;
   if (!code || !token || code.includes('/') || token.includes('/'))
     return null;
-  return { code, token, albumId: albumId || undefined };
+  const result: { code: string; token: string; albumId?: string; minutes?: number; oneTime?: boolean } = {
+    code,
+    token,
+    albumId: albumId || undefined,
+  };
+  if (flag && /^\d+$/.test(flag)) {
+    const mins = parseInt(flag, 10);
+    if (mins > 0) result.minutes = mins;
+  } else if (flag === 'once') {
+    result.oneTime = true;
+  }
+  return result;
 }
 
 /** Infer MIME type from a filename extension. */

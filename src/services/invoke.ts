@@ -26,9 +26,7 @@ export const isTauriRuntime =
 
 /** Vitest mocks `@tauri-apps/api/core` and the event module; in that env the
  *  data plane must consult the mocked invoke instead of the browser shim. */
-const inTestMode =
-  typeof import.meta !== 'undefined' &&
-  import.meta.env?.MODE === 'test';
+const inTestMode = typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test';
 
 /** True when the real Tauri IPC is available (desktop app under test/browser
  *  mocks included); false only in a genuine plain-browser webHost/guest run. */
@@ -90,8 +88,7 @@ function normalizeListArgs(args?: InvokeArgs): Partial<ListFilesOptions> {
       : Array.isArray(a.personIds_item)
         ? (a.personIds_item as string[])
         : undefined,
-    personMatch:
-      a.personMatch === 'and' || a.personMatch === 'or' ? a.personMatch : undefined,
+    personMatch: a.personMatch === 'and' || a.personMatch === 'or' ? a.personMatch : undefined,
     personAlone: a.personAlone === true,
     location: typeof a.location === 'string' ? a.location : undefined,
     tag: typeof a.tag === 'string' ? a.tag : undefined,
@@ -139,8 +136,7 @@ const browserHandlers: Record<string, (args?: InvokeArgs) => Promise<unknown>> =
   count_trash: async () => (await waitForBackend()).countTrash(),
   list_trash: async (args) =>
     JSON.stringify(await (await waitForBackend()).listTrash(num(args?.limit) ?? 100)),
-  toggle_favorite: async (args) =>
-    (await waitForBackend()).toggleFavorite(String(args?.id)),
+  toggle_favorite: async (args) => (await waitForBackend()).toggleFavorite(String(args?.id)),
   set_favorites: async (args) =>
     (await waitForBackend()).setFavorites(asStringArray(args?.ids), args?.favorite === true),
   trash_photo: async (args) => (await waitForBackend()).trashPhoto(String(args?.id)),
@@ -148,7 +144,9 @@ const browserHandlers: Record<string, (args?: InvokeArgs) => Promise<unknown>> =
   empty_trash: async () => (await waitForBackend()).emptyTrash(),
   get_person_photos: async (args) =>
     JSON.stringify(
-      await (await waitForBackend()).listFiles({
+      await (
+        await waitForBackend()
+      ).listFiles({
         personIds: [String(args?.personId ?? args?.fromPerson ?? '')],
         offset: num(args?.offset) ?? 0,
         limit: num(args?.limit) ?? 200,

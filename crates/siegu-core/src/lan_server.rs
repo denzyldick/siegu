@@ -1467,4 +1467,60 @@ mod tests {
             }
         }
     }
+
+    #[tokio::test]
+    async fn test_web_dist_serves_spa_and_assets() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpStream;
+
+        async fn http_get(port: u16, path: &str) -> (String, u16) {
+            let mut stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let req =
+                format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+            stream.write_all(req.as_bytes()).await.unwrap();
+            let mut buf = Vec::new();
+            stream.read_to_end(&mut buf).await.unwrap();
+            let text = String::from_utf8_lossy(&buf).to_string();
+            let status: u16 = text
+                .split('\n')
+                .next()
+                .and_then(|l| l.split_whitespace().nth(1))
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+            (text, status)
+        }
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let assets = dir.path().join("assets");
+        std::fs::create_dir_all(&assets).expect("assets dir");
+        std::fs::write(
+            dir.path().join("index.html"),
+            "<!doctype html><title>siegu</title>",
+        )
+        .expect("index.html");
+        std::fs::write(assets.join("app.js"), "console.log('siegu');").expect("app.js");
+
+        let server = start_with_config(ServerConfig {
+            port: 0,
+            token: None,
+            web_dist: Some(dir.path().to_path_buf()),
+        })
+        .await;
+        let port = server.port;
+
+        // Route 1: GET / → index.html.
+        let (body, status) = http_get(port, "/").await;
+        assert_eq!(status, 200, "GET / must serve the SPA: {body}");
+        assert!(body.contains("<title>siegu</title>"), "wrong index body");
+
+        // Route 3: GET /assets/* → static bundle files.
+        let (body, status) = http_get(port, "/assets/app.js").await;
+        assert_eq!(
+            status, 200,
+            "GET /assets/app.js must serve the bundle: {body}"
+        );
+        assert!(body.contains("console.log('siegu')"), "wrong asset body");
+
+        server.stop();
+    }
 }
