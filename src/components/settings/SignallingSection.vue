@@ -105,7 +105,7 @@
       </div>
 
       <a
-        href="https://github.com/denzyl/siegu/blob/main/docs/SIGNALLING.md"
+        href="https://github.com/denzyldick/siegu/blob/main/docs/SIGNALLING.md"
         target="_blank"
         class="d-inline-flex align-center text-caption font-weight-medium mb-4"
         style="color: rgb(var(--v-theme-info)); text-decoration: none"

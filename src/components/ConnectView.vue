@@ -119,7 +119,7 @@
             {{ $t('connect.same_network_note') }}
           </div>
           <a
-            href="https://siegu.app/waitlist"
+            :href="APP_LANDING_URL"
             target="_blank"
             class="text-caption font-weight-medium mb-4 d-inline-block"
             style="color: rgb(var(--v-theme-success)); text-decoration: none"
@@ -379,6 +379,7 @@ import ConnectJoinView from '@/components/connect/ConnectJoinView.vue';
 import ConnectLanDiscovery from '@/components/connect/ConnectLanDiscovery.vue';
 import ConnectStatusBar from '@/components/connect/ConnectStatusBar.vue';
 import GuestGallery from '@/components/connect/GuestGallery.vue';
+import { APP_LANDING_URL } from '@/services/appConfig';
 
 const { t } = useI18n();
 const syncStore = useSyncStore();

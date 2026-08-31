@@ -19,6 +19,17 @@ export const APP_WEB_BASE = `https://${APP_BASE_HOST}`;
 /** Public marketing/help entry point for sharing (`siegu.io/connect`). */
 export const APP_CONNECT_URL = `${APP_WEB_BASE}/connect`;
 
+/** Landing page. Overridable via `VITE_APP_LANDING_URL` to run it locally. */
+export const APP_LANDING_URL = import.meta.env.VITE_APP_LANDING_URL || APP_WEB_BASE;
+
+/** Source repository (open source project). */
+export const APP_GITHUB_URL =
+  import.meta.env.VITE_APP_GITHUB_URL || 'https://github.com/denzyldick/siegu';
+
+/** User documentation (source docs folder on GitHub). */
+export const APP_DOCS_URL =
+  import.meta.env.VITE_APP_DOCS_URL || `${APP_GITHUB_URL}/tree/main/docs`;
+
 /** Signalling WebSocket endpoint default (`wss://siegu.io/ws`). */
 export const DEFAULT_SIGNALING_URL =
   import.meta.env.VITE_SIGNALING_URL || `wss://${APP_BASE_HOST}/ws`;
