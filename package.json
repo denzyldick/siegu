@@ -1,0 +1,12 @@
+{
+  "name": "siegu-landing",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "start": "node scripts/serve.mjs",
+    "check:translations": "node scripts/check-translations.js"
+  },
+  "license": "UNLICENSED"
+}

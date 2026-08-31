@@ -1,0 +1,175 @@
+{
+  "meta": {
+    "title": "Siegu — Your photo library, privately yours",
+    "description": "Siegu is a private, local-first photo library with on-device AI. Browse, search, share and relive your memories — without handing them to the cloud."
+  },
+  "nav": {
+    "features": "Features",
+    "pricing": "Pricing",
+    "docs": "Docs",
+    "faq": "FAQ",
+    "open_app": "Open app",
+    "get_started": "Get started"
+  },
+  "hero": {
+    "badge": "Private by design · Local-first",
+    "title1": "Your photo library,",
+    "title2": "privately yours",
+    "subtitle": "Siegu keeps every photo and video on your device. Powerful search, on-device AI, and seamless sharing — no cloud, no uploads, no compromises.",
+    "cta_primary": "Get Siegu",
+    "cta_secondary": "Learn more",
+    "note": "Windows · macOS · Linux · Web"
+  },
+  "logos": {
+    "label": "Made for the way you actually take photos"
+  },
+  "features": {
+    "eyebrow": "Features",
+    "title": "Everything your photos deserve",
+    "subtitle": "A fast, private photo library that thinks the way you do.",
+    "listen": {
+      "title": "Private by design",
+      "desc": "Your photos never leave your device. No servers, no cloud, no uploads. Ever."
+    },
+    "search": {
+      "title": "Natural-language search",
+      "desc": "“beach in 2021” or “birthday cake” — find any moment in an instant with on-device AI."
+    },
+    "organized": {
+      "title": "Auto-organized",
+      "desc": "Faces, places, trips and events, clustered automatically and kept private."
+    },
+    "share": {
+      "title": "Privately share",
+      "desc": "Share a whole collection over a live, encrypted link. Guests see only what you allow."
+    },
+    "offline": {
+      "title": "Works offline",
+      "desc": "Your library is local, so it works on a plane, in a cabin, anywhere."
+    },
+    "speed": {
+      "title": "Blazing fast",
+      "desc": "Millions of photos, instant results. Your device does the heavy lifting."
+    }
+  },
+  "showcase": {
+    "eyebrow": "The library",
+    "title": "A home for every memory",
+    "desc": "Clean, calm and fast — Siegu turns your entire photo history into something you actually enjoy browsing.",
+    "caption": "Your library, your rules."
+  },
+  "pricing": {
+    "eyebrow": "Pricing",
+    "title": "Simple, honest pricing",
+    "subtitle": "Everything is local and private. Pay for convenience, not for your data.",
+    "toggle": {
+      "monthly": "Monthly",
+      "yearly": "Yearly",
+      "save": "Save 20%"
+    },
+    "free": {
+      "name": "Free",
+      "price": "$0",
+      "period": "forever",
+      "tagline": "The full app on your device.",
+      "features": [
+        "Unlimited local photos",
+        "On-device AI search",
+        "Automatic organization",
+        "Local sharing on your network"
+      ],
+      "cta": "Get started"
+    },
+    "pro": {
+      "name": "Pro",
+      "price": "$5",
+      "period": "per month",
+      "tagline": "Everything, everywhere.",
+      "highlight": "Most popular",
+      "features": [
+        "Everything in Free",
+        "Cloud-synced sharing",
+        "Anyone, anywhere links",
+        "Priority support",
+        "Early access to new features"
+      ],
+      "cta": "Go Pro",
+      "yearly_badge": "billed yearly"
+    },
+    "team": {
+      "name": "Family",
+      "price": "$9",
+      "period": "per month",
+      "tagline": "Share one library together.",
+      "features": [
+        "Everything in Pro",
+        "Up to 6 members",
+        "Invitational management",
+        "Dedicated home hub"
+      ],
+      "cta": "Choose Family"
+    },
+    "note": "Prices in USD. Cancel anytime. No extra fees for more photos."
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "title": "Questions, answered",
+    "items": [
+      {
+        "q": "Is my data really private?",
+        "a": "Yes. Your photos and metadata stay on your device. Siegu uses on-device AI, so nothing is uploaded for processing."
+      },
+      {
+        "q": "Does Siegu work offline?",
+        "a": "Absolutely. Your library is stored locally, so you can browse and search your photos anywhere — even without a connection."
+      },
+      {
+        "q": "How does sharing work?",
+        "a": "You can share a collection over a live, end-to-end-encrypted link. Guests only see what you choose to share, and nothing is stored on our side."
+      },
+      {
+        "q": "What platforms are supported?",
+        "a": "Siegu runs on Windows, macOS and Linux, with a full web experience for guests."
+      },
+      {
+        "q": "Can I import from Google Photos or iCloud?",
+        "a": "Yes — Siegu imports your existing library, then processes it all locally and privately."
+      }
+    ]
+  },
+  "cta": {
+    "title": "Take your photos back",
+    "subtitle": "Private, local, and yours. Siegu is ready when you are.",
+    "button": "Get Siegu — it's free",
+    "note": "No account, no uploads, no lock-in."
+  },
+  "footer": {
+    "tagline": "A private, local-first photo library.",
+    "product": "Product",
+    "product_links": {
+      "features": "Features",
+      "pricing": "Pricing",
+      "changelog": "Changelog",
+      "roadmap": "Roadmap"
+    },
+    "resources": "Resources",
+    "resources_links": {
+      "docs": "Documentation",
+      "download": "Download",
+      "support": "Support"
+    },
+    "company": "Company",
+    "company_links": {
+      "about": "About",
+      "github": "GitHub",
+      "blog": "Blog"
+    },
+    "legal": "Privacy & Terms",
+    "rights": "All rights reserved.",
+    "made": "Made with care — no cloud required."
+  },
+  "misc": {
+    "load": "Loading…",
+    "skip": "Skip to content"
+  }
+}
