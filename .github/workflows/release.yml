@@ -187,9 +187,15 @@ jobs:
       APP_COMMIT_SHA: ${{ needs.ci-gate.outputs.short_sha }}
 
     steps:
+      - name: Force LF line endings (Windows only)
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v4
+
       - uses: ./.github/actions/setup
         with:
-          git-autocrlf: ${{ matrix.platform == 'windows-latest' }}
           cache-key-suffix: release-${{ matrix.platform }}
 
       - name: Install dependencies (Ubuntu only)
@@ -312,6 +318,8 @@ jobs:
         with:
           packages: "platforms;android-34 build-tools;34.0.0 ndk;27.0.12077973"
 
+      - uses: actions/checkout@v4
+
       - uses: ./.github/actions/setup
         with:
           rust-targets: aarch64-linux-android
@@ -430,6 +438,8 @@ jobs:
       contents: read
     runs-on: macos-latest
     steps:
+      - uses: actions/checkout@v4
+
       - uses: ./.github/actions/setup
         with:
           rust-targets: aarch64-apple-ios, x86_64-apple-ios, aarch64-apple-ios-sim

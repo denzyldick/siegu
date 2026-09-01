@@ -19,6 +19,8 @@ jobs:
     env:
       ORT_STRATEGY: download
     steps:
+      - uses: actions/checkout@v4
+
       - uses: ./.github/actions/setup
         with:
           rust-targets: aarch64-apple-ios, x86_64-apple-ios, aarch64-apple-ios-sim

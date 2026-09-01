@@ -26,6 +26,8 @@ jobs:
       ORT_STRATEGY: download
 
     steps:
+      - uses: actions/checkout@v4
+
       - uses: ./.github/actions/setup
         with:
           rust-components: rustfmt

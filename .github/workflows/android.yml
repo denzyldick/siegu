@@ -28,6 +28,8 @@ jobs:
         with:
           packages: "platforms;android-34 build-tools;34.0.0 ndk;27.0.12077973"
 
+      - uses: actions/checkout@v4
+
       - uses: ./.github/actions/setup
         with:
           rust-targets: aarch64-linux-android,x86_64-linux-android

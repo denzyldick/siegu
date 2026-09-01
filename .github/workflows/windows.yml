@@ -22,9 +22,13 @@ jobs:
       ORT_STRATEGY: download
 
     steps:
+      - name: Force LF line endings
+        shell: bash
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v4
+
       - uses: ./.github/actions/setup
-        with:
-          git-autocrlf: true
 
       # ffmpeg-sys-next's configure (features = ["build"]) needs the full MSVC
       # dev environment (cl.exe, link.exe, INCLUDE/LIB) or it fails with
