@@ -15,7 +15,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PHOTOS="$REPO_ROOT/tests/fixtures/faces"
 
-BIN="${SIEGU_BIN:-$REPO_ROOT/target/release/siegu}"
+BIN="${SIEGU_BIN:-$REPO_ROOT/target/release/siegu-cli}"
 
 if [ ! -x "$BIN" ]; then
   echo "siegu binary not found at $BIN. Run: cargo build --release -p siegu-cli" >&2

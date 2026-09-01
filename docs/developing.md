@@ -126,10 +126,10 @@ Requires: `nvim-dap`, `codelldb` on PATH, Neovim with `exrc` enabled.
 
 ```bash
 # Serve a seeded library over HTTP (no ML by default)
-siegu web --port 8788 --config-path ./dev-scratch --share-mode rw
+siegu-cli web --port 8788 --config-path ./dev-scratch --share-mode rw
 
 # Enable owner-tier ML for the web bearer (starts the live worker)
-siegu web --port 8788 --config-path ./dev-scratch --owner-mode
+siegu-cli web --port 8788 --config-path ./dev-scratch --owner-mode
 
 # The guest path pairs by code+token; use a --server signaler for cross-network
 ```

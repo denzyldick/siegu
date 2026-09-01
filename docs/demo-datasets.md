@@ -13,8 +13,8 @@ and plan fixes accordingly. Each entry has an `#impact-platforms` line mapping t
 
 ## 1. What is validated
 
-The test suite runs the **real compiled `siegu` binary** as an external API
-(`CARGO_BIN_EXE_siegu`), against a throwaway config dir, then reads the
+The test suite runs the **real compiled `siegu-cli` binary** as an external API
+(`CARGO_BIN_EXE_siegu-cli`), against a throwaway config dir, then reads the
 produced `siegu.db` with `rusqlite` and asserts the extracted state matches the
 bundled `demos/` source assets.
 
@@ -185,7 +185,7 @@ and BUG-4 are the two most likely to bite outside the CLI.
 ## 5. WebHost data plane — verified in a real browser
 
 The full Vue UI (not the legacy `webclient/dist` share view) now runs in a plain
-browser against a `siegu web` host over the `Browser data-plane` seam.
+browser against a `siegu-cli web` host over the `Browser data-plane` seam.
 
 **Demo composition (as of this report):** **46 items** = 40 photos (picsum
 800×600; 4 categories × 10: landscapes, people, cities, food) + **6 synthetic
@@ -215,7 +215,7 @@ Verified end-to-end on the seeded demo (Playwright/Chromium, 0 console errors):
 
 ### Host RPC inventory (`crates/siegu-core/src/rpc.rs` `dispatch`)
 The host `/rpc` surface now mirrors the full Tauri command set so the browser
-client can **manage** a `siegu web` instance, not just read it. Read-only
+client can **manage** a `siegu-cli web` instance, not just read it. Read-only
 commands run in any share mode; mutations require the host to be started with
 `--share-mode rw` (gate error:
 `command '{name}' mutates the host library; restart with --share-mode rw`).

@@ -125,7 +125,7 @@ bash scripts/e2e-sync.sh
 docker run --rm -p 8080:8080 ghcr.io/denzyldick/siegu-signal:latest
 SIEGU_SIGNAL_URL=ws://127.0.0.1:8080 bash scripts/e2e-sync.sh
 
-# Or: a bare `siegu serve` on one terminal, then the script with SIEGU_SIGNAL_URL
+# Or: a bare `siegu-cli serve` on one terminal, then the script with SIEGU_SIGNAL_URL
 ```
 
 The Rust-level equivalents live in `crates/siegu-core/tests/` and run with

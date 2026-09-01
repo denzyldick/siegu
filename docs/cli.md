@@ -1,6 +1,6 @@
 # CLI Reference
 
-The `siegu` CLI provides headless access to all core features.
+The `siegu-cli` binary provides headless access to all core features.
 
 ## Install
 
@@ -18,31 +18,31 @@ cargo install --path crates/siegu-cli
 
 ## Commands
 
-### `siegu scan`
+### `siegu-cli scan`
 
 Scan directories for media files and import into the library.
 
 ```bash
 # Scan a specific folder (and add it to watched directories)
-siegu scan /path/to/photos
+siegu-cli scan /path/to/photos
 
 # Scan all configured watched directories
-siegu scan
+siegu-cli scan
 ```
 
-### `siegu analyze`
+### `siegu-cli analyze`
 
 Run ML analysis on photos.
 
 ```bash
 # Analyze all unprocessed photos
-siegu analyze all
+siegu-cli analyze all
 
 # Analyze a single photo by ID
-siegu analyze photo <photo-id>
+siegu-cli analyze photo <photo-id>
 
 # Run a specific model on all photos
-siegu analyze model <model-id>
+siegu-cli analyze model <model-id>
 ```
 
 Model IDs: `clip`, `face`, `ocr`, `nsfw`, `aesthetics`, `yolo`, `blip`, `midas`, `whisper` (`ultraface`/`arcface` are accepted as aliases of `face`)
@@ -50,80 +50,80 @@ Model IDs: `clip`, `face`, `ocr`, `nsfw`, `aesthetics`, `yolo`, `blip`, `midas`,
 All three forms accept `--headless`, which prints progress lines and an E2E
 summary instead of showing the interactive TUI (used by CI scripts).
 
-### `siegu models`
+### `siegu-cli models`
 
 Manage AI model files.
 
 ```bash
 # List all models with download status
-siegu models list
+siegu-cli models list
 
 # Download all models
-siegu models download
+siegu-cli models download
 
 # Download specific models
-siegu models download clip face nsfw
+siegu-cli models download clip face nsfw
 
 # Show disk usage per model
-siegu models usage
+siegu-cli models usage
 ```
 
-### `siegu config`
+### `siegu-cli config`
 
 Manage configuration.
 
 ```bash
 # View all config
-siegu config get
+siegu-cli config get
 
 # Get a specific key
-siegu config get-key theme
+siegu-cli config get-key theme
 
 # Set a config value
-siegu config set theme dark
+siegu-cli config set theme dark
 
 # List valid config keys
-siegu config keys
+siegu-cli config keys
 ```
 
-### `siegu mesh`
+### `siegu-cli mesh`
 
 Peer-to-peer mesh synchronization.
 
 ```bash
 # Host a LAN sync session (starts a signaling server + mDNS)
-siegu mesh host
+siegu-cli mesh host
 
 # Host on a specific port (default 0 = pick a free port)
-siegu mesh host --port 9090
+siegu-cli mesh host --port 9090
 
 # Host against an existing signaling server, joining/creating a room
-siegu mesh host --server ws://192.168.1.100:8080 --room myroom
+siegu-cli mesh host --server ws://192.168.1.100:8080 --room myroom
 
 # Join a mesh room (room ID is positional; URL goes in --server)
-siegu mesh join myroom
-siegu mesh join myroom --server ws://192.168.1.100:8080
+siegu-cli mesh join myroom
+siegu-cli mesh join myroom --server ws://192.168.1.100:8080
 
 # When joining a --server host with a pre-agreed room, create the WebRTC offer
-siegu mesh join myroom --server ws://192.168.1.100:8080 --initiator
+siegu-cli mesh join myroom --server ws://192.168.1.100:8080 --initiator
 
 # Show session status / disconnect / storage quota usage
-siegu mesh status
-siegu mesh disconnect
-siegu mesh quota
+siegu-cli mesh status
+siegu-cli mesh disconnect
+siegu-cli mesh quota
 
 # Browse a peer's library view-only and verify the manifest (#9, e2e helper)
-siegu mesh browse myroom --server ws://192.168.1.100:8080
+siegu-cli mesh browse myroom --server ws://192.168.1.100:8080
 
 # Browse in album-share mode for a specific album (#16)
-siegu mesh browse myroom --album <album-id>
+siegu-cli mesh browse myroom --album <album-id>
 
 # Send a single RPC command to the peer and print its reply (#19, e2e helper)
-siegu mesh rpc myroom list_files --server ws://192.168.1.100:8080
-siegu mesh rpc myroom toggle_favorite '{"id": "<photo-id>"}'
+siegu-cli mesh rpc myroom list_files --server ws://192.168.1.100:8080
+siegu-cli mesh rpc myroom toggle_favorite '{"id": "<photo-id>"}'
 
 # Seed a manual album with the first N photos (prints ALBUM ID, e2e helper)
-siegu mesh seed-album --name "Shared" --take-first 5
+siegu-cli mesh seed-album --name "Shared" --take-first 5
 ```
 
 Availability and defaults:
@@ -141,19 +141,19 @@ Availability and defaults:
 
 ### Remote sync via mesh
 
-There is no separate `siegu sync` command. Remote (non-LAN) sync is done with
+There is no separate `siegu-cli sync` command. Remote (non-LAN) sync is done with
 the mesh commands above — host on one machine, join on the other — using a
 signaling server URL in `--server`.
 
-### `siegu serve`
+### `siegu-cli serve`
 
 Start a standalone LAN signaling server.
 
 ```bash
-siegu serve --port 8080
+siegu-cli serve --port 8080
 ```
 
-### `siegu web`
+### `siegu-cli web`
 
 Share this machine's library as a browser gallery (#11, #19). Starts an
 embedded signaling server plus a small static web server and prints a one-off
@@ -162,7 +162,7 @@ library until the command stops. Nothing is downloaded or written on the
 viewing device; media streams over the WebRTC data channel on demand.
 
 ```bash
-siegu web
+siegu-cli web
 # Open in a browser on this machine:
 #   http://127.0.0.1:8787/#<code>.<token>
 # Or from another device on this network:
@@ -179,12 +179,12 @@ The web bundle lives in `webclient/`; build it once with
 `cd webclient && bun install && bun run build` (npm also works), or point
 `SIEGU_WEB_DIST` at a built `dist/` directory.
 
-### `siegu status`
+### `siegu-cli status`
 
 Show app overview.
 
 ```bash
-siegu status
+siegu-cli status
 ```
 
 Output includes: config directory, database status, photo/video counts, watched folders, config values, model disk usage, available memory.

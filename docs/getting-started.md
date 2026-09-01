@@ -151,7 +151,7 @@ Language, theme, directories, models, and sync settings live under **Settings**.
 
 ### CLI
 
-Everything above is also available headless via the `siegu` CLI — scanning, model downloads, analysis, and mesh hosting. See [docs/cli.md](cli.md).
+Everything above is also available headless via the `siegu-cli` binary — scanning, model downloads, analysis, and mesh hosting. See [docs/cli.md](cli.md).
 
 ---
 
@@ -159,9 +159,9 @@ Everything above is also available headless via the `siegu` CLI — scanning, mo
 
 | Task | GUI | CLI |
 |------|-----|-----|
-| Scan folders | Settings → Directories → Add | `siegu scan /path/to/photos` |
-| Download models | Settings → Models → Download | `siegu models download` |
-| Analyze photos | Auto after scan (if indexing_mode != manual) | `siegu analyze all` |
+| Scan folders | Settings → Directories → Add | `siegu-cli scan /path/to/photos` |
+| Download models | Settings → Models → Download | `siegu-cli models download` |
+| Analyze photos | Auto after scan (if indexing_mode != manual) | `siegu-cli analyze all` |
 | Search | Search bar (text or semantic) | — |
-| Mesh sync | Connect panel → Host or Join | `siegu mesh host` / `siegu mesh join <room>` |
-| Change config | Settings → Preferences | `siegu config set <key> <val>` |
+| Mesh sync | Connect panel → Host or Join | `siegu-cli mesh host` / `siegu-cli mesh join <room>` |
+| Change config | Settings → Preferences | `siegu-cli config set <key> <val>` |

@@ -3,7 +3,7 @@
 ## The shape of the system
 
 Siegu has **one source of truth and several peers.** `siegu-core` (Rust) owns the
-command contract and every frontend — desktop Tauri, the `siegu web` host, and the
+command contract and every frontend — desktop Tauri, the `siegu-cli web` host, and the
 WebRTC guest — sits above a single clean facade (`rpc::dispatch`). Rust defines
 the contract; TypeScript is generated from it.
 
@@ -90,8 +90,8 @@ command names/casing. Regenerate with `cargo build -p siegu-core`.
 | `rw` guest (WebRTC/mesh, or web without `--owner-mode`) | read + write | no |
 | `ro` guest | read only | no |
 
-- `siegu web --share-mode ro|rw` caps web/WebRTC/mesh guests. Default `ro`.
-- `siegu web --owner-mode` promotes the bearer of the printed `web_token` to
+- `siegu-cli web --share-mode ro|rw` caps web/WebRTC/mesh guests. Default `ro`.
+- `siegu-cli web --owner-mode` promotes the bearer of the printed `web_token` to
   `ShareMode::Owner` at that host and starts the live ML worker. It implies
   `rw`, which then applies only to guests. Without it the web bearer stays
   capped by `--share-mode` and `ml: None`.
@@ -142,7 +142,7 @@ siegu/
 ├── crates/siegu-cli/             # CLI binary (clap)
 │   └── src/
 │       ├── main.rs               # command groups: scan/analyze/mesh/web/...
-│       └── web.rs                # `siegu web` host: static SPA + /rpc → dispatch
+│       └── web.rs                # `siegu-cli web` host: static SPA + /rpc → dispatch
 │
 ├── src-tauri/                    # Tauri desktop/mobile shell
 │   └── src/

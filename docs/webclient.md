@@ -7,7 +7,7 @@ The web client is a standalone, zero-dependency browser app that lets someone vi
 ```
 Host (Tauri app)                    Guest (Browser)
      │                                    │
-     │  1. Host runs `siegu web`          │
+     │  1. Host runs `siegu-cli web`          │
      │     → starts signalling server     │
      │     → starts embedded web server   │
      │     → prints share URL             │
@@ -32,7 +32,7 @@ Host (Tauri app)                    Guest (Browser)
 ### Prerequisites
 
 - Node.js 18+
-- A running Siegu host (Tauri app with `siegu web` active)
+- A running Siegu host (Tauri app with `siegu-cli web` active)
 
 ### Development Server
 
@@ -43,7 +43,7 @@ npm run dev
 # → http://localhost:5173
 ```
 
-The dev server proxies WebSocket connections to the host's signalling server. Open the share URL printed by `siegu web` in your browser.
+The dev server proxies WebSocket connections to the host's signalling server. Open the share URL printed by `siegu-cli web` in your browser.
 
 ### Build for Production
 
@@ -53,7 +53,7 @@ npm run build
 # → dist/
 ```
 
-The `dist/` folder is served by the host's embedded web server when running `siegu web`.
+The `dist/` folder is served by the host's embedded web server when running `siegu-cli web`.
 
 ## Docker (Quick Test)
 

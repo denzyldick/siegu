@@ -10,7 +10,7 @@ the workflow it imposes. Then follow the setup, conventions, and PR process belo
 
 Siegu's frontends are peers, and **none of them own the command contract**.
 The Rust core (`siegu-core`) defines every command the app can run, and every
-platform frontend — desktop Tauri, the `siegu web` host, and the WebRTC guest —
+platform frontend — desktop Tauri, the `siegu-cli web` host, and the WebRTC guest —
 talks to **one** clean facade: `crates/siegu-core/src/rpc.rs::dispatch`.
 
 ```
@@ -49,7 +49,7 @@ Every command belongs to one of three tiers (see `Tier` in `rpc_catalog.rs`):
 **Owner** is the trust boundary. Only owner-tier commands run ML analysis,
 indexing, and device sync. A WebRTC guest (code + token on `siegu.io` or a
 remote signaler) is **capped at `write`** and can never become owner, no matter
-what it sends. `siegu web` opens ML to the web bearer only when launched with
+what it sends. `siegu-cli web` opens ML to the web bearer only when launched with
 `--owner-mode`; without it the bearer is capped at `--share-mode` (`ro`/`rw`).
 
 See [docs/architecture.md](docs/architecture.md#rpc-facade) for the detail.
@@ -133,7 +133,7 @@ npm run typecheck && npm run test  # frontend types + vitest
 npm run check:translations        # locale completeness
 ```
 
-Full E2E guidance is in [docs/e2e.md](docs/e2e.md): desktop Tauri, the `siegu web`
+Full E2E guidance is in [docs/e2e.md](docs/e2e.md): desktop Tauri, the `siegu-cli web`
 host (`--owner-mode` for ML parity), and the WebRTC guest round-trip.
 
 ---
@@ -146,7 +146,7 @@ host (`--owner-mode` for ML parity), and the WebRTC guest round-trip.
 | RPC facade (`dispatch`) | `crates/siegu-core/src/rpc.rs` |
 | Generated TS contract (committed) | `shared/generated/rpc-commands.ts` |
 | Shared RPC/desktop business logic | `crates/siegu-core/src/library.rs`, `ml_commands.rs` |
-| Capability + auth | `ShareMode` / `Tier`; `siegu web --share-mode`, `--owner-mode` |
+| Capability + auth | `ShareMode` / `Tier`; `siegu-cli web --share-mode`, `--owner-mode` |
 | Frontend  Backend seam | `src/services/backend/{interface,tauriBackend,webHostBackend,guest}.ts` |
 | Tauri command wrappers | `src-tauri/src/commands/*.rs` |
 | Web host server | `crates/siegu-cli/src/web.rs` |

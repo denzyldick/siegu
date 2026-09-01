@@ -2,11 +2,11 @@
 
 ## Purpose
 
-One `siegu` binary / one Vue build serves the UI in three runtime modes:
+One `siegu-cli`/desktop binary / one Vue build serves the UI in three runtime modes:
 
 - **`desktop`** — the native Tauri app (unchanged, existing behavior).
 - **`webHost` (Mode A)** — the browser is the **owner** of a library mounted on a
-  VPS / `siegu web` instance (e.g. `docker compose` with `/data` mounted). Full
+  VPS / `siegu-cli web` instance (e.g. `docker compose` with `/data` mounted). Full
   GUI over HTTP; no pairing.
 - **`guest` (Mode B)** — a browser on another device **pairs by code + token** with
   a remote or desktop Siegu over an Internet `wss://` signaler, and **streams
@@ -28,7 +28,7 @@ needs a browser-native pairing mechanism, which this plan provides.
 
 ## Current state (facts from a code pass)
 
-- `siegu web` today is already a **pairing host**: it embeds a loopback signaling
+- `siegu-cli web` today is already a **pairing host**: it embeds a loopback signaling
   server, creates a room `code`, and prints `http://HOST:PORT/#code.token`
   (`crates/siegu-cli/src/web.rs`). It serves the **desktop-only** Vue bundle.
 - The `#19` Backend seam exists but is **unused by stores/components**:
@@ -67,7 +67,7 @@ The browser in Mode A is the **owner** of its local library; it should not pair
 with itself over WebRTC.
 
 - **Option 1 — WebHost over HTTP/RPC (RECOMMENDED).** New Rust HTTP-RPC routes on
-  `siegu web` mirroring `rpc::dispatch` (`crates/siegu-core/src/rpc.rs:161-261`),
+  `siegu-cli web` mirroring `rpc::dispatch` (`crates/siegu-core/src/rpc.rs:161-261`),
   plus HTTP media routes; new `webHostBackend.ts` `fetch`-based impl in the `#19`
   seam. Honors `--share-mode ro/rw`. Reuses tested RPC.
 - **Option 2 — Reuse pairing/RPC internally.** Auto-pair browser with its own
@@ -121,7 +121,7 @@ working today.
 - Session auth + `/session` self-probe as webHost detection + auth handshake.
 
 ### Phase 4 — Mode B multi-tenant signalling
-- `siegu web --server <wss://signal>` + desktop "Share" → hosted signaler;
+- `siegu-cli web --server <wss://signal>` + desktop "Share" → hosted signaler;
   browser `getConfiguredSignalingUrl()`.
 - Shared / album-scoped sharing so a guest only streams what's shared
   (`mesh.rs:1567-1596` album scope exists).

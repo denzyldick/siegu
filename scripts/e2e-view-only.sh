@@ -16,7 +16,7 @@ set -euo pipefail
 #   scripts/e2e-view-only.sh
 #
 # Env:
-#   SIEGU_BIN          path to the siegu CLI binary (default: target/release/siegu)
+#   SIEGU_BIN          path to the siegu CLI binary (default: target/release/siegu-cli)
 #   SIEGU_E2E_PHOTOS   directory of media to host (default: tests/fixtures/faces)
 #
 # Unlike e2e-sync.sh this always uses the host's in-process signaling server;
@@ -26,7 +26,7 @@ set -euo pipefail
 # windows.yml.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BIN="${SIEGU_BIN:-$REPO_ROOT/target/release/siegu}"
+BIN="${SIEGU_BIN:-$REPO_ROOT/target/release/siegu-cli}"
 PHOTOS="${SIEGU_E2E_PHOTOS:-$REPO_ROOT/tests/fixtures/faces}"
 
 if [ ! -x "$BIN" ] && [ ! -x "${BIN}.exe" ]; then

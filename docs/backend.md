@@ -2,7 +2,7 @@
 
 The "backend" in Siegu is **one Rust facade** — `crates/siegu-core/src/rpc.rs::dispatch`
 — plus thin transport adapters for each platform. Every frontend (desktop Tauri,
-the `siegu web` host, the WebRTC guest) reaches the same code, so behavior (and
+the `siegu-cli web` host, the WebRTC guest) reaches the same code, so behavior (and
 authorization) is identical everywhere.
 
 ## The facade: `dispatch`
@@ -39,7 +39,7 @@ on mode.
 | Principal | `ShareMode` | Effect |
 |-----------|-------------|--------|
 | Desktop user | `Owner` | everything, incl. ML |
-| `siegu web` bearer with `--owner-mode` | `Owner` | everything incl. ML (live worker started) |
+| `siegu-cli web` bearer with `--owner-mode` | `Owner` | everything incl. ML (live worker started) |
 | web / WebRTC bearer (default) | `ro` / `rw` from `--share-mode` | read, or read+write; never ML |
 | guest (code+token) | capped at `rw` | read+write; never `Owner`, never ML |
 

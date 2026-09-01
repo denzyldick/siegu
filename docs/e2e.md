@@ -6,7 +6,7 @@ processes over real WebRTC/mesh transport, and a manual web-host flow that
 verifies the browser data plane (including `--owner-mode` ML parity).
 
 Everything below assumes you built the CLI: `cargo build --release -p siegu-cli`
-(or use `target/debug/siegu` for faster iteration).
+(or use `target/debug/siegu-cli` for faster iteration).
 
 ---
 
@@ -38,16 +38,16 @@ still compiles standalone: `cargo check -p siegu --manifest-path src-tauri/Cargo
 
 ## 2. CLI "contract" level (no UI, no browser)
 
-The `siegu web` / `siegu mesh` commands exercise the **same `dispatch` facade**
+The `siegu-cli web` / `siegu-cli mesh` commands exercise the **same `dispatch` facade**
 the frontends use. Verify your flags and share-mode mapping:
 
 ```bash
 # web host command surface + help
-./target/debug/siegu web --help
+./target/debug/siegu-cli web --help
 
 # quick RPC sanity against a tiny library
-./target/debug/siegu --config-dir /tmp/demo scan tests/fixtures
-./target/debug/siegu --config-dir /tmp/demo web --port 8788 --share-mode rw &
+./target/debug/siegu-cli --config-dir /tmp/demo scan tests/fixtures
+./target/debug/siegu-cli --config-dir /tmp/demo web --port 8788 --share-mode rw &
 ```
 
 ---
@@ -97,13 +97,13 @@ opt-in ML parity:
 bun install && bun run build
 
 # 2. Serve a scanned library from the web host, default (no ML, ro)
-./target/debug/siegu web --port 8788 --config /tmp/demo --share-mode rw
+./target/debug/siegu-cli web --port 8788 --config /tmp/demo --share-mode rw
 
 # 3. Open http://localhost:8787 and browse/search — the browser drives /rpc.
 #    (The SPA talks to the host over HTTP via src/services/backend/webHostBackend.ts.)
 
 # 4. ML parity: relaunch with the owner flag
-./target/debug/siegu web --port 8788 --config /tmp/demo --owner-mode
+./target/debug/siegu-cli web --port 8788 --config /tmp/demo --owner-mode
 #    Now the bearer of the printed `web_token` at this host's /rpc is Owner:
 #    analyze_photo / index_faces / analyze_model become available, the live ML
 #    worker runs, and --share-mode still caps any WebRTC/mesh guests.

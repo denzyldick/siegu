@@ -45,16 +45,16 @@ Override with `--config-dir` flag on CLI commands.
 
 ```bash
 # View all config
-siegu config get
+siegu-cli config get
 
 # Get a specific key
-siegu config get-key theme
+siegu-cli config get-key theme
 
 # Set a value
-siegu config set theme dark
+siegu-cli config set theme dark
 
 # List all valid keys
-siegu config keys
+siegu-cli config keys
 ```
 
 Config key validation: keys are whitelisted, values have type/range checking. Invalid values are rejected with a descriptive error.
