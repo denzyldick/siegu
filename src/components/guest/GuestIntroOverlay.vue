@@ -25,7 +25,18 @@ watch(
   <div :class="['guest-intro', { 'guest-intro--revealed': revealed }]">
     <div class="guest-intro__blur" aria-hidden="true"></div>
     <div class="guest-intro__card" :class="{ 'guest-intro__card--gone': revealed }">
-      <img src="/og-logo.png" alt="siegu" class="guest-intro__logo" />
+      <svg class="guest-intro__logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="2" y="2" width="20" height="20" rx="5" fill="rgb(var(--v-theme-primary))" />
+        <circle cx="9" cy="9.5" r="2.2" fill="rgb(var(--v-theme-on-primary))" />
+        <path
+          d="M4.5 18.5 10 12l3.2 3.4 2.3-2.3 4 4.9"
+          stroke="rgb(var(--v-theme-on-primary))"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          fill="none"
+        />
+      </svg>
       <h2 class="guest-intro__title">{{ t('guest.intro_title') }}</h2>
       <p class="guest-intro__desc">{{ t('guest.intro_desc') }}</p>
 

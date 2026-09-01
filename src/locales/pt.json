@@ -10,6 +10,27 @@
     "devices": "Dispositivos",
     "settings": "Configuracoes"
   },
+
+  "guest": {
+    "intro_title": "Someone shared a collection with you",
+    "intro_desc": "You're viewing this collection over a live, private WebRTC link. Nothing is downloaded — media streams from the owner's device and is cleared when the session ends.",
+    "intro_learn_more": "Learn more on",
+    "intro_go_watch": "Go watch",
+    "intro_note": "By continuing you agree this content stays between you and the owner.",
+    "upsell_title": "Siegu, your private photo library",
+    "upsell_desc": "You're browsing a collection shared by a Siegu owner through a live, private link. Nothing you see is downloaded — media streams straight from their device.",
+    "upsell_feature_1": "All your photos and videos, on every device",
+    "upsell_feature_2": "Private by design — no photos stored on any server",
+    "upsell_feature_3": "Built-in sharing and collections, free on your network",
+    "upsell_cta": "Get the Siegu app",
+    "upsell_external": "Sharing with anyone, anywhere",
+    "upsell_external_desc": "siegu.io hosted links let you share outside your network.",
+    "upsell_close": "Back to viewing",
+    "share_ended": "This shared collection session has ended.",
+    "connecting": "Connecting to the owner's device…",
+    "connected": "Connected — streamed live from the owner",
+    "error": "Couldn't connect to this shared collection."
+  },
   "onboarding": {
     "add_media_title": "Adicionar suas mídias",
     "add_media_desc": "Selecione as pastas onde você mantém suas fotos e vídeos.",

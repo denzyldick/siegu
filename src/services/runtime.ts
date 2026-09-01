@@ -82,12 +82,16 @@ export async function detectMode(): Promise<DetectedMode> {
   if (isTauri) {
     return { mode: 'tauri' };
   }
-  if (await isWebHost()) {
-    return { mode: 'webHost', webHostToken: webHostToken() };
-  }
+  // A `#CODE.TOKEN` fragment is unambiguously a shared-collection guest link.
+  // Check it BEFORE the webHost probe so the same web build served by `siegu
+  // web` (which also answers `/session`) still boots as a guest when a share
+  // link is present, rather than being hijacked into webHost/owner mode.
   const session = guestSessionFromHash();
   if (session) {
     return { mode: 'guest', session };
+  }
+  if (await isWebHost()) {
+    return { mode: 'webHost', webHostToken: webHostToken() };
   }
   return { mode: 'onboarding' };
 }

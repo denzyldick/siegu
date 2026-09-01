@@ -14,7 +14,18 @@ function backToLibrary(): void {
 <template>
   <div class="guest-upsell">
     <div class="guest-upsell__inner">
-      <img src="/og-logo.png" alt="siegu" class="guest-upsell__logo" />
+      <svg class="guest-upsell__logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="2" y="2" width="20" height="20" rx="5" fill="rgb(var(--v-theme-primary))" />
+        <circle cx="9" cy="9.5" r="2.2" fill="rgb(var(--v-theme-on-primary))" />
+        <path
+          d="M4.5 18.5 10 12l3.2 3.4 2.3-2.3 4 4.9"
+          stroke="rgb(var(--v-theme-on-primary))"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          fill="none"
+        />
+      </svg>
       <h1 class="guest-upsell__title">{{ t('guest.upsell_title') }}</h1>
       <p class="guest-upsell__desc">{{ t('guest.upsell_desc') }}</p>
 

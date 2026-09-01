@@ -370,7 +370,9 @@
                 <v-list-item-title>{{ $t('albums.edit_rules') }}</v-list-item-title>
               </v-list-item>
               <v-list-item
-                v-if="currentSectionItem?.album?.kind === 'manual'"
+                v-if="
+                  ['manual', 'smart', 'trip'].includes(currentSectionItem?.album?.kind as string)
+                "
                 @click="shareAlbum"
                 prepend-icon="mdi-share-variant-outline"
               >
@@ -628,180 +630,177 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="shareDialog" max-width="520">
-      <v-card class="rounded-xl pa-6" color="surface">
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          size="small"
-          class="position-absolute"
-          style="top: 12px; right: 12px"
-          @click="shareDialog = false"
-        ></v-btn>
-        <div class="d-flex align-center mb-4">
-          <v-avatar color="surface" size="40" class="mr-3">
-            <v-icon color="primary" size="20">mdi-link</v-icon>
-          </v-avatar>
-          <div>
-            <h3 class="text-h6 font-weight-bold text-high-emphasis">
-              {{ $t('albums.share_album') }}
-            </h3>
-            <p class="text-caption text-disabled mb-0">{{ $t('albums.share_album_subtitle') }}</p>
-          </div>
-        </div>
-
-        <v-alert
-          type="info"
-          variant="tonal"
-          color="primary"
-          border="start"
-          class="mb-4"
-          rounded="lg"
-        >
-          <div class="text-body-2 text-high-emphasis">
-            {{ $t('albums.share_requires_signalling') }}
-          </div>
-        </v-alert>
-
-        <v-alert type="info" variant="tonal" color="info" border="start" rounded="lg" class="mb-4">
-          <div class="d-flex align-center">
-            <v-icon size="18" class="mr-2">mdi-account-network-outline</v-icon>
+    <v-dialog v-model="shareDialog" max-width="460" content-class="share-dialog">
+      <v-card class="rounded-xl" color="surface">
+        <v-card-text class="pa-6">
+          <div class="d-flex align-center mb-4">
+            <v-avatar color="primary" variant="flat" size="44" class="mr-3 rounded-xl">
+              <v-icon color="on-primary" size="22">mdi-share-variant-outline</v-icon>
+            </v-avatar>
             <div>
-              <div class="text-body-2 text-high-emphasis font-weight-bold">
-                {{ $t('albums.share_upsell_title') }}
-              </div>
-              <div class="text-body-2 text-medium-emphasis">
-                {{ $t('albums.share_upsell_desc') }}
-              </div>
+              <h3 class="text-h6 font-weight-bold text-high-emphasis lh-sm">
+                {{ $t('albums.share_album') }}
+              </h3>
+              <p class="text-body-2 text-medium-emphasis mb-0">
+                {{ $t('albums.share_album_desc') }}
+              </p>
+            </div>
+          </div>
+
+          <template v-if="shareLoading">
+            <div class="d-flex flex-column align-center text-medium-emphasis py-8">
+              <v-progress-circular size="32" indeterminate class="mb-4" />
+              <span class="text-body-2">{{ $t('albums.share_creating') }}</span>
+            </div>
+          </template>
+
+          <template v-else-if="shareUrl">
+            <div class="d-flex align-center mb-3">
+              <v-chip
+                size="small"
+                class="mr-2"
+                color="success"
+                variant="tonal"
+                density="comfortable"
+              >
+                <v-icon start size="16">mdi-check-circle-outline</v-icon>
+                {{
+                  shareMode === 'one_time'
+                    ? $t('albums.share_one_time_mode')
+                    : $t('albums.share_timed_mode')
+                }}
+                <template v-if="shareMode !== 'one_time'">
+                  · {{ $t('albums.share_minutes', { minutes: shareDuration }) }}
+                </template>
+              </v-chip>
+              <v-spacer></v-spacer>
               <v-btn
                 variant="text"
-                color="primary"
                 size="small"
-                class="mt-2 px-0"
-                :href="APP_CONNECT_URL"
-                target="_blank"
-                rel="noopener"
+                color="error"
+                class="text-none"
+                @click="stopSharing"
               >
-                {{ $t('albums.share_upsell_cta') }}
-                <v-icon end size="14">mdi-open-in-new</v-icon>
+                {{ $t('albums.stop_sharing') }}
               </v-btn>
             </div>
-          </div>
-        </v-alert>
 
-        <v-alert type="info" variant="outlined" border="start" class="mb-4" rounded="lg">
-          <div class="text-body-2 text-high-emphasis font-weight-bold mb-1">
-            {{ $t('albums.share_how_it_works') }}
-          </div>
-          <div class="text-body-2 text-medium-emphasis">
-            {{ $t('albums.share_how_it_desc') }}
-          </div>
-        </v-alert>
+            <v-text-field
+              :model-value="shareUrl"
+              :label="$t('albums.share_link')"
+              variant="outlined"
+              density="comfortable"
+              readonly
+              :append-inner-icon="'mdi-content-copy'"
+              :hint="
+                shareMode === 'one_time'
+                  ? $t('albums.share_one_time_hint')
+                  : $t('albums.share_timed_hint', { minutes: shareDuration })
+              "
+              persistent-hint
+              @click:append-inner="copyShareLink"
+              @click:control="selectShareLink"
+            ></v-text-field>
 
-        <v-divider class="my-1"></v-divider>
-
-        <template v-if="shareLoading">
-          <div class="d-flex align-center text-medium-emphasis pa-2">
-            <v-progress-circular size="18" indeterminate class="mr-3" />
-            <span class="text-body-2">{{ $t('albums.share_creating') }}</span>
-          </div>
-        </template>
-
-        <template v-else-if="shareUrl">
-          <v-text-field
-            :model-value="shareUrl"
-            :label="$t('albums.share_link')"
-            variant="outlined"
-            density="comfortable"
-            readonly
-            class="mb-1"
-            :prepend-inner-icon="'mdi-link-variant'"
-          ></v-text-field>
-          <div class="text-caption text-medium-emphasis mb-3">
-            {{
-              shareMode === 'one_time'
-                ? $t('albums.share_one_time_hint')
-                : $t('albums.share_timed_hint', { minutes: shareDuration })
-            }}
-          </div>
-          <v-alert type="warning" variant="tonal" border="start" rounded="lg" class="mb-3">
-            <div class="text-body-2 text-medium-emphasis">
-              {{ $t('albums.share_guests_same_network') }}
-            </div>
-          </v-alert>
-          <div class="d-flex ga-2 align-center">
             <v-btn
-              size="small"
               variant="flat"
               color="primary"
-              class="px-4 text-none"
-              :prepend-icon="'mdi-content-copy'"
-              @click="copyShareLink"
-            >
-              {{ $t('albums.copy_link') }}
-            </v-btn>
-            <v-btn
-              size="small"
-              variant="flat"
-              color="primary"
-              class="px-4 text-none"
+              class="text-none w-100 mt-1"
               :prepend-icon="'mdi-open-in-new'"
               @click="openShareLink"
             >
               {{ $t('albums.open_link') }}
             </v-btn>
-            <v-spacer></v-spacer>
-            <v-btn size="small" variant="text" color="error" class="text-none" @click="stopSharing">
-              {{ $t('albums.stop_sharing') }}
-            </v-btn>
-          </div>
-        </template>
+          </template>
 
-        <template v-else>
-          <div class="mt-3 mb-1">
-            <div class="text-body-2 font-weight-bold mb-1">{{ $t('albums.share_mode') }}</div>
-            <v-btn-toggle v-model="shareMode" variant="outlined" density="comfortable" divided>
-              <v-btn value="timed" class="text-none">
+          <template v-else>
+            <div class="text-body-2 font-weight-bold text-high-emphasis mb-2">
+              {{ $t('albums.share_mode') }}
+            </div>
+            <v-btn-toggle
+              v-model="shareMode"
+              variant="outlined"
+              color="primary"
+              density="comfortable"
+              divided
+              class="mb-3 w-100"
+            >
+              <v-btn value="timed" class="text-none flex-grow-1">
+                <v-icon start size="18">mdi-timer-outline</v-icon>
                 {{ $t('albums.share_timed_mode') }}
               </v-btn>
-              <v-btn value="one_time" class="text-none">
+              <v-btn value="one_time" class="text-none flex-grow-1">
+                <v-icon start size="18">mdi-account-off-outline</v-icon>
                 {{ $t('albums.share_one_time_mode') }}
               </v-btn>
             </v-btn-toggle>
-          </div>
 
-          <div v-if="shareMode === 'timed'" class="mb-2">
-            <div class="text-body-2 font-weight-bold mb-1">{{ $t('albums.share_duration') }}</div>
-            <v-btn-toggle v-model="shareDuration" variant="outlined" density="comfortable" divided>
-              <v-btn v-for="m in [15, 30, 45]" :key="m" :value="m" class="text-none">
-                {{ $t('albums.share_minutes', { minutes: m }) }}
-              </v-btn>
-            </v-btn-toggle>
-          </div>
+            <transition name="share-fade">
+              <div v-if="shareMode === 'timed'" class="mb-3">
+                <div class="text-body-2 font-weight-bold text-high-emphasis mb-2">
+                  {{ $t('albums.share_duration') }}
+                </div>
+                <div class="d-flex ga-2">
+                  <v-btn
+                    v-for="m in [15, 30, 45]"
+                    :key="m"
+                    :variant="shareDuration === m ? 'flat' : 'tonal'"
+                    :color="shareDuration === m ? 'primary' : 'default'"
+                    class="text-none flex-grow-1"
+                    @click="shareDuration = m"
+                  >
+                    {{ $t('albums.share_minutes', { minutes: m }) }}
+                  </v-btn>
+                </div>
+              </div>
+            </transition>
 
-          <v-alert type="warning" variant="tonal" border="start" rounded="lg" class="my-2">
-            <div class="text-body-2 text-medium-emphasis">
-              {{ $t('albums.share_laptop_off_warning') }}
-            </div>
-          </v-alert>
-
-          <div class="d-flex justify-end mt-3">
-            <v-btn
-              variant="flat"
-              color="primary"
-              class="text-none"
-              :loading="shareLoading"
-              :prepend-icon="'mdi-link-plus'"
-              @click="createShare"
+            <v-alert
+              type="info"
+              variant="tonal"
+              color="info"
+              density="compact"
+              rounded="lg"
+              class="mb-3"
             >
-              {{ $t('albums.create_share_link') }}
-            </v-btn>
-          </div>
-        </template>
+              <div class="d-flex align-center">
+                <v-icon size="18" class="mr-2 mt-n1">mdi-wifi-check</v-icon>
+                <div class="flex-grow-1">
+                  <div class="text-body-2 text-high-emphasis">
+                    {{ $t('albums.share_guests_same_network') }}
+                  </div>
+                  <div class="text-caption text-medium-emphasis mt-1">
+                    {{ $t('albums.share_laptop_off_warning') }}
+                  </div>
+                </div>
+              </div>
+            </v-alert>
 
-        <div class="d-flex justify-end mt-4">
-          <v-btn variant="text" @click="shareDialog = false">{{ $t('common.close') }}</v-btn>
-        </div>
+            <div class="d-flex align-center justify-space-between">
+              <div class="text-caption text-medium-emphasis d-flex align-center">
+                <span class="mr-1">{{ $t('albums.share_requires_signalling') }}</span>
+                <a
+                  :href="APP_CONNECT_URL"
+                  target="_blank"
+                  rel="noopener"
+                  class="text-primary text-decoration-none"
+                >
+                  {{ $t('albums.share_upsell_cta') }}
+                </a>
+              </div>
+              <v-btn
+                variant="flat"
+                color="primary"
+                class="text-none"
+                :loading="shareLoading"
+                :prepend-icon="'mdi-link-plus'"
+                @click="createShare"
+              >
+                {{ $t('albums.create_share_link') }}
+              </v-btn>
+            </div>
+          </template>
+        </v-card-text>
       </v-card>
     </v-dialog>
 
@@ -1565,6 +1564,14 @@ async function copyShareLink(): Promise<void> {
   }
 }
 
+function selectShareLink(event: MouseEvent): void {
+  const input = (event.currentTarget as HTMLElement | null)?.querySelector('input');
+  if (input) {
+    input.select();
+    input.setSelectionRange(0, input.value.length);
+  }
+}
+
 function openShareLink(): void {
   if (shareUrl.value) window.open(shareUrl.value, '_blank', 'noopener');
 }
@@ -1850,5 +1857,20 @@ onUnmounted(() => {
 
 .bulk-toolbar {
   pointer-events: auto;
+}
+
+.share-fade-enter-active,
+.share-fade-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+.share-fade-enter-from {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+.share-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 </style>

@@ -610,17 +610,18 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
     Ok(())
 }
 
-/// Resolve the web client bundle location: `$SIEGU_WEB_DIST`, `./webclient/dist`,
-/// or the workspace-relative path when running inside the repo.
+/// Resolve the web client bundle location: `$SIEGU_WEB_DIST`, `./dist`,
+/// or the workspace-relative path when running inside the repo. This serves the
+/// SAME build as the app's own UI so `siegu web` shows the full Siegu web app.
 fn web_dist_dir() -> PathBuf {
     if let Ok(dir) = std::env::var("SIEGU_WEB_DIST") {
         return PathBuf::from(dir);
     }
-    let local = PathBuf::from("webclient/dist");
+    let local = PathBuf::from("dist");
     if local.join("index.html").exists() {
         return local;
     }
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../webclient/dist")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../dist")
 }
 
 #[cfg(test)]

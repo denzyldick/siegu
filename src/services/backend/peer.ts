@@ -165,7 +165,16 @@ export function createPeerTransport(
       pc.ondatachannel = (ev) => {
         dc = ev.channel;
         dc.binaryType = 'arraybuffer';
-        dc.onopen = () => emitOpen();
+        dc.onopen = () => {
+          emitOpen();
+          // Scope the guest to a single shared collection when the link carries
+          // an album id; otherwise drop into view-only whole-library mode.
+          if (session.albumId) {
+            transport.send({ type: 'EnterAlbumShare', album_id: session.albumId });
+          } else {
+            transport.send({ type: 'EnterViewOnly' });
+          }
+        };
         dc.onmessage = (me) => {
           const text =
             typeof me.data === 'string' ? me.data : decoder.decode(me.data as ArrayBuffer);

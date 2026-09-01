@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, computed, ref } from 'vue';
+import { onMounted, computed, ref, watch } from 'vue';
 import { listen } from '@tauri-apps/api/event';
 import { useI18n } from 'vue-i18n';
 import { useAppStore } from '@/stores/app';
@@ -19,6 +19,8 @@ import CollectionsView from '@/components/CollectionsView.vue';
 import MapView from '@/components/MapView.vue';
 import DeviceList from '@/components/DeviceList.vue';
 import SettingsView from '@/components/SettingsView.vue';
+import GuestIntroOverlay from '@/components/guest/GuestIntroOverlay.vue';
+import GuestUpsellView from '@/components/guest/GuestUpsellView.vue';
 import GuidedTour from '@/components/GuidedTour.vue';
 import ErrorBoundary from '@/components/shared/ErrorBoundary.vue';
 import PersonMatchControls from '@/components/search/PersonMatchControls.vue';
@@ -52,6 +54,15 @@ const mediaFilters = computed(() => ({
 }));
 
 const runtimeStore = useRuntimeStore();
+import { useGuestSession } from '@/composables/useGuestSession';
+const guest = useGuestSession();
+const guestEnded = ref(false);
+watch(
+  () => guest.ended.value,
+  (v) => {
+    if (v) guestEnded.value = true;
+  },
+);
 
 const openedFile = ref<string | null>(null);
 const fileSnackbar = ref(false);
@@ -181,15 +192,17 @@ function removeFilterChip(index: number): void {
     </template>
 
     <template v-else>
-      <ScanExperience />
+      <ScanExperience v-if="!runtimeStore.isGuest" />
 
-      <AppToolbar v-if="currentPage === 'home'" />
+      <AppToolbar v-if="currentPage === 'home' && !runtimeStore.isGuest" />
 
       <v-main>
         <ErrorBoundary :key="currentPage">
           <div data-tour="photos" class="w-100">
             <div
-              v-if="currentPage === 'home' && searchStore.activeFilters.length"
+              v-if="
+                !runtimeStore.isGuest && currentPage === 'home' && searchStore.activeFilters.length
+              "
               class="d-flex align-center flex-wrap px-4 pt-2 ga-2"
               style="max-width: 980px; margin: 0 auto"
             >
@@ -225,22 +238,23 @@ function removeFilterChip(index: number): void {
               @search-person="handleSearchPerson"
             />
           </div>
-          <CollectionsView v-if="currentPage === 'collections'" />
-          <MapView v-if="currentPage === 'location'" />
-          <DeviceList v-if="currentPage === 'devices'" />
+          <CollectionsView v-if="currentPage === 'collections' && !runtimeStore.isGuest" />
+          <MapView v-if="currentPage === 'location' && !runtimeStore.isGuest" />
+          <DeviceList v-if="currentPage === 'devices' && !runtimeStore.isGuest" />
+          <GuestUpsellView v-if="runtimeStore.isGuest && currentPage === 'settings'" />
           <SettingsView
-            v-if="currentPage === 'settings'"
+            v-else-if="currentPage === 'settings' && !runtimeStore.isGuest"
             @done="uiStore.setPage('home')"
             @start-tour="appStore.startSettingsTour()"
           />
         </ErrorBoundary>
       </v-main>
 
-      <ProgressBanner />
+      <ProgressBanner v-if="!runtimeStore.isGuest" />
       <AppDock />
     </template>
 
-    <SyncStatusBanner />
+    <SyncStatusBanner v-if="!runtimeStore.isGuest" />
     <v-snackbar v-model="fileSnackbar" timeout="5000" color="surface" location="bottom">
       <div class="d-flex align-center ga-2">
         <v-icon color="primary" size="20">mdi-file-image-outline</v-icon>
@@ -251,12 +265,24 @@ function removeFilterChip(index: number): void {
         </span>
       </div>
     </v-snackbar>
+    <v-snackbar v-model="guestEnded" timeout="5000" color="surface" location="bottom">
+      <div class="d-flex align-center ga-2">
+        <v-icon color="error" size="20">mdi-close-circle-outline</v-icon>
+        <span>{{ t('guest.share_ended') }}</span>
+      </div>
+    </v-snackbar>
+    <GuestIntroOverlay
+      v-if="runtimeStore.isGuest && !guest.ended.value"
+      :force-close="guest.ended.value"
+    />
     <GuidedTour
+      v-if="!runtimeStore.isGuest"
       :active="appStore.showTour && !scanStore.showFullScreen"
       @finish="appStore.dismissTour()"
       @skip="appStore.dismissTour()"
     />
     <GuidedTour
+      v-if="!runtimeStore.isGuest"
       :active="appStore.settingsShowTour && !scanStore.showFullScreen"
       :steps="settingsTourSteps"
       @finish="appStore.dismissSettingsTour()"

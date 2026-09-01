@@ -3,14 +3,16 @@ import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useUiStore } from '@/stores/ui';
 import { useScanStore } from '@/stores/scan';
+import { useRuntimeStore } from '@/stores/runtime';
 import { normalizeIndexingCount, formatEta } from '@/composables/useMediaUtils';
 import logo from '@/assets/logo.png';
 
 const { t } = useI18n();
 const uiStore = useUiStore();
 const scanStore = useScanStore();
+const runtimeStore = useRuntimeStore();
 
-const navItems = [
+const allNavItems = [
   {
     page: 'home' as const,
     icon: null,
@@ -47,6 +49,15 @@ const navItems = [
     label: 'dock.settings' as const,
   },
 ];
+
+const GUEST_PAGES: Array<(typeof allNavItems)[number]['page']> = ['home', 'settings'];
+
+const navItems = computed(() => {
+  if (runtimeStore.isGuest) {
+    return allNavItems.filter((item) => GUEST_PAGES.includes(item.page));
+  }
+  return allNavItems;
+});
 
 const isIndexing = computed(() => scanStore.isActive);
 const jobsLeft = computed(() => normalizeIndexingCount(scanStore.indexingCount));

@@ -367,10 +367,12 @@ pub struct AlbumShareInfo {
     pub duration_min: u32,
 }
 
-/// Locate the view-only webclient bundle (`index.html` + `assets/`) that is
-/// served to browser guests on the share URL. Resolution: `SIEGU_WEB_DIST`
-/// (packaged deployment), `./webclient/dist` (crate cwd), then the workspace
-/// path relative to `src-tauri`. Returns `None` when no bundle is present.
+/// Locate the web client bundle (`index.html` + `assets/`) served to browser
+/// guests on the share URL. The SAME build as the app's own UI is used so a
+/// shared collection opens inside the full Siegu web app (scoped, with the
+/// upsell moment) rather than a separate minimal view. Resolution:
+/// `SIEGU_WEB_DIST` (packaged deployment), `./dist` (crate cwd), then the
+/// workspace path relative to `src-tauri`. Returns `None` when no bundle.
 fn webclient_dist_dir() -> Option<std::path::PathBuf> {
     if let Ok(dir) = std::env::var("SIEGU_WEB_DIST") {
         let p = std::path::PathBuf::from(dir);
@@ -378,11 +380,11 @@ fn webclient_dist_dir() -> Option<std::path::PathBuf> {
             return Some(p);
         }
     }
-    let local = std::path::PathBuf::from("webclient/dist");
+    let local = std::path::PathBuf::from("dist");
     if local.join("index.html").exists() {
         return Some(local);
     }
-    let rel = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../webclient/dist");
+    let rel = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../dist");
     if rel.join("index.html").exists() {
         return Some(rel);
     }
@@ -524,8 +526,11 @@ pub async fn start_album_share(
             }
         }
 
+        // The embedded signaler enforces `token`, so the in-mesh initiator URL
+        // must carry it too (`extract_token` picks it from the query); the guest
+        // origin stays clean — guests present their code+token via the hash.
         (
-            format!("ws://{lan_ip}:{port}"),
+            format!("ws://{lan_ip}:{port}?token={own_token}"),
             format!("http://{lan_ip}:{port}"),
             own_token.clone(),
             port,

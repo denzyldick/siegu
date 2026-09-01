@@ -12,7 +12,8 @@
 export type GuestOutbound =
   | { type: 'CommandRequest'; id: number; name: string; payload: Record<string, unknown> }
   | { type: 'FetchMediaRequest'; id: number | string; thumbnail: boolean }
-  | { type: 'EnterViewOnly' };
+  | { type: 'EnterViewOnly' }
+  | { type: 'EnterAlbumShare'; album_id: string };
 
 /** What the host sends back over the data channel. */
 export type GuestInbound =
@@ -31,20 +32,35 @@ export type GuestInbound =
 // is intentionally no catch-all union member so TypeScript can narrow the
 // known shapes above.
 
-/** Parse "#CODE.TOKEN[.ALBUM_ID]" from the URL fragment (as in webclient/lib.ts). */
+/** Parse "#CODE.TOKEN[.ALBUM_ID][.MIN|.once]" from the URL fragment. */
 export interface GuestSession {
   code: string;
   token: string;
   albumId?: string;
+  /** Present when the link carries a `.MIN` duration flag. */
+  minutes?: number;
+  /** Present when the link carries a `.once` (one-time view) flag. */
+  oneTime?: boolean;
 }
 
 export function parseHash(hash: string): GuestSession | null {
   const raw = decodeURIComponent(hash.replace(/^#/, ''));
   const parts = raw.split('.');
   if (parts.length < 2) return null;
-  const [code, token, albumId] = parts;
+  const [code, token, albumId, flag] = parts;
   if (!code || !token || code.includes('/') || token.includes('/')) return null;
-  return { code, token, albumId: albumId || undefined };
+  const result: GuestSession = {
+    code,
+    token,
+    albumId: albumId || undefined,
+  };
+  if (flag && /^\d+$/.test(flag)) {
+    const mins = parseInt(flag, 10);
+    if (mins > 0) result.minutes = mins;
+  } else if (flag === 'once') {
+    result.oneTime = true;
+  }
+  return result;
 }
 
 /** Infer a MIME type from a filename extension (mirrors webclient/lib.ts). */

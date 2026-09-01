@@ -27,8 +27,7 @@ export const APP_GITHUB_URL =
   import.meta.env.VITE_APP_GITHUB_URL || 'https://github.com/denzyldick/siegu';
 
 /** User documentation (source docs folder on GitHub). */
-export const APP_DOCS_URL =
-  import.meta.env.VITE_APP_DOCS_URL || `${APP_GITHUB_URL}/tree/main/docs`;
+export const APP_DOCS_URL = import.meta.env.VITE_APP_DOCS_URL || `${APP_GITHUB_URL}/tree/main/docs`;
 
 /** Signalling WebSocket endpoint default (`wss://siegu.io/ws`). */
 export const DEFAULT_SIGNALING_URL =

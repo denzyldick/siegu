@@ -179,7 +179,11 @@ impl SyncEvent for CliSyncEvent {
 }
 
 #[derive(Parser)]
-#[command(name = "siegu", version, about = "Privacy-first media management CLI")]
+#[command(
+    name = "siegu-cli",
+    version,
+    about = "Privacy-first media management CLI"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,

@@ -153,26 +153,42 @@ pub async fn start_with_config(config: ServerConfig) -> LanServer {
     // identical in both branches; when `web_dist` is None the web routes
     // simply reject and warp falls through to the WS/health routes.
     let routes = {
-        // Route 1: GET / → index.html (SPA entry point)
+        // Route 1: GET / → index.html (SPA entry point) with Open Graph
+        // meta tags injected so chat apps (WhatsApp, Facebook, Signal, …) show
+        // a branded preview instead of a bare link. The `?token` never appears
+        // here: guests pair via the URL fragment, which crawlers don't receive.
         let index_web_dist = config.web_dist.clone();
         let index = warp::get()
             .and(warp::path::end())
+            .and(warp::header::optional::<String>("host"))
             .and(warp::any().map(move || index_web_dist.clone()))
-            .and_then(|dist: Option<std::path::PathBuf>| async move {
-                let Some(dist) = dist else {
-                    return Err(warp::reject::not_found());
-                };
-                let path = dist.join("index.html");
-                match tokio::fs::read(&path).await {
-                    Ok(bytes) => Ok::<_, warp::reject::Rejection>(
-                        warp::http::Response::builder()
-                            .header("content-type", "text/html; charset=utf-8")
-                            .body(bytes)
-                            .unwrap_or_else(|_| warp::http::Response::new("internal error".into())),
-                    ),
-                    Err(_) => Err(warp::reject::not_found()),
-                }
-            })
+            .and_then(
+                |host: Option<String>, dist: Option<std::path::PathBuf>| async move {
+                    let Some(dist) = dist else {
+                        return Err(warp::reject::not_found());
+                    };
+                    let path = dist.join("index.html");
+                    match tokio::fs::read(&path).await {
+                        Ok(bytes) => {
+                            let html = String::from_utf8_lossy(&bytes);
+                            let origin = host
+                                .filter(|h| !h.trim().is_empty())
+                                .map(|h| format!("http://{}", h.trim()))
+                                .unwrap_or_default();
+                            let out = inject_meta(&html, &shared_og_meta(&origin));
+                            Ok::<_, warp::reject::Rejection>(
+                                warp::http::Response::builder()
+                                    .header("content-type", "text/html; charset=utf-8")
+                                    .body(out.into_bytes())
+                                    .unwrap_or_else(|_| {
+                                        warp::http::Response::new("internal error".into())
+                                    }),
+                            )
+                        }
+                        Err(_) => Err(warp::reject::not_found()),
+                    }
+                },
+            )
             .boxed();
 
         // Route 2: GET /session → JSON health probe for the guest client
@@ -203,9 +219,43 @@ pub async fn start_with_config(config: ServerConfig) -> LanServer {
             .and(warp::fs::dir(assets_base))
             .boxed();
 
+        // Route 3b: GET /og-logo.png → the app logo under a stable path so the
+        // injected `og:image` URL survives content-hash changes across rebuilds.
+        let logo_dist = config.web_dist.clone();
+        let logo = warp::get()
+            .and(warp::path("og-logo.png"))
+            .and(warp::path::end())
+            .and(warp::any().map(move || logo_dist.clone()))
+            .and_then(|dist: Option<std::path::PathBuf>| async move {
+                let Some(dist) = dist else {
+                    return Err(warp::reject::not_found());
+                };
+                let read = tokio::fs::read_dir(dist.join("assets")).await;
+                let mut entries = match read {
+                    Ok(d) => std::pin::pin!(d),
+                    Err(_) => return Err(warp::reject::not_found()),
+                };
+                while let Ok(Some(entry)) = entries.as_mut().next_entry().await {
+                    let name = entry.file_name().to_string_lossy().into_owned();
+                    if name.starts_with("logo-") && name.ends_with(".png") {
+                        if let Ok(bytes) = tokio::fs::read(entry.path()).await {
+                            return Ok::<_, warp::reject::Rejection>(
+                                warp::http::Response::builder()
+                                    .header("content-type", "image/png")
+                                    .body(bytes)
+                                    .unwrap_or_else(|_| warp::http::Response::new(vec![])),
+                            );
+                        }
+                    }
+                }
+                Err(warp::reject::not_found())
+            })
+            .boxed();
+
         index
             .or(session)
             .or(assets)
+            .or(logo)
             .or(remote_route)
             .or(lan_route)
             .or(health)
@@ -246,6 +296,54 @@ pub async fn start_with_config(config: ServerConfig) -> LanServer {
         port: actual_addr.port(),
         abort: Some(task.abort_handle()),
     }
+}
+
+const SHARE_OG_TITLE: &str = "You're invited to view a shared photo collection";
+const SHARE_OG_DESC: &str = "Someone is sharing a private photo collection with \
+you over a live, encrypted link on Siegu. Nothing is permanently downloaded.";
+
+/// Build the static Open Graph / Twitter-Card meta block for share previews.
+/// `origin` is the request host (e.g. `http://192.168.1.45:38115`) so `og:image`
+/// and `og:url` resolve absolutely for crawlers; when absent fall back to
+/// relative paths.
+fn shared_og_meta(origin: &str) -> String {
+    let (image, url) = if origin.is_empty() {
+        ("/og-logo.png".to_string(), "/".to_string())
+    } else {
+        (format!("{origin}/og-logo.png"), origin.to_string())
+    };
+    format!(
+        r##"<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Siegu" />
+<meta property="og:title" content="{}" />
+<meta property="og:description" content="{}" />
+<meta property="og:image" content="{}" />
+<meta property="og:image:alt" content="Siegu" />
+<meta property="og:url" content="{}" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="{}" />
+<meta name="twitter:description" content="{}" />
+<meta name="twitter:image" content="{}" />
+<meta name="theme-color" content="#0b0b0f" />"##,
+        SHARE_OG_TITLE, SHARE_OG_DESC, image, url, SHARE_OG_TITLE, SHARE_OG_DESC, image
+    )
+}
+
+/// Insert `metas` into `html` — inside `<head>` when possible, else just before
+/// the closing `</head>`, else prepended. Used to stamp Open Graph tags onto the
+/// served SPA entry point without editing the built bundle.
+fn inject_meta(html: &str, metas: &str) -> String {
+    if let Some(end) = html.find("</head>") {
+        return format!("{}{}\n{}", &html[..end], metas, &html[end..]);
+    }
+    if let Some(start) = html.find("<head") {
+        let gt = html[start..]
+            .find('>')
+            .map(|i| start + i + 1)
+            .unwrap_or(start);
+        return format!("{}{}\n{}", &html[..gt], metas, &html[gt..]);
+    }
+    format!("{metas}\n{html}")
 }
 
 fn admission_reject(ctx: &Arc<ServerContext>, remote: Option<SocketAddr>) -> Option<String> {

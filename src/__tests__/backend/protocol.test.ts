@@ -18,6 +18,32 @@ describe('parseHash', () => {
     expect(parseHash('#a%20b.c%20d')).toEqual({ code: 'a b', token: 'c d' });
   });
 
+  it('parses a numeric duration flag as minutes', () => {
+    expect(parseHash('#abc123.secTok.alb-1.30')).toEqual({
+      code: 'abc123',
+      token: 'secTok',
+      albumId: 'alb-1',
+      minutes: 30,
+    });
+  });
+
+  it('parses the one-time flag', () => {
+    expect(parseHash('#abc123.secTok.alb-1.once')).toEqual({
+      code: 'abc123',
+      token: 'secTok',
+      albumId: 'alb-1',
+      oneTime: true,
+    });
+  });
+
+  it('ignores an unknown flag', () => {
+    expect(parseHash('#abc123.secTok.alb-1.x')).toEqual({
+      code: 'abc123',
+      token: 'secTok',
+      albumId: 'alb-1',
+    });
+  });
+
   it('returns null for malformed hashes', () => {
     expect(parseHash('')).toBeNull();
     expect(parseHash('#onlyCode')).toBeNull();

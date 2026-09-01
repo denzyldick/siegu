@@ -19,10 +19,12 @@ use std::process::{Command, Output};
 
 const MEDIA_EXTS: &[&str] = &["jpg", "jpeg", "png", "mp4", "mov"];
 
-/// Path to the compiled `siegu` binary (cargo sets `CARGO_BIN_EXE_siegu` for
-/// integration tests in the crate that declares the `siegu` bin).
+/// Path to the compiled `siegu-cli` binary (cargo sets `CARGO_BIN_EXE_siegu-cli` for
+/// integration tests in the crate that declares the `siegu-cli` bin).
 fn bin() -> PathBuf {
-    PathBuf::from(std::env::var_os("CARGO_BIN_EXE_siegu").expect("CARGO_BIN_EXE_siegu is set"))
+    PathBuf::from(
+        std::env::var_os("CARGO_BIN_EXE_siegu-cli").expect("CARGO_BIN_EXE_siegu-cli is set"),
+    )
 }
 
 /// The bundled demo assets: `<workspace>/demos/`.
