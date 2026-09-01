@@ -114,14 +114,14 @@ platform (details in `docs/ci.md`):
 
 | Workflow | Platform | Key jobs |
 |----------|----------|-----------|
-| `ubuntu.yml` | Ubuntu | `tests`, `mesh-e2e`, `ai-inference` |
-| `macos.yml` | macOS | `tests`, `mesh-e2e`, `ai-inference` |
-| `windows.yml` | Windows | `tests`, `mesh-e2e`, `ai-inference` |
-| `android.yml` | Ubuntu (Android target) | cross-compile check + core tests on an arm64 emulator |
+| `ubuntu.yml` | Ubuntu | tests, lint, mesh + view-only E2E, face-grouping E2E, full AI inference |
+| `macos.yml` | macOS | tests, Tauri build, mesh + view-only E2E |
+| `windows.yml` | Windows | tests, Tauri build, mesh + view-only E2E |
+| `android.yml` | Ubuntu (Android target) | cross-compile check + core tests on an x86_64 emulator |
 | `ios.yml` | macOS (iOS target) | cross-compile check + core tests on a simulator |
 
-Release jobs (`release.yml`: desktop installers, Android APK, Arch AppImage,
-iOS) publish binaries on GitHub Releases.
+Release jobs (`release.yml`: desktop installers, Android APK, iOS build gate)
+attach binaries to the GitHub release whose `v*` tag triggered the run.
 
 ### CI environment variables
 

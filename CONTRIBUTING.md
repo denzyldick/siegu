@@ -121,7 +121,7 @@ Pre-commit hooks (`.githooks/pre-commit`) run:
    canonical key set; other locales must match).
 
 CI (`.github/workflows/`) enforces `cargo fmt --check`, `prettier`, the
-translation check, `cargo test`, `clippy`, the mesh/sync E2Es, and (on releases)
+translation check, `cargo test`, the mesh/sync E2Es, and (on releases)
 desktop/mobile builds. See [docs/ci.md](docs/ci.md).
 
 ### Local verification (quick)

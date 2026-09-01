@@ -161,7 +161,7 @@ siegu/
 ├── webclient/                    # standalone guest demo (superseded by the src bundle)
 ├── shared/generated/             # committed generated TS contract
 ├── scripts/                      # e2e drivers, translation check, android build
-└── .github/workflows/            # CI (tests, mesh-e2e, ai-inference, releases)
+└── .github/workflows/            # CI (per-platform tests + E2E, releases, docker)
 ```
 
 ## Runtime modes

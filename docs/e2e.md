@@ -82,7 +82,8 @@ scripts/e2e-view-only.sh         # env: SIEGU_BIN, SIEGU_E2E_PHOTOS
 scripts/e2e-sync.sh
 ```
 
-These run in the `mesh-e2e` / `ai-inference` CI jobs (see `docs/ci.md`).
+The mesh E2E scripts run in CI on every platform; the face-grouping/ML tests
+run only on Ubuntu (see `docs/ci.md`).
 
 ---
 
