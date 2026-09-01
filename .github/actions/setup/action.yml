@@ -1,0 +1,64 @@
+name: Set up Siegu build toolchain
+description: >
+  Shared toolchain setup for Siegu CI jobs: checkout, Node, Bun, Rust
+  (rustup stable + optional targets/components), and the Cargo cache.
+  OS-specific dependencies (apt/brew/choco/MSVC/MSYS2/Android NDK) stay in
+  the calling workflow so this action stays platform-agnostic and portable.
+inputs:
+  workspaces:
+    description: >
+      Cargo workspace roots to cache with Swatinem/rust-cache. Leave empty to
+      cache the whole checkout (default Swatinem behaviour).
+    required: false
+    default: src-tauri
+  rust-targets:
+    description: Space-separated extra rustup targets to install (e.g. 'aarch64-linux-android').
+    required: false
+    default: ''
+  rust-components:
+    description: Space-separated extra rustup components to install (e.g. 'rustfmt').
+    required: false
+    default: ''
+  cache-key-suffix:
+    description: Optional suffix appended to the selected workflow's cache key.
+    required: false
+    default: ''
+  git-autocrlf:
+    description: >
+      Force core.autocrlf false before checkout (required on Windows so the
+      repo keeps LF line endings). Set 'true' on Windows, leave empty elsewhere.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Force LF line endings
+      if: inputs.git-autocrlf == 'true'
+      shell: bash
+      run: git config --global core.autocrlf false
+
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Set up Bun
+      uses: oven-sh/setup-bun@v1
+      with:
+        bun-version: latest
+
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ inputs.rust-targets }}
+        components: ${{ inputs.rust-components }}
+
+    - name: Cache Cargo build artifacts
+      uses: Swatinem/rust-cache@v2
+      with:
+        key: ${{ inputs.cache-key-suffix }}
+        workspaces: ${{ inputs.workspaces }}

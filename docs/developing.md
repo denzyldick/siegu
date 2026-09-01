@@ -45,19 +45,21 @@ git config core.hooksPath .githooks
 
 GitHub Actions workflows in `.github/workflows/` (details in `docs/ci.md`):
 
-| Workflow | Jobs |
-|----------|------|
-| `ubuntu.yml` / `macos.yml` / `windows.yml` | per platform: `tests` (fmt, check, test, clippy, tauri build), `mesh-e2e`, `ai-inference` |
-| `android.yml` / `ios.yml` | `test` (cross-compile check + core tests on emulator/simulator) |
-| `release.yml` | desktop installers, Android APK, Arch AppImage, iOS |
-| `signal-docker.yml` / `landing-page-docker.yml` | Docker publish + build-only PR validation; `signal-docker.yml` also runs the mesh-sync E2E against the just-pushed commit image |
+| Workflow | What it checks |
+|----------|----------------|
+| `ubuntu.yml` | Unit/integration tests, lint, mesh + view-only E2E, face-grouping E2E, full AI inference (only platform that runs ML tests) |
+| `macos.yml` / `windows.yml` | Unit tests, Tauri desktop build, mesh + view-only E2E |
+| `android.yml` | Cross-compile check (aarch64 + x86_64) + core tests on an x86_64 emulator |
+| `ios.yml` | Cross-compile check (aarch64) + core tests on an iOS simulator |
+| `release.yml` | Builds desktop installers + Android APK and gates on iOS build; triggered by a GitHub release or a `v*` tag push — artifacts auto-attach to the release |
+| `signal-docker.yml` | Docker publish (PRs only validate the build); mesh-sync E2E against the just-pushed image |
 
 ### Formatting
 
 CI enforces:
-- **Rust**: `cargo fmt --check`
-- **JS/Vue**: `npm run format:check` (prettier)
-- **Translations**: `npm run check:translations`
+- **Rust**: `cargo fmt --check` (Ubuntu only)
+- **JS/Vue**: `bun x prettier --check` (Ubuntu only)
+- **Translations**: `bun run check:translations` (Ubuntu only)
 
 Run locally:
 ```bash

@@ -14,39 +14,33 @@ platform's list.
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `ubuntu.yml` | push to `main`, PRs | Ubuntu: `tests`, `mesh-e2e`, `ai-inference` jobs |
-| `macos.yml` | push to `main`, PRs | macOS: `tests`, `mesh-e2e`, `ai-inference` jobs |
-| `windows.yml` | push to `main`, PRs | Windows: `tests`, `mesh-e2e`, `ai-inference` jobs |
-| `android.yml` | push to `main`, PRs | Android: cross-compile check + core tests on an arm64 emulator |
+| `ubuntu.yml` | push to `main`, PRs | Unit/integration tests, lint, mesh E2E, face-grouping E2E, full ONNX inference (the only platform that runs AI tests) |
+| `macos.yml` | push to `main`, PRs | macOS: unit tests, Tauri desktop build, mesh + view-only E2E |
+| `windows.yml` | push to `main`, PRs | Windows: unit tests, Tauri desktop build, mesh + view-only E2E |
+| `android.yml` | push to `main`, PRs | Android: cross-compile check + core tests on an x86_64 emulator |
 | `ios.yml` | push to `main`, PRs | iOS: cross-compile check + core tests on a simulator |
-| `release.yml` | tags, releases | Build/publish desktop installers, Android APK, Arch AppImage, iOS |
+| `release.yml` | GitHub release `created`, push of `v*` tags | Build desktop installers + Android APK, gate on iOS build, attach artifacts to the triggering release |
 | `signal-docker.yml` | push to `main`, PRs, tags | Build/push the signaling-server Docker image; PRs only validate the build |
-| `landing-page-docker.yml` | push to `main`, PRs, tags | Build/push the landing-page Docker image; PRs only validate the build |
 
 ### Desktop workflows (`ubuntu.yml`, `macos.yml`, `windows.yml`)
 
-Each runs three jobs on its platform:
+Each is a **single job** that runs every check it can on that platform. Shared
+checks (fmt, typecheck, lint, prettier, `cargo test`, `cargo audit`, and the
+full ONNX model inference) run once in `ubuntu.yml`; the other platforms skip
+them to avoid triple-running on every PR (the main driver of long CI time).
 
-- **`tests`**: `cargo fmt --check`, `cargo test`, `cargo clippy --all-targets -- -D warnings`
-  (which subsumes `cargo check`), a second clippy run gating
-  `-D clippy::unwrap_used -D clippy::expect_used` on production code (lib + bins;
-  tests are excluded so they may keep unwraps), and
-  `npm run tauri build -- --no-bundle`. The unwrap/expect gate also runs in the
-  pre-commit hook, so no new panics-on-error can be added to shipped code.
-  macOS builds ONNX Runtime with the CoreML feature; other platforms use plain
-  or DirectML (see `crates/siegu-core/Cargo.toml` `[target.*.dependencies]`).
-- **`mesh-e2e`**: builds `siegu-cli` and runs `scripts/e2e-sync.sh`. Two CLI
-  processes connect over WebRTC through an in-process signaling server, exchange
-  protocol messages, and transfer a photo byte-for-byte (SHA-256 compared). No ML
-  models required. On Ubuntu the same CLI build also runs
-  `scripts/e2e-face-grouping.sh` (one release build instead of two), which
-  downloads face-detection models to `/tmp/siegu-e2e-models` (cache key
-  `siegu-e2e-models-v2`) and asserts that same-person photos are grouped into one
-  album by the AI pipeline.
-- **`ai-inference`**: downloads the model suite to `src-tauri/test_models/`
-  (cache key `ai-test-models-v3-${{ runner.os }}`) and runs the two `#[ignore]`d
-  integration tests in `src-tauri/src/ml.rs`: `test_full_inference_on_sample`
-  and `test_whisper_smoke`.
+- **`ubuntu.yml`** — frontend checks (`cargo fmt --check`, typecheck, lint,
+  prettier, `test:coverage`), `cargo audit`, `cargo test` (both src-tauri and
+  siegu-core), `cargo check --all-targets`, Tauri desktop build (`--no-bundle`),
+  the CLI release build, mesh-sync E2E, view-only/RPC E2E, face-grouping E2E,
+  and the full AI inference test (downloads ~5 GB of ONNX models; cache key
+  `ai-test-models-v3-${{ runner.os }}`). This is the only platform where
+  `--ignored` ML integration tests run.
+- **`macos.yml`** / **`windows.yml`** — `cargo test` (src-tauri), `cargo check
+  --all-targets`, Tauri desktop build (`--no-bundle`), CLI release build,
+  mesh-sync E2E, and view-only/RPC E2E. The `tests`, `lint`, and `ai-inference`
+  jobs described above are Ubuntu-only; these platforms only verify compilation
+  and the shared runtime on their OS.
 
 ### Mobile workflows
 
@@ -56,7 +50,7 @@ Each runs three jobs on its platform:
 - **`ios.yml`** — `cargo check` for `aarch64-apple-ios`, builds the same
   harnesses for `aarch64-apple-ios-sim`, and runs them on an iOS simulator.
 
-### Docker publish workflows
+### Docker publish workflow
 
 - `signal-docker.yml` — image `ghcr.io/denzyldick/siegu-signal`, built from
   `crates/siegu-signal/Dockerfile` (repository root is the build context).
@@ -65,10 +59,7 @@ Each runs three jobs on its platform:
   a `mesh-sync-e2e` job runs `scripts/e2e-sync.sh` against the
   commit-sha-tagged container just pushed (not `latest`), so the exact image
   built from the current commit is exercised.
-- `landing-page-docker.yml` — image `ghcr.io/denzyldick/siegu-landing-page`,
-  built from `landing-page/Dockerfile` (`node:20-alpine`, `npm ci --omit=dev`).
-- Both add a build-only `build-image` job on PRs so image breakage is caught
-  before merge without publishing.
+- PRs only validate the build (no image push).
 - Tagging: pushes to `main` get `main` + `<commit-sha>`; version tags get
   `semver` tags + `<commit-sha>` and set `latest` (so `latest` always points at
   the newest release, never at unreleased `main`).
@@ -80,18 +71,21 @@ What is actually verified per platform, and on which devices the app can run.
 | Coverage | macOS | Ubuntu | Windows | Android | iOS |
 |----------|-------|--------|---------|---------|-----|
 | Unit/integration tests + lint | ✅ | ✅ | ✅ | — | — |
-| Real AI inference (full model suite) | ✅ | ✅ | ✅ | — | — |
+| Real AI inference (full model suite) | — | ✅ | — | — | — |
 | Mesh sync E2E (CLI, in-process signaling) | ✅ | ✅ | ✅ | — | — |
 | ML face-grouping E2E | — | ✅ | — | — | — |
 | Container mesh E2E | — | ✅ | — | — | — |
 | Cross-compile check | — | — | — | ✅ | ✅ |
 | On-device unit tests + mesh sync (`sync_e2e`) | — | — | — | ✅ emulator | ✅ simulator |
-| Release artifacts | ✅ | ✅ | ✅ | ✅ APK | — |
+| Release desktop installers | ✅ | ✅ | ✅ | — | — |
+| Release Android APK | — | — | — | ✅ | — |
+| Release iOS build (real gate, no artifact) | — | — | — | — | ✅ |
 
-**Policy**: real AI *inference* is verified on desktop only; mobile guarantees
-compile-time support. The shared runtime (DB, WebRTC mesh) is exercised
-on-device via the Android emulator and iOS simulator jobs at least once — these
-may be disabled if they prove too slow in CI.
+**Policy**: real AI *inference* is verified on Ubuntu only (the only platform
+that downloads and exercises the full ~5 GB ONNX model suite); other platforms
+only verify that the ML code compiles. The iOS app must build for the simulator
+as a release gate, but no signed artifact is produced in CI (App Store
+credentials are out of scope for automation).
 
 **Supported devices** (determined by which prebuilt ONNX Runtime binaries exist
 for `ort`'s `download-binaries` strategy, plus per-OS EP features):

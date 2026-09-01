@@ -19,29 +19,13 @@ jobs:
     env:
       ORT_STRATEGY: download
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup
         with:
-          node-version: 20
-
-      - uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-ios, x86_64-apple-ios, aarch64-apple-ios-sim
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ios
+          rust-targets: aarch64-apple-ios, x86_64-apple-ios, aarch64-apple-ios-sim
           workspaces: crates,src-tauri
+          cache-key-suffix: ios
 
       - run: bun install
-
-      - run: cargo fmt --check
-        working-directory: src-tauri
 
       - run: cargo check --target aarch64-apple-ios
         working-directory: src-tauri

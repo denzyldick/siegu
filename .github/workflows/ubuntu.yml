@@ -26,23 +26,9 @@ jobs:
       ORT_STRATEGY: download
 
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup
         with:
-          node-version: 20
-
-      - uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
+          rust-components: rustfmt
 
       - name: Install dependencies
         run: |

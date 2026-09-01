@@ -19,8 +19,6 @@ jobs:
     env:
       ORT_STRATEGY: download
     steps:
-      - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
@@ -30,18 +28,11 @@ jobs:
         with:
           packages: "platforms;android-34 build-tools;34.0.0 ndk;27.0.12077973"
 
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup
         with:
-          node-version: 20
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android,x86_64-linux-android
-          components: rustfmt
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: android
+          rust-targets: aarch64-linux-android,x86_64-linux-android
+          workspaces: . # cache the whole checkout (crates/ is built here too)
+          cache-key-suffix: android
 
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y nasm
@@ -63,9 +54,6 @@ jobs:
           fi
           echo "Patching $BUILD_RS"
           python3 scripts/patch-ffmpeg-android.py "$BUILD_RS"
-
-      - run: cargo fmt --check
-        working-directory: src-tauri
 
       - name: Check Rust lib for Android (aarch64)
         working-directory: src-tauri

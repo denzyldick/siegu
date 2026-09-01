@@ -1,28 +1,45 @@
 name: Release
 
-# Automated flow: a push to main that introduces a brand-new app version
-# (per src-tauri/tauri.conf.json) waits for CI to pass, then builds every
-# platform and attaches the artifacts to a DRAFT release tagged
-# v<version>-<short-sha> (e.g. v0.1.8-gahafeufae). Publishing the draft is
-# the only manual step; the Tauri updater picks the release up on publish
-# because latest.json carries the pure semver version.
+# Release-driven flow:
 #
-# Note: the old `release: published` trigger was removed on purpose —
-# publishing a draft must not kick off a redundant full rebuild.
+#   * Create a release from a vX.Y.Z tag on GitHub (draft or published), or
+#     push a v* tag, and this workflow builds every platform and attaches the
+#     installers/APK to that release. Assets are attached to the release whose
+#     tag triggered the run — no manual upload step.
+#
+# Triggers:
+#   - release:created   (draft or published — build starts as soon as you
+#                        create the release from a tag; publishing later does
+#                        NOT rebuild, assets are already attached)
+#   - push of v* tags   (a bare tag push builds and creates a draft release
+#                        if none exists yet)
+#   - workflow_dispatch (manual escape hatch; pass the tag you want to build)
+#
+# We deliberately do NOT trigger on `release: published` or `push: main`:
+# publishing a draft must not kick off a redundant rebuild, and shipping is
+# driven by the tag/release you create, not by every commit landing on main.
 on:
+  release:
+    types: [created]
   push:
-    branches: [main]
+    tags:
+      - 'v*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag to attach artifacts to (e.g. v0.1.13 default: derive from the latest release)'
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
+  group: release-${{ github.event.release.tag_name || github.ref_name || inputs.release_tag || github.sha }}
+  cancel-in-progress: true
 
 jobs:
-  # ── Gate: version-bump detection + CI wait + draft pre-create ───────────
+  # ── Gate: resolve the tag, wait for all platform CI, pre-create the draft ──
   ci-gate:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -40,58 +57,65 @@ jobs:
           fetch-depth: 0
 
       - id: decide
-        name: Decide release, wait for CI, pre-create draft
+        name: Resolve tag, wait for CI, pre-create draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
-          VERSION=$(jq -r .version src-tauri/tauri.conf.json)
-          SHORT_SHA=$(git rev-parse --short=9 HEAD)
-          TAG="v${VERSION}-${SHORT_SHA}"
-          TITLE="Siegu v${VERSION} (${SHORT_SHA})"
-          HEAD_SHA=$(git rev-parse HEAD)
-
-          echo "App version: $VERSION | HEAD: $SHORT_SHA | Tag: $TAG"
-
-          # workflow_dispatch = manual escape hatch: always (re)build assets
-          # for the current version, attaching to whatever release exists.
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Manual dispatch — forcing release"
-            SHOULD=true
+          # Figure out which release/tag we are building for. Order:
+          # 1. `release: created` — the release object carries the tag.
+          # 2. tag push — refs/tags/vX.Y.Z.
+          # 3. manual dispatch — explicit input, else the latest existing release.
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+            TITLE="${{ github.event.release.name }}"
+            echo "Trigger: release '${{ github.event.release.name }}' tag=$TAG"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            TITLE="Siegu $TAG"
+            echo "Trigger: tag push $TAG"
           else
-            # Release only when this exact version has never been shipped,
-            # draft or published. Covers both legacy plain tags (v0.1.8)
-            # and hash-suffixed ones (v0.1.8-gahafeufae).
-            EXISTING=$(gh release list --limit 100 \
-              --json tagName \
-              --jq ".[].tagName | select(. == \"v${VERSION}\" or startswith(\"v${VERSION}-\"))")
-            if [ -n "$EXISTING" ]; then
-              echo "Version $VERSION already has a release/draft ($EXISTING) — nothing to do"
-              SHOULD=false
+            if [ -n "${{ inputs.release_tag }}" ]; then
+              TAG="${{ inputs.release_tag }}"
+              TITLE="Siegu $TAG"
+              echo "Trigger: manual dispatch tag=$TAG"
             else
-              echo "New version detected — releasing"
-              SHOULD=true
+              TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
+              TITLE="Siegu $TAG"
+              echo "Trigger: manual dispatch (latest release) tag=$TAG"
             fi
           fi
 
-          {
-            echo "should_release=$SHOULD"
-            echo "tag_name=$TAG"
-            echo "release_title=$TITLE"
-            echo "version=$VERSION"
-            echo "short_sha=$SHORT_SHA"
-          } >> "$GITHUB_OUTPUT"
+          # A release only makes sense for vX.Y.Z tags (updater resolves the
+          # pure semver from latest.json; hash-suffixed draft tags are legacy).
+          case "$TAG" in
+            v[0-9]*\.[0-9]*\.[0-9]*) echo "OK: tag $TAG" ;;
+            *) echo "::error::Tag '$TAG' is not a vX.Y.Z release tag — refusing to build."; exit 1 ;;
+          esac
+          VERSION="${TAG#v}"
+          SHORT_SHA=$(git rev-parse --short=9 HEAD)
+          HEAD_SHA=$(git rev-parse HEAD)
+          [ -z "$TITLE" ] && TITLE="Siegu v${VERSION}"
 
-          if [ "$SHOULD" != "true" ]; then
-            exit 0
+          echo "Version: $VERSION | HEAD: $SHORT_SHA | Tag: $TAG"
+
+          # The tag and the app version must agree: the updater derives the
+          # version from tauri.conf.json, so a release tagged v0.1.13 while
+          # tauri.conf.json still says 0.1.12 would attach a 0.1.12 update
+          # manifest to a v0.1.13 release and break delta updates.
+          CONF_VERSION=$(jq -r .version src-tauri/tauri.conf.json)
+          if [ "$CONF_VERSION" != "$VERSION" ]; then
+            echo "::error::Tag $TAG is v$VERSION but tauri.conf.json still pins $CONF_VERSION. Bump the app version first."
+            exit 1
           fi
 
-          # ── Wait for the CI workflows triggered by this same push ────────
-          # Avoids duplicating toolchain setup that CI already validates.
+          # ── Wait for the CI workflows for the commit being released ─────
+          # The release should only ship after every supported platform has
+          # passed its own CI on exactly this commit.
           FAILED=0
           TIMEOUT=$((60 * 95))
-          for wf in Ubuntu Windows macOS Android; do
+          for wf in Ubuntu Windows macOS Android iOS; do
             FILE="${wf,,}.yml"
             echo "--- Waiting for $wf CI on $HEAD_SHA ---"
             CONCLUSION=""
@@ -125,17 +149,26 @@ jobs:
           fi
           echo "All CI checks passed for $HEAD_SHA"
 
-          # ── Pre-create the draft so parallel build jobs attach to it ────
-          # Without this, the Android uploader would race ahead and publish
-          # its own release before tauri-action finishes the desktop one.
+          # ── Ensure the target release exists so parallel jobs can attach ──
+          # On `release: created` it always exists. On a bare tag push it may
+          # not, so create a draft the build jobs append to (prevents the
+          # Android uploader racing ahead and publishing its own release).
           if ! gh release view "$TAG" --json id >/dev/null 2>&1; then
             gh release create "$TAG" --draft --target "$HEAD_SHA" \
               --title "$TITLE" \
-              --notes "Automated draft build for v${VERSION} (${SHORT_SHA}). Review the assets, then publish to ship."
+              --notes "Automated build for v${VERSION} (${SHORT_SHA}). Review the assets, then publish to ship."
             echo "Created draft release $TAG"
           else
             echo "Release $TAG already exists — assets will be appended"
           fi
+
+          {
+            echo "should_release=true"
+            echo "tag_name=$TAG"
+            echo "release_title=$TITLE"
+            echo "version=$VERSION"
+            echo "short_sha=$SHORT_SHA"
+          } >> "$GITHUB_OUTPUT"
 
   # ── Desktop installers (macOS, Ubuntu, Windows) ────────────────────────
   desktop:
@@ -154,22 +187,10 @@ jobs:
       APP_COMMIT_SHA: ${{ needs.ci-gate.outputs.short_sha }}
 
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup
         with:
-          node-version: 20
-
-      - uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: release-${{ matrix.platform }}
-          workspaces: src-tauri
+          git-autocrlf: ${{ matrix.platform == 'windows-latest' }}
+          cache-key-suffix: release-${{ matrix.platform }}
 
       - name: Install dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-24.04'
@@ -282,8 +303,6 @@ jobs:
       ORT_STRATEGY: download
       APP_COMMIT_SHA: ${{ needs.ci-gate.outputs.short_sha }}
     steps:
-      - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
@@ -293,23 +312,11 @@ jobs:
         with:
           packages: "platforms;android-34 build-tools;34.0.0 ndk;27.0.12077973"
 
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup
         with:
-          node-version: 20
-
-      - uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android
-          components: rustfmt
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: release-android
+          rust-targets: aarch64-linux-android
           workspaces: src-tauri
+          cache-key-suffix: release-android
 
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y nasm
@@ -409,33 +416,35 @@ jobs:
           tag_name: ${{ needs.ci-gate.outputs.tag_name }}
           files: src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
 
-  # ── iOS ─────────────────────────────────────────────────────────────────
+  # ── iOS (real gate: the app must BUILD; no signed artifact is attached) ─
+  # ios.yml already runs the core test suite on a simulator against this
+  # commit, so this job only needs to prove the iOS app itself compiles and
+  # bundles. Building for the simulator requires no Apple developer account
+  # or signing identity, but it WILL fail the workflow if the iOS target
+  # regresses. No artifact is uploaded — shipping an .ipa needs App Store
+  # credentials that are out of scope for the automated release.
   ios:
     needs: [ci-gate]
     if: needs.ci-gate.outputs.should_release == 'true'
     permissions:
-      contents: write
+      contents: read
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup
         with:
-          node-version: 20
-
-      - uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-ios, x86_64-apple-ios, aarch64-apple-ios-sim
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: release-ios
-          workspaces: src-tauri
+          rust-targets: aarch64-apple-ios, x86_64-apple-ios, aarch64-apple-ios-sim
+          workspaces: crates,src-tauri
+          cache-key-suffix: release-ios
 
       - run: bun install
 
-      - run: npm run tauri ios build || echo "iOS build skipped/failed. Please configure code signing."
+      # The Xcode project scaffold (src-tauri/gen/apple) is not tracked in
+      # the repo, only the Android one is — regenerate it here so the build
+      # below proves the full iOS app (not just cargo check) compiles and
+      # bundles. This is intentionally NOT guarded with `|| echo "skipped"`
+      # anymore: a broken iOS build must fail the release.
+      - name: Initialize iOS project scaffold
+        run: npm run tauri ios init
+
+      - name: Build iOS app for simulator (real gate)
+        run: npm run tauri ios build -- --debug --target aarch64-apple-ios-sim
