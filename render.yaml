@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: siegu-demo
+    runtime: image
+    image:
+      url: # populated after first deploy; or use Render's "Build from Dockerfile"
+    envVars:
+      - key: SIEGU_WEB_DIST
+        value: /srv/webui
+    healthCheckPath: /
+    autoDeploy: false
