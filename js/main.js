@@ -98,7 +98,7 @@ function renderPricing() {
   const d = state.dict || {};
   const plans = ['free', 'pro'];
   const grid = document.getElementById('pricingGrid');
-  const html = plans
+  let html = plans
     .map((key) => {
       const p = lookup('pricing.' + key, d) || {};
       const featured = key === 'pro';
