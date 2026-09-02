@@ -166,6 +166,7 @@ img { max-width: 100%; display: block; }
 .hero p.sub { font-size: clamp(1.05rem, 2vw, 1.3rem); color: var(--text-2); max-width: 640px; margin: 0 auto 36px; }
 .hero-cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
 .hero-note { color: var(--text-3); font-size: 13.5px; margin-top: 20px; }
+.hero-trust { color: var(--text-3); font-size: 13px; font-weight: 600; margin-top: 6px; letter-spacing: .02em; }
 
 .hero-visual { margin-top: 64px; }
 
@@ -333,7 +334,32 @@ img { max-width: 100%; display: block; }
 .cta-band p { color: rgba(0,0,0,.6); font-size: 1.1rem; max-width: 520px; margin: 0 auto 30px; }
 .cta-band .btn-ink { background: var(--bg); color: var(--ink); }
 .cta-note { margin-top: 16px; font-size: 13.5px; color: rgba(0,0,0,.5); }
+.cta-band .btn-ghost { color: var(--bg); border-color: rgba(255,255,255,.25); margin-left: 8px; }
 .section .cta-band { margin: 0 24px; }
+
+/* How it works steps */
+.steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 10px; }
+.step {
+  text-align: center; position: relative; padding: 36px 20px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); transition: transform .18s ease;
+}
+.step:hover { transform: translateY(-3px); }
+.step-num {
+  position: absolute; top: 12px; left: 16px; width: 26px; height: 26px;
+  border-radius: 50%; background: var(--ink); color: var(--on-ink);
+  font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+}
+.step .ico { margin-bottom: 14px; }
+.step h3 { font-size: 1.08rem; margin: 0 0 8px; }
+.step p { font-size: .92rem; color: var(--text-2); margin: 0; line-height: 1.5; }
+
+/* Trust / reassurance row */
+.trust-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 14px; font-size: 13px; font-weight: 600; color: var(--text-3); }
+.tdot { opacity: .5; }
+
+/* Pricing risk reversal */
+.plan-risk { font-size: 13px; color: var(--text-3); margin: 10px 0 0; }
 
 /* ---------- Footer ---------- */
 .site-footer { border-top: 1px solid var(--border); padding: 70px 0 30px; margin-top: 96px; }

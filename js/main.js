@@ -13,7 +13,7 @@ const FALLBACK = 'en';
 const state = {
   locale: FALLBACK,
   dict: null,
-  billing: 'monthly',
+  billing: 'yearly',
   trackersOn: false,
 };
 
@@ -114,6 +114,7 @@ function renderPricing() {
         ${isYearly && key !== 'free' ? `<p class="yearly-badge">${p.yearly_badge || ''}</p>` : ''}
         <p class="tagline">${p.tagline || ''}</p>
         <ul>${feats.map((f) => `<li><span class="check">✓</span><span>${f}</span></li>`).join('')}</ul>
+        ${key !== 'free' ? '<p class="plan-risk">Cancel anytime</p>' : ''}
         <a class="btn ${featured ? 'btn-ink' : 'btn-ghost'}" href="${checkoutHref(key)}" ${checkoutHref(key) !== '#' ? 'target="_blank" rel="noopener"' : ''} data-track="pricing_${key}">${p.cta || ''}</a>
       </div>`;
     })
@@ -161,9 +162,8 @@ function applyTheme() {
 }
 
 function cycleTheme() {
-  const modes = ['light', 'dark', 'system'];
-  const next = modes[(modes.indexOf(storedTheme()) + 1) % modes.length];
-  localStorage.setItem(THEME_KEY, next);
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  localStorage.setItem(THEME_KEY, isDark ? 'light' : 'dark');
   applyTheme();
 }
 
@@ -196,8 +196,8 @@ function trackersOn() {
    substitutes the real per-tier product URLs into the GUMROAD_* placeholders.
    While the placeholders remain unset, the matching buttons stay inert (#). */
 const GUMROAD_PRODUCTS = {
-  free: '',
-  pro: '',
+  free: 'https://3848817799485.gumroad.com/l/nrohiy',
+  pro: 'https://3848817799485.gumroad.com/l/acudv',
   team: '',
   primary: 'https://3848817799485.gumroad.com/l/acudv',
 };
@@ -218,10 +218,14 @@ function checkoutHref(planKey) {
   return '#';
 }
 
-/* Point the header / footer "Get Siegu" links at checkout once available. */
+/* Point the header / footer / hero "Get siegu free" links at the free
+   checkout (free-first funnel), and the dedicated upgrade button at Pro. */
 function applyCtas() {
   document.querySelectorAll('.hero-cta a[data-track="cta_get_started"], .cta-band a[data-track="cta_footer"], .header-actions a[data-track="cta_get_started"]').forEach((a) => {
-    a.setAttribute('href', checkoutHref());
+    a.setAttribute('href', checkoutHref('free'));
+  });
+  document.querySelectorAll('a[data-track="cta_upgrade"]').forEach((a) => {
+    a.setAttribute('href', checkoutHref('pro'));
   });
 }
 

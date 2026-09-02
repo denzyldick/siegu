@@ -8,8 +8,8 @@
     "pricing": "Precios",
     "docs": "Docs",
     "faq": "FAQ",
-    "open_app": "Abrir la app",
-    "get_started": "Empezar"
+    "get_started": "Empezar",
+    "get_free": "Descargar siegu gratis"
   },
   "hero": {
     "badge": "Privado por diseño · Local-primero",
@@ -18,7 +18,8 @@
     "subtitle": "Siegu guarda cada foto y video en tu dispositivo. Búsqueda potente, IA en tu dispositivo y uso compartido fluido — sin nube, sin subidas, sin concesiones.",
     "cta_primary": "Obtener Siegu",
     "cta_secondary": "Saber más",
-    "note": "Windows · macOS · Linux · Web"
+    "note": "Windows · macOS · Linux · Web",
+    "trust": "Gratis para siempre · Sin cuenta · Cancela cuando quieras."
   },
   "logos": {
     "win": "Windows",
@@ -92,9 +93,8 @@
       "highlight": "Más popular",
       "features": [
         "Todo en Gratis",
-        "Uso compartido sincronizado en la nube",
+        "Enlaces de uso compartido instantáneos hacia colecciones con otros",
         "Enlaces para cualquiera, en cualquier lugar",
-        "Soporte prioritario",
         "Acceso temprano a nuevas funciones"
       ],
       "cta": "Ir a Pro",
@@ -145,7 +145,8 @@
     "title": "Recupera tus fotos",
     "subtitle": "Privado, local y tuyo. Siegu está listo cuando tú lo estés.",
     "button": "Obtén Siegu — es gratis",
-    "note": "Sin cuenta, sin subidas, sin ataduras."
+    "note": "Sin cuenta, sin subidas, sin ataduras.",
+    "upgrade": "Mejorar a Pro"
   },
   "footer": {
     "tagline": "Una biblioteca de fotos privada, local-primero.",
@@ -175,5 +176,27 @@
   "misc": {
     "load": "Cargando…",
     "skip": "Saltar al contenido"
+  },
+  "how": {
+    "eyebrow": "Cómo funciona",
+    "title": "Listo en minutos",
+    "subtitle": "Tres pasos, todo en tu dispositivo.",
+    "step1": {
+      "title": "Descarga siegu gratis",
+      "desc": "Descarga la app para tu dispositivo — Windows, macOS, Linux o Android."
+    },
+    "step2": {
+      "title": "Importa tus fotos",
+      "desc": "Señale siegu a tus carpetas. Todo queda local y privado."
+    },
+    "step3": {
+      "title": "Busca, comparte y mejora a Pro",
+      "desc": "Encuentra cualquier cosa en segundos. Mejora a Pro cuando quieras más."
+    }
+  },
+  "trust": {
+    "open_source": "Código abierto",
+    "no_uploads": "Sin subidas",
+    "local": "Tus fotos nunca salen de tu dispositivo"
   }
 }

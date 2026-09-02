@@ -8,8 +8,8 @@
     "pricing": "Precio",
     "docs": "Docs",
     "faq": "FAQ",
-    "open_app": "Labra e app",
-    "get_started": "Kuminsá"
+    "get_started": "Kuminsá",
+    "get_free": "Download siegu gratis"
   },
   "hero": {
     "badge": "Privá pa diseño · Lokal-promé",
@@ -18,7 +18,8 @@
     "subtitle": "Siegu ta warda kada foto i video riba bo aparato. Búskeda poderoso, IA riba bo aparato i kompartí sin problema — sin nubia, sin subí, sin kompromiso.",
     "cta_primary": "Optené Siegu",
     "cta_secondary": "Sap mas",
-    "note": "Windows · macOS · Linux · Web"
+    "note": "Windows · macOS · Linux · Web",
+    "trust": "Gratis pa semper · Sin kuenta · Cancela na kualke momentu."
   },
   "logos": {
     "win": "Windows",
@@ -92,9 +93,8 @@
       "highlight": "Mas popular",
       "features": [
         "Tur kos na Gratis",
-        "Kompartí sinkronisá den nubia",
+        "Link di kompartí den momentu pa kolekshon ku otro",
         "Link pa ken ku sea, na unda ku sea",
-        "Soporte prioritario",
         "Akceso avaná na funshon nobo"
       ],
       "cta": "Bai Pro",
@@ -145,7 +145,8 @@
     "title": "Tuma bo fotonan bek",
     "subtitle": "Privá, lokal i di bo. Siegu ta klá ora bo ta klá.",
     "button": "Optené Siegu — e ta gratis",
-    "note": "Sin cuenta, sin subí, sin saká."
+    "note": "Sin cuenta, sin subí, sin saká.",
+    "upgrade": "Upgrade na Pro"
   },
   "footer": {
     "tagline": "Un biblioteka di foto privá, lokal-promé.",
@@ -175,5 +176,27 @@
   "misc": {
     "load": "Kargando…",
     "skip": "Bai na contenido"
+  },
+  "how": {
+    "eyebrow": "Kon e ta traha",
+    "title": "Ready den minüt",
+    "subtitle": "Tres paso, tur kosa ta bo ekipo.",
+    "step1": {
+      "title": "Download siegu gratis",
+      "desc": "Download e app pa bo ekipo — Windows, macOS, Linux of Android."
+    },
+    "step2": {
+      "title": "Importa bo potrèt",
+      "desc": "Indiká siegu na bo folder. Tur kosa ta keda lokal i privá."
+    },
+    "step3": {
+      "title": "Buska, kompartí i Upgrade na Pro",
+      "desc": "Haña tur kos den sekònder. Upgrade na Pro ora bo kier mas."
+    }
+  },
+  "trust": {
+    "open_source": "Código habrí",
+    "no_uploads": "Sin upload",
+    "local": "Bo potrèt ta keda semper riba bo ekipo"
   }
 }

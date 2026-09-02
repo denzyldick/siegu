@@ -8,8 +8,8 @@
     "pricing": "Pricing",
     "docs": "Docs",
     "faq": "FAQ",
-    "open_app": "Open app",
-    "get_started": "Get started"
+    "get_started": "Get started",
+    "get_free": "Get siegu free"
   },
   "hero": {
     "badge": "Private by design · Local-first",
@@ -18,7 +18,8 @@
     "subtitle": "Siegu keeps every photo and video on your device. Powerful search, on-device AI, and seamless sharing — no cloud, no uploads, no compromises.",
     "cta_primary": "Get Siegu",
     "cta_secondary": "Learn more",
-    "note": "Windows · macOS · Linux · Web"
+    "note": "Windows · macOS · Linux · Web",
+    "trust": "Free forever · No account · Cancel anytime."
   },
   "logos": {
     "win": "Windows",
@@ -92,9 +93,8 @@
       "highlight": "Most popular",
       "features": [
         "Everything in Free",
-        "Cloud-synced sharing",
+        "Instant sharing links to collections with others",
         "Anyone, anywhere links",
-        "Priority support",
         "Early access to new features"
       ],
       "cta": "Go Pro",
@@ -145,7 +145,8 @@
     "title": "Take your photos back",
     "subtitle": "Private, local, and yours. Siegu is ready when you are.",
     "button": "Get Siegu — it's free",
-    "note": "No account, no uploads, no lock-in."
+    "note": "No account, no uploads, no lock-in.",
+    "upgrade": "Upgrade to Pro"
   },
   "footer": {
     "tagline": "A private, local-first photo library.",
@@ -175,5 +176,27 @@
   "misc": {
     "load": "Loading…",
     "skip": "Skip to content"
+  },
+  "how": {
+    "eyebrow": "How it works",
+    "title": "Up and running in minutes",
+    "subtitle": "Three steps, all on your device.",
+    "step1": {
+      "title": "Get siegu free",
+      "desc": "Download the app for your device — Windows, macOS, Linux or Android."
+    },
+    "step2": {
+      "title": "Import your photos",
+      "desc": "Point siegu at your folders. Everything stays local and private."
+    },
+    "step3": {
+      "title": "Search, share & upgrade to Pro",
+      "desc": "Find anything in seconds. Upgrade to Pro when you want more."
+    }
+  },
+  "trust": {
+    "open_source": "Open source",
+    "no_uploads": "No uploads",
+    "local": "Your photos never leave your device"
   }
 }

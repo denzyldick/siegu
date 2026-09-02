@@ -8,8 +8,8 @@
     "pricing": "Preise",
     "docs": "Doku",
     "faq": "FAQ",
-    "open_app": "App öffnen",
-    "get_started": "Loslegen"
+    "get_started": "Loslegen",
+    "get_free": "Kostenlos herunterladen"
   },
   "hero": {
     "badge": "Privat by Design · Lokal zuerst",
@@ -18,7 +18,8 @@
     "subtitle": "Siegu bewahrt jedes Foto und Video auf deinem Gerät. Leistungsstarke Suche, KI auf dem Gerät und nahtloses Teilen – keine Cloud, keine Uploads, keine Kompromisse.",
     "cta_primary": "Siegu holen",
     "cta_secondary": "Mehr erfahren",
-    "note": "Windows · macOS · Linux · Web"
+    "note": "Windows · macOS · Linux · Web",
+    "trust": "Für immer kostenlos · Kein Konto · Jederzeit kündbar."
   },
   "logos": {
     "win": "Windows",
@@ -92,9 +93,8 @@
       "highlight": "Am beliebtesten",
       "features": [
         "Alles aus Kostenlos",
-        "Cloud-synchronisiertes Teilen",
+        "Sofortige Share-Links zu Sammlungen mit anderen",
         "Links für jeden, überall",
-        "Priorisierter Support",
         "Früher Zugang zu neuen Funktionen"
       ],
       "cta": "Pro holen",
@@ -145,7 +145,8 @@
     "title": "Hol dir deine Fotos zurück",
     "subtitle": "Privat, lokal und deins. Siegu ist bereit, wenn du es bist.",
     "button": "Siegu holen – es ist kostenlos",
-    "note": "Kein Konto, keine Uploads, keine Bindung."
+    "note": "Kein Konto, keine Uploads, keine Bindung.",
+    "upgrade": "Auf Pro upgraden"
   },
   "footer": {
     "tagline": "Eine private, lokale Fotobibliothek.",
@@ -175,5 +176,27 @@
   "misc": {
     "load": "Lädt…",
     "skip": "Zum Inhalt springen"
+  },
+  "how": {
+    "eyebrow": "So funktioniert's",
+    "title": "In Minuten startklar",
+    "subtitle": "Drei Schritte, alles bleibt auf deinem Gerät.",
+    "step1": {
+      "title": "Hole siegu kostenlos",
+      "desc": "Lade die App für dein Gerät herunter — Windows, macOS, Linux oder Android."
+    },
+    "step2": {
+      "title": "Importiere deine Fotos",
+      "desc": "Zeige siegu deine Ordner. Alles bleibt lokal und privat."
+    },
+    "step3": {
+      "title": "Suche, teile & upgrade auf Pro",
+      "desc": "Finde alles in Sekunden. Upgrade auf Pro, wenn du mehr willst."
+    }
+  },
+  "trust": {
+    "open_source": "Open Source",
+    "no_uploads": "Keine Uploads",
+    "local": "Deine Fotos verlassen nie dein Gerät"
   }
 }
