@@ -269,7 +269,7 @@ function selectAsset(assets, os, arch) {
   return null;
 }
 
-let latestAssets = null;
+let latestAssets = [];
 let latestFailed = false;
 
 async function loadLatestRelease() {
