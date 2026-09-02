@@ -3,7 +3,14 @@
     "title": "Siegu — Jouw fotobibliotheek, privé van jou",
     "description": "Siegu is een privé, local-first fotobibliotheek met AI op je eigen apparaat. Blader, zoek, deel en beleef je herinneringen — zonder je foto's aan de cloud te geven."
   },
-  "nav": { "features": "Functies", "pricing": "Prijzen", "docs": "Docs", "faq": "FAQ", "open_app": "App openen", "get_started": "Aan de slag" },
+  "nav": {
+    "features": "Functies",
+    "pricing": "Prijzen",
+    "docs": "Docs",
+    "faq": "FAQ",
+    "open_app": "App openen",
+    "get_started": "Aan de slag"
+  },
   "hero": {
     "badge": "Privé door ontwerp · Local-first",
     "title1": "Jouw fotobibliotheek,",
@@ -13,44 +20,160 @@
     "cta_secondary": "Meer weten",
     "note": "Windows · macOS · Linux · Web"
   },
-  "logos": { "label": "Gemaakt voor hoe jij echt foto's maakt" },
-  "features": {
-    "eyebrow": "Functies", "title": "Alles wat je foto's verdienen",
-    "subtitle": "Een snelle, privé fotobibliotheek die denkt zoals jij.",
-    "listen": { "title": "Privé door ontwerp", "desc": "Je foto's verlaten nooit je apparaat. Geen servers, geen cloud, geen uploads. Nooit." },
-    "search": { "title": "Zoeken in natuurlijke taal", "desc": "\"strand in 2021\" of \"verjaardagstaart\" — vind elk moment in een oogwenk met AI op je apparaat." },
-    "organized": { "title": "Automatisch georganiseerd", "desc": "Gezichten, plekken, reizen en gebeurtenissen, automatisch gegroepeerd en privé gehouden." },
-    "share": { "title": "Privé delen", "desc": "Deel een hele collectie via een live, versleutelde link. Gasten zien alleen wat jij toestaat." },
-    "offline": { "title": "Werkt offline", "desc": "Je bibliotheek is lokaal, dus het werkt in het vliegtuig, in een hut, overal." },
-    "speed": { "title": "Bliksemsnel", "desc": "Miljoenen foto's, directe resultaten. Jouw apparaat doet het zware werk." }
+  "logos": {
+    "win": "Windows",
+    "mac": "macOS",
+    "linux": "Linux",
+    "android": "Android",
+    "web": "Web"
   },
-  "showcase": { "eyebrow": "De bibliotheek", "title": "Een thuis voor elke herinnering", "desc": "Schoon, rustig en snel — Siegu verandert je hele fotogeschiedenis in iets waar je echt van geniet.", "caption": "Jouw bibliotheek, jouw regels." },
+  "features": {
+    "eyebrow": "Functies",
+    "title": "Alles wat je foto's verdienen",
+    "subtitle": "Een snelle, privé fotobibliotheek die denkt zoals jij.",
+    "listen": {
+      "title": "Privé door ontwerp",
+      "desc": "Je foto's verlaten nooit je apparaat. Geen servers, geen cloud, geen uploads. Nooit."
+    },
+    "search": {
+      "title": "Zoeken in natuurlijke taal",
+      "desc": "\"strand in 2021\" of \"verjaardagstaart\" — vind elk moment in een oogwenk met AI op je apparaat."
+    },
+    "organized": {
+      "title": "Automatisch georganiseerd",
+      "desc": "Gezichten, plekken, reizen en gebeurtenissen, automatisch gegroepeerd en privé gehouden."
+    },
+    "share": {
+      "title": "Privé delen",
+      "desc": "Deel een hele collectie via een live, versleutelde link. Gasten zien alleen wat jij toestaat."
+    },
+    "offline": {
+      "title": "Werkt offline",
+      "desc": "Je bibliotheek is lokaal, dus het werkt in het vliegtuig, in een hut, overal."
+    },
+    "speed": {
+      "title": "Bliksemsnel",
+      "desc": "Miljoenen foto's, directe resultaten. Jouw apparaat doet het zware werk."
+    }
+  },
+  "showcase": {
+    "eyebrow": "De bibliotheek",
+    "title": "Een thuis voor elke herinnering",
+    "desc": "Schoon, rustig en snel — Siegu verandert je hele fotogeschiedenis in iets waar je echt van geniet.",
+    "caption": "Jouw bibliotheek, jouw regels."
+  },
   "pricing": {
-    "eyebrow": "Prijzen", "title": "Simpele, eerlijke prijzen",
+    "eyebrow": "Prijzen",
+    "title": "Simpele, eerlijke prijzen",
     "subtitle": "Alles is lokaal en privé. Betaal voor gemak, niet voor je data.",
-    "toggle": { "monthly": "Maandelijks", "yearly": "Jaarlijks", "save": "Bespaar 20%" },
-    "free": { "name": "Gratis", "price": "$0", "period": "voor altijd", "tagline": "De volledige app op je apparaat.", "features": ["Onbeperkt lokale foto's", "AI-zoekopdracht op je apparaat", "Automatische organisatie", "Lokaal delen op je netwerk"], "cta": "Aan de slag" },
-    "pro": { "name": "Pro", "price": "$5", "period": "per maand", "tagline": "Alles, overal.", "highlight": "Meest populair", "features": ["Alles in Gratis", "Cloud-gesynchroniseerd delen", "Links voor iedereen, overal", "Prioriteit ondersteuning", "Vroege toegang tot nieuwe functies"], "cta": "Ga Pro", "yearly_badge": "jaarlijks gefactureerd" },
-    "team": { "name": "Familie", "price": "$9", "period": "per maand", "tagline": "Deel samen één bibliotheek.", "features": ["Alles in Pro", "Tot 6 leden", "Uitnodigingsbeheer", "Toegewijde thuis-hub"], "cta": "Kies Familie" },
+    "toggle": {
+      "monthly": "Maandelijks",
+      "yearly": "Jaarlijks",
+      "save": "Bespaar 20%"
+    },
+    "free": {
+      "name": "Gratis",
+      "price": "$0",
+      "period": "voor altijd",
+      "tagline": "De volledige app op je apparaat.",
+      "features": [
+        "Onbeperkt lokale foto's",
+        "AI-zoekopdracht op je apparaat",
+        "Automatische organisatie",
+        "Lokaal delen op je netwerk"
+      ],
+      "cta": "Aan de slag"
+    },
+    "pro": {
+      "name": "Pro",
+      "price": "$5",
+      "period": "per maand",
+      "tagline": "Alles, overal.",
+      "highlight": "Meest populair",
+      "features": [
+        "Alles in Gratis",
+        "Cloud-gesynchroniseerd delen",
+        "Links voor iedereen, overal",
+        "Prioriteit ondersteuning",
+        "Vroege toegang tot nieuwe functies"
+      ],
+      "cta": "Ga Pro",
+      "yearly_badge": "jaarlijks gefactureerd"
+    },
+    "team": {
+      "name": "Familie",
+      "price": "$9",
+      "period": "per maand",
+      "tagline": "Deel samen één bibliotheek.",
+      "features": [
+        "Alles in Pro",
+        "Tot 6 leden",
+        "Uitnodigingsbeheer",
+        "Toegewijde thuis-hub"
+      ],
+      "cta": "Kies Familie"
+    },
     "note": "Prijzen in USD. Annuleer wanneer je wilt. Geen extra kosten voor meer foto's."
   },
   "faq": {
-    "eyebrow": "FAQ", "title": "Vragen, beantwoord",
+    "eyebrow": "FAQ",
+    "title": "Vragen, beantwoord",
     "items": [
-      { "q": "Is mijn data echt privé?", "a": "Ja. Je foto's en metadata blijven op je apparaat. Siegu gebruikt AI op je apparaat, dus er wordt niets geüpload voor verwerking." },
-      { "q": "Werkt Siegu offline?", "a": "Absoluut. Je bibliotheek wordt lokaal opgeslagen, dus je kunt overal door je foto's bladeren en zoeken — zelfs zonder verbinding." },
-      { "q": "Hoe werkt delen?", "a": "Je kunt een collectie delen via een live, end-to-end-versleutelde link. Gasten zien alleen wat jij kiest om te delen, en er wordt niets aan onze kant opgeslagen." },
-      { "q": "Welke platformen worden ondersteund?", "a": "Siegu draait op Windows, macOS en Linux, met een volledige webervaring voor gasten." },
-      { "q": "Kan ik importeren vanuit Google Foto's of iCloud?", "a": "Ja — Siegu importeert je bestaande bibliotheek en verwerkt die vervolgens volledig lokaal en privé." }
+      {
+        "q": "Is mijn data echt privé?",
+        "a": "Ja. Je foto's en metadata blijven op je apparaat. Siegu gebruikt AI op je apparaat, dus er wordt niets geüpload voor verwerking."
+      },
+      {
+        "q": "Werkt Siegu offline?",
+        "a": "Absoluut. Je bibliotheek wordt lokaal opgeslagen, dus je kunt overal door je foto's bladeren en zoeken — zelfs zonder verbinding."
+      },
+      {
+        "q": "Hoe werkt delen?",
+        "a": "Je kunt een collectie delen via een live, end-to-end-versleutelde link. Gasten zien alleen wat jij kiest om te delen, en er wordt niets aan onze kant opgeslagen."
+      },
+      {
+        "q": "Welke platformen worden ondersteund?",
+        "a": "Siegu draait op Windows, macOS en Linux, met een volledige webervaring voor gasten."
+      },
+      {
+        "q": "Kan ik importeren vanuit Google Foto's of iCloud?",
+        "a": "Ja — Siegu importeert je bestaande bibliotheek en verwerkt die vervolgens volledig lokaal en privé."
+      }
     ]
   },
-  "cta": { "title": "Neem je foto's terug", "subtitle": "Privé, lokaal en van jou. Siegu is er klaar voor.", "button": "Download Siegu — het is gratis", "note": "Geen account, geen uploads, geen lock-in." },
+  "cta": {
+    "title": "Neem je foto's terug",
+    "subtitle": "Privé, lokaal en van jou. Siegu is er klaar voor.",
+    "button": "Download Siegu — het is gratis",
+    "note": "Geen account, geen uploads, geen lock-in."
+  },
   "footer": {
     "tagline": "Een privé, local-first fotobibliotheek.",
-    "product": "Product", "product_links": { "features": "Functies", "pricing": "Prijzen", "changelog": "Wijzigingslogboek", "roadmap": "Roadmap" },
-    "resources": "Bronnen", "resources_links": { "docs": "Documentatie", "download": "Download", "support": "Ondersteuning" },
-    "company": "Bedrijf", "company_links": { "about": "Over ons", "github": "GitHub", "blog": "Blog" },
-    "legal": "Privacy & Voorwaarden", "rights": "Alle rechten voorbehouden.", "made": "Met zorg gemaakt — geen cloud nodig."
+    "product": "Product",
+    "product_links": {
+      "features": "Functies",
+      "pricing": "Prijzen",
+      "changelog": "Wijzigingslogboek",
+      "roadmap": "Roadmap"
+    },
+    "resources": "Bronnen",
+    "resources_links": {
+      "docs": "Documentatie",
+      "download": "Download",
+      "support": "Ondersteuning"
+    },
+    "company": "Bedrijf",
+    "company_links": {
+      "about": "Over ons",
+      "github": "GitHub",
+      "blog": "Blog"
+    },
+    "legal": "Privacy & Voorwaarden",
+    "rights": "Alle rechten voorbehouden.",
+    "made": "Met zorg gemaakt — geen cloud nodig."
   },
-  "misc": { "load": "Laden…", "skip": "Naar inhoud" }
+  "misc": {
+    "load": "Laden…",
+    "skip": "Naar inhoud"
+  }
 }

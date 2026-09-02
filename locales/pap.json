@@ -3,7 +3,14 @@
     "title": "Siegu — Bo biblioteka di foto, privá pa bo",
     "description": "Siegu ta un biblioteka di foto privá, lokal-promé, ku IA riba bo aparato. Mira, buska, kompartí i bebe bo recuerdonan — sin entregá nan na e nubia."
   },
-  "nav": { "features": "Funshon", "pricing": "Precio", "docs": "Docs", "faq": "FAQ", "open_app": "Labra e app", "get_started": "Kuminsá" },
+  "nav": {
+    "features": "Funshon",
+    "pricing": "Precio",
+    "docs": "Docs",
+    "faq": "FAQ",
+    "open_app": "Labra e app",
+    "get_started": "Kuminsá"
+  },
   "hero": {
     "badge": "Privá pa diseño · Lokal-promé",
     "title1": "Bo biblioteka di foto,",
@@ -13,44 +20,160 @@
     "cta_secondary": "Sap mas",
     "note": "Windows · macOS · Linux · Web"
   },
-  "logos": { "label": "Traha pa manera bo realmente ta tuma foto" },
-  "features": {
-    "eyebrow": "Funshon", "title": "Tur loke bo fotonan meresé",
-    "subtitle": "Un biblioteka di foto rápido i privá ku ta pensa manera bo.",
-    "listen": { "title": "Privá pa diseño", "desc": "Bo fotonan nunka no sali di bo aparato. Sin server, sin nubia, sin subí. Nunka." },
-    "search": { "title": "Búskeda den lenguage natural", "desc": "\"playa na 2021\" òf \"kei di kumpleaños\" — haña kualke momento den un instante ku IA riba bo aparato." },
-    "organized": { "title": "Organisá automátikamente", "desc": "Kara, lugánan, biahenan i evento, agrupá automátikamente i mantené privá." },
-    "share": { "title": "Kompartí di forma privá", "desc": "Kompartí un kolekshon kompleto via un link kriptá i na bibo. Huespednan ta mira solamente loke bo permití." },
-    "offline": { "title": "Funshoná sin konèkshon", "desc": "Bo biblioteka ta lokal, asina e ta funshoná den avion, den kas di kunuku, unda ku sea." },
-    "speed": { "title": "Rápido ekstremo", "desc": "Miyones di foto, resulta instantáneo. Bo aparato ta hasi e trabou pisá." }
+  "logos": {
+    "win": "Windows",
+    "mac": "macOS",
+    "linux": "Linux",
+    "android": "Android",
+    "web": "Web"
   },
-  "showcase": { "eyebrow": "E biblioteka", "title": "Un kas pa kada recuerdo", "desc": "Pikiña, kayetu i rápido — Siegu ta bira tur bo historia di foto den algu ku bo realmente gusta wak.", "caption": "Bo biblioteka, bo reglanan." },
+  "features": {
+    "eyebrow": "Funshon",
+    "title": "Tur loke bo fotonan meresé",
+    "subtitle": "Un biblioteka di foto rápido i privá ku ta pensa manera bo.",
+    "listen": {
+      "title": "Privá pa diseño",
+      "desc": "Bo fotonan nunka no sali di bo aparato. Sin server, sin nubia, sin subí. Nunka."
+    },
+    "search": {
+      "title": "Búskeda den lenguage natural",
+      "desc": "\"playa na 2021\" òf \"kei di kumpleaños\" — haña kualke momento den un instante ku IA riba bo aparato."
+    },
+    "organized": {
+      "title": "Organisá automátikamente",
+      "desc": "Kara, lugánan, biahenan i evento, agrupá automátikamente i mantené privá."
+    },
+    "share": {
+      "title": "Kompartí di forma privá",
+      "desc": "Kompartí un kolekshon kompleto via un link kriptá i na bibo. Huespednan ta mira solamente loke bo permití."
+    },
+    "offline": {
+      "title": "Funshoná sin konèkshon",
+      "desc": "Bo biblioteka ta lokal, asina e ta funshoná den avion, den kas di kunuku, unda ku sea."
+    },
+    "speed": {
+      "title": "Rápido ekstremo",
+      "desc": "Miyones di foto, resulta instantáneo. Bo aparato ta hasi e trabou pisá."
+    }
+  },
+  "showcase": {
+    "eyebrow": "E biblioteka",
+    "title": "Un kas pa kada recuerdo",
+    "desc": "Pikiña, kayetu i rápido — Siegu ta bira tur bo historia di foto den algu ku bo realmente gusta wak.",
+    "caption": "Bo biblioteka, bo reglanan."
+  },
   "pricing": {
-    "eyebrow": "Precio", "title": "Precio simple i honesto",
+    "eyebrow": "Precio",
+    "title": "Precio simple i honesto",
     "subtitle": "Tur kos ta lokal i privá. Paga pa komodidat, no pa bo data.",
-    "toggle": { "monthly": "Mensual", "yearly": "Anual", "save": "Hurga 20%" },
-    "free": { "name": "Gratis", "price": "$0", "period": "pa semper", "tagline": "E app kompleto riba bo aparato.", "features": ["Fotonan lokal sin límite", "Búskeda IA riba e aparato", "Organisashon automátiko", "Kompartí lokal riba bo red"], "cta": "Kuminsá" },
-    "pro": { "name": "Pro", "price": "$5", "period": "pa luna", "tagline": "Tur kos, na tur kaminda.", "highlight": "Mas popular", "features": ["Tur kos na Gratis", "Kompartí sinkronisá den nubia", "Link pa ken ku sea, na unda ku sea", "Soporte prioritario", "Akceso avaná na funshon nobo"], "cta": "Bai Pro", "yearly_badge": "fakturá anualmente" },
-    "team": { "name": "Famia", "price": "$9", "period": "pa luna", "tagline": "Kompartí un biblioteka huntu.", "features": ["Tur kos na Pro", "Te ku 6 miembro", "Maneho di invitashon", "Hub dediká"], "cta": "Elegí Famia" },
+    "toggle": {
+      "monthly": "Mensual",
+      "yearly": "Anual",
+      "save": "Hurga 20%"
+    },
+    "free": {
+      "name": "Gratis",
+      "price": "$0",
+      "period": "pa semper",
+      "tagline": "E app kompleto riba bo aparato.",
+      "features": [
+        "Fotonan lokal sin límite",
+        "Búskeda IA riba e aparato",
+        "Organisashon automátiko",
+        "Kompartí lokal riba bo red"
+      ],
+      "cta": "Kuminsá"
+    },
+    "pro": {
+      "name": "Pro",
+      "price": "$5",
+      "period": "pa luna",
+      "tagline": "Tur kos, na tur kaminda.",
+      "highlight": "Mas popular",
+      "features": [
+        "Tur kos na Gratis",
+        "Kompartí sinkronisá den nubia",
+        "Link pa ken ku sea, na unda ku sea",
+        "Soporte prioritario",
+        "Akceso avaná na funshon nobo"
+      ],
+      "cta": "Bai Pro",
+      "yearly_badge": "fakturá anualmente"
+    },
+    "team": {
+      "name": "Famia",
+      "price": "$9",
+      "period": "pa luna",
+      "tagline": "Kompartí un biblioteka huntu.",
+      "features": [
+        "Tur kos na Pro",
+        "Te ku 6 miembro",
+        "Maneho di invitashon",
+        "Hub dediká"
+      ],
+      "cta": "Elegí Famia"
+    },
     "note": "Precio na USD. Kanselá kuantu ke. Sin kosto extra pa mas foto."
   },
   "faq": {
-    "eyebrow": "FAQ", "title": "Pregunta, kontestá",
+    "eyebrow": "FAQ",
+    "title": "Pregunta, kontestá",
     "items": [
-      { "q": "Mi data ta realmente privá?", "a": "Sí. Bo fotonan i metadata ta keda riba bo aparato. Siegu ta usa IA riba e aparato, asina nada no ta wòrdu subí pa prosesá." },
-      { "q": "Siegu ta funshoná sin konèkshon?", "a": "Absolútamente. Bo biblioteka ta wòrdu warda lokal, asina bo por wak i buska bo fotonan na unda ku sea — asta sin konèkshon." },
-      { "q": "Kon e kompartí ta traha?", "a": "Bo por kompartí un kolekshon via un link kriptá di ekstremo na ekstremo i na bibo. Huespednan ta mira solamente loke bo skohe pa kompartí, i nada no ta wòrdu warda na nos lado." },
-      { "q": "Kua plataforma ta soportá?", "a": "Siegu ta kore riba Windows, macOS i Linux, ku un eksperensia web kompleto pa huespednan." },
-      { "q": "Por importá for di Google Fotos òf iCloud?", "a": "Sí — Siegu ta importá bo biblioteka eksistente i laga e prosesá tur lokal i privá." }
+      {
+        "q": "Mi data ta realmente privá?",
+        "a": "Sí. Bo fotonan i metadata ta keda riba bo aparato. Siegu ta usa IA riba e aparato, asina nada no ta wòrdu subí pa prosesá."
+      },
+      {
+        "q": "Siegu ta funshoná sin konèkshon?",
+        "a": "Absolútamente. Bo biblioteka ta wòrdu warda lokal, asina bo por wak i buska bo fotonan na unda ku sea — asta sin konèkshon."
+      },
+      {
+        "q": "Kon e kompartí ta traha?",
+        "a": "Bo por kompartí un kolekshon via un link kriptá di ekstremo na ekstremo i na bibo. Huespednan ta mira solamente loke bo skohe pa kompartí, i nada no ta wòrdu warda na nos lado."
+      },
+      {
+        "q": "Kua plataforma ta soportá?",
+        "a": "Siegu ta kore riba Windows, macOS i Linux, ku un eksperensia web kompleto pa huespednan."
+      },
+      {
+        "q": "Por importá for di Google Fotos òf iCloud?",
+        "a": "Sí — Siegu ta importá bo biblioteka eksistente i laga e prosesá tur lokal i privá."
+      }
     ]
   },
-  "cta": { "title": "Tuma bo fotonan bek", "subtitle": "Privá, lokal i di bo. Siegu ta klá ora bo ta klá.", "button": "Optené Siegu — e ta gratis", "note": "Sin cuenta, sin subí, sin saká." },
+  "cta": {
+    "title": "Tuma bo fotonan bek",
+    "subtitle": "Privá, lokal i di bo. Siegu ta klá ora bo ta klá.",
+    "button": "Optené Siegu — e ta gratis",
+    "note": "Sin cuenta, sin subí, sin saká."
+  },
   "footer": {
     "tagline": "Un biblioteka di foto privá, lokal-promé.",
-    "product": "Prodokto", "product_links": { "features": "Funshon", "pricing": "Precio", "changelog": "Changelog", "roadmap": "Roadmap" },
-    "resources": "Rekursonan", "resources_links": { "docs": "Dokumentashon", "download": "Deskargá", "support": "Soporte" },
-    "company": "Kompania", "company_links": { "about": "Di nos", "github": "GitHub", "blog": "Blog" },
-    "legal": "Privacidad & Términonan", "rights": "Tur derecho reservá.", "made": "Traha ku kuidado — sin nubia nesesario."
+    "product": "Prodokto",
+    "product_links": {
+      "features": "Funshon",
+      "pricing": "Precio",
+      "changelog": "Changelog",
+      "roadmap": "Roadmap"
+    },
+    "resources": "Rekursonan",
+    "resources_links": {
+      "docs": "Dokumentashon",
+      "download": "Deskargá",
+      "support": "Soporte"
+    },
+    "company": "Kompania",
+    "company_links": {
+      "about": "Di nos",
+      "github": "GitHub",
+      "blog": "Blog"
+    },
+    "legal": "Privacidad & Términonan",
+    "rights": "Tur derecho reservá.",
+    "made": "Traha ku kuidado — sin nubia nesesario."
   },
-  "misc": { "load": "Kargando…", "skip": "Bai na contenido" }
+  "misc": {
+    "load": "Kargando…",
+    "skip": "Bai na contenido"
+  }
 }

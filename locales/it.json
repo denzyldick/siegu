@@ -3,7 +3,14 @@
     "title": "Siegu — La tua libreria fotografica, privata per te",
     "description": "Siegu è una libreria fotografica privata, local-first, con IA sul dispositivo. Esplora, cerca, condividi e rivivi i tuoi ricordi — senza affidarli alla nuvola."
   },
-  "nav": { "features": "Funzionalità", "pricing": "Prezzi", "docs": "Documenti", "faq": "FAQ", "open_app": "Apri l'app", "get_started": "Inizia" },
+  "nav": {
+    "features": "Funzionalità",
+    "pricing": "Prezzi",
+    "docs": "Documenti",
+    "faq": "FAQ",
+    "open_app": "Apri l'app",
+    "get_started": "Inizia"
+  },
   "hero": {
     "badge": "Privato per design · Local-first",
     "title1": "La tua libreria fotografica,",
@@ -13,44 +20,160 @@
     "cta_secondary": "Scopri di più",
     "note": "Windows · macOS · Linux · Web"
   },
-  "logos": { "label": "Progettato per come fotografi davvero" },
-  "features": {
-    "eyebrow": "Funzionalità", "title": "Tutto ciò che le tue foto meritano",
-    "subtitle": "Una libreria fotografica veloce e privata che pensa come te.",
-    "listen": { "title": "Privato per design", "desc": "Le tue foto non lasciano mai il tuo dispositivo. Niente server, niente cloud, niente upload. Mai." },
-    "search": { "title": "Ricerca in linguaggio naturale", "desc": "“spiaggia nel 2021” oppure “torta di compleanno” — trova qualsiasi momento in un istante con l'IA sul dispositivo." },
-    "organized": { "title": "Organizzazione automatica", "desc": "Volti, luoghi, viaggi ed eventi, raggruppati automaticamente e mantenuti privati." },
-    "share": { "title": "Condivisione privata", "desc": "Condividi un'intera raccolta tramite un collegamento crittografato e live. Gli ospiti vedono solo ciò che permetti." },
-    "offline": { "title": "Funziona anche offline", "desc": "La tua libreria è locale, quindi funziona in aereo, in rifugio, ovunque." },
-    "speed": { "title": "Estremamente veloce", "desc": "Milioni di foto, risultati istantanei. È il tuo dispositivo a fare il lavoro pesante." }
+  "logos": {
+    "win": "Windows",
+    "mac": "macOS",
+    "linux": "Linux",
+    "android": "Android",
+    "web": "Web"
   },
-  "showcase": { "eyebrow": "La libreria", "title": "Una casa per ogni ricordo", "desc": "Pulita, calma e veloce — Siegu trasforma tutta la tua storia fotografica in qualcosa che ami davvero esplorare.", "caption": "La tua libreria, le tue regole." },
+  "features": {
+    "eyebrow": "Funzionalità",
+    "title": "Tutto ciò che le tue foto meritano",
+    "subtitle": "Una libreria fotografica veloce e privata che pensa come te.",
+    "listen": {
+      "title": "Privato per design",
+      "desc": "Le tue foto non lasciano mai il tuo dispositivo. Niente server, niente cloud, niente upload. Mai."
+    },
+    "search": {
+      "title": "Ricerca in linguaggio naturale",
+      "desc": "“spiaggia nel 2021” oppure “torta di compleanno” — trova qualsiasi momento in un istante con l'IA sul dispositivo."
+    },
+    "organized": {
+      "title": "Organizzazione automatica",
+      "desc": "Volti, luoghi, viaggi ed eventi, raggruppati automaticamente e mantenuti privati."
+    },
+    "share": {
+      "title": "Condivisione privata",
+      "desc": "Condividi un'intera raccolta tramite un collegamento crittografato e live. Gli ospiti vedono solo ciò che permetti."
+    },
+    "offline": {
+      "title": "Funziona anche offline",
+      "desc": "La tua libreria è locale, quindi funziona in aereo, in rifugio, ovunque."
+    },
+    "speed": {
+      "title": "Estremamente veloce",
+      "desc": "Milioni di foto, risultati istantanei. È il tuo dispositivo a fare il lavoro pesante."
+    }
+  },
+  "showcase": {
+    "eyebrow": "La libreria",
+    "title": "Una casa per ogni ricordo",
+    "desc": "Pulita, calma e veloce — Siegu trasforma tutta la tua storia fotografica in qualcosa che ami davvero esplorare.",
+    "caption": "La tua libreria, le tue regole."
+  },
   "pricing": {
-    "eyebrow": "Prezzi", "title": "Prezzi semplici e onesti",
+    "eyebrow": "Prezzi",
+    "title": "Prezzi semplici e onesti",
     "subtitle": "Tutto è locale e privato. Paghi per la comodità, non per i tuoi dati.",
-    "toggle": { "monthly": "Mensile", "yearly": "Annuale", "save": "Risparmia il 20%" },
-    "free": { "name": "Gratis", "price": "$0", "period": "per sempre", "tagline": "L'app completa sul tuo dispositivo.", "features": ["Foto locali illimitate", "Ricerca IA sul dispositivo", "Organizzazione automatica", "Condivisione locale sulla tua rete"], "cta": "Inizia" },
-    "pro": { "name": "Pro", "price": "$5", "period": "al mese", "tagline": "Tutto, ovunque.", "highlight": "Più popolare", "features": ["Tutto nel piano Gratis", "Condivisione sincronizzata sul cloud", "Collegamenti per chiunque, ovunque", "Supporto prioritario", "Accesso anticipato alle novità"], "cta": "Passa a Pro", "yearly_badge": "fatturato annualmente" },
-    "team": { "name": "Famiglia", "price": "$9", "period": "al mese", "tagline": "Condividete un'unica libreria.", "features": ["Tutto nel piano Pro", "Fino a 6 membri", "Gestione tramite inviti", "Hub domestico dedicato"], "cta": "Scegli Famiglia" },
+    "toggle": {
+      "monthly": "Mensile",
+      "yearly": "Annuale",
+      "save": "Risparmia il 20%"
+    },
+    "free": {
+      "name": "Gratis",
+      "price": "$0",
+      "period": "per sempre",
+      "tagline": "L'app completa sul tuo dispositivo.",
+      "features": [
+        "Foto locali illimitate",
+        "Ricerca IA sul dispositivo",
+        "Organizzazione automatica",
+        "Condivisione locale sulla tua rete"
+      ],
+      "cta": "Inizia"
+    },
+    "pro": {
+      "name": "Pro",
+      "price": "$5",
+      "period": "al mese",
+      "tagline": "Tutto, ovunque.",
+      "highlight": "Più popolare",
+      "features": [
+        "Tutto nel piano Gratis",
+        "Condivisione sincronizzata sul cloud",
+        "Collegamenti per chiunque, ovunque",
+        "Supporto prioritario",
+        "Accesso anticipato alle novità"
+      ],
+      "cta": "Passa a Pro",
+      "yearly_badge": "fatturato annualmente"
+    },
+    "team": {
+      "name": "Famiglia",
+      "price": "$9",
+      "period": "al mese",
+      "tagline": "Condividete un'unica libreria.",
+      "features": [
+        "Tutto nel piano Pro",
+        "Fino a 6 membri",
+        "Gestione tramite inviti",
+        "Hub domestico dedicato"
+      ],
+      "cta": "Scegli Famiglia"
+    },
     "note": "Prezzi in USD. Annulla quando vuoi. Nessun costo extra per altre foto."
   },
   "faq": {
-    "eyebrow": "FAQ", "title": "Domande, risposte",
+    "eyebrow": "FAQ",
+    "title": "Domande, risposte",
     "items": [
-      { "q": "I miei dati sono davvero privati?", "a": "Sì. Le tue foto e i metadati restano sul tuo dispositivo. Siegu usa IA sul dispositivo, quindi non viene caricato nulla per l'elaborazione." },
-      { "q": "Siegu funziona offline?", "a": "Assolutamente. La tua libreria è archiviata localmente, quindi puoi esplorare e cercare le tue foto ovunque — anche senza connessione." },
-      { "q": "Come funziona la condivisione?", "a": "Puoi condividere una raccolta tramite un collegamento crittografato end-to-end e live. Gli ospiti vedono solo ciò che scegli di condividere e nulla viene archiviato dal nostro lato." },
-      { "q": "Quali piattaforme sono supportate?", "a": "Siegu funziona su Windows, macOS e Linux, con un'esperienza web completa per gli ospiti." },
-      { "q": "Posso importare da Google Foto o iCloud?", "a": "Sì — Siegu importa la tua libreria esistente e poi la elabora interamente in locale e in modo privato." }
+      {
+        "q": "I miei dati sono davvero privati?",
+        "a": "Sì. Le tue foto e i metadati restano sul tuo dispositivo. Siegu usa IA sul dispositivo, quindi non viene caricato nulla per l'elaborazione."
+      },
+      {
+        "q": "Siegu funziona offline?",
+        "a": "Assolutamente. La tua libreria è archiviata localmente, quindi puoi esplorare e cercare le tue foto ovunque — anche senza connessione."
+      },
+      {
+        "q": "Come funziona la condivisione?",
+        "a": "Puoi condividere una raccolta tramite un collegamento crittografato end-to-end e live. Gli ospiti vedono solo ciò che scegli di condividere e nulla viene archiviato dal nostro lato."
+      },
+      {
+        "q": "Quali piattaforme sono supportate?",
+        "a": "Siegu funziona su Windows, macOS e Linux, con un'esperienza web completa per gli ospiti."
+      },
+      {
+        "q": "Posso importare da Google Foto o iCloud?",
+        "a": "Sì — Siegu importa la tua libreria esistente e poi la elabora interamente in locale e in modo privato."
+      }
     ]
   },
-  "cta": { "title": "Riprenditi le tue foto", "subtitle": "Privato, locale e tuo. Siegu è pronto quando lo sei tu.", "button": "Scarica Siegu — è gratis", "note": "Nessun account, nessun upload, nessun vincolo." },
+  "cta": {
+    "title": "Riprenditi le tue foto",
+    "subtitle": "Privato, locale e tuo. Siegu è pronto quando lo sei tu.",
+    "button": "Scarica Siegu — è gratis",
+    "note": "Nessun account, nessun upload, nessun vincolo."
+  },
   "footer": {
     "tagline": "Una libreria fotografica privata, local-first.",
-    "product": "Prodotto", "product_links": { "features": "Funzionalità", "pricing": "Prezzi", "changelog": "Registro modifiche", "roadmap": "Roadmap" },
-    "resources": "Risorse", "resources_links": { "docs": "Documentazione", "download": "Scarica", "support": "Supporto" },
-    "company": "Azienda", "company_links": { "about": "Chi siamo", "github": "GitHub", "blog": "Blog" },
-    "legal": "Privacy e Termini", "rights": "Tutti i diritti riservati.", "made": "Fatto con cura — nessun cloud richiesto."
+    "product": "Prodotto",
+    "product_links": {
+      "features": "Funzionalità",
+      "pricing": "Prezzi",
+      "changelog": "Registro modifiche",
+      "roadmap": "Roadmap"
+    },
+    "resources": "Risorse",
+    "resources_links": {
+      "docs": "Documentazione",
+      "download": "Scarica",
+      "support": "Supporto"
+    },
+    "company": "Azienda",
+    "company_links": {
+      "about": "Chi siamo",
+      "github": "GitHub",
+      "blog": "Blog"
+    },
+    "legal": "Privacy e Termini",
+    "rights": "Tutti i diritti riservati.",
+    "made": "Fatto con cura — nessun cloud richiesto."
   },
-  "misc": { "load": "Caricamento…", "skip": "Vai al contenuto" }
+  "misc": {
+    "load": "Caricamento…",
+    "skip": "Vai al contenuto"
+  }
 }

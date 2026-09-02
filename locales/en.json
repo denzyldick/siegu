@@ -21,7 +21,11 @@
     "note": "Windows · macOS · Linux · Web"
   },
   "logos": {
-    "label": "Made for the way you actually take photos"
+    "win": "Windows",
+    "mac": "macOS",
+    "linux": "Linux",
+    "android": "Android",
+    "web": "Web"
   },
   "features": {
     "eyebrow": "Features",

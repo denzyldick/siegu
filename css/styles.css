@@ -1,7 +1,9 @@
 /* Siegu landing — monochrome, minimal, fast. Matches the app's
    black-on-white / white-on-black theme and the Outfit typeface. */
 
-:root {
+/* Light theme is the default (also matches prefers-color-scheme: light). */
+:root,
+:root[data-theme='light'] {
   --bg: #ffffff;
   --surface: #fafafa;
   --surface-2: #f4f4f5;
@@ -18,8 +20,33 @@
   --font: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* Dark palette applies for OS-dark (system mode) OR a manual dark choice.
+   The JS inlines the resolved theme onto <html data-theme> in both cases, so
+   this block drives the effective styling regardless of which path triggered
+   it. */
+:root[data-theme='dark'] {
+  --bg: #09090b;
+  --surface: #18181b;
+  --surface-2: #27272a;
+  --border: #2a2a2e;
+  --text: #fafafa;
+  --text-2: #a1a1aa;
+  --text-3: #71717a;
+  --ink: #ffffff;
+  --on-ink: #000000;
+  --error: #f87171;
+  --success: #4ade80;
+}
+
+/* In dark mode the (black) brand glyph and flat favicons are inverted to
+   white so they stay visible on the dark header and dark browser tabs. */
+:root[data-theme='dark'] .brand img,
+:root[data-theme='dark'] .brand-header-icon { filter: invert(1); }
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  /* Fallback for the brief moment before JS sets data-theme, and for
+     environments where prefers-color-scheme drives styling directly. */
+  :root:not([data-theme='light']) {
     --bg: #09090b;
     --surface: #18181b;
     --surface-2: #27272a;
@@ -32,6 +59,8 @@
     --error: #f87171;
     --success: #4ade80;
   }
+  :root:not([data-theme='light']) .brand img,
+  :root:not([data-theme='light']) .brand-header-icon { filter: invert(1); }
 }
 
 * { box-sizing: border-box; }
@@ -73,11 +102,20 @@ img { max-width: 100%; display: block; }
   height: 68px;
 }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 20px; letter-spacing: .3px; }
-.brand img { width: 26px; height: 26px; object-fit: contain; border-radius: 6px; }
+.brand img { width: 32px; height: 32px; object-fit: contain; border-radius: 7px; }
 .nav { display: flex; align-items: center; gap: 26px; }
 .nav a { font-size: 14.5px; font-weight: 600; color: var(--text-2); }
 .nav a:hover { color: var(--text); }
 .header-actions { display: flex; align-items: center; gap: 14px; }
+
+.theme-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: none; border: 1px solid var(--border); cursor: pointer;
+  font-size: 16px; line-height: 1; color: var(--text);
+  transition: background .2s ease, border-color .2s ease;
+}
+.theme-btn:hover { background: var(--surface-2); }
 
 .lang-switch { position: relative; }
 .lang-btn {
@@ -193,6 +231,12 @@ img { max-width: 100%; display: block; }
 /* ---------- Logos strip ---------- */
 .logo-strip { padding: 18px 0 0; text-align: center; }
 .logo-strip .label { color: var(--text-3); font-size: 13px; font-weight: 600; letter-spacing: .05em; }
+.platform-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.platform-item {
+  font-size: 13px; font-weight: 600; color: var(--text-3);
+  border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px;
+  background: var(--surface);
+}
 
 /* ---------- Features grid ---------- */
 .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }

@@ -3,7 +3,14 @@
     "title": "Siegu — Votre photothèque, rien qu'à vous",
     "description": "Siegu est une photothèque privée et locale, avec IA embarquée. Parcourez, recherchez, partagez et revivez vos souvenirs — sans les confier au cloud."
   },
-  "nav": { "features": "Fonctionnalités", "pricing": "Tarifs", "docs": "Docs", "faq": "FAQ", "open_app": "Ouvrir l'app", "get_started": "Commencer" },
+  "nav": {
+    "features": "Fonctionnalités",
+    "pricing": "Tarifs",
+    "docs": "Docs",
+    "faq": "FAQ",
+    "open_app": "Ouvrir l'app",
+    "get_started": "Commencer"
+  },
   "hero": {
     "badge": "Privé par conception · Local d'abord",
     "title1": "Votre photothèque,",
@@ -13,44 +20,160 @@
     "cta_secondary": "En savoir plus",
     "note": "Windows · macOS · Linux · Web"
   },
-  "logos": { "label": "Conçu pour la façon dont vous prenez vraiment des photos" },
-  "features": {
-    "eyebrow": "Fonctionnalités", "title": "Tout ce que vos photos méritent",
-    "subtitle": "Une photothèque rapide et privée qui pense comme vous.",
-    "listen": { "title": "Privé par conception", "desc": "Vos photos ne quittent jamais votre appareil. Pas de serveur, pas de cloud, pas d'envoi. Jamais." },
-    "search": { "title": "Recherche en langage naturel", "desc": "\"plage en 2021\" ou \"gâteau d'anniversaire\" — retrouvez n'importe quel moment en un instant grâce à l'IA embarquée." },
-    "organized": { "title": "Organisation automatique", "desc": "Visages, lieux, voyages et événements, regroupés automatiquement et en toute confidentialité." },
-    "share": { "title": "Partage privé", "desc": "Partagez toute une collection via un lien chiffré et en direct. Les invités ne voient que ce que vous autorisez." },
-    "offline": { "title": "Fonctionne hors ligne", "desc": "Votre photothèque est locale, elle fonctionne donc en avion, en cabane, partout." },
-    "speed": { "title": "Ultra rapide", "desc": "Des millions de photos, des résultats instantanés. Votre appareil fait le travail." }
+  "logos": {
+    "win": "Windows",
+    "mac": "macOS",
+    "linux": "Linux",
+    "android": "Android",
+    "web": "Web"
   },
-  "showcase": { "eyebrow": "La photothèque", "title": "Une maison pour chaque souvenir", "desc": "Propre, calme et rapide — Siegu transforme votre histoire photo en quelque chose que vous aimez vraiment parcourir.", "caption": "Votre photothèque, vos règles." },
+  "features": {
+    "eyebrow": "Fonctionnalités",
+    "title": "Tout ce que vos photos méritent",
+    "subtitle": "Une photothèque rapide et privée qui pense comme vous.",
+    "listen": {
+      "title": "Privé par conception",
+      "desc": "Vos photos ne quittent jamais votre appareil. Pas de serveur, pas de cloud, pas d'envoi. Jamais."
+    },
+    "search": {
+      "title": "Recherche en langage naturel",
+      "desc": "\"plage en 2021\" ou \"gâteau d'anniversaire\" — retrouvez n'importe quel moment en un instant grâce à l'IA embarquée."
+    },
+    "organized": {
+      "title": "Organisation automatique",
+      "desc": "Visages, lieux, voyages et événements, regroupés automatiquement et en toute confidentialité."
+    },
+    "share": {
+      "title": "Partage privé",
+      "desc": "Partagez toute une collection via un lien chiffré et en direct. Les invités ne voient que ce que vous autorisez."
+    },
+    "offline": {
+      "title": "Fonctionne hors ligne",
+      "desc": "Votre photothèque est locale, elle fonctionne donc en avion, en cabane, partout."
+    },
+    "speed": {
+      "title": "Ultra rapide",
+      "desc": "Des millions de photos, des résultats instantanés. Votre appareil fait le travail."
+    }
+  },
+  "showcase": {
+    "eyebrow": "La photothèque",
+    "title": "Une maison pour chaque souvenir",
+    "desc": "Propre, calme et rapide — Siegu transforme votre histoire photo en quelque chose que vous aimez vraiment parcourir.",
+    "caption": "Votre photothèque, vos règles."
+  },
   "pricing": {
-    "eyebrow": "Tarifs", "title": "Des tarifs simples et honnêtes",
+    "eyebrow": "Tarifs",
+    "title": "Des tarifs simples et honnêtes",
     "subtitle": "Tout est local et privé. Payez pour la commodité, pas pour vos données.",
-    "toggle": { "monthly": "Mensuel", "yearly": "Annuel", "save": "Économisez 20%" },
-    "free": { "name": "Gratuit", "price": "$0", "period": "pour toujours", "tagline": "L'app complète sur votre appareil.", "features": ["Photos locales illimitées", "Recherche IA embarquée", "Organisation automatique", "Partage local sur votre réseau"], "cta": "Commencer" },
-    "pro": { "name": "Pro", "price": "$5", "period": "par mois", "tagline": "Tout, partout.", "highlight": "Le plus populaire", "features": ["Tout le plan Gratuit", "Partage synchronisé dans le cloud", "Liens pour tout le monde, partout", "Support prioritaire", "Accès anticipé aux nouveautés"], "cta": "Passer Pro", "yearly_badge": "facturé à l'année" },
-    "team": { "name": "Famille", "price": "$9", "period": "par mois", "tagline": "Partagez une seule photothèque ensemble.", "features": ["Tout le plan Pro", "Jusqu'à 6 membres", "Gestion par invitation", "Hub domestique dédié"], "cta": "Choisir Famille" },
+    "toggle": {
+      "monthly": "Mensuel",
+      "yearly": "Annuel",
+      "save": "Économisez 20%"
+    },
+    "free": {
+      "name": "Gratuit",
+      "price": "$0",
+      "period": "pour toujours",
+      "tagline": "L'app complète sur votre appareil.",
+      "features": [
+        "Photos locales illimitées",
+        "Recherche IA embarquée",
+        "Organisation automatique",
+        "Partage local sur votre réseau"
+      ],
+      "cta": "Commencer"
+    },
+    "pro": {
+      "name": "Pro",
+      "price": "$5",
+      "period": "par mois",
+      "tagline": "Tout, partout.",
+      "highlight": "Le plus populaire",
+      "features": [
+        "Tout le plan Gratuit",
+        "Partage synchronisé dans le cloud",
+        "Liens pour tout le monde, partout",
+        "Support prioritaire",
+        "Accès anticipé aux nouveautés"
+      ],
+      "cta": "Passer Pro",
+      "yearly_badge": "facturé à l'année"
+    },
+    "team": {
+      "name": "Famille",
+      "price": "$9",
+      "period": "par mois",
+      "tagline": "Partagez une seule photothèque ensemble.",
+      "features": [
+        "Tout le plan Pro",
+        "Jusqu'à 6 membres",
+        "Gestion par invitation",
+        "Hub domestique dédié"
+      ],
+      "cta": "Choisir Famille"
+    },
     "note": "Prix en USD. Annulez à tout moment. Pas de frais supplémentaires pour plus de photos."
   },
   "faq": {
-    "eyebrow": "FAQ", "title": "Des questions, des réponses",
+    "eyebrow": "FAQ",
+    "title": "Des questions, des réponses",
     "items": [
-      { "q": "Mes données sont-elles vraiment privées ?", "a": "Oui. Vos photos et métadonnées restent sur votre appareil. Siegu utilise l'IA embarquée, donc rien n'est envoyé pour être traité." },
-      { "q": "Siegu fonctionne-t-il hors ligne ?", "a": "Absolument. Votre photothèque est stockée localement, vous pouvez donc parcourir et rechercher vos photos partout — même sans connexion." },
-      { "q": "Comment fonctionne le partage ?", "a": "Vous pouvez partager une collection via un lien chiffré de bout en bout et en direct. Les invités ne voient que ce que vous choisissez de partager, et rien n'est stocké de notre côté." },
-      { "q": "Quelles plateformes sont prises en charge ?", "a": "Siegu fonctionne sur Windows, macOS et Linux, avec une expérience web complète pour les invités." },
-      { "q": "Puis-je importer depuis Google Photos ou iCloud ?", "a": "Oui — Siegu importe votre photothèque existante, puis la traite entièrement en local et en privé." }
+      {
+        "q": "Mes données sont-elles vraiment privées ?",
+        "a": "Oui. Vos photos et métadonnées restent sur votre appareil. Siegu utilise l'IA embarquée, donc rien n'est envoyé pour être traité."
+      },
+      {
+        "q": "Siegu fonctionne-t-il hors ligne ?",
+        "a": "Absolument. Votre photothèque est stockée localement, vous pouvez donc parcourir et rechercher vos photos partout — même sans connexion."
+      },
+      {
+        "q": "Comment fonctionne le partage ?",
+        "a": "Vous pouvez partager une collection via un lien chiffré de bout en bout et en direct. Les invités ne voient que ce que vous choisissez de partager, et rien n'est stocké de notre côté."
+      },
+      {
+        "q": "Quelles plateformes sont prises en charge ?",
+        "a": "Siegu fonctionne sur Windows, macOS et Linux, avec une expérience web complète pour les invités."
+      },
+      {
+        "q": "Puis-je importer depuis Google Photos ou iCloud ?",
+        "a": "Oui — Siegu importe votre photothèque existante, puis la traite entièrement en local et en privé."
+      }
     ]
   },
-  "cta": { "title": "Reprenez vos photos", "subtitle": "Privé, local et vôtre. Siegu est prêt quand vous l'êtes.", "button": "Obtenir Siegu — c'est gratuit", "note": "Pas de compte, pas d'envoi, pas de verrouillage." },
+  "cta": {
+    "title": "Reprenez vos photos",
+    "subtitle": "Privé, local et vôtre. Siegu est prêt quand vous l'êtes.",
+    "button": "Obtenir Siegu — c'est gratuit",
+    "note": "Pas de compte, pas d'envoi, pas de verrouillage."
+  },
   "footer": {
     "tagline": "Une photothèque privée, locale d'abord.",
-    "product": "Produit", "product_links": { "features": "Fonctionnalités", "pricing": "Tarifs", "changelog": "Journal des modifications", "roadmap": "Feuille de route" },
-    "resources": "Ressources", "resources_links": { "docs": "Documentation", "download": "Télécharger", "support": "Assistance" },
-    "company": "Entreprise", "company_links": { "about": "À propos", "github": "GitHub", "blog": "Blog" },
-    "legal": "Confidentialité & Conditions", "rights": "Tous droits réservés.", "made": "Fait avec soin — aucun cloud requis."
+    "product": "Produit",
+    "product_links": {
+      "features": "Fonctionnalités",
+      "pricing": "Tarifs",
+      "changelog": "Journal des modifications",
+      "roadmap": "Feuille de route"
+    },
+    "resources": "Ressources",
+    "resources_links": {
+      "docs": "Documentation",
+      "download": "Télécharger",
+      "support": "Assistance"
+    },
+    "company": "Entreprise",
+    "company_links": {
+      "about": "À propos",
+      "github": "GitHub",
+      "blog": "Blog"
+    },
+    "legal": "Confidentialité & Conditions",
+    "rights": "Tous droits réservés.",
+    "made": "Fait avec soin — aucun cloud requis."
   },
-  "misc": { "load": "Chargement…", "skip": "Aller au contenu" }
+  "misc": {
+    "load": "Chargement…",
+    "skip": "Aller au contenu"
+  }
 }

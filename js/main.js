@@ -137,10 +137,34 @@ function renderFaq() {
 }
 
 /* ---------- Theme ---------- */
+const THEME_KEY = 'siegu_theme';
+const THEME_MODES = ['light', 'dark', 'system'];
+
+function storedTheme() {
+  const v = localStorage.getItem(THEME_KEY);
+  return THEME_MODES.includes(v) ? v : 'system';
+}
+
 function applyTheme() {
-  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const mode = storedTheme();
+  const dark =
+    mode === 'dark' ||
+    (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const root = document.documentElement;
-  root.className = dark ? 'is-dark' : '';
+  root.setAttribute('data-theme', dark ? 'dark' : 'light');
+  root.classList.toggle('is-dark', dark);
+  const btn = document.getElementById('themeBtn');
+  if (btn) {
+    btn.setAttribute('aria-label', `Theme: ${dark ? 'dark' : 'light'} (click to cycle)`);
+    btn.textContent = dark ? '☀︎' : '☾';
+  }
+}
+
+function cycleTheme() {
+  const modes = ['light', 'dark', 'system'];
+  const next = modes[(modes.indexOf(storedTheme()) + 1) % modes.length];
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme();
 }
 
 /* ---------- Trackers / analytics ----------
@@ -149,7 +173,7 @@ function applyTheme() {
    GA4: the Docker build injects the real Measurement ID into GA_MEASUREMENT_ID
    (see deploy/Caddyfile + README). When the ID is still the public placeholder
    or absent, GA stays off — including under plain `npm run dev`. */
-const GA_MEASUREMENT_ID = 'G-GA4-MEASUREMENT-ID';
+const GA_MEASUREMENT_ID = 'G-8Q72K460VG';
 const GA_ENABLED = /^G-[A-Z0-9]+$/.test(GA_MEASUREMENT_ID);
 
 function trackersOn() {
@@ -330,6 +354,8 @@ async function boot() {
   });
 
   applyTheme();
+  const themeBtn = document.getElementById('themeBtn');
+  if (themeBtn) themeBtn.addEventListener('click', cycleTheme);
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 
   initTracking();

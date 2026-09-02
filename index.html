@@ -5,16 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Siegu — Your photo library, privately yours</title>
   <meta name="description" content="Siegu is a private, local-first photo library with on-device AI. Browse, search, share and relive your memories without handing them to the cloud." />
+  <script>
+    // Apply the saved theme before first paint to avoid a flash of the wrong
+    // palette. Mirrors applyTheme() in js/main.js (light | dark | system).
+    (function () {
+      try {
+        var v = localStorage.getItem('siegu_theme');
+        var mode = ['light', 'dark', 'system'].indexOf(v) !== -1 ? v : 'system';
+        var dark = mode === 'dark' ||
+          (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      } catch (e) { /* localStorage unavailable: rely on CSS media-query fallback */ }
+    })();
+  </script>
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Siegu" />
   <meta property="og:title" content="Siegu — Your photo library, privately yours" />
   <meta property="og:description" content="Private, local-first photo library with on-device AI. No cloud, no uploads." />
-  <meta property="og:image" content="banner.png" />
+  <meta property="og:image" content="https://denzyldick.github.io/siegu/banner.png" />
   <meta name="twitter:card" content="summary_large_image" />
-  <!-- iOS / favicon -->
-  <link rel="icon" href="logo.png" />
+  <!-- iOS / favicon (adaptive: dark-supporting browsers get the white glyph) -->
+  <link rel="icon" href="favicon.png" />
+  <link rel="icon" href="favicon-white.png" media="(prefers-color-scheme: dark)" />
   <link rel="apple-touch-icon" href="logo.png" />
+
 
   <!-- Fonts (same typeface as the app) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -44,6 +59,7 @@
         <a href="#docs" data-i18n="nav.docs">Docs</a>
       </nav>
       <div class="header-actions">
+        <button class="theme-btn" id="themeBtn" type="button" aria-label="Toggle theme">☾</button>
         <div class="lang-switch">
           <button class="lang-btn" id="langBtn" type="button">
             <span id="langCode">EN</span>
@@ -84,9 +100,15 @@
       </div>
     </section>
 
-    <!-- Logos strip -->
-    <section class="logo-strip section" style="padding-top:40px;padding-bottom:20px">
-      <p class="label" data-i18n="logos.label">Made for the way you actually take photos</p>
+    <!-- Platform strip -->
+    <section class="logo-strip section" style="padding-top:34px;padding-bottom:20px">
+      <div class="platform-row">
+        <span class="platform-item" data-i18n="logos.win">Windows</span>
+        <span class="platform-item" data-i18n="logos.mac">macOS</span>
+        <span class="platform-item" data-i18n="logos.linux">Linux</span>
+        <span class="platform-item" data-i18n="logos.android">Android</span>
+        <span class="platform-item" data-i18n="logos.web">Web</span>
+      </div>
     </section>
 
     <!-- Features -->
