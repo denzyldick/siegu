@@ -48,6 +48,7 @@ COPY index.html vite.config.ts tsconfig.json ./
 COPY src/ src/
 COPY public/ public/
 COPY branding/ branding/
+COPY shared/ shared/
 RUN npm run build
 
 ###############################################################################
