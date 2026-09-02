@@ -114,7 +114,7 @@ function renderPricing() {
         ${isYearly && key !== 'free' ? `<p class="yearly-badge">${p.yearly_badge || ''}</p>` : ''}
         <p class="tagline">${p.tagline || ''}</p>
         <ul>${feats.map((f) => `<li><span class="check">✓</span><span>${f}</span></li>`).join('')}</ul>
-        <a class="btn ${featured ? 'btn-ink' : 'btn-ghost'}" href="${checkoutHref()}" ${GUMROAD_ENABLED ? 'target="_blank" rel="noopener"' : ''} data-track="pricing_${key}">${p.cta || ''}</a>
+        <a class="btn ${featured ? 'btn-ink' : 'btn-ghost'}" href="${checkoutHref(key)}" ${checkoutHref(key) !== '#' ? 'target="_blank" rel="noopener"' : ''} data-track="pricing_${key}">${p.cta || ''}</a>
       </div>`;
     })
     .join('');
@@ -168,14 +168,30 @@ function trackersOn() {
 }
 
 /* ---------- Gumroad checkout ----------
-   First distribution channel. The Docker build injects the real product URL
-   into GUMROAD_PRODUCT_URL (see deploy/Caddyfile + README). While it's still
-   the placeholder, buy buttons stay inert (#). */
-const GUMROAD_PRODUCT_URL = 'GUMROAD_PRODUCT_URL';
-const GUMROAD_ENABLED = /^https:\/\/[a-z0-9./-]*gumroad\.com\/[a-z0-9-]+$/i.test(GUMROAD_PRODUCT_URL);
+   First distribution channel. A build script (scripts/build-static.mjs)
+   substitutes the real per-tier product URLs into the GUMROAD_* placeholders.
+   While the placeholders remain unset, the matching buttons stay inert (#). */
+const GUMROAD_PRODUCTS = {
+  free: '',
+  pro: '',
+  team: '',
+  primary: 'https://3848817799485.gumroad.com/l/acudv',
+};
 
-function checkoutHref() {
-  return GUMROAD_ENABLED ? GUMROAD_PRODUCT_URL : '#';
+// Accepts custom-subdomain or standard Gumroad product links, e.g.
+//   https://3848817799485.gumroad.com/l/acudv   (custom subdomain, /l/{slug})
+//   https://yourname.gumroad.com/l/slug
+//   https://gumroad.com/l/slug
+const GUMROAD_RE = /^https:\/\/[a-z0-9.-]*gumroad\.com\/l\/[a-z0-9-]+$/i;
+
+function checkoutHref(planKey) {
+  // A pricing row uses its own tier URL when set; otherwise every button
+  // falls back to the primary URL so a single-product launch wires them all.
+  const candidates = [planKey && GUMROAD_PRODUCTS[planKey], GUMROAD_PRODUCTS.primary];
+  for (const url of candidates) {
+    if (GUMROAD_RE.test(url || '')) return url;
+  }
+  return '#';
 }
 
 /* Point the header / footer "Get Siegu" links at checkout once available. */
