@@ -138,6 +138,10 @@
       {
         "q": "Puis-je importer depuis Google Photos ou iCloud ?",
         "a": "Oui — Siegu importe votre photothèque existante, puis la traite entièrement en local et en privé."
+      },
+      {
+        "q": "Puis-je essayer une démo ?",
+        "a": "Oui ! Ouvrez la démo en direct pour voir Siegu à l'œuvre dans votre navigateur — sans installation ni compte."
       }
     ]
   },
@@ -193,7 +197,8 @@
     "step3": {
       "title": "Recherchez, partagez et passez à Pro",
       "desc": "Trouvez tout en quelques secondes. Passez à Pro quand vous voulez plus."
-    }
+    },
+    "demo": "Préférez essayer d'abord ? Ouvrir la démo en direct →"
   },
   "trust": {
     "open_source": "Open source",

@@ -138,6 +138,10 @@
       {
         "q": "Por importá for di Google Fotos òf iCloud?",
         "a": "Sí — Siegu ta importá bo biblioteka eksistente i laga e prosesá tur lokal i privá."
+      },
+      {
+        "q": "Tin un demo ku mi por purba?",
+        "a": "Sí! Habri e demo biba pa mira Siegu na akshon den bo browser — sin instalashon ni kuenta."
       }
     ]
   },
@@ -193,7 +197,8 @@
     "step3": {
       "title": "Buska, kompartí i Upgrade na Pro",
       "desc": "Haña tur kos den sekònder. Upgrade na Pro ora bo kier mas."
-    }
+    },
+    "demo": "Ta preferá purba promé? Habri e demo biba →"
   },
   "trust": {
     "open_source": "Código habrí",

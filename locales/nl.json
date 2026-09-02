@@ -138,6 +138,10 @@
       {
         "q": "Kan ik importeren vanuit Google Foto's of iCloud?",
         "a": "Ja — Siegu importeert je bestaande bibliotheek en verwerkt die vervolgens volledig lokaal en privé."
+      },
+      {
+        "q": "Is er een demo die ik kan proberen?",
+        "a": "Ja! Open de live demo om Siegu direct in je browser te zien — geen installatie of account nodig."
       }
     ]
   },
@@ -193,7 +197,8 @@
     "step3": {
       "title": "Zoek, deel & upgrade naar Pro",
       "desc": "Vind alles in seconden. Upgrade naar Pro als je meer wilt."
-    }
+    },
+    "demo": "Liever eerst proberen? Open de live demo →"
   },
   "trust": {
     "open_source": "Open source",

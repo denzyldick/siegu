@@ -23,12 +23,60 @@
   <meta property="og:site_name" content="Siegu" />
   <meta property="og:title" content="Siegu — Your photo library, privately yours" />
   <meta property="og:description" content="Private, local-first photo library with on-device AI. No cloud, no uploads." />
-  <meta property="og:image" content="https://denzyldick.github.io/siegu/banner.png" />
+  <meta property="og:url" content="https://denzyldick.github.io/siegu/" />
+  <meta property="og:image" content="https://denzyldick.github.io/siegu/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Siegu — Your photo library, privately yours" />
+  <meta name="twitter:description" content="Private, local-first photo library with on-device AI. No cloud, no uploads." />
+  <meta name="twitter:image" content="https://denzyldick.github.io/siegu/og-image.png" />
+
+  <!-- SEO -->
+  <link rel="canonical" href="https://denzyldick.github.io/siegu/" />
+  <meta name="robots" content="index, follow" />
+  <meta name="author" content="Denzyl Dick" />
+  <meta name="keywords" content="photo library, photo manager, local-first, on-device AI, private photos, photo search, offline photo app, open source photo, privacy, self-hosted, photo organizer" />
+  <meta name="theme-color" content="#0b0b0b" />
+  <meta property="og:locale" content="en_US" />
+
+  <!-- Structured data: SoftwareApplication + Organization -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "name": "Siegu",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "Windows, macOS, Linux, Android",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "description": "Siegu is a private, local-first photo library with on-device AI. Browse, search, share and relive your memories without handing them to the cloud.",
+        "url": "https://denzyldick.github.io/siegu/",
+        "image": "https://denzyldick.github.io/siegu/og-image.png"
+      },
+      {
+        "@type": "Organization",
+        "name": "Siegu",
+        "url": "https://denzyldick.github.io/siegu/",
+        "logo": "https://denzyldick.github.io/siegu/logo.png",
+        "sameAs": [
+          "https://github.com/denzyldick/siegu"
+        ]
+      }
+    ]
+  }
+  </script>
+
   <!-- iOS / favicon (adaptive: dark-supporting browsers get the white glyph) -->
   <link rel="icon" href="favicon.png" />
   <link rel="icon" href="favicon-white.png" media="(prefers-color-scheme: dark)" />
   <link rel="apple-touch-icon" href="logo.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
 
 
   <!-- Fonts (same typeface as the app) -->
@@ -48,6 +96,11 @@
 </head>
 <body>
   <a class="skip" href="#main" style="position:absolute;left:-9999px;top:-9999px">Skip to content</a>
+  <noscript>
+    <p style="background:#1f1f1f;color:#e8e8e8;text-align:center;padding:10px 16px;margin:0;font-size:14px">
+      Siegu needs JavaScript to show the download buttons and live demo. It's free, private, and works offline.
+    </p>
+  </noscript>
 
   <header class="site-header">
     <div class="container header-inner">
@@ -152,6 +205,9 @@
             <p data-i18n="how.step3.desc">Find anything in seconds. Upgrade to Pro when you want more.</p>
           </div>
         </div>
+        <p class="how-demo" style="text-align:center;margin-top:34px">
+          <a href="https://siegu.onrender.com" target="_blank" rel="noopener" data-track="demo_clicked" data-i18n="how.demo">Prefer to try it first? Open the live demo →</a>
+        </p>
       </div>
     </section>
 

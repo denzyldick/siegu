@@ -138,6 +138,10 @@
       {
         "q": "Posso importare da Google Foto o iCloud?",
         "a": "Sì — Siegu importa la tua libreria esistente e poi la elabora interamente in locale e in modo privato."
+      },
+      {
+        "q": "C'è una demo che posso provare?",
+        "a": "Sì! Apri la demo live per vedere Siegu in azione nel tuo browser — senza installare o creare un account."
       }
     ]
   },
@@ -193,7 +197,8 @@
     "step3": {
       "title": "Cerca, condividi e passa a Pro",
       "desc": "Trova tutto in pochi secondi. Passa a Pro quando vuoi di più."
-    }
+    },
+    "demo": "Preferisci provarlo prima? Apri la demo live →"
   },
   "trust": {
     "open_source": "Open source",
