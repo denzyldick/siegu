@@ -31,7 +31,7 @@ COPY crates/ crates/
 
 # Configure the ffmpeg/linking env the core uses, then build just the CLI.
 RUN cargo build -p siegu-cli --release --locked
-RUN cp target/release/siegu /siegu
+RUN cp target/release/siegu-cli /siegu
 
 ###############################################################################
 # Stage 2 — build the Vue client (the real desktop UI, reused as the web UI).

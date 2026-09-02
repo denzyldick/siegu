@@ -28,7 +28,7 @@ COPY shared/ shared/
 COPY crates/ crates/
 
 RUN cargo build -p siegu-cli --release --locked
-RUN cp target/release/siegu /siegu
+RUN cp target/release/siegu-cli /siegu
 
 ###############################################################################
 # Stage 2 — build the Vue client.
