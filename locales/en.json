@@ -101,17 +101,18 @@
       "yearly_badge": "billed yearly"
     },
     "note": "Prices in USD. Cancel anytime. No extra fees for more photos.",
-    "waitlist": {
+    "team": {
       "name": "Family",
+      "price": "$9",
+      "period": "per month",
       "tagline": "Share one library together.",
       "features": [
+        "Everything in Pro",
         "Up to 6 members",
         "Invitational management",
         "Dedicated home hub"
       ],
-      "placeholder": "Your email",
-      "cta": "Join waitlist",
-      "note": "We'll notify you when it's ready."
+      "cta": "Choose Family"
     }
   },
   "faq": {
@@ -197,5 +198,11 @@
     "open_source": "Open source",
     "no_uploads": "No uploads",
     "local": "Your photos never leave your device"
+  },
+  "waitlist": {
+    "title": "You're early — and that's a great thing.",
+    "desc": "Family sharing is launching soon. Drop your email and we'll let you know the moment it's ready — plus an early-bird discount.",
+    "cta": "Join waitlist",
+    "note": "No spam. Just a heads-up when it's ready."
   }
 }

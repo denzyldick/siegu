@@ -91,20 +91,26 @@ function toggleLangMenu(force) {
 
 /* ---------- Pricing ---------- */
 function priceFor(plan, price) {
-  return state.billing === 'yearly' ? (price * 0.8).toFixed(0) : String(price);
+  if (plan === 'free') return '0';
+  return state.billing === 'yearly' ? (price * 0.8).toFixed(2) : price.toFixed(2);
 }
 
 function renderPricing() {
   const d = state.dict || {};
-  const plans = ['free', 'pro'];
+  const plans = ['free', 'pro', 'team'];
   const grid = document.getElementById('pricingGrid');
   let html = plans
     .map((key) => {
       const p = lookup('pricing.' + key, d) || {};
       const featured = key === 'pro';
       const isYearly = state.billing === 'yearly';
-      const price = { free: 0, pro: 5 }[key];
+      const price = { free: 0, pro: 9.99, team: 9.99 }[key];
       const feats = Array.isArray(p.features) ? p.features : [];
+      const isWaitlist = key === 'team';
+      const btnClass = featured ? 'btn-ink' : isWaitlist ? 'btn-ghost' : 'btn-ghost';
+      const btnHref = isWaitlist ? '#' : checkoutHref(key);
+      const btnTrack = isWaitlist ? 'data-track="pricing_waitlist"' : `data-track="pricing_${key}"`;
+      const btnExtra = isWaitlist ? 'data-action="open-waitlist"' : (btnHref !== '#' ? 'target="_blank" rel="noopener"' : '');
       return `
       <div class="plan ${featured ? 'featured' : ''}">
         ${featured ? `<span class="plan-badge">${p.highlight || ''}</span>` : ''}
@@ -115,25 +121,10 @@ function renderPricing() {
         <p class="tagline">${p.tagline || ''}</p>
         <ul>${feats.map((f) => `<li><span class="check">✓</span><span>${f}</span></li>`).join('')}</ul>
         ${key !== 'free' ? '<p class="plan-risk">Cancel anytime</p>' : ''}
-        <a class="btn ${featured ? 'btn-ink' : 'btn-ghost'}" href="${checkoutHref(key)}" ${checkoutHref(key) !== '#' ? 'target="_blank" rel="noopener"' : ''} data-track="pricing_${key}">${p.cta || ''}</a>
+        <a class="btn ${btnClass}" href="${btnHref}" ${btnExtra} ${btnTrack}>${p.cta || ''}</a>
       </div>`;
     })
     .join('');
-
-  // Waitlist card — replaced the Family tier
-  const waitlist = d.pricing?.waitlist || {};
-  html += `
-    <div class="plan waitlist-card">
-      <p class="plan-name">${waitlist.name || 'Family'}</p>
-      <p class="tagline">${waitlist.tagline || 'Coming soon.'}</p>
-      <ul>${(waitlist.features || []).map((f) => `<li><span class="check">✓</span><span>${f}</span></li>`).join('')}</ul>
-      <form class="waitlist-form" action="https://formspree.io/f/mrpgkbyj" method="POST" target="_blank">
-        <input type="email" name="email" placeholder="${waitlist.placeholder || 'Your email'}" required aria-label="Email" />
-        <button type="submit" class="btn btn-ghost">${waitlist.cta || 'Join waitlist'}</button>
-      </form>
-      <p class="plan-risk">${waitlist.note || 'We\'ll notify you when it\'s ready.'}</p>
-    </div>`;
-
   grid.innerHTML = html;
 }
 
@@ -358,6 +349,32 @@ async function boot() {
     document.querySelectorAll('#billingToggle button').forEach((b) => b.classList.toggle('active', b === btn));
     renderPricing();
   });
+
+  /* Waitlist modal (Family plan) */
+  const modal = document.getElementById('waitlistModal');
+  const modalClose = document.getElementById('waitlistClose');
+  function openModal() {
+    if (!modal) return;
+    modal.setAttribute('aria-hidden', 'false');
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    modal.querySelector('input[type="email"]')?.focus();
+  }
+  function closeModal() {
+    if (!modal) return;
+    modal.setAttribute('aria-hidden', 'true');
+    modal.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('[data-action="open-waitlist"]')) {
+      e.preventDefault();
+      openModal();
+    }
+  });
+  if (modalClose) modalClose.addEventListener('click', closeModal);
+  if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
   document.getElementById('faqList').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-faq]');

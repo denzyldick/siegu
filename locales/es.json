@@ -101,17 +101,18 @@
       "yearly_badge": "facturado anualmente"
     },
     "note": "Precios en USD. Cancela cuando quieras. Sin cargos extra por más fotos.",
-    "waitlist": {
+    "team": {
       "name": "Familia",
+      "price": "$9",
+      "period": "por mes",
       "tagline": "Comparte una biblioteca juntos.",
       "features": [
+        "Todo en Pro",
         "Hasta 6 miembros",
         "Gestión por invitación",
         "Hub familiar dedicado"
       ],
-      "placeholder": "Tu correo electrónico",
-      "cta": "Unirse a la lista",
-      "note": "Te avisaremos cuando esté listo."
+      "cta": "Elegir Familia"
     }
   },
   "faq": {
@@ -197,5 +198,11 @@
     "open_source": "Código abierto",
     "no_uploads": "Sin subidas",
     "local": "Tus fotos nunca salen de tu dispositivo"
+  },
+  "waitlist": {
+    "title": "Llegaste antes — y eso es genial.",
+    "desc": "El uso compartido familiar llega pronto. Deja tu correo y te avisaremos cuando esté listo — con un descuento por ser de los primeros.",
+    "cta": "Unirse a la lista",
+    "note": "Sin spam. Solo un aviso cuando esté listo."
   }
 }

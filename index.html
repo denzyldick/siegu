@@ -330,6 +330,20 @@
     </div>
   </footer>
 
+  <!-- Waitlist modal (Family plan) -->
+  <div class="waitlist-overlay" id="waitlistModal" aria-hidden="true" role="dialog" aria-label="Join waitlist">
+    <div class="waitlist-dialog">
+      <button class="waitlist-close" id="waitlistClose" type="button" aria-label="Close">&times;</button>
+      <h3 data-i18n="waitlist.title">You're early — and that's a great thing.</h3>
+      <p data-i18n="waitlist.desc">Family sharing is launching soon. Drop your email and we'll let you know the moment it's ready — plus an early-bird discount.</p>
+      <form class="waitlist-modal-form" action="https://formspree.io/f/mrpgkbyj" method="POST">
+        <input type="email" name="email" placeholder="your@email.com" required aria-label="Email address" />
+        <button type="submit" class="btn btn-ink btn-lg" data-track="waitlist_submit" data-i18n="waitlist.cta">Join waitlist</button>
+      </form>
+      <p class="waitlist-note" data-i18n="waitlist.note">No spam. Just a heads-up when it's ready.</p>
+    </div>
+  </div>
+
   <script src="js/main.js"></script>
 </body>
 </html>

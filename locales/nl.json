@@ -101,17 +101,18 @@
       "yearly_badge": "jaarlijks gefactureerd"
     },
     "note": "Prijzen in USD. Annuleer wanneer je wilt. Geen extra kosten voor meer foto's.",
-    "waitlist": {
+    "team": {
       "name": "Familie",
+      "price": "$9",
+      "period": "per maand",
       "tagline": "Deel één bibliotheek samen.",
       "features": [
+        "Alles in Pro",
         "Tot 6 leden",
         "Uitnodigingsbeheer",
         "Gewijd home-hub"
       ],
-      "placeholder": "Je e-mailadres",
-      "cta": "Wachtlijst",
-      "note": "We laten het je weten wanneer het klaar is."
+      "cta": "Kies Familie"
     }
   },
   "faq": {
@@ -197,5 +198,11 @@
     "open_source": "Open source",
     "no_uploads": "Geen uploads",
     "local": "Je foto's verlaten nooit je apparaat"
+  },
+  "waitlist": {
+    "title": "Je bent vroeg — en dat is geweldig.",
+    "desc": "Familiedelen komt binnenkort. Laat je e-mail achter en we laten je weten wanneer het klaar is — plus een vroeg-klant korting.",
+    "cta": "Wachtlijst",
+    "note": "Geen spam. Alleen een seintje als het klaar is."
   }
 }

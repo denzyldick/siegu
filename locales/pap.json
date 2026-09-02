@@ -101,17 +101,18 @@
       "yearly_badge": "fakturá anualmente"
     },
     "note": "Precio na USD. Kanselá kuantu ke. Sin kosto extra pa mas foto.",
-    "waitlist": {
+    "team": {
       "name": "Familia",
+      "price": "$9",
+      "period": "pa luna",
       "tagline": "Kompartí unu biblioteka huntu.",
       "features": [
+        "Tur kos na Pro",
         "Tei 6 miembro",
         "Maneho pa invitashon",
         "Hub familiar dediká"
       ],
-      "placeholder": "Bo email",
-      "cta": "Subí na lista di espera",
-      "note": "Lo avísabo ora e kla."
+      "cta": "Skuèchi Familia"
     }
   },
   "faq": {
@@ -197,5 +198,11 @@
     "open_source": "Código habrí",
     "no_uploads": "Sin upload",
     "local": "Bo potrèt ta keda semper riba bo ekipo"
+  },
+  "waitlist": {
+    "title": "Bo a kaba di yega promé — i esaki ta genial.",
+    "desc": "Kompartí familiar ta biniendo pronto. Laga bo email i lo avísabo ora e kla — ku un diskont pa promé kliente.",
+    "cta": "Subí na lista di espera",
+    "note": "Sin spam. Un aviso nada mas ora e kla."
   }
 }
