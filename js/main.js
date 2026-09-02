@@ -96,14 +96,14 @@ function priceFor(plan, price) {
 
 function renderPricing() {
   const d = state.dict || {};
-  const plans = ['free', 'pro', 'team'];
+  const plans = ['free', 'pro'];
   const grid = document.getElementById('pricingGrid');
   const html = plans
     .map((key) => {
       const p = lookup('pricing.' + key, d) || {};
       const featured = key === 'pro';
       const isYearly = state.billing === 'yearly';
-      const price = { free: 0, pro: 5, team: 9 }[key];
+      const price = { free: 0, pro: 5 }[key];
       const feats = Array.isArray(p.features) ? p.features : [];
       return `
       <div class="plan ${featured ? 'featured' : ''}">
@@ -119,6 +119,21 @@ function renderPricing() {
       </div>`;
     })
     .join('');
+
+  // Waitlist card — replaced the Family tier
+  const waitlist = d.pricing?.waitlist || {};
+  html += `
+    <div class="plan waitlist-card">
+      <p class="plan-name">${waitlist.name || 'Family'}</p>
+      <p class="tagline">${waitlist.tagline || 'Coming soon.'}</p>
+      <ul>${(waitlist.features || []).map((f) => `<li><span class="check">✓</span><span>${f}</span></li>`).join('')}</ul>
+      <form class="waitlist-form" action="https://formspree.io/f/YOUR_FORM_ID" method="POST" target="_blank">
+        <input type="email" name="email" placeholder="${waitlist.placeholder || 'Your email'}" required aria-label="Email" />
+        <button type="submit" class="btn btn-ghost">${waitlist.cta || 'Join waitlist'}</button>
+      </form>
+      <p class="plan-risk">${waitlist.note || 'We\'ll notify you when it\'s ready.'}</p>
+    </div>`;
+
   grid.innerHTML = html;
 }
 

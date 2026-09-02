@@ -100,20 +100,19 @@
       "cta": "Ga Pro",
       "yearly_badge": "jaarlijks gefactureerd"
     },
-    "team": {
+    "note": "Prijzen in USD. Annuleer wanneer je wilt. Geen extra kosten voor meer foto's.",
+    "waitlist": {
       "name": "Familie",
-      "price": "$9",
-      "period": "per maand",
-      "tagline": "Deel samen één bibliotheek.",
+      "tagline": "Deel één bibliotheek samen.",
       "features": [
-        "Alles in Pro",
         "Tot 6 leden",
         "Uitnodigingsbeheer",
-        "Toegewijde thuis-hub"
+        "Gewijd home-hub"
       ],
-      "cta": "Kies Familie"
-    },
-    "note": "Prijzen in USD. Annuleer wanneer je wilt. Geen extra kosten voor meer foto's."
+      "placeholder": "Je e-mailadres",
+      "cta": "Wachtlijst",
+      "note": "We laten het je weten wanneer het klaar is."
+    }
   },
   "faq": {
     "eyebrow": "FAQ",

@@ -100,20 +100,19 @@
       "cta": "Bai Pro",
       "yearly_badge": "fakturá anualmente"
     },
-    "team": {
-      "name": "Famia",
-      "price": "$9",
-      "period": "pa luna",
-      "tagline": "Kompartí un biblioteka huntu.",
+    "note": "Precio na USD. Kanselá kuantu ke. Sin kosto extra pa mas foto.",
+    "waitlist": {
+      "name": "Familia",
+      "tagline": "Kompartí unu biblioteka huntu.",
       "features": [
-        "Tur kos na Pro",
-        "Te ku 6 miembro",
-        "Maneho di invitashon",
-        "Hub dediká"
+        "Tei 6 miembro",
+        "Maneho pa invitashon",
+        "Hub familiar dediká"
       ],
-      "cta": "Elegí Famia"
-    },
-    "note": "Precio na USD. Kanselá kuantu ke. Sin kosto extra pa mas foto."
+      "placeholder": "Bo email",
+      "cta": "Subí na lista di espera",
+      "note": "Lo avísabo ora e kla."
+    }
   },
   "faq": {
     "eyebrow": "FAQ",

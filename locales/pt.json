@@ -100,20 +100,19 @@
       "cta": "Assinar Pro",
       "yearly_badge": "cobrado anualmente"
     },
-    "team": {
+    "note": "Preços em USD. Cancele quando quiser. Sem taxas extras por mais fotos.",
+    "waitlist": {
       "name": "Família",
-      "price": "$9",
-      "period": "por mês",
       "tagline": "Compartilhe uma biblioteca juntos.",
       "features": [
-        "Tudo no Pro",
         "Até 6 membros",
         "Gestão por convite",
-        "Hub doméstico dedicado"
+        "Hub familiar dedicado"
       ],
-      "cta": "Escolher Família"
-    },
-    "note": "Preços em USD. Cancele quando quiser. Sem taxas extras por mais fotos."
+      "placeholder": "Seu e-mail",
+      "cta": "Entrar na lista",
+      "note": "Notificaremos quando estiver pronto."
+    }
   },
   "faq": {
     "eyebrow": "FAQ",

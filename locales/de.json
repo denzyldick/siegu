@@ -100,20 +100,19 @@
       "cta": "Pro holen",
       "yearly_badge": "jährlich abgerechnet"
     },
-    "team": {
+    "note": "Preise in USD. Jederzeit kündbar. Keine Zusatzkosten für mehr Fotos.",
+    "waitlist": {
       "name": "Familie",
-      "price": "$9",
-      "period": "pro Monat",
-      "tagline": "Teilt euch eine Bibliothek.",
+      "tagline": "Teilt eine Bibliothek gemeinsam.",
       "features": [
-        "Alles aus Pro",
         "Bis zu 6 Mitglieder",
         "Einladungsverwaltung",
         "Dedizierter Home-Hub"
       ],
-      "cta": "Familie wählen"
-    },
-    "note": "Preise in USD. Jederzeit kündbar. Keine Zusatzkosten für mehr Fotos."
+      "placeholder": "Deine E-Mail",
+      "cta": "Auf Warteliste",
+      "note": "Wir benachrichtigen dich, wenn es soweit ist."
+    }
   },
   "faq": {
     "eyebrow": "FAQ",

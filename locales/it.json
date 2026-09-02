@@ -100,20 +100,19 @@
       "cta": "Passa a Pro",
       "yearly_badge": "fatturato annualmente"
     },
-    "team": {
+    "note": "Prezzi in USD. Annulla quando vuoi. Nessun costo extra per altre foto.",
+    "waitlist": {
       "name": "Famiglia",
-      "price": "$9",
-      "period": "al mese",
-      "tagline": "Condividete un'unica libreria.",
+      "tagline": "Condividi una libreria insieme.",
       "features": [
-        "Tutto nel piano Pro",
         "Fino a 6 membri",
-        "Gestione tramite inviti",
-        "Hub domestico dedicato"
+        "Gestione su invito",
+        "Hub familiare dedicato"
       ],
-      "cta": "Scegli Famiglia"
-    },
-    "note": "Prezzi in USD. Annulla quando vuoi. Nessun costo extra per altre foto."
+      "placeholder": "La tua email",
+      "cta": "Mettiti in lista",
+      "note": "Ti avviseremo quando sarà pronto."
+    }
   },
   "faq": {
     "eyebrow": "FAQ",

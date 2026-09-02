@@ -100,20 +100,19 @@
       "cta": "Go Pro",
       "yearly_badge": "billed yearly"
     },
-    "team": {
+    "note": "Prices in USD. Cancel anytime. No extra fees for more photos.",
+    "waitlist": {
       "name": "Family",
-      "price": "$9",
-      "period": "per month",
       "tagline": "Share one library together.",
       "features": [
-        "Everything in Pro",
         "Up to 6 members",
         "Invitational management",
         "Dedicated home hub"
       ],
-      "cta": "Choose Family"
-    },
-    "note": "Prices in USD. Cancel anytime. No extra fees for more photos."
+      "placeholder": "Your email",
+      "cta": "Join waitlist",
+      "note": "We'll notify you when it's ready."
+    }
   },
   "faq": {
     "eyebrow": "FAQ",

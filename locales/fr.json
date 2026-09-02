@@ -100,20 +100,19 @@
       "cta": "Passer Pro",
       "yearly_badge": "facturé à l'année"
     },
-    "team": {
+    "note": "Prix en USD. Annulez à tout moment. Pas de frais supplémentaires pour plus de photos.",
+    "waitlist": {
       "name": "Famille",
-      "price": "$9",
-      "period": "par mois",
-      "tagline": "Partagez une seule photothèque ensemble.",
+      "tagline": "Partagez une bibliothèque ensemble.",
       "features": [
-        "Tout le plan Pro",
         "Jusqu'à 6 membres",
         "Gestion par invitation",
-        "Hub domestique dédié"
+        "Hub familial dédié"
       ],
-      "cta": "Choisir Famille"
-    },
-    "note": "Prix en USD. Annulez à tout moment. Pas de frais supplémentaires pour plus de photos."
+      "placeholder": "Votre email",
+      "cta": "S'inscrire",
+      "note": "Nous vous préviendrons quand ce sera prêt."
+    }
   },
   "faq": {
     "eyebrow": "FAQ",
