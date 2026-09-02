@@ -1,21 +1,263 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/logo.png" />
-    <link rel="apple-touch-icon" href="/logo.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Siegu</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700;900&display=swap"
-      rel="stylesheet"
-    />
-  </head>
+<html lang="en" data-theme="system">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Siegu — Your photo library, privately yours</title>
+  <meta name="description" content="Siegu is a private, local-first photo library with on-device AI. Browse, search, share and relive your memories without handing them to the cloud." />
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Siegu" />
+  <meta property="og:title" content="Siegu — Your photo library, privately yours" />
+  <meta property="og:description" content="Private, local-first photo library with on-device AI. No cloud, no uploads." />
+  <meta property="og:image" content="banner.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <!-- iOS / favicon -->
+  <link rel="icon" href="logo.png" />
+  <link rel="apple-touch-icon" href="logo.png" />
 
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+  <!-- Fonts (same typeface as the app) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/styles.css" />
+
+  <!--
+    MARKETING / TRACKER HOOK
+    Drop vendor scripts (Plausible, Fathom, GA, Meta Pixel, Hotjar, …) here.
+    Each snippet can live in its own file under /trackers/*.js and be included
+    with a <script src> tag, or added inline below. They load only after the
+    cookie-consent banner has been accepted (see js/main.js `trackersOn`).
+  -->
+</head>
+<body>
+  <a class="skip" href="#main" style="position:absolute;left:-9999px;top:-9999px">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="#top" class="brand"><img src="logo.png" alt="siegu" /><span>siegu</span></a>
+      <nav class="nav" aria-label="Primary">
+        <a href="#features" data-i18n="nav.features">Features</a>
+        <a href="#pricing" data-i18n="nav.pricing">Pricing</a>
+        <a href="#faq" data-i18n="nav.faq">FAQ</a>
+        <a href="#docs" data-i18n="nav.docs">Docs</a>
+      </nav>
+      <div class="header-actions">
+        <div class="lang-switch">
+          <button class="lang-btn" id="langBtn" type="button">
+            <span id="langCode">EN</span>
+            <span>▾</span>
+          </button>
+          <div class="lang-menu" id="langMenu"></div>
+        </div>
+        <a class="btn btn-ink btn-sm" href="#" data-i18n="nav.open_app">Open app</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- Hero -->
+    <section class="hero" id="top">
+      <div class="container">
+        <span class="hero-badge"><span class="dot"></span><span data-i18n="hero.badge">Private by design · Local-first</span></span>
+        <h1>
+          <span data-i18n="hero.title1">Your photo library,</span><br />
+          <span class="dim" data-i18n="hero.title2">privately yours</span>
+        </h1>
+        <p class="sub" data-i18n="hero.subtitle">Siegu keeps every photo and video on your device. Powerful search, on-device AI, and seamless sharing — no cloud, no uploads, no compromises.</p>
+        <div class="hero-cta">
+          <a class="btn btn-ink" href="#" data-track="cta_get_started" data-i18n="hero.cta_primary">Get Siegu</a>
+          <a class="btn btn-ghost" href="#features" data-i18n="hero.cta_secondary">Learn more</a>
+        </div>
+        <p class="hero-note" data-i18n="hero.note">Windows · macOS · Linux · Web</p>
+      </div>
+      <div class="container hero-visual">
+        <div class="carousel" id="heroCarousel" aria-roledescription="carousel" aria-label="Siegu in action">
+          <div class="carousel-viewport" id="carouselViewport">
+            <!-- slides injected by js/main.js from /slides.json -->
+          </div>
+          <button class="carousel-arrow carousel-prev" id="carouselPrev" type="button" aria-label="Previous slide">‹</button>
+          <button class="carousel-arrow carousel-next" id="carouselNext" type="button" aria-label="Next slide">›</button>
+          <div class="carousel-dots" id="carouselDots"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Logos strip -->
+    <section class="logo-strip section" style="padding-top:40px;padding-bottom:20px">
+      <p class="label" data-i18n="logos.label">Made for the way you actually take photos</p>
+    </section>
+
+    <!-- Features -->
+    <section class="section" id="features">
+      <div class="container center">
+        <p class="section-eyebrow" data-i18n="features.eyebrow">Features</p>
+        <h2 class="section-title" data-i18n="features.title">Everything your photos deserve</h2>
+        <p class="section-sub" data-i18n="features.subtitle">A fast, private photo library that thinks the way you do.</p>
+      </div>
+      <div class="container">
+        <div class="features-grid">
+          <div class="feature">
+            <div class="ico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3 5 6v5c0 4.5 3 8.3 7 9.7 4-1.4 7-5.2 7-9.7V6l-7-3z"/>
+              <rect x="9" y="10.5" width="6" height="4" rx="1"/>
+              <path d="M12 10.5V9a1.6 1.6 0 0 1 3 0"/>
+            </svg></div>
+            <h3 data-i18n="features.listen.title">Private by design</h3>
+            <p data-i18n="features.listen.desc">Your photos never leave your device. No servers, no cloud, no uploads. Ever.</p>
+          </div>
+          <div class="feature">
+            <div class="ico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.5"/>
+              <line x1="16" y1="16" x2="20.5" y2="20.5"/>
+              <path class="fill" d="M17 4l.7 1.8L19.5 6.5l-1.8.7L17 9l-.7-1.8-1.8-.7 1.8-.7L17 4z"/>
+            </svg></div>
+            <h3 data-i18n="features.search.title">Natural-language search</h3>
+            <p data-i18n="features.search.desc">“beach in 2021” or “birthday cake” — find any moment in an instant with on-device AI.</p>
+          </div>
+          <div class="feature">
+            <div class="ico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3 3 7.5l9 4.5 9-4.5L12 3z"/>
+              <path d="M3 12.5l9 4.5 9-4.5"/>
+              <path d="M3 17.5l9 4.5 9-4.5"/>
+            </svg></div>
+            <h3 data-i18n="features.organized.title">Auto-organized</h3>
+            <p data-i18n="features.organized.desc">Faces, places, trips and events, clustered automatically and kept private.</p>
+          </div>
+          <div class="feature">
+            <div class="ico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="5" cy="12" r="2.5"/>
+              <circle cx="18" cy="6" r="2.5"/>
+              <circle cx="18" cy="18" r="2.5"/>
+              <path d="M7.2 10.8l8.5-3.6M7.2 13.2l8.5 3.6"/>
+            </svg></div>
+            <h3 data-i18n="features.share.title">Privately share</h3>
+            <p data-i18n="features.share.desc">Share a whole collection over a live, encrypted link. Guests see only what you allow.</p>
+          </div>
+          <div class="feature">
+            <div class="ico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M21 15.5c0 .9-.5 1.7-1.4 2.1a3 3 0 0 1-2.9 3.2H6.3a3.3 3.3 0 0 1-2.3-5.6A4 4 0 0 1 7 11a5.5 5.5 0 0 1 10.6 1.1A3 3 0 0 1 21 15.5z"/>
+              <path d="M16 9V4l-2 2-2-2 2 5"/>
+            </svg></div>
+            <h3 data-i18n="features.offline.title">Works offline</h3>
+            <p data-i18n="features.offline.desc">Your library is local, so it works on a plane, in a cabin, anywhere.</p>
+          </div>
+          <div class="feature">
+            <div class="ico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/>
+            </svg></div>
+            <h3 data-i18n="features.speed.title">Blazing fast</h3>
+            <p data-i18n="features.speed.desc">Millions of photos, instant results. Your device does the heavy lifting.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Showcase -->
+    <section class="section" id="showcase">
+      <div class="container showcase-wrap">
+        <div class="showcase-frame"><img src="banner.png" alt="Siegu" /></div>
+        <div class="showcase-copy">
+          <p class="section-eyebrow" data-i18n="showcase.eyebrow">The library</p>
+          <h2 class="section-title" data-i18n="showcase.title">A home for every memory</h2>
+          <p class="section-sub" data-i18n="showcase.desc">Clean, calm and fast — Siegu turns your entire photo history into something you actually enjoy browsing.</p>
+          <div class="point">
+            <div class="pico"><svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2"/>
+              <circle cx="8.5" cy="9.5" r="1.6"/>
+              <path d="M4 18.5 9 12l4 4.5 2.5-2.5 4.5 5"/>
+            </svg></div>
+            <div>
+              <h4 data-i18n="showcase.caption">Your library, your rules.</h4>
+              <p>Browse by person, place, trip or event — all instant, all local.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pricing -->
+    <section class="section" id="pricing">
+      <div class="container center pricing-head">
+        <p class="section-eyebrow" data-i18n="pricing.eyebrow">Pricing</p>
+        <h2 class="section-title" data-i18n="pricing.title">Simple, honest pricing</h2>
+        <p class="section-sub" data-i18n="pricing.subtitle">Everything is local and private. Pay for convenience, not for your data.</p>
+        <div class="toggle-row" id="billingToggle">
+          <button type="button" class="active" data-period="monthly" data-i18n="pricing.toggle.monthly">Monthly</button>
+          <button type="button" data-period="yearly" data-i18n="pricing.toggle.yearly">Yearly</button>
+          <span class="save-tag" data-i18n="pricing.toggle.save">Save 20%</span>
+        </div>
+      </div>
+      <div class="container">
+        <div class="pricing-grid" id="pricingGrid">
+          <!-- Plan cards injected by js/main.js -->
+        </div>
+        <p class="pricing-note center" data-i18n="pricing.note">Prices in USD. Cancel anytime. No extra fees for more photos.</p>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section" id="faq">
+      <div class="container center">
+        <p class="section-eyebrow" data-i18n="faq.eyebrow">FAQ</p>
+        <h2 class="section-title" data-i18n="faq.title">Questions, answered</h2>
+      </div>
+      <div class="container">
+        <div class="faq-list" id="faqList"><!-- injected --></div>
+      </div>
+    </section>
+
+    <!-- Docs anchor (lands on GitHub docs, per current scope) -->
+    <span id="docs"></span>
+
+    <!-- CTA -->
+    <section class="section">
+      <div class="container">
+        <div class="cta-band">
+          <h2 data-i18n="cta.title">Take your photos back</h2>
+          <p data-i18n="cta.subtitle">Private, local, and yours. Siegu is ready when you are.</p>
+          <a class="btn btn-ink btn-lg" href="#" data-track="cta_footer" data-i18n="cta.button">Get Siegu — it's free</a>
+          <p class="cta-note" data-i18n="cta.note">No account, no uploads, no lock-in.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="#top" class="brand"><img src="logo.png" alt="siegu" /><span>siegu</span></a>
+          <p data-i18n="footer.tagline">A private, local-first photo library.</p>
+        </div>
+        <div class="footer-col">
+          <h5 data-i18n="footer.product">Product</h5>
+          <a href="#features" data-i18n="footer.product_links.features">Features</a>
+          <a href="#pricing" data-i18n="footer.product_links.pricing">Pricing</a>
+          <a href="#" data-i18n="footer.product_links.changelog">Changelog</a>
+          <a href="#" data-i18n="footer.product_links.roadmap">Roadmap</a>
+        </div>
+        <div class="footer-col">
+          <h5 data-i18n="footer.resources">Resources</h5>
+          <a href="https://github.com/denzyldick/siegu/tree/main/docs" target="_blank" rel="noopener" data-i18n="footer.resources_links.docs">Documentation</a>
+          <a href="#" data-i18n="footer.resources_links.download">Download</a>
+          <a href="#" data-i18n="footer.resources_links.support">Support</a>
+        </div>
+        <div class="footer-col">
+          <h5 data-i18n="footer.company">Company</h5>
+          <a href="#" data-i18n="footer.company_links.about">About</a>
+          <a href="https://github.com/denzyldick/siegu" target="_blank" rel="noopener" data-i18n="footer.company_links.github">GitHub</a>
+          <a href="#" data-i18n="footer.company_links.blog">Blog</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© <span id="year"></span> siegu. <span data-i18n="footer.rights">All rights reserved.</span></span>
+        <a href="#" data-i18n="footer.legal">Privacy & Terms</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
 </html>

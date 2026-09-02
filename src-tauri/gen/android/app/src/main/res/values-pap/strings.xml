@@ -1,8 +1,0 @@
-<resources>
-    <string name="sync_notification_text">Sinkronisando fotonan</string>
-    <string name="sync_notification_channel_name">Sinkronisashon di fotonan</string>
-    <string name="all_files_title">Akseso na almacenamentu</string>
-    <string name="all_files_message">Fotonan sinkronisá ta ser wardá den un mapa manera DCIM of Pictures. Android mester di akseso na tur fail pa skirbi einan. Duna esaki den Settings.</string>
-    <string name="all_files_open_settings">Habri Settings</string>
-    <string name="all_files_later">Despues</string>
-</resources>

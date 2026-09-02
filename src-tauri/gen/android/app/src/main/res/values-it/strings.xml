@@ -1,8 +1,0 @@
-<resources>
-    <string name="sync_notification_text">Sincronizzazione foto in corso</string>
-    <string name="sync_notification_channel_name">Sincronizzazione foto</string>
-    <string name="all_files_title">Accesso allo storage</string>
-    <string name="all_files_message">Le foto sincronizzate vengono salvate in una cartella come DCIM o Pictures. Android richiede il permesso di accesso a tutti i file per scrivere lì. Concedilo nelle Impostazioni.</string>
-    <string name="all_files_open_settings">Apri Impostazioni</string>
-    <string name="all_files_later">Più tardi</string>
-</resources>

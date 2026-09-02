@@ -1,8 +1,0 @@
-<resources>
-    <string name="sync_notification_text">Foto\'s synchroniseren</string>
-    <string name="sync_notification_channel_name">Foto-synchronisatie</string>
-    <string name="all_files_title">Toegang tot opslag</string>
-    <string name="all_files_message">Gesynchroniseerde foto\'s worden opgeslagen in een map zoals DCIM of Pictures. Android heeft hiervoor toegang tot alle bestanden nodig. Sta dit toe in Instellingen.</string>
-    <string name="all_files_open_settings">Instellingen openen</string>
-    <string name="all_files_later">Later</string>
-</resources>

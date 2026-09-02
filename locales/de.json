@@ -1,0 +1,56 @@
+{
+  "meta": {
+    "title": "Siegu — Deine Fotobibliothek, privat für dich",
+    "description": "Siegu ist eine private, lokale Fotobibliothek mit KI auf dem Gerät. Durchstöbern, suchen, teilen und Erinnerungen erleben – ohne sie der Cloud anzuvertrauen."
+  },
+  "nav": { "features": "Funktionen", "pricing": "Preise", "docs": "Doku", "faq": "FAQ", "open_app": "App öffnen", "get_started": "Loslegen" },
+  "hero": {
+    "badge": "Privat by Design · Lokal zuerst",
+    "title1": "Deine Fotobibliothek,",
+    "title2": "privat für dich",
+    "subtitle": "Siegu bewahrt jedes Foto und Video auf deinem Gerät. Leistungsstarke Suche, KI auf dem Gerät und nahtloses Teilen – keine Cloud, keine Uploads, keine Kompromisse.",
+    "cta_primary": "Siegu holen",
+    "cta_secondary": "Mehr erfahren",
+    "note": "Windows · macOS · Linux · Web"
+  },
+  "logos": { "label": "Gemacht für die Art, wie du wirklich fotografierst" },
+  "features": {
+    "eyebrow": "Funktionen", "title": "Alles, was deine Fotos verdienen",
+    "subtitle": "Eine schnelle, private Fotobibliothek, die so denkt wie du.",
+    "listen": { "title": "Privat by Design", "desc": "Deine Fotos verlassen niemals dein Gerät. Keine Server, keine Cloud, keine Uploads. Niemals." },
+    "search": { "title": "Suche in natürlicher Sprache", "desc": "»Strand 2021« oder »Geburtstagstorte« – finde jeden Moment im Nu mit KI auf dem Gerät." },
+    "organized": { "title": "Automatisch organisiert", "desc": "Gesichter, Orte, Reisen und Ereignisse – automatisch gruppiert und privat gehalten." },
+    "share": { "title": "Privat teilen", "desc": "Teile eine ganze Sammlung über einen verschlüsselten Live-Link. Gäste sehen nur, was du erlaubst." },
+    "offline": { "title": "Funktioniert offline", "desc": "Deine Bibliothek ist lokal, also funktioniert sie im Flugzeug, in der Hütte, überall." },
+    "speed": { "title": "Blitzschnell", "desc": "Millionen Fotos, sofortige Ergebnisse. Dein Gerät erledigt die harte Arbeit." }
+  },
+  "showcase": { "eyebrow": "Die Bibliothek", "title": "Ein Zuhause für jede Erinnerung", "desc": "Sauber, ruhig und schnell – Siegu macht deine gesamte Fotogeschichte zu etwas, das du wirklich gern durchstöberst.", "caption": "Deine Bibliothek, deine Regeln." },
+  "pricing": {
+    "eyebrow": "Preise", "title": "Einfache, ehrliche Preise",
+    "subtitle": "Alles ist lokal und privat. Zahle für Komfort, nicht für deine Daten.",
+    "toggle": { "monthly": "Monatlich", "yearly": "Jährlich", "save": "20% sparen" },
+    "free": { "name": "Kostenlos", "price": "$0", "period": "für immer", "tagline": "Die vollständige App auf deinem Gerät.", "features": ["Unbegrenzte lokale Fotos", "KI-Suche auf dem Gerät", "Automatische Organisation", "Lokales Teilen im Netzwerk"], "cta": "Loslegen" },
+    "pro": { "name": "Pro", "price": "$5", "period": "pro Monat", "tagline": "Alles. Überall.", "highlight": "Am beliebtesten", "features": ["Alles aus Kostenlos", "Cloud-synchronisiertes Teilen", "Links für jeden, überall", "Priorisierter Support", "Früher Zugang zu neuen Funktionen"], "cta": "Pro holen", "yearly_badge": "jährlich abgerechnet" },
+    "team": { "name": "Familie", "price": "$9", "period": "pro Monat", "tagline": "Teilt euch eine Bibliothek.", "features": ["Alles aus Pro", "Bis zu 6 Mitglieder", "Einladungsverwaltung", "Dedizierter Home-Hub"], "cta": "Familie wählen" },
+    "note": "Preise in USD. Jederzeit kündbar. Keine Zusatzkosten für mehr Fotos."
+  },
+  "faq": {
+    "eyebrow": "FAQ", "title": "Fragen, beantwortet",
+    "items": [
+      { "q": "Sind meine Daten wirklich privat?", "a": "Ja. Deine Fotos und Metadaten bleiben auf deinem Gerät. Siegu nutzt KI auf dem Gerät, sodass nichts zum Verarbeiten hochgeladen wird." },
+      { "q": "Funktioniert Siegu offline?", "a": "Absolut. Deine Bibliothek wird lokal gespeichert, sodass du überall deine Fotos durchstöbern und suchen kannst – sogar ohne Verbindung." },
+      { "q": "Wie funktioniert das Teilen?", "a": "Du kannst eine Sammlung über einen Ende-zu-Ende-verschlüsselten Live-Link teilen. Gäste sehen nur, was du teilst, und nichts wird auf unserer Seite gespeichert." },
+      { "q": "Welche Plattformen werden unterstützt?", "a": "Siegu läuft auf Windows, macOS und Linux, mit einem vollständigen Weberlebnis für Gäste." },
+      { "q": "Kann ich von Google Fotos oder iCloud importieren?", "a": "Ja – Siegu importiert deine bestehende Bibliothek und verarbeitet sie dann vollständig lokal und privat." }
+    ]
+  },
+  "cta": { "title": "Hol dir deine Fotos zurück", "subtitle": "Privat, lokal und deins. Siegu ist bereit, wenn du es bist.", "button": "Siegu holen – es ist kostenlos", "note": "Kein Konto, keine Uploads, keine Bindung." },
+  "footer": {
+    "tagline": "Eine private, lokale Fotobibliothek.",
+    "product": "Produkt", "product_links": { "features": "Funktionen", "pricing": "Preise", "changelog": "Änderungsprotokoll", "roadmap": "Roadmap" },
+    "resources": "Ressourcen", "resources_links": { "docs": "Dokumentation", "download": "Download", "support": "Support" },
+    "company": "Unternehmen", "company_links": { "about": "Über uns", "github": "GitHub", "blog": "Blog" },
+    "legal": "Datenschutz & AGB", "rights": "Alle Rechte vorbehalten.", "made": "Mit Sorgfalt gemacht – keine Cloud nötig."
+  },
+  "misc": { "load": "Lädt…", "skip": "Zum Inhalt springen" }
+}
