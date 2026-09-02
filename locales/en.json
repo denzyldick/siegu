@@ -16,8 +16,8 @@
     "title1": "Your photo library,",
     "title2": "privately yours",
     "subtitle": "Siegu keeps every photo and video on your device. Powerful search, on-device AI, and seamless sharing — no cloud, no uploads, no compromises.",
-    "cta_primary": "Get Siegu",
-    "cta_secondary": "Learn more",
+    "cta_primary": "Get siegu free",
+    "cta_secondary": "See Pro",
     "note": "Windows · macOS · Linux · Web",
     "trust": "Free forever · No account · Cancel anytime."
   },
@@ -144,7 +144,7 @@
   "cta": {
     "title": "Take your photos back",
     "subtitle": "Private, local, and yours. Siegu is ready when you are.",
-    "button": "Get Siegu — it's free",
+    "button": "Get siegu free",
     "note": "No account, no uploads, no lock-in.",
     "upgrade": "Upgrade to Pro"
   },

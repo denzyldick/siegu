@@ -16,8 +16,8 @@
     "title1": "Jouw fotobibliotheek,",
     "title2": "privé van jou",
     "subtitle": "Siegu bewaart elke foto en video op je eigen apparaat. Krachtige zoekopdrachten, AI op je device en naadloos delen — geen cloud, geen uploads, geen compromissen.",
-    "cta_primary": "Download Siegu",
-    "cta_secondary": "Meer weten",
+    "cta_primary": "Download siegu gratis",
+    "cta_secondary": "Bekijk Pro",
     "note": "Windows · macOS · Linux · Web",
     "trust": "Gratis voor altijd · Geen account · Altijd opzegbaar."
   },
@@ -144,7 +144,7 @@
   "cta": {
     "title": "Neem je foto's terug",
     "subtitle": "Privé, lokaal en van jou. Siegu is er klaar voor.",
-    "button": "Download Siegu — het is gratis",
+    "button": "Download siegu gratis",
     "note": "Geen account, geen uploads, geen lock-in.",
     "upgrade": "Upgrade naar Pro"
   },
