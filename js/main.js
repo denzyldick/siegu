@@ -127,7 +127,7 @@ function renderPricing() {
       <p class="plan-name">${waitlist.name || 'Family'}</p>
       <p class="tagline">${waitlist.tagline || 'Coming soon.'}</p>
       <ul>${(waitlist.features || []).map((f) => `<li><span class="check">✓</span><span>${f}</span></li>`).join('')}</ul>
-      <form class="waitlist-form" action="https://formspree.io/f/YOUR_FORM_ID" method="POST" target="_blank">
+      <form class="waitlist-form" action="https://formspree.io/f/mrpgkbyj" method="POST" target="_blank">
         <input type="email" name="email" placeholder="${waitlist.placeholder || 'Your email'}" required aria-label="Email" />
         <button type="submit" class="btn btn-ghost">${waitlist.cta || 'Join waitlist'}</button>
       </form>
