@@ -33,7 +33,7 @@ RUN cp target/release/siegu /siegu
 ###############################################################################
 # Stage 2 — build the Vue client.
 ###############################################################################
-FROM node:22-alpine AS ui
+FROM node:22 AS ui
 WORKDIR /ui
 COPY package.json package-lock.json* ./
 RUN npm ci --ignore-scripts --prefer-offline
