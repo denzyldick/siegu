@@ -317,6 +317,7 @@ img { max-width: 100%; display: block; }
 .plan li .check { color: var(--success); font-weight: 800; }
 .plan.featured li .check { color: #052e16; }
 .plan .btn { width: 100%; }
+.plan.featured .btn-ink { background: var(--bg); color: var(--ink); }
 .pricing-note { color: var(--text-3); font-size: 13px; margin-top: 22px; }
 
 /* ---------- FAQ ---------- */

@@ -107,6 +107,8 @@ function renderPricing() {
       const price = { free: 0, pro: 9.99, team: 9.99 }[key];
       const feats = Array.isArray(p.features) ? p.features : [];
       const isWaitlist = key === 'team';
+      // Waitlist (Team) is a secondary action; Free/Pro are primary.
+      const btnClass = isWaitlist ? 'btn-ghost' : 'btn-ink';
       // Free -> platform download; Pro -> Stripe Payment Link; Team -> waitlist.
       const btnHref = isWaitlist ? '#'
         : key === 'free' ? freeDownloadUrl()
