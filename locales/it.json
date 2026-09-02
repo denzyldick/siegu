@@ -203,6 +203,7 @@
     "title": "Sei in anticipo — e fantastico.",
     "desc": "La condivisione familiare sta per uscire. Lascia la tua email e ti avviseremo quando sarà pronto — con uno sconto per i primi.",
     "cta": "Mettiti in lista",
-    "note": "Nessuno spam. Solo un avviso quando sarà pronto."
+    "note": "Nessuno spam. Solo un avviso quando sarà pronto.",
+    "success": "Sei in lista: ti faremo sapere!"
   }
 }

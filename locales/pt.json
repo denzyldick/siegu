@@ -203,6 +203,7 @@
     "title": "Você está na frente — e isso é ótimo.",
     "desc": "O compartilhamento familiar está chegando em breve. Deixe seu e-mail e avisaremos quando estiver pronto — com um desconto para os primeiros.",
     "cta": "Entrar na lista",
-    "note": "Sem spam. Apenas um aviso quando estiver pronto."
+    "note": "Sem spam. Apenas um aviso quando estiver pronto.",
+    "success": "Você está na lista: avisaremos você!"
   }
 }

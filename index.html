@@ -338,6 +338,7 @@
       <p data-i18n="waitlist.desc">Family sharing is launching soon. Drop your email and we'll let you know the moment it's ready — plus an early-bird discount.</p>
       <form class="waitlist-modal-form" action="https://formspree.io/f/mrpgkbyj" method="POST">
         <input type="email" name="email" placeholder="your@email.com" required aria-label="Email address" />
+        <input type="hidden" name="source" id="waitlistSource" value="family" />
         <button type="submit" class="btn btn-ink btn-lg" data-track="waitlist_submit" data-i18n="waitlist.cta">Join waitlist</button>
       </form>
       <p class="waitlist-note" data-i18n="waitlist.note">No spam. Just a heads-up when it's ready.</p>

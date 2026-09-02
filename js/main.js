@@ -107,10 +107,21 @@ function renderPricing() {
       const price = { free: 0, pro: 9.99, team: 9.99 }[key];
       const feats = Array.isArray(p.features) ? p.features : [];
       const isWaitlist = key === 'team';
-      const btnClass = featured ? 'btn-ink' : isWaitlist ? 'btn-ghost' : 'btn-ghost';
-      const btnHref = isWaitlist ? '#' : checkoutHref(key);
+      // Free -> platform download; Pro -> Gumroad; Team -> waitlist modal.
+      const btnHref = isWaitlist ? '#'
+        : key === 'free' ? freeDownloadUrl()
+        : (GUMROAD_RE.test(https://3848817799485.gumroad.com/l/acudv) ? https://3848817799485.gumroad.com/l/acudv : '#');
       const btnTrack = isWaitlist ? 'data-track="pricing_waitlist"' : `data-track="pricing_${key}"`;
-      const btnExtra = isWaitlist ? 'data-action="open-waitlist"' : (btnHref !== '#' ? 'target="_blank" rel="noopener"' : '');
+      // Tag the Free (download) card with platform/arch for GA breakdowns.
+      let dataPlatform = '';
+      if (key === 'free' && !isWaitlist) {
+        const pl = detectPlatform();
+        if (latestAssets.length > 0 && pl.os !== 'web' && pl.os !== 'ios') {
+          dataPlatform = ` data-platform="${pl.os}" data-arch="${pl.arch}"`;
+        }
+      }
+      const btnExtra = isWaitlist ? 'data-action="open-waitlist"'
+        : (btnHref !== '#' ? `target="_blank" rel="noopener"${dataPlatform}` : '');
       return `
       <div class="plan ${featured ? 'featured' : ''}">
         ${featured ? `<span class="plan-badge">${p.highlight || ''}</span>` : ''}
@@ -197,55 +208,164 @@ function trackersOn() {
   window.gtag('config', GA_MEASUREMENT_ID);
 }
 
-/* ---------- Gumroad checkout ----------
-   First distribution channel. A build script (scripts/build-static.mjs)
-   substitutes the real per-tier product URLs into the GUMROAD_* placeholders.
-   While the placeholders remain unset, the matching buttons stay inert (#). */
-const GUMROAD_PRODUCTS = {
-  free: 'https://3848817799485.gumroad.com/l/nrohiy',
-  pro: 'https://3848817799485.gumroad.com/l/acudv',
-  team: '',
-  primary: 'https://3848817799485.gumroad.com/l/acudv',
-};
-
-// Accepts custom-subdomain or standard Gumroad product links, e.g.
-//   https://3848817799485.gumroad.com/l/acudv   (custom subdomain, /l/{slug})
-//   https://yourname.gumroad.com/l/slug
-//   https://gumroad.com/l/slug
+/* ---------- Pro checkout (Gumroad) ----------
+   Pro is paid, and Gumroad is the merchant of record. A build script
+   (scripts/build-static.mjs) substitutes the Pro product URL into the
+   https://3848817799485.gumroad.com/l/acudv placeholder. */
+const https://3848817799485.gumroad.com/l/acudv = 'https://3848817799485.gumroad.com/l/acudv';
 const GUMROAD_RE = /^https:\/\/[a-z0-9.-]*gumroad\.com\/l\/[a-z0-9-]+$/i;
 
-function checkoutHref(planKey) {
-  // A pricing row uses its own tier URL when set; otherwise every button
-  // falls back to the primary URL so a single-product launch wires them all.
-  const candidates = [planKey && GUMROAD_PRODUCTS[planKey], GUMROAD_PRODUCTS.primary];
-  for (const url of candidates) {
-    if (GUMROAD_RE.test(url || '')) return url;
-  }
-  return '#';
+/* ---------- Free downloads (GitHub Releases) ----------
+   The free app is distributed via GitHub Releases, which the release
+   pipeline populates automatically. We fetch the latest release and hand
+   the visitor the correct installer for their OS/architecture. Nothing is
+   hardcoded: assets are selected by matching the release's asset names. */
+const RELEASE_API = 'https://api.github.com/repos/denzyldick/siegu/releases/latest';
+const RELEASE_PAGE = 'https://github.com/denzyldick/siegu/releases/latest';
+
+function detectPlatform() {
+  const ua = navigator.userAgent + ' ' + navigator.platform;
+  const isMac = /Mac|iPhone|iPad|iPod/i.test(ua) && !/Windows/i.test(ua);
+  const isWin = /Win/i.test(ua);
+  const isAndroid = /Android/i.test(ua);
+  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  const isLinux = !isMac && !isWin && !isAndroid && !isIOS && /Linux|X11/i.test(ua);
+  const os = isAndroid ? 'android' : isIOS ? 'ios' : isMac ? 'macos' : isWin ? 'windows' : isLinux ? 'linux' : 'web';
+  const arm = /arm|aarch64/i.test(ua);
+  const arch = arm ? 'aarch64' : 'x86_64';
+  return { os, arch, ua };
 }
 
-/* Point the header / footer / hero "Get siegu free" links at the free
-   checkout (free-first funnel), and the dedicated upgrade button at Pro. */
-function applyCtas() {
+// Match a release asset to a platform. Returns the browser_download_url or null.
+function selectAsset(assets, os, arch) {
+  const isM1 = arch === 'aarch64';
+  const byName = (re) => {
+    const hit = assets.find((a) => re.test(a.name));
+    return hit ? hit.browser_download_url : null;
+  };
+  if (os === 'windows') {
+    return byName(/\.exe$/) || byName(/\.msi$/);
+  }
+  if (os === 'linux') {
+    return byName(/\.AppImage$/) || byName(/\.deb$/);
+  }
+  if (os === 'android') {
+    return byName(/\.apk$/);
+  }
+  if (os === 'macos') {
+    return (isM1 ? byName(/aarch64.*\.dmg$/) : byName(/(amd64|x64).*\.dmg$/)) || byName(/\.dmg$/);
+  }
+  return null;
+}
+
+let latestAssets = null;
+let latestFailed = false;
+
+async function loadLatestRelease() {
+  try {
+    const res = await fetch(RELEASE_API, { headers: { Accept: 'application/vnd.github+json' } });
+    if (!res.ok) throw new Error(res.status);
+    const rel = await res.json();
+    latestAssets = Array.isArray(rel.assets) ? rel.assets : [];
+  } catch {
+    latestFailed = true;
+    latestAssets = [];
+  }
+}
+
+// Resolve the download URL for the visitor's platform. Returns null when we
+// can't match an installer (falls back to the release page).
+function freeDownloadUrl() {
+  const { os, arch } = detectPlatform();
+  if (latestAssets.length) {
+    const direct = selectAsset(latestAssets, os, arch);
+    if (direct) return direct;
+  }
+  // No matching asset yet — send them to the release page so they always get
+  // the latest working installers regardless of platform.
+  return RELEASE_PAGE;
+}
+
+/* Wire the "Get siegu free" links. Free always goes to the platform download
+   (or opens the waitlist modal for platforms with no build — e.g. web/iOS),
+   and the Pro/upgrade buttons go to Gumroad */
+async function applyCtas() {
+  await loadLatestRelease();
+  const { os, arch } = detectPlatform();
+  const freeHref = freeDownloadUrl();
+  const waitlistPlatforms = ['ios', 'web'];
+  const isWaitlistPlatform = waitlistPlatforms.includes(os);
+  // A direct asset match (not the fallback release page) is a real download.
+  const isDirectAsset = latestAssets.length > 0 && os !== 'web' && os !== 'ios';
+
   document.querySelectorAll('.hero-cta a[data-track="cta_get_started"], .cta-band a[data-track="cta_footer"], .header-actions a[data-track="cta_get_started"]').forEach((a) => {
-    a.setAttribute('href', checkoutHref('free'));
+    if (isWaitlistPlatform) {
+      a.setAttribute('href', '#');
+      a.setAttribute('data-action', 'open-waitlist');
+      a.setAttribute('target', '');
+      a.removeAttribute('data-track');
+      a.setAttribute('data-track', 'cta_waitlist');
+      a.removeAttribute('data-platform');
+      a.removeAttribute('data-arch');
+      // Remember which platform triggered the waitlist so the email list is
+      // segmented (macOS, iOS, etc.) instead of everything lumped as "family".
+      a.setAttribute('data-waitlist-source', os);
+    } else {
+      a.setAttribute('href', freeHref);
+      a.removeAttribute('data-action');
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener');
+      // Stamp platform/arch so GA can break out downloads by OS.
+      if (isDirectAsset) {
+        a.setAttribute('data-platform', os);
+        a.setAttribute('data-arch', arch);
+      } else {
+        a.removeAttribute('data-platform');
+        a.removeAttribute('data-arch');
+      }
+    }
   });
+
   document.querySelectorAll('a[data-track="cta_upgrade"]').forEach((a) => {
-    a.setAttribute('href', checkoutHref('pro'));
+    a.setAttribute('href', GUMROAD_RE.test(https://3848817799485.gumroad.com/l/acudv) ? https://3848817799485.gumroad.com/l/acudv : '#');
   });
+
+  // Re-render pricing so the Free card's button resolves to the direct
+  // platform download now that release assets are loaded — and stamp it too.
+  if (document.getElementById('pricingGrid')) renderPricing();
 }
 
 /* ---------- Track outbound / CTA clicks ---------- */
+function pushEvent(name, params) {
+  const payload = { event: name, ...params };
+  console.debug('[track]', payload);
+  if (window.dataLayer) window.dataLayer.push(payload);
+  if (typeof window.gtag === 'function') {
+    window.gtag('event', name, params);
+  }
+}
+
 function initTracking() {
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-track]');
     if (!el) return;
-    const ev = { name: el.getAttribute('data-track'), locale: state.locale };
-    console.debug('[track]', ev);
-    if (window.dataLayer) window.dataLayer.push({ event: 'cta', ...ev });
-    if (typeof window.gtag === 'function') {
-      window.gtag('event', 'cta', { cta_name: ev.name, locale: ev.locale });
+    const trackName = el.getAttribute('data-track');
+
+    // A free CTA with a platform stamp is an actual install download.
+    if (el.getAttribute('data-platform')) {
+      pushEvent('download_started', {
+        platform: el.getAttribute('data-platform'),
+        arch: el.getAttribute('data-arch') || 'unknown',
+        locale: state.locale,
+      });
     }
+
+    // "Upgrade to Pro" / Pro pricing clicks = purchase intent.
+    if (trackName === 'cta_upgrade' || trackName === 'pricing_pro') {
+      pushEvent('upgrade_clicked', { locale: state.locale });
+    }
+
+    pushEvent('cta', { cta_name: trackName, locale: state.locale });
   });
 }
 
@@ -367,14 +487,54 @@ async function boot() {
     document.body.style.overflow = '';
   }
   document.addEventListener('click', (e) => {
-    if (e.target.closest('[data-action="open-waitlist"]')) {
-      e.preventDefault();
-      openModal();
-    }
+    const trig = e.target.closest('[data-action="open-waitlist"]');
+    if (!trig) return;
+    e.preventDefault();
+    // Segment the waitlist by what opened it (family plan, macOS, web, ...).
+    const src = trig.getAttribute('data-waitlist-source') || 'family';
+    const field = document.getElementById('waitlistSource');
+    if (field) field.value = src;
+    openModal();
   });
   if (modalClose) modalClose.addEventListener('click', closeModal);
   if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+  // AJAX-submit the waitlist form so we can report success/failure to GA.
+  const wlForm = modal ? modal.querySelector('form.waitlist-modal-form') : null;
+  if (wlForm) {
+    wlForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = wlForm.querySelector('button[type="submit"]');
+      const email = wlForm.querySelector('input[type="email"]');
+      const src = wlForm.querySelector('#waitlistSource');
+      if (btn) { btn.disabled = true; btn.textContent = '…'; }
+      const data = { email: email.value, source: src ? src.value : 'family', _subject: 'siegu waitlist' };
+      try {
+        const res = await fetch(wlForm.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(data),
+        });
+        if (res.ok) {
+          pushEvent('form_submitted', { form: 'waitlist', source: data.source, locale: state.locale });
+          wlForm.innerHTML = '<p class="waitlist-success" data-i18n="waitlist.success">You\'re on the list — we\'ll be in touch!</p>';
+          const el = wlForm.querySelector('[data-i18n="waitlist.success"]');
+          if (el && state.dict) el.textContent = t('waitlist.success');
+        } else {
+          pushEvent('form_failed', { form: 'waitlist', status: res.status, locale: state.locale });
+          if (btn) { btn.disabled = false; btn.textContent = ''; }
+          const note = wlForm.querySelector('.waitlist-note');
+          if (note) note.textContent = 'Something went wrong — please try again.';
+        }
+      } catch (err) {
+        pushEvent('form_failed', { form: 'waitlist', error: String(err), locale: state.locale });
+        if (btn) { btn.disabled = false; btn.textContent = ''; }
+        const note = wlForm.querySelector('.waitlist-note');
+        if (note) note.textContent = 'Network error — please try again.';
+      }
+    });
+  }
 
   document.getElementById('faqList').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-faq]');

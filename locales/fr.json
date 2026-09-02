@@ -203,6 +203,7 @@
     "title": "Vous êtes en avance — et c'est formidable.",
     "desc": "Le partage familial arrive bientôt. Laissez votre email et nous vous préviendrons dès que ce sera prêt — avec une réduction de lancement.",
     "cta": "S'inscrire",
-    "note": "Pas de spam. Juste un avis quand ce sera prêt."
+    "note": "Pas de spam. Juste un avis quand ce sera prêt.",
+    "success": "Vous êtes sur la liste — on vous contacte !"
   }
 }

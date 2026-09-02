@@ -203,6 +203,7 @@
     "title": "Je bent vroeg — en dat is geweldig.",
     "desc": "Familiedelen komt binnenkort. Laat je e-mail achter en we laten je weten wanneer het klaar is — plus een vroeg-klant korting.",
     "cta": "Wachtlijst",
-    "note": "Geen spam. Alleen een seintje als het klaar is."
+    "note": "Geen spam. Alleen een seintje als het klaar is.",
+    "success": "Je staat op de lijst — we nemen contact op!"
   }
 }

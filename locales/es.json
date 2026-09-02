@@ -203,6 +203,7 @@
     "title": "Llegaste antes — y eso es genial.",
     "desc": "El uso compartido familiar llega pronto. Deja tu correo y te avisaremos cuando esté listo — con un descuento por ser de los primeros.",
     "cta": "Unirse a la lista",
-    "note": "Sin spam. Solo un aviso cuando esté listo."
+    "note": "Sin spam. Solo un aviso cuando esté listo.",
+    "success": "Estás en la lista: ¡te avisaremos!"
   }
 }

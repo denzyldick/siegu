@@ -203,6 +203,7 @@
     "title": "You're early — and that's a great thing.",
     "desc": "Family sharing is launching soon. Drop your email and we'll let you know the moment it's ready — plus an early-bird discount.",
     "cta": "Join waitlist",
-    "note": "No spam. Just a heads-up when it's ready."
+    "note": "No spam. Just a heads-up when it's ready.",
+    "success": "You're on the list — we'll be in touch!"
   }
 }

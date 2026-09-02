@@ -203,6 +203,7 @@
     "title": "Du bist früher da — und das ist großartig.",
     "desc": "Familienfreigabe kommt bald. Hinterlasse deine E-Mail und wir benachrichtigen dich, sobald es soweit ist — plus einen Früh Rabatt.",
     "cta": "Auf Warteliste",
-    "note": "Kein Spam. Nur eine Benachrichtigung, wenn es soweit ist."
+    "note": "Kein Spam. Nur eine Benachrichtigung, wenn es soweit ist.",
+    "success": "Du bist auf der Liste — wir melden uns!"
   }
 }
