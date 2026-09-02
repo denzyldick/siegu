@@ -107,10 +107,10 @@ function renderPricing() {
       const price = { free: 0, pro: 9.99, team: 9.99 }[key];
       const feats = Array.isArray(p.features) ? p.features : [];
       const isWaitlist = key === 'team';
-      // Free -> platform download; Pro -> Gumroad; Team -> waitlist modal.
+      // Free -> platform download; Pro -> Stripe Payment Link; Team -> waitlist.
       const btnHref = isWaitlist ? '#'
         : key === 'free' ? freeDownloadUrl()
-        : (GUMROAD_RE.test(https://3848817799485.gumroad.com/l/acudv) ? https://3848817799485.gumroad.com/l/acudv : '#');
+        : (STRIPE_PAYMENT_RE.test(proPaymentLink()) ? proPaymentLink() : '#');
       const btnTrack = isWaitlist ? 'data-track="pricing_waitlist"' : `data-track="pricing_${key}"`;
       // Tag the Free (download) card with platform/arch for GA breakdowns.
       let dataPlatform = '';
@@ -208,12 +208,23 @@ function trackersOn() {
   window.gtag('config', GA_MEASUREMENT_ID);
 }
 
-/* ---------- Pro checkout (Gumroad) ----------
-   Pro is paid, and Gumroad is the merchant of record. A build script
-   (scripts/build-static.mjs) substitutes the Pro product URL into the
-   https://3848817799485.gumroad.com/l/acudv placeholder. */
-const https://3848817799485.gumroad.com/l/acudv = 'https://3848817799485.gumroad.com/l/acudv';
-const GUMROAD_RE = /^https:\/\/[a-z0-9.-]*gumroad\.com\/l\/[a-z0-9-]+$/i;
+/* ---------- Pro checkout (Stripe Payment Links) ----------
+   Pro is paid. Stripe Payment Links are the merchant of record: a hosted,
+   PCI-compliant checkout page Stripe generates — no backend needed on our
+   side. A build script (scripts/build-static.mjs) substitutes the real links
+   into these placeholders. Monthly and Yearly are separate prices (Yearly is
+   ~20% off), so the Pro button hands off to whichever period is selected. */
+const STRIPE_PRO_PAYMENT_LINK_MONTHLY = 'https://buy.stripe.com/test_cNiaEX8HIdZc1e7fLL9MY00';
+const STRIPE_PRO_PAYMENT_LINK_YEARLY = 'https://buy.stripe.com/test_cNieVd3nocV8cWP2YZ9MY01';
+// The currently-selected period is read from state.billing by proPaymentLink().
+function proPaymentLink() {
+  return state.billing === 'yearly'
+    ? STRIPE_PRO_PAYMENT_LINK_YEARLY
+    : STRIPE_PRO_PAYMENT_LINK_MONTHLY;
+}
+// Matches Stripe Payment Link URLs (buy.stripe.com) so an unset placeholder
+// stays inert (#).
+const STRIPE_PAYMENT_RE = /^https:\/\/(?:buy|checkout)\.stripe\.com\//i;
 
 /* ---------- Free downloads (GitHub Releases) ----------
    The free app is distributed via GitHub Releases, which the release
@@ -288,7 +299,7 @@ function freeDownloadUrl() {
 
 /* Wire the "Get siegu free" links. Free always goes to the platform download
    (or opens the waitlist modal for platforms with no build — e.g. web/iOS),
-   and the Pro/upgrade buttons go to Gumroad */
+   and the Pro/upgrade buttons go to the Stripe Payment Link */
 async function applyCtas() {
   await loadLatestRelease();
   const { os, arch } = detectPlatform();
@@ -327,7 +338,7 @@ async function applyCtas() {
   });
 
   document.querySelectorAll('a[data-track="cta_upgrade"]').forEach((a) => {
-    a.setAttribute('href', GUMROAD_RE.test(https://3848817799485.gumroad.com/l/acudv) ? https://3848817799485.gumroad.com/l/acudv : '#');
+    a.setAttribute('href', STRIPE_PAYMENT_RE.test(proPaymentLink()) ? proPaymentLink() : '#');
   });
 
   // Re-render pricing so the Free card's button resolves to the direct
