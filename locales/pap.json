@@ -6,10 +6,9 @@
   "nav": {
     "features": "Funshon",
     "pricing": "Precio",
-    "docs": "Docs",
     "faq": "FAQ",
-    "get_started": "Kuminsá",
-    "get_free": "Download siegu gratis"
+    "get_free": "Download siegu gratis",
+    "demo": "Demo biba"
   },
   "hero": {
     "badge": "Privá pa diseño · Lokal-promé",
@@ -17,9 +16,10 @@
     "title2": "privá pa bo",
     "subtitle": "Siegu ta warda kada foto i video riba bo aparato. Búskeda poderoso, IA riba bo aparato i kompartí sin problema — sin nubia, sin subí, sin kompromiso.",
     "cta_primary": "Download siegu gratis",
-    "cta_secondary": "Wak Pro",
     "note": "Windows · macOS · Linux · Web",
-    "trust": "Gratis pa semper · Sin kuenta · Cancela na kualke momentu."
+    "trust": "Gratis pa semper · Sin kuenta · Cancela na kualke momentu.",
+    "cta_demo": "Pruéb e demo biba",
+    "see_pro": "Mira Pro →"
   },
   "logos": {
     "win": "Windows",
@@ -146,7 +146,8 @@
     "subtitle": "Privá, lokal i di bo. Siegu ta klá ora bo ta klá.",
     "button": "Download siegu gratis",
     "note": "Sin cuenta, sin subí, sin saká.",
-    "upgrade": "Upgrade na Pro"
+    "upgrade": "Upgrade na Pro",
+    "demo": "Pruéb e demo biba"
   },
   "footer": {
     "tagline": "Un biblioteka di foto privá, lokal-promé.",
@@ -161,7 +162,7 @@
     "resources_links": {
       "docs": "Dokumentashon",
       "download": "Deskargá",
-      "support": "Soporte"
+      "demo": "Demo biba"
     },
     "company": "Kompania",
     "company_links": {

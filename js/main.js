@@ -298,7 +298,7 @@ async function applyCtas() {
   // A direct asset match (not the fallback release page) is a real download.
   const isDirectAsset = latestAssets.length > 0 && os !== 'web' && os !== 'ios';
 
-  document.querySelectorAll('.hero-cta a[data-track="cta_get_started"], .cta-band a[data-track="cta_footer"], .header-actions a[data-track="cta_get_started"]').forEach((a) => {
+  document.querySelectorAll('.hero-cta a[data-track="cta_get_started"], .cta-band a[data-track="cta_footer"], .header-actions a[data-track="cta_get_started"], .site-footer a[data-action="platform-download"]').forEach((a) => {
     if (isWaitlistPlatform) {
       a.setAttribute('href', '#');
       a.setAttribute('data-action', 'open-waitlist');
@@ -363,6 +363,11 @@ function initTracking() {
     // "Upgrade to Pro" / Pro pricing clicks = purchase intent.
     if (trackName === 'cta_upgrade' || trackName === 'pricing_pro') {
       pushEvent('upgrade_clicked', { locale: state.locale });
+    }
+
+    // "Try the live demo" clicks = engagement / trial intent.
+    if (trackName === 'demo_clicked') {
+      pushEvent('demo_clicked', { locale: state.locale });
     }
 
     pushEvent('cta', { cta_name: trackName, locale: state.locale });

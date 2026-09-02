@@ -6,10 +6,9 @@
   "nav": {
     "features": "Functies",
     "pricing": "Prijzen",
-    "docs": "Docs",
     "faq": "FAQ",
-    "get_started": "Aan de slag",
-    "get_free": "Download siegu gratis"
+    "get_free": "Download siegu gratis",
+    "demo": "Live demo"
   },
   "hero": {
     "badge": "Privé door ontwerp · Local-first",
@@ -17,9 +16,10 @@
     "title2": "privé van jou",
     "subtitle": "Siegu bewaart elke foto en video op je eigen apparaat. Krachtige zoekopdrachten, AI op je device en naadloos delen — geen cloud, geen uploads, geen compromissen.",
     "cta_primary": "Download siegu gratis",
-    "cta_secondary": "Bekijk Pro",
     "note": "Windows · macOS · Linux · Web",
-    "trust": "Gratis voor altijd · Geen account · Altijd opzegbaar."
+    "trust": "Gratis voor altijd · Geen account · Altijd opzegbaar.",
+    "cta_demo": "Probeer de live demo",
+    "see_pro": "Bekijk Pro →"
   },
   "logos": {
     "win": "Windows",
@@ -146,7 +146,8 @@
     "subtitle": "Privé, lokaal en van jou. Siegu is er klaar voor.",
     "button": "Download siegu gratis",
     "note": "Geen account, geen uploads, geen lock-in.",
-    "upgrade": "Upgrade naar Pro"
+    "upgrade": "Upgrade naar Pro",
+    "demo": "Probeer de live demo"
   },
   "footer": {
     "tagline": "Een privé, local-first fotobibliotheek.",
@@ -161,7 +162,7 @@
     "resources_links": {
       "docs": "Documentatie",
       "download": "Download",
-      "support": "Ondersteuning"
+      "demo": "Live demo"
     },
     "company": "Bedrijf",
     "company_links": {

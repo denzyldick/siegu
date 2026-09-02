@@ -6,10 +6,9 @@
   "nav": {
     "features": "Features",
     "pricing": "Pricing",
-    "docs": "Docs",
     "faq": "FAQ",
-    "get_started": "Get started",
-    "get_free": "Get siegu free"
+    "get_free": "Get siegu free",
+    "demo": "Live demo"
   },
   "hero": {
     "badge": "Private by design · Local-first",
@@ -17,9 +16,10 @@
     "title2": "privately yours",
     "subtitle": "Siegu keeps every photo and video on your device. Powerful search, on-device AI, and seamless sharing — no cloud, no uploads, no compromises.",
     "cta_primary": "Get siegu free",
-    "cta_secondary": "See Pro",
     "note": "Windows · macOS · Linux · Web",
-    "trust": "Free forever · No account · Cancel anytime."
+    "trust": "Free forever · No account · Cancel anytime.",
+    "cta_demo": "Try the live demo",
+    "see_pro": "See Pro →"
   },
   "logos": {
     "win": "Windows",
@@ -146,7 +146,8 @@
     "subtitle": "Private, local, and yours. Siegu is ready when you are.",
     "button": "Get siegu free",
     "note": "No account, no uploads, no lock-in.",
-    "upgrade": "Upgrade to Pro"
+    "upgrade": "Upgrade to Pro",
+    "demo": "Try the live demo"
   },
   "footer": {
     "tagline": "A private, local-first photo library.",
@@ -161,7 +162,7 @@
     "resources_links": {
       "docs": "Documentation",
       "download": "Download",
-      "support": "Support"
+      "demo": "Live demo"
     },
     "company": "Company",
     "company_links": {

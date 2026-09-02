@@ -6,10 +6,9 @@
   "nav": {
     "features": "Funzionalità",
     "pricing": "Prezzi",
-    "docs": "Documenti",
     "faq": "FAQ",
-    "get_started": "Inizia",
-    "get_free": "Scarica siegu gratis"
+    "get_free": "Scarica siegu gratis",
+    "demo": "Demo live"
   },
   "hero": {
     "badge": "Privato per design · Local-first",
@@ -17,9 +16,10 @@
     "title2": "privata per te",
     "subtitle": "Siegu conserva ogni foto e ogni video sul tuo dispositivo. Ricerca potente, IA sul dispositivo e condivisione fluida — niente cloud, niente upload, nessun compromesso.",
     "cta_primary": "Scarica siegu gratis",
-    "cta_secondary": "Vedi Pro",
     "note": "Windows · macOS · Linux · Web",
-    "trust": "Gratis per sempre · Nessun account · Cancella quando vuoi."
+    "trust": "Gratis per sempre · Nessun account · Cancella quando vuoi.",
+    "cta_demo": "Prova la demo",
+    "see_pro": "Vedi Pro →"
   },
   "logos": {
     "win": "Windows",
@@ -146,7 +146,8 @@
     "subtitle": "Privato, locale e tuo. Siegu è pronto quando lo sei tu.",
     "button": "Scarica siegu gratis",
     "note": "Nessun account, nessun upload, nessun vincolo.",
-    "upgrade": "Passa a Pro"
+    "upgrade": "Passa a Pro",
+    "demo": "Prova la demo"
   },
   "footer": {
     "tagline": "Una libreria fotografica privata, local-first.",
@@ -161,7 +162,7 @@
     "resources_links": {
       "docs": "Documentazione",
       "download": "Scarica",
-      "support": "Supporto"
+      "demo": "Demo live"
     },
     "company": "Azienda",
     "company_links": {

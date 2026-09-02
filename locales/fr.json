@@ -6,10 +6,9 @@
   "nav": {
     "features": "Fonctionnalités",
     "pricing": "Tarifs",
-    "docs": "Docs",
     "faq": "FAQ",
-    "get_started": "Commencer",
-    "get_free": "Télécharger siegu gratuitement"
+    "get_free": "Télécharger siegu gratuitement",
+    "demo": "Démo en direct"
   },
   "hero": {
     "badge": "Privé par conception · Local d'abord",
@@ -17,9 +16,10 @@
     "title2": "rien qu'à vous",
     "subtitle": "Siegu conserve chaque photo et vidéo sur votre appareil. Recherche puissante, IA embarquée et partage fluide — ni cloud, ni envoi, aucun compromis.",
     "cta_primary": "Télécharger siegu gratuitement",
-    "cta_secondary": "Voir Pro",
     "note": "Windows · macOS · Linux · Web",
-    "trust": "Gratuit pour toujours · Aucun compte · Annulez à tout moment."
+    "trust": "Gratuit pour toujours · Aucun compte · Annulez à tout moment.",
+    "cta_demo": "Essayer la démo",
+    "see_pro": "Voir Pro →"
   },
   "logos": {
     "win": "Windows",
@@ -146,7 +146,8 @@
     "subtitle": "Privé, local et vôtre. Siegu est prêt quand vous l'êtes.",
     "button": "Télécharger siegu gratuitement",
     "note": "Pas de compte, pas d'envoi, pas de verrouillage.",
-    "upgrade": "Passer à Pro"
+    "upgrade": "Passer à Pro",
+    "demo": "Essayer la démo"
   },
   "footer": {
     "tagline": "Une photothèque privée, locale d'abord.",
@@ -161,7 +162,7 @@
     "resources_links": {
       "docs": "Documentation",
       "download": "Télécharger",
-      "support": "Assistance"
+      "demo": "Démo en direct"
     },
     "company": "Entreprise",
     "company_links": {

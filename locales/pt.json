@@ -6,10 +6,9 @@
   "nav": {
     "features": "Recursos",
     "pricing": "Preços",
-    "docs": "Docs",
     "faq": "FAQ",
-    "get_started": "Começar",
-    "get_free": "Baixe siegu grátis"
+    "get_free": "Baixe siegu grátis",
+    "demo": "Demo ao vivo"
   },
   "hero": {
     "badge": "Privado por design · Local em primeiro lugar",
@@ -17,9 +16,10 @@
     "title2": "privada para você",
     "subtitle": "Siegu mantém cada foto e vídeo no seu dispositivo. Busca poderosa, IA no dispositivo e compartilhamento fluido — sem nuvem, sem uploads, sem concessões.",
     "cta_primary": "Baixe siegu grátis",
-    "cta_secondary": "Ver Pro",
     "note": "Windows · macOS · Linux · Web",
-    "trust": "Grátis para sempre · Sem conta · Cancele quando quiser."
+    "trust": "Grátis para sempre · Sem conta · Cancele quando quiser.",
+    "cta_demo": "Experimente a demo",
+    "see_pro": "Ver Pro →"
   },
   "logos": {
     "win": "Windows",
@@ -146,7 +146,8 @@
     "subtitle": "Privado, local e seu. Siegu está pronto quando você estiver.",
     "button": "Baixe siegu grátis",
     "note": "Sem conta, sem uploads, sem aprisionamento.",
-    "upgrade": "Fazer upgrade para Pro"
+    "upgrade": "Fazer upgrade para Pro",
+    "demo": "Experimente a demo"
   },
   "footer": {
     "tagline": "Uma biblioteca de fotos privada, local em primeiro lugar.",
@@ -161,7 +162,7 @@
     "resources_links": {
       "docs": "Documentação",
       "download": "Baixar",
-      "support": "Suporte"
+      "demo": "Demo ao vivo"
     },
     "company": "Empresa",
     "company_links": {
