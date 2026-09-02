@@ -136,14 +136,16 @@ img { max-width: 100%; display: block; }
 .carousel-viewport {
   position: relative; border: 1px solid var(--border); border-radius: var(--radius);
   overflow: hidden; background: var(--surface); box-shadow: 0 40px 120px rgba(0,0,0,.22);
+  height: 620px;
 }
 .carousel-slide {
-  position: relative; opacity: 0; visibility: hidden; transform: scale(1.035);
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  opacity: 0; visibility: hidden; transform: scale(1.035);
   transition: opacity .9s cubic-bezier(.22,1,.36,1), transform 1.2s cubic-bezier(.22,1,.36,1), visibility .9s;
   pointer-events: none;
 }
 .carousel-slide.is-active { opacity: 1; visibility: visible; transform: scale(1); pointer-events: auto; z-index: 2; }
-.carousel-slide img { width: 100%; height: 620px; object-fit: cover; display: block; }
+.carousel-slide img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .carousel-label {
   position: absolute; left: 0; right: 0; bottom: 0; padding: 70px 28px 22px;
   background: linear-gradient(to top, rgba(0,0,0,.72), rgba(0,0,0,0));
@@ -173,7 +175,7 @@ img { max-width: 100%; display: block; }
 .carousel-dot.is-active { width: 26px; background: var(--ink); }
 
 @media (max-width: 720px) {
-  .carousel-slide img { height: 340px; }
+  .carousel-viewport { height: 340px; }
   .carousel-arrow { width: 38px; height: 38px; }
 }
 
