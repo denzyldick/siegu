@@ -6,7 +6,7 @@ compatibility_date = "2025-01-01"
 # Create with: npx wrangler kv namespace create PAID_EMAILS
 # then set the id below (and paste the preview_id too). Never hardcode secrets.
 kv_namespaces = [
-  { binding = "PAID_EMAILS", id = "REPLACE_WITH_KV_NAMESPACE_ID", preview_id = "REPLACE_WITH_PREVIEW_ID" }
+  { binding = "PAID_EMAILS", id = "d3f2b05fe6ea4bdc8bb54ffa1467ad8e", preview_id = "d3f2b05fe6ea4bdc8bb54ffa1467ad8e" }
 ]
 
 # workers_dev exposes https://siegu-pro-license.<account>.workers.dev

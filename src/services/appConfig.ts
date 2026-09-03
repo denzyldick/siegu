@@ -28,7 +28,8 @@ export const APP_LANDING_URL = import.meta.env.VITE_APP_LANDING_URL || APP_WEB_B
  * Overridable via `pro_license_url` config key (see settings store).
  */
 export const PRO_LICENSE_URL =
-  import.meta.env.VITE_PRO_LICENSE_URL || 'https://siegu-pro-license.workers.dev';
+  import.meta.env.VITE_PRO_LICENSE_URL || 'https://siegu-pro-license.ddenzyl.workers.dev';
+
 
 /** Landing "upgrade to Pro" anchor the app points users to. */
 export const APP_PRO_URL = `${APP_LANDING_URL}/#pricing`;
