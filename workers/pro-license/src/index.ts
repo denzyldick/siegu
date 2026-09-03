@@ -347,7 +347,11 @@ export default {
         }
 
         const session = event.data?.object ?? {};
-        const email = normalizeEmail(session.customer_email ?? '');
+        // Payment Links store the customer's entered email under
+        // customer_details.email (customer_email is only for pre-filling).
+        const email = normalizeEmail(
+          session.customer_details?.email ?? session.customer_email ?? '',
+        );
 
         if (email) {
           const record = {
