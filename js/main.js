@@ -109,21 +109,22 @@ function renderPricing() {
       const isWaitlist = key === 'team';
       // Waitlist (Team) is a secondary action; Free/Pro are primary.
       const btnClass = isWaitlist ? 'btn-ghost' : 'btn-ink';
-      // Free -> platform download; Pro -> Stripe Payment Link; Team -> waitlist.
-      const btnHref = isWaitlist ? '#'
-        : key === 'free' ? freeDownloadUrl()
-        : (STRIPE_PAYMENT_RE.test(proPaymentLink()) ? proPaymentLink() : '#');
+      // Free -> download dialog; Pro -> pro dialog (Stripe inside); Team -> waitlist.
+      const btnAction = isWaitlist ? 'open-waitlist'
+        : key === 'free' ? 'open-download'
+        : 'open-pro';
+      const btnHref = '#';
+      const btnTarget = 'target="_blank" rel="noopener"';
       const btnTrack = isWaitlist ? 'data-track="pricing_waitlist"' : `data-track="pricing_${key}"`;
-      // Tag the Free (download) card with platform/arch for GA breakdowns.
+      const btnExtra = isWaitlist ? `data-waitlist-source="family"` : '';
+      // Keep the Free card's data-platform stamp for GA download breakdowns.
       let dataPlatform = '';
-      if (key === 'free' && !isWaitlist) {
+      if (key === 'free') {
         const pl = detectPlatform();
         if (latestAssets.length > 0 && pl.os !== 'web' && pl.os !== 'ios') {
           dataPlatform = ` data-platform="${pl.os}" data-arch="${pl.arch}"`;
         }
       }
-      const btnExtra = isWaitlist ? 'data-action="open-waitlist"'
-        : (btnHref !== '#' ? `target="_blank" rel="noopener"${dataPlatform}` : '');
       return `
       <div class="plan ${featured ? 'featured' : ''}">
         ${featured ? `<span class="plan-badge">${p.highlight || ''}</span>` : ''}
@@ -134,7 +135,7 @@ function renderPricing() {
         <p class="tagline">${p.tagline || ''}</p>
         <ul>${feats.map((f) => `<li><span class="check">✓</span><span>${f}</span></li>`).join('')}</ul>
         ${key !== 'free' ? '<p class="plan-risk">Cancel anytime</p>' : ''}
-        <a class="btn ${btnClass}" href="${btnHref}" ${btnExtra} ${btnTrack}>${p.cta || ''}</a>
+        <a class="btn ${btnClass}" href="${btnHref}" data-action="${btnAction}" ${btnTarget} ${btnExtra} ${dataPlatform} ${btnTrack}>${p.cta || ''}</a>
       </div>`;
     })
     .join('');
@@ -286,66 +287,127 @@ async function loadLatestRelease() {
   }
 }
 
-// Resolve the download URL for the visitor's platform. Returns null when we
-// can't match an installer (falls back to the release page).
-function freeDownloadUrl() {
-  const { os, arch } = detectPlatform();
-  if (latestAssets.length) {
-    const direct = selectAsset(latestAssets, os, arch);
-    if (direct) return direct;
-  }
-  // No matching asset yet — send them to the release page so they always get
-  // the latest working installers regardless of platform.
-  return RELEASE_PAGE;
+// Resolve the download URL for a specific OS/arch against the release assets.
+function downloadUrlFor(os, arch) {
+  if (!latestAssets.length) return RELEASE_PAGE;
+  return selectAsset(latestAssets, os, arch) || RELEASE_PAGE;
 }
 
-/* Wire the "Get siegu free" links. Free always goes to the platform download
-   (or opens the waitlist modal for platforms with no build — e.g. web/iOS),
-   and the Pro/upgrade buttons go to the Stripe Payment Link */
+/* ---------- Download dialog (modern OS picker) ---------- */
+// Inline SVG platform icons (stroke-based, currentColor) — no icon font needed.
+const PICO = {
+  windows:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>',
+  macos:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 5c-1.5-1.7-3.4-2-5-1.8a6.5 6.5 0 0 0 1.4 12.9c.7 0 1.6-.5 2.8-.5s2 .6 2.8.6c1.8 0 4-2.5 4-5 .9-1.8-.3-3.6-2-4-.3-1.1-1.8-2.6-4-2.2z"/><path d="M9.5 3.2c-.2-1.3.9-2.6 2.3-2.9"/></svg>',
+  linux:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3c-3 0-5 2.4-5 5.5 0 2 .6 3.6 1.3 5.4.5 1.2 1 2.3 1.2 3.6.2 1.7.9 3.5 2.5 3.5s2.3-1.8 2.5-3.5c.2-1.3.7-2.4 1.2-3.6.7-1.8 1.3-3.4 1.3-5.4C17 5.4 15 3 12 3z"/><path d="M12 3c-1 1.3-1 3.7 0 6.6.7 2 2 4 2.5 5.4.3.9.5 1.8.5 2.5" opacity=".5"/></svg>',
+  android:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M5 9v6M19 9v6"/><rect x="5" y="9" width="14" height="10" rx="2"/><path d="M8 9l-2-3M16 9l2-3M8 19v2M16 19v2"/></svg>',
+  web:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>',
+};
+
+// The options surfaced in the download dialog, in display order. `osMatch`
+// picks the release asset prefix; `note` flags platforms with no build.
+const DL_OPTIONS = [
+  { key: 'windows', label: 'Windows', arch: 'x64', icon: PICO.windows, osMatch: /\.exe$|\.msi$/ },
+  { key: 'macos', label: 'macOS', arch: 'Apple Silicon', icon: PICO.macos, osMatch: /aarch64.*\.dmg$|arm64.*\.dmg$/ },
+  { key: 'macos-intel', label: 'macOS', arch: 'Intel', icon: PICO.macos, osMatch: /(amd64|x64|intel).*\.dmg$/ },
+  { key: 'linux', label: 'Linux', arch: 'AppImage', icon: PICO.linux, osMatch: /\.AppImage$/ },
+  { key: 'android', label: 'Android', arch: 'APK', icon: PICO.android, osMatch: /\.apk$/ },
+  { key: 'web', label: 'Web / iOS', arch: 'coming soon', icon: PICO.web, osMatch: null, soon: true },
+];
+
+function buildDownloadDialog() {
+  const grid = document.getElementById('dlGrid');
+  if (!grid) return;
+  const { os: curOs, arch: curArch } = detectPlatform();
+  grid.innerHTML = DL_OPTIONS.map((opt) => {
+    let href = '#';
+    let soon = opt.soon;
+    if (!soon) {
+      const baseOs = opt.key === 'macos-intel' ? 'macos' : opt.key;
+      const archName = baseOs === 'macos'
+        ? (opt.key === 'macos' ? 'aarch64' : 'x86_64')
+        : opt.arch;
+      href = selectAsset(latestAssets, baseOs === 'macos-intel' ? 'macos' : baseOs, archName) || RELEASE_PAGE;
+    }
+    const isArm = /arm|aarch64/i.test(navigator.userAgent);
+    const isCurrent =
+      opt.key === curOs ||
+      (opt.key === 'macos-intel' && curOs === 'macos' && !isArm) ||
+      (opt.key === 'macos' && curOs === 'macos' && isArm);
+    const track = soon
+      ? 'data-track="download_soon"'
+      : `data-track="download_${opt.key}" data-platform="${opt.key.replace(/-.*$/, '')}" data-arch="${opt.arch}"`;
+    const content = `
+      <span class="dl-icon">${opt.icon}</span>
+      <span class="dl-name">${opt.label}</span>
+      ${soon ? '<span class="dl-soon">' + opt.arch + '</span>' : '<span class="dl-arch">' + opt.arch + '</span>'}`;
+    return soon
+      ? `<button type="button" class="dl-opt" data-action="open-waitlist" data-waitlist-source="${opt.key}" data-track="download_${opt.key}">${content}</button>`
+      : `<a class="dl-opt" href="${href}" target="_blank" rel="noopener" ${track}>${content}</a>`;
+  }).join('');
+}
+
+/* ---------- Pro dialog (explain + Stripe pay) ---------- */
+const PRO_BENEFITS = [
+  'Unlimited photos and albums',
+  'Advanced on-device AI search',
+  'Private sharing for the whole family',
+  'Priority support and early features',
+];
+
+function proPriceFor() {
+  const base = 9.99;
+  return state.billing === 'yearly' ? (base * 0.8).toFixed(2) : base.toFixed(2);
+}
+
+function buildProDialog() {
+  const benefits = document.getElementById('proBenefits');
+  if (benefits) {
+    benefits.innerHTML = PRO_BENEFITS
+      .map((b) => `<li><span class="check">✓</span><span>${b}</span></li>`)
+      .join('');
+  }
+  const price = document.getElementById('proPrice');
+  if (price) price.innerHTML = `$${proPriceFor()}<small> ${state.billing === 'yearly' ? '/year' : '/month'}</small>`;
+  const pay = document.getElementById('proPayBtn');
+  if (pay) pay.setAttribute('href', STRIPE_PAYMENT_RE.test(proPaymentLink()) ? proPaymentLink() : '#');
+}
+
+
+
+/* Wire the "Get siegu free" and Pro/upgrade buttons. Free CTAs now open the
+   download dialog (OS picker) instead of auto-downloading; Pro/upgrade buttons
+   open the pro modal with the Stripe pay button. */
 async function applyCtas() {
   await loadLatestRelease();
-  const { os, arch } = detectPlatform();
-  const freeHref = freeDownloadUrl();
-  const waitlistPlatforms = ['ios', 'web'];
-  const isWaitlistPlatform = waitlistPlatforms.includes(os);
-  // A direct asset match (not the fallback release page) is a real download.
-  const isDirectAsset = latestAssets.length > 0 && os !== 'web' && os !== 'ios';
+  const { os } = detectPlatform();
 
-  document.querySelectorAll('.hero-cta a[data-track="cta_get_started"], .cta-band a[data-track="cta_footer"], .header-actions a[data-track="cta_get_started"], .site-footer a[data-action="platform-download"]').forEach((a) => {
-    if (isWaitlistPlatform) {
-      a.setAttribute('href', '#');
-      a.setAttribute('data-action', 'open-waitlist');
-      a.setAttribute('target', '');
-      a.removeAttribute('data-track');
-      a.setAttribute('data-track', 'cta_waitlist');
-      a.removeAttribute('data-platform');
-      a.removeAttribute('data-arch');
-      // Remember which platform triggered the waitlist so the email list is
-      // segmented (macOS, iOS, etc.) instead of everything lumped as "family".
-      a.setAttribute('data-waitlist-source', os);
-    } else {
-      a.setAttribute('href', freeHref);
-      a.removeAttribute('data-action');
-      a.setAttribute('target', '_blank');
-      a.setAttribute('rel', 'noopener');
-      // Stamp platform/arch so GA can break out downloads by OS.
-      if (isDirectAsset) {
-        a.setAttribute('data-platform', os);
-        a.setAttribute('data-arch', arch);
-      } else {
-        a.removeAttribute('data-platform');
-        a.removeAttribute('data-arch');
-      }
-    }
+  // Free CTAs -> open the download dialog (which offers every platform).
+  document.querySelectorAll('.hero-cta a[data-track="cta_get_started"], .cta-band a[data-track="cta_footer"], .header-actions a[data-track="cta_get_started"], .site-footer a[data-action="platform-download"], a[data-action="open-download"]').forEach((a) => {
+    a.removeAttribute('href');
+    a.setAttribute('href', '#');
+    a.setAttribute('data-action', 'open-download');
+    a.setAttribute('target', '');
+    a.setAttribute('rel', '');
   });
 
-  document.querySelectorAll('a[data-track="cta_upgrade"]').forEach((a) => {
-    a.setAttribute('href', STRIPE_PAYMENT_RE.test(proPaymentLink()) ? proPaymentLink() : '#');
+  // Pro / Upgrade buttons -> open the pro dialog (Stripe pay inside).
+  document.querySelectorAll('a[data-track="cta_upgrade"], a[data-action="open-pro"]').forEach((a) => {
+    a.setAttribute('href', '#');
+    a.setAttribute('data-action', 'open-pro');
+    a.setAttribute('target', '');
+    a.setAttribute('rel', '');
   });
 
-  // Re-render pricing so the Free card's button resolves to the direct
-  // platform download now that release assets are loaded — and stamp it too.
+  // Re-render pricing so the Free card's button opens the download dialog and
+  // the Pro card's button opens the pro dialog (rebuilt with current billing).
   if (document.getElementById('pricingGrid')) renderPricing();
+  buildDownloadDialog();
+  buildProDialog();
 }
 
 /* ---------- Track outbound / CTA clicks ---------- */
@@ -486,6 +548,34 @@ async function boot() {
     state.billing = btn.getAttribute('data-period');
     document.querySelectorAll('#billingToggle button').forEach((b) => b.classList.toggle('active', b === btn));
     renderPricing();
+    buildProDialog();
+  });
+
+  /* Download + Pro dialogs */
+  const dlModal = document.getElementById('downloadModal');
+  const proModal = document.getElementById('proModal');
+  function openDl(overlay) {
+    if (!overlay) return;
+    overlay.setAttribute('aria-hidden', 'false');
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeDl(overlay) {
+    if (!overlay) return;
+    overlay.setAttribute('aria-hidden', 'true');
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('click', (e) => {
+    const dlTrig = e.target.closest('[data-action="open-download"]');
+    if (dlTrig) { e.preventDefault(); openDl(dlModal); return; }
+    const proTrig = e.target.closest('[data-action="open-pro"]');
+    if (proTrig) { e.preventDefault(); buildProDialog(); openDl(proModal); return; }
+    if (e.target.closest('[data-dl-close]') || e.target === dlModal) closeDl(dlModal);
+    if (e.target.closest('[data-pro-close]') || e.target === proModal) closeDl(proModal);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closeDl(dlModal); closeDl(proModal); }
   });
 
   /* Waitlist modal (Family plan) */

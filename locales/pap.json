@@ -211,5 +211,18 @@
     "cta": "Subí na lista di espera",
     "note": "Sin spam. Un aviso nada mas ora e kla.",
     "success": "Bo ta riba e lista — lo nos avisábo!"
+  },
+  "download": {
+    "title": "Deskarga Siegu gratis",
+    "desc": "Gratis pa semper, privá i di bo. Skohe bo platform pa deskarga e vershon mas nobo.",
+    "note": "Tur deskarga ta gratis — sin cuenta, sin cloud."
+  },
+  "pro": {
+    "title": "Upgrade pa Pro",
+    "desc": "Desblokea tur kos. Un preis, riba tur aparato, sin sospresa.",
+    "per_month": " /luna",
+    "per_year": " /aña",
+    "pay": "Paga ku tarheta",
+    "note": "Checkout segur dor di Stripe. Kanselá ora bo ke."
   }
 }

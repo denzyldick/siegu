@@ -7,7 +7,7 @@
   <meta name="description" content="Siegu is a private, local-first photo library with on-device AI. Browse, search, share and relive your memories without handing them to the cloud." />
   <script>
     // Apply the saved theme before first paint to avoid a flash of the wrong
-    // palette. Mirrors applyTheme() in js/main.js?v=mtkowa4p (light | dark | system).
+    // palette. Mirrors applyTheme() in js/main.js?v=mtldstyj (light | dark | system).
     (function () {
       try {
         var v = localStorage.getItem('siegu_theme');
@@ -84,14 +84,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="css/styles.css?v=mtkowa4p" />
+  <link rel="stylesheet" href="css/styles.css?v=mtldstyj" />
 
   <!--
     MARKETING / TRACKER HOOK
     Drop vendor scripts (Plausible, Fathom, GA, Meta Pixel, Hotjar, …) here.
     Each snippet can live in its own file under /trackers/*.js and be included
     with a <script src> tag, or added inline below. They load only after the
-    cookie-consent banner has been accepted (see js/main.js?v=mtkowa4p `trackersOn`).
+    cookie-consent banner has been accepted (see js/main.js?v=mtldstyj `trackersOn`).
   -->
 </head>
 <body>
@@ -145,7 +145,7 @@
       <div class="container hero-visual">
         <div class="carousel" id="heroCarousel" aria-roledescription="carousel" aria-label="Siegu in action">
           <div class="carousel-viewport" id="carouselViewport">
-            <!-- slides injected by js/main.js?v=mtkowa4p from /slides.json -->
+            <!-- slides injected by js/main.js?v=mtldstyj from /slides.json -->
           </div>
           <button class="carousel-arrow carousel-prev" id="carouselPrev" type="button" aria-label="Previous slide">‹</button>
           <button class="carousel-arrow carousel-next" id="carouselNext" type="button" aria-label="Next slide">›</button>
@@ -318,7 +318,7 @@
       </div>
       <div class="container">
         <div class="pricing-grid" id="pricingGrid">
-          <!-- Plan cards injected by js/main.js?v=mtkowa4p -->
+          <!-- Plan cards injected by js/main.js?v=mtldstyj -->
         </div>
         <p class="pricing-note center" data-i18n="pricing.note">Prices in USD. Cancel anytime. No extra fees for more photos.</p>
       </div>
@@ -387,6 +387,32 @@
     </div>
   </footer>
 
+  <!-- Download modal: pick your OS -->
+  <div class="dl-overlay" id="downloadModal" aria-hidden="true" role="dialog" aria-label="Download Siegu">
+    <div class="dl-dialog">
+      <button class="dl-close" data-dl-close type="button" aria-label="Close">&times;</button>
+      <h3 data-i18n="download.title">Get Siegu free</h3>
+      <p class="dl-sub" data-i18n="download.desc">Free forever, private, and yours. Pick your platform to download the latest build.</p>
+      <div class="dl-grid" id="dlGrid"><!-- filled by main.js --></div>
+      <p class="dl-note" data-i18n="download.note">All downloads check in at zero cost — no account, no cloud.</p>
+    </div>
+  </div>
+
+  <!-- Pro modal: explain + pay -->
+  <div class="dl-overlay" id="proModal" aria-hidden="true" role="dialog" aria-label="Upgrade to Pro">
+    <div class="dl-dialog">
+      <button class="dl-close" data-pro-close type="button" aria-label="Close">&times;</button>
+      <h3 data-i18n="pro.title">Upgrade to Pro</h3>
+      <p class="dl-sub" data-i18n="pro.desc">Unlock everything. One price, every device, no subscriptions quirks.</p>
+      <ul class="pro-benefits" id="proBenefits"><!-- filled by main.js --></ul>
+      <div class="pro-pay-row">
+        <span class="pro-price" id="proPrice">$9.99<span data-i18n="pro.per_month"> /month</span></span>
+        <a class="btn btn-ink btn-lg" id="proPayBtn" data-track="upgrade_clicked" target="_blank" rel="noopener" data-i18n="pro.pay">Pay with card</a>
+      </div>
+      <p class="dl-note" data-i18n="pro.note">Secure checkout by Stripe. Cancel anytime.</p>
+    </div>
+  </div>
+
   <!-- Waitlist modal (Family plan) -->
   <div class="waitlist-overlay" id="waitlistModal" aria-hidden="true" role="dialog" aria-label="Join waitlist">
     <div class="waitlist-dialog">
@@ -402,6 +428,6 @@
     </div>
   </div>
 
-  <script src="js/main.js?v=mtkowa4p"></script>
+  <script src="js/main.js?v=mtldstyj"></script>
 </body>
 </html>

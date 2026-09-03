@@ -211,5 +211,18 @@
     "cta": "S'inscrire",
     "note": "Pas de spam. Juste un avis quand ce sera prêt.",
     "success": "Vous êtes sur la liste — on vous contacte !"
+  },
+  "download": {
+    "title": "Télécharger Siegu gratuitement",
+    "desc": "Gratuit pour toujours, privé et à vous. Choisissez votre plateforme pour télécharger la dernière version.",
+    "note": "Tous les téléchargements sont gratuits — sans compte, sans cloud."
+  },
+  "pro": {
+    "title": "Passer à Pro",
+    "desc": "Débloquez tout. Un prix, sur chaque appareil, sans surprise.",
+    "per_month": " /mois",
+    "per_year": " /an",
+    "pay": "Payer par carte",
+    "note": "Paiement sécurisé par Stripe. Annulable à tout moment."
   }
 }

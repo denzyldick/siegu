@@ -211,5 +211,18 @@
     "cta": "Auf Warteliste",
     "note": "Kein Spam. Nur eine Benachrichtigung, wenn es soweit ist.",
     "success": "Du bist auf der Liste — wir melden uns!"
+  },
+  "download": {
+    "title": "Siegu kostenlos herunterladen",
+    "desc": "Für immer kostenlos, privat und gehört dir. Wähle deine Plattform, um den neuesten Build zu laden.",
+    "note": "Alle Downloads sind kostenlos — ohne Konto, ohne Cloud."
+  },
+  "pro": {
+    "title": "Auf Pro upgraden",
+    "desc": "Schalte alles frei. Ein Preis, auf jedem Gerät, ohne Überraschungen.",
+    "per_month": " /Monat",
+    "per_year": " /Jahr",
+    "pay": "Mit Karte bezahlen",
+    "note": "Sichere Zahlung über Stripe. Jederzeit kündbar."
   }
 }

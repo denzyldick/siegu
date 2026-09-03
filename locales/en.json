@@ -211,5 +211,18 @@
     "cta": "Join waitlist",
     "note": "No spam. Just a heads-up when it's ready.",
     "success": "You're on the list — we'll be in touch!"
+  },
+  "download": {
+    "title": "Get Siegu free",
+    "desc": "Free forever, private, and yours. Pick your platform to download the latest build.",
+    "note": "All downloads are free — no account, no cloud."
+  },
+  "pro": {
+    "title": "Upgrade to Pro",
+    "desc": "Unlock everything. One price, on every device, no surprises.",
+    "per_month": " /month",
+    "per_year": " /year",
+    "pay": "Pay with card",
+    "note": "Secure checkout by Stripe. Cancel anytime."
   }
 }

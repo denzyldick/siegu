@@ -211,5 +211,18 @@
     "cta": "Wachtlijst",
     "note": "Geen spam. Alleen een seintje als het klaar is.",
     "success": "Je staat op de lijst — we nemen contact op!"
+  },
+  "download": {
+    "title": "Download Siegu gratis",
+    "desc": "Gratis voor altijd, privé en van jou. Kies je platform om de nieuwste versie te downloaden.",
+    "note": "Alle downloads zijn gratis — geen account, geen cloud."
+  },
+  "pro": {
+    "title": "Upgrade naar Pro",
+    "desc": "Ontgrendel alles. Eén prijs, op elk apparaat, zonder verrassingen.",
+    "per_month": " /maand",
+    "per_year": " /jaar",
+    "pay": "Betaal met kaart",
+    "note": "Veilige checkout door Stripe. Annuleer op elk moment."
   }
 }
