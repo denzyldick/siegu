@@ -1,0 +1,45 @@
+name: siegu-landing
+
+# Siegu marketing site deployment.
+#
+#   caddy — serves ./public statically over HTTPS.
+#           Local:    SIEGU_CERT_ISSUER=internal (default) + scripts/local-setup.sh
+#           VPS:      SIEGU_DOMAIN=siegu.io SIEGU_CERT_ISSUER=acme (Let's Encrypt)
+#
+# Usage:
+#   Local:   SIEGU_GA_ID=G-XXXXXXX docker compose up -d --build
+#            sudo bash scripts/local-setup.sh   # siegu.io in /etc/hosts + trust CA
+#   VPS:     SIEGU_DOMAIN=siegu.io SIEGU_CERT_ISSUER=acme \
+#              SIEGU_GA_ID=G-XXXXXXX \
+#              SIEGU_STRIPE_MONTHLY=https://buy.stripe.com/xxx \
+#              SIEGU_STRIPE_YEARLY=https://buy.stripe.com/xxx \
+#              docker compose up -d --build
+
+services:
+  caddy:
+    build:
+      context: .
+      # BuildKit RUN steps need network here (broken default bridge); host
+      # networking matches the pattern used by the main siegu-compose build.
+      network: host
+      args:
+        # Baked into /srv/js/main.js at build time. Placeholder / unset = GA off.
+        SIEGU_GA_ID: ${SIEGU_GA_ID:-__GA_MEASUREMENT_ID__}
+        # Baked into the Pro checkout links (monthly/yearly) at build time. Placeholder / unset = buttons inert.
+        SIEGU_STRIPE_MONTHLY: ${SIEGU_STRIPE_MONTHLY:-__STRIPE_PRO_PAYMENT_LINK_MONTHLY__}
+        SIEGU_STRIPE_YEARLY: ${SIEGU_STRIPE_YEARLY:-__STRIPE_PRO_PAYMENT_LINK_YEARLY__}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDR: ${SIEGU_DOMAIN:-siegu.io}
+      CERT_ISSUER: ${SIEGU_CERT_ISSUER:-internal}
+    volumes:
+      # Persistent Caddy storage (keeps the internal CA's root across rebuilds).
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

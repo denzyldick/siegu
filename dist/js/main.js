@@ -193,7 +193,7 @@ function cycleTheme() {
    GA4: the Docker build injects the real Measurement ID into GA_MEASUREMENT_ID
    (see deploy/Caddyfile + README). When the ID is still the public placeholder
    or absent, GA stays off — including under plain `npm run dev`. */
-const GA_MEASUREMENT_ID = '__GA_MEASUREMENT_ID__';
+const GA_MEASUREMENT_ID = '';
 const GA_ENABLED = /^G-[A-Z0-9]+$/.test(GA_MEASUREMENT_ID);
 
 function trackersOn() {
@@ -217,8 +217,8 @@ function trackersOn() {
    side. A build script (scripts/build-static.mjs) substitutes the real links
    into these placeholders. Monthly and Yearly are separate prices (Yearly is
    ~20% off), so the Pro button hands off to whichever period is selected. */
-const STRIPE_PRO_PAYMENT_LINK_MONTHLY = '__STRIPE_PRO_PAYMENT_LINK_MONTHLY__';
-const STRIPE_PRO_PAYMENT_LINK_YEARLY = '__STRIPE_PRO_PAYMENT_LINK_YEARLY__';
+const STRIPE_PRO_PAYMENT_LINK_MONTHLY = '';
+const STRIPE_PRO_PAYMENT_LINK_YEARLY = '';
 // The currently-selected period is read from state.billing by proPaymentLink().
 function proPaymentLink() {
   return state.billing === 'yearly'

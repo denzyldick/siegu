@@ -68,3 +68,24 @@ When running locally, the Siegu app's landing links are driven by env vars
 
 Build/run the app with the first override to make its landing links open this
 local site.
+
+## Single-command deploy (Docker + Caddy)
+
+One container (Caddy) serves `./public/` statically over HTTPS: internal CA
+certificates locally, automatic Let's Encrypt on the VPS.
+
+```sh
+# Local (browser comes up green on https://siegu.io after the one-time setup):
+SIEGU_GA_ID=G-XXXXXXX docker compose up -d --build
+sudo bash scripts/local-setup.sh        # /etc/hosts entry + trust Caddy internal CA
+# then restart the browser and open https://siegu.io
+
+# VPS:
+SIEGU_DOMAIN=siegu.io SIEGU_CERT_ISSUER=acme \
+  SIEGU_GA_ID=G-XXXXXXX docker compose up -d --build
+```
+
+GA4 is only enabled when `SIEGU_GA_ID` is a real `G-…` measurement ID (baked
+into `js/main.js` at build time; placeholder/unset keeps GA off, including for
+`npm run dev`). CTA clicks are sent as GA4 `cta` events with
+`cta_name` + `locale`.

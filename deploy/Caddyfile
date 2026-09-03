@@ -1,0 +1,16 @@
+{
+	# Trusted proxies not needed (public server edges directly).
+	admin off
+}
+
+{$SITE_ADDR:siegu.io} {
+	encode gzip
+
+	root * /srv
+	try_files {path} {path}/ /index.html
+	file_server
+
+	# Local:  SIEGU_CERT_ISSUER=internal (default) -> internal CA, hosts file entry.
+	# VPS:    SIEGU_CERT_ISSUER=acme           -> automatic Let's Encrypt.
+	tls {$CERT_ISSUER:internal}
+}

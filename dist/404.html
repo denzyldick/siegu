@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Page not found — Siegu</title>
+  <meta name="robots" content="noindex" />
+  <link rel="canonical" href="https://denzyldick.github.io/siegu/" />
+  <link rel="icon" href="favicon.png" />
+  <link rel="icon" href="favicon-white.png" media="(prefers-color-scheme: dark)" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="./" class="brand"><img src="logo.png" alt="siegu" /><span>siegu</span></a>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="container" style="text-align:center">
+        <span class="hero-badge"><span class="dot"></span><span>404</span></span>
+        <h1>
+          <span>That page went</span><br />
+          <span class="dim">off the grid</span>
+        </h1>
+        <p class="hero-sub">The page you're looking for doesn't exist (or your photos took it).</p>
+        <div class="hero-cta" style="justify-content:center">
+          <a class="btn btn-ink" href="./" data-i18n="404.home">Back to home</a>
+          <a class="btn btn-ghost" href="https://siegu.onrender.com" target="_blank" rel="noopener">Try the live demo</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-bottom" style="justify-content:center;text-align:center">
+        <span>© <span id="year"></span> siegu. All rights reserved.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
