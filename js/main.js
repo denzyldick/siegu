@@ -568,9 +568,9 @@ async function boot() {
   }
   document.addEventListener('click', (e) => {
     const dlTrig = e.target.closest('[data-action="open-download"]');
-    if (dlTrig) { e.preventDefault(); openDl(dlModal); return; }
+    if (dlTrig) { e.preventDefault(); openDl(dlModal); pushEvent('download_dialog_opened', { locale: state.locale }); return; }
     const proTrig = e.target.closest('[data-action="open-pro"]');
-    if (proTrig) { e.preventDefault(); buildProDialog(); openDl(proModal); return; }
+    if (proTrig) { e.preventDefault(); buildProDialog(); openDl(proModal); pushEvent('pro_dialog_opened', { locale: state.locale }); return; }
     if (e.target.closest('[data-dl-close]') || e.target === dlModal) closeDl(dlModal);
     if (e.target.closest('[data-pro-close]') || e.target === proModal) closeDl(proModal);
   });
