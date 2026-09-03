@@ -448,7 +448,14 @@
     "pro_pro_advanced_hide": "Erweitert ausblenden",
     "pro_pro_upsell_title": "Siegu Pro entsperren",
     "pro_pro_upsell_desc": "Privat, auf dem Gerät, ein Preis für jedes Gerät.",
-    "pro_pro_upsell_cta": "Pro holen"
+    "pro_pro_upsell_cta": "Pro holen",
+    "pro_verify": "Pro verifizieren",
+    "pro_steps_short": "Gib die E-Mail ein, mit der du bezahlt hast, und tippe auf „Pro verifizieren“ — wir senden einen Link und entsperren Pro, sobald du ihn antippst.",
+    "pro_dialog_sending": "Sende deine Verifizierungs-E-Mail…",
+    "pro_dialog_waiting": "Prüfe deinen Posteingang",
+    "pro_dialog_waiting_desc": "Wir haben einen Bestätigungslink gesendet an",
+    "pro_dialog_watching": "Warte auf den Link… er wird automatisch entsperrt.",
+    "pro_dialog_close": "Schließen"
   },
   "open_with": {
     "opened_in_siegu": "In Siegu geöffnet: {file}"

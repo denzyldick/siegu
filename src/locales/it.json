@@ -448,7 +448,14 @@
     "pro_pro_advanced_hide": "Nascondi avanzate",
     "pro_pro_upsell_title": "Sblocca Siegu Pro",
     "pro_pro_upsell_desc": "Privato, sul dispositivo, un prezzo per ogni dispositivo.",
-    "pro_pro_upsell_cta": "Ottieni Pro"
+    "pro_pro_upsell_cta": "Ottieni Pro",
+    "pro_verify": "Verifica Pro",
+    "pro_steps_short": "Inserisci l’e-mail con cui hai pagato e tocca “Verifica Pro”: ti invieremo un link e sbloccheremo Pro appena lo tocchi.",
+    "pro_dialog_sending": "Invio della tua e-mail di verifica…",
+    "pro_dialog_waiting": "Controlla la tua casella di posta",
+    "pro_dialog_waiting_desc": "Abbiamo inviato un link di conferma a",
+    "pro_dialog_watching": "In attesa che tocchi il link… si sbloccherà automaticamente.",
+    "pro_dialog_close": "Chiudi"
   },
   "open_with": {
     "opened_in_siegu": "Aperto in Siegu: {file}"

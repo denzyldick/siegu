@@ -1,4 +1,4 @@
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, readonly } from 'vue';
 import { defineStore } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { invoke, listen } from '@/services/invoke';
@@ -32,7 +32,12 @@ import {
 import type { Update } from '@tauri-apps/plugin-updater';
 import { DEFAULT_SIGNALING_URL, appendToken, pingSignalling } from '@/services/signalling';
 import type { PingResult } from '@/services/signalling';
-import { PRO_LICENSE_URL, APP_PRO_URL } from '@/services/appConfig';
+import {
+  PRO_LICENSE_URL,
+  PRO_LICENSE_TOKEN,
+  APP_PRO_URL,
+  APP_CONNECT_URL,
+} from '@/services/appConfig';
 
 let listenersSetUp = false;
 const cleanupFns: Array<() => void> = [];
@@ -143,7 +148,14 @@ export const useSettingsStore = defineStore('settings', () => {
   const proVerifying = ref(false);
   const proStatus = ref<ProStatus | null>(null);
   const proLicenseUrl = ref('');
-  const proLicenseToken = ref('');
+  // Baked-in shared secret: users can't edit it (rotate via appConfig / env).
+  const proLicenseToken = readonly(ref(PRO_LICENSE_TOKEN));
+
+  // One-tap verify: dialog + polling state.
+  const proDialogOpen = ref(false);
+  const proDialogSending = ref(false);
+  const proDialogVerifying = ref(false);
+  let proPollTimer: ReturnType<typeof setInterval> | null = null;
 
   const uiNow = ref(Date.now());
 
@@ -725,12 +737,10 @@ export const useSettingsStore = defineStore('settings', () => {
       const config = JSON.parse(await invoke<string>('get_config')) as Record<string, string>;
       proEmail.value = config.paid_email || '';
       proLicenseUrl.value = config.pro_license_url || PRO_LICENSE_URL;
-      proLicenseToken.value = config.pro_license_token || '';
       proLoadError.value = '';
     } catch (e) {
       proEmail.value = '';
       proLicenseUrl.value = PRO_LICENSE_URL;
-      proLicenseToken.value = '';
       proLoadError.value = String(e);
     }
   }
@@ -738,10 +748,6 @@ export const useSettingsStore = defineStore('settings', () => {
   async function saveLicenseConfig(): Promise<void> {
     try {
       await invoke('save_config', { key: 'pro_license_url', value: proLicenseUrl.value.trim() });
-      await invoke('save_config', {
-        key: 'pro_license_token',
-        value: proLicenseToken.value.trim(),
-      });
       showSnackbar(t('settings.pro_config_saved'));
     } catch (e) {
       showSnackbar(t('settings.pro_config_save_failed', { error: e }), true);
@@ -834,6 +840,113 @@ export const useSettingsStore = defineStore('settings', () => {
     } finally {
       proVerifying.value = false;
     }
+  }
+
+  function stopProPolling(): void {
+    if (proPollTimer) {
+      clearInterval(proPollTimer);
+      proPollTimer = null;
+    }
+  }
+
+  async function closeProDialog(): Promise<void> {
+    stopProPolling();
+    proDialogOpen.value = false;
+    proDialogSending.value = false;
+    proDialogVerifying.value = false;
+    proVerifying.value = false;
+  }
+
+  /** One click (or Enter): send the verification email, then keep checking
+   *  /verify until the user taps the emailed link (or times out), then store
+   *  Pro — no separate "Check status" step. */
+  async function startProVerification(): Promise<void> {
+    stopProPolling();
+    const email = proEmail.value.trim();
+    if (!email) {
+      showSnackbar(t('settings.pro_email_required'), true);
+      proStatus.value = { ok: false, paid: false, verified: false, error: 'invalid_email' };
+      return;
+    }
+    const workerUrl = proLicenseUrl.value.trim() || PRO_LICENSE_URL;
+    const token = proLicenseToken.value.trim();
+
+    proDialogOpen.value = true;
+    proDialogSending.value = true;
+    proDialogVerifying.value = false;
+
+    // 1) Send the verification email.
+    try {
+      const raw = await invoke<string>('send_pro_verification', { email, workerUrl, token });
+      const parsed = parseProStatus(raw);
+      proStatus.value = parsed;
+      if (parsed.error === 'not_paid') {
+        showSnackbar(t('settings.pro_not_paid'), true);
+        await closeProDialog();
+        return;
+      }
+      if (!parsed.sent) {
+        showSnackbar(t('settings.pro_send_failed', { error: parsed.error }), true);
+        await closeProDialog();
+        return;
+      }
+      await invoke('save_config', { key: 'paid_email', value: email });
+      showSnackbar(t('settings.pro_email_sent'));
+    } catch (e) {
+      const error = String(e);
+      proStatus.value = { ok: false, paid: false, verified: false, error };
+      showSnackbar(t('settings.pro_send_failed', { error }), true);
+      await closeProDialog();
+      return;
+    }
+
+    // 2) Poll /verify until the link is clicked (or timeout).
+    proDialogSending.value = false;
+    proDialogVerifying.value = true;
+    proVerifying.value = true;
+
+    const started = Date.now();
+    const timeoutMs = 3 * 60 * 1000;
+
+    const pollOnce = async (): Promise<boolean> => {
+      try {
+        const raw = await invoke<string>('verify_pro_email', { email, workerUrl, token });
+        const parsed = parseProStatus(raw);
+        proStatus.value = parsed;
+        if (parsed.verified) {
+          stopProPolling();
+          proVerifying.value = false;
+          await invoke('save_config', { key: 'paid_email', value: email });
+          await invoke('save_config', { key: 'tier', value: 'paid' });
+          showSnackbar(t('settings.pro_unlocked'));
+          await closeProDialog();
+          return true;
+        }
+        if (parsed.error === 'not_paid') {
+          stopProPolling();
+          proVerifying.value = false;
+          showSnackbar(t('settings.pro_not_paid'), true);
+          await closeProDialog();
+          return true;
+        }
+      } catch {
+        // transient network error — keep polling
+      }
+      return false;
+    };
+
+    if (await pollOnce()) return;
+
+    proPollTimer = setInterval(() => {
+      if (Date.now() - started >= timeoutMs) {
+        stopProPolling();
+        proVerifying.value = false;
+        proDialogVerifying.value = false;
+        showSnackbar(t('settings.pro_check_failed', { error: 'timeout' }), true);
+        return;
+      }
+      void pollOnce();
+    }, 5000);
   }
 
   async function downloadModels(
@@ -1217,6 +1330,9 @@ export const useSettingsStore = defineStore('settings', () => {
     proStatus,
     proLicenseUrl,
     proLicenseToken,
+    proDialogOpen,
+    proDialogSending,
+    proDialogVerifying,
     sortedModels,
     isAnyModelProcessing,
     missingSelectedCount,
@@ -1265,8 +1381,11 @@ export const useSettingsStore = defineStore('settings', () => {
     saveLicenseConfig,
     sendProVerification,
     verifyProEmail,
+    startProVerification,
+    closeProDialog,
     proLoadError,
     APP_PRO_URL,
+    APP_CONNECT_URL,
     downloadModels,
     getProgress,
     getDownloadStats,

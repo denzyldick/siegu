@@ -5,8 +5,9 @@
  *
  * Flow
  * ----
- *   1. Stripe `checkout.session.completed` -> `POST /webhook` -> records
- *      `paid:<email>` in KV (idempotent). Stripe must capture the buyer's email.
+ *   1. Stripe `checkout.session.completed` -> `POST /stripe-webhook` -> records
+ *      `paid:<email>` in KV (idempotent) and emails the buyer a download link +
+ *      setup instructions (Resend). Stripe must capture the buyer's email.
  *
  *   2. In the desktop app (Settings > Pro) the user enters the email they
  *      bought with and taps "Send verification email". The app calls
@@ -29,10 +30,11 @@
  *   - `token:<sha256>`    -> single-use confirmation tokens (keyed by digest)
  *
  * Secrets (all set via `wrangler secret put`):
- *   - STRIPE_WEBHOOK_SECRET  : Stripe webhook signing secret (whsec_...)
- *   - SIEGU_VERIFY_TOKEN     : shared secret the desktop app sends
- *   - RESEND_API_KEY         : Resend API key (for sending the verify email)
- *   - MAIL_FROM              : verified sender, e.g. "Siegu <pro@example.com>"
+ *   - STRIPE_WEBHOOK_SECRET   : Stripe webhook signing secret (whsec_...)
+ *   - SIEGU_VERIFY_TOKEN      : shared secret the desktop app sends (app auth)
+ *   - CONFIRM_SIGNING_SECRET  : HMAC key for confirm links (NEVER in the app)
+ *   - RESEND_API_KEY          : Resend API key (for sending email)
+ *   - MAIL_FROM               : verified sender, e.g. "Siegu <pro@example.com>"
  *
  * Deploy:
  *   cd workers/pro-license
@@ -40,6 +42,7 @@
  *   npx wrangler kv namespace create PAID_EMAILS        # paste id/preview_id below
  *   npx wrangler secret put STRIPE_WEBHOOK_SECRET
  *   npx wrangler secret put SIEGU_VERIFY_TOKEN
+ *   npx wrangler secret put CONFIRM_SIGNING_SECRET
  *   npx wrangler secret put RESEND_API_KEY
  *   npx wrangler secret put MAIL_FROM
  *   npx wrangler deploy
@@ -48,12 +51,23 @@ export interface Env {
   PAID_EMAILS: KVNamespace;
   STRIPE_WEBHOOK_SECRET: string;
   SIEGU_VERIFY_TOKEN: string;
+  CONFIRM_SIGNING_SECRET: string;
   RESEND_API_KEY: string;
   MAIL_FROM: string;
 }
 
 /** Landing page shown after a successful verification. */
 const SUCCESS_URL = 'https://denzyldick.github.io/siegu/#pricing';
+
+/** Direct download for the Linux (AppImage) build, sent to buyers. */
+const DOWNLOAD_URL =
+  'https://github.com/denzyldick/siegu/releases/download/v0.1.13/Siegu_0.1.13_amd64.AppImage';
+
+/** README section listing install from source / all supported platforms. */
+const RUN_OTHER_WAYS_URL = 'https://github.com/denzyldick/siegu#how-do-i-install-it';
+
+/** Setup / troubleshooting guide (landing page). */
+const SETUP_URL = 'https://denzyldick.github.io/siegu/';
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
@@ -78,11 +92,16 @@ function encodeParam(input: string): string {
 // ---- Signed verification tokens (HMAC-SHA256, no random code) ----
 // Token payload: `<email>|<expiresEpochSeconds>`. Signature is the HMAC of the
 // payload. format: base64url(payload).base64url(sig). Expiry ~30 min.
+//
+// SECURITY: the HMAC key is a DEDICATED secret (CONFIRM_SIGNING_SECRET), NOT
+// the app's SIEGU_VERIFY_TOKEN. The app token is embedded in the shipped
+// desktop app, so it must never double as the key used to forge confirm links.
+// Keep these two secrets distinct.
 
 async function hmacHex(env: Env, data: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     'raw',
-    new TextEncoder().encode(env.SIEGU_VERIFY_TOKEN),
+    new TextEncoder().encode(env.CONFIRM_SIGNING_SECRET),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign'],
@@ -204,6 +223,46 @@ async function sendVerifyEmail(env: Env, to: string, link: string): Promise<void
 
 async function readRawBody(request: Request): Promise<ArrayBuffer> {
   return await request.arrayBuffer();
+}
+
+// ---- Purchase fulfillment email (download + setup instructions) ----
+async function sendPurchaseEmail(env: Env, to: string, amount: number | null, currency: string | null): Promise<void> {
+  const price = amount != null ? (amount / 100).toFixed(2) : null;
+  const priceLine =
+    price != null
+      ? `<p style="color:#52525b">Order total: <strong>${(currency ?? '').toUpperCase()} ${price}</strong></p>`
+      : '';
+  const resp = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: env.MAIL_FROM || 'Siegu <pro@example.com>',
+      to,
+      subject: 'Welcome to Siegu Pro — your download & next steps',
+      html: `
+        <div style="font-family:Outfit,Arial,sans-serif;max-width:480px;margin:0 auto;color:#18181b">
+          <h2 style="margin-bottom:8px">You're all set for Siegu Pro 🎉</h2>
+          <p style="color:#52525b">Thanks for your purchase. Below is your download and the two quick steps to get Pro activated.</p>
+          ${priceLine}
+          <p style="text-align:center;margin:24px 0">
+            <a href="${DOWNLOAD_URL}" style="background:#000;color:#fff;text-decoration:none;padding:14px 28px;border-radius:12px;font-weight:700;display:inline-block">Download Siegu for Linux</a>
+          </p>
+          <ol style="color:#52525b;line-height:1.7;padding-left:20px">
+            <li>Run the downloaded file (right-click → <em>Allow launching</em>, or use a package manager).</li>
+            <li>Open <strong>Settings → Pro</strong>, enter the email you used at checkout (<strong>${to}</strong>), tap <em>Send verification email</em>, then click the link you receive to unlock Pro.</li>
+          </ol>
+          <p style="color:#8f8f98;font-size:13px;line-height:1.5">Prefer another way to run Siegu? See <a href="${RUN_OTHER_WAYS_URL}" style="color:#000">all the ways to install and run the app</a> (Linux, macOS, Windows, Android, iOS, or from source). Need help? Reply to this email or see <a href="${SETUP_URL}" style="color:#000">siegu's site</a>.</p>
+        </div>
+      `,
+    }),
+  });
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`purchase_resend_error_${resp.status}: ${body.slice(0, 200)}`);
+  }
 }
 
 export default {
@@ -335,7 +394,7 @@ export default {
       }
 
       // ---- Stripe webhook
-      if (url.pathname === '/webhook' && request.method === 'POST') {
+      if (url.pathname === '/stripe-webhook' && request.method === 'POST') {
         const raw = await readRawBody(request);
         const header = request.headers.get('stripe-signature');
         const valid = await verifyStripeSignature(env, raw, header);
@@ -363,6 +422,14 @@ export default {
             paidAt: new Date().toISOString(),
           };
           await env.PAID_EMAILS.put(`paid:${email}`, JSON.stringify(record));
+
+          // Best-effort download + setup email. Swallow failures so a mail
+          // error can't cause Stripe to retry (which would re-record + resend).
+          try {
+            await sendPurchaseEmail(env, email, session.amount_total ?? null, session.currency ?? null);
+          } catch (err) {
+            console.error('purchase email failed', err instanceof Error ? err.message : err);
+          }
         }
 
         return withCors(json({ ok: true }));

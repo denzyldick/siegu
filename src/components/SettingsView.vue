@@ -56,19 +56,6 @@
 
         <StorageSection v-if="!embedded" />
 
-        <SignallingSection
-          v-if="!embedded"
-          :model-value="signalingUrl"
-          :token="signalingToken"
-          :testing="signalingTesting"
-          :saving="signallingSaving"
-          :ping-result="signalingPingResult"
-          @update:model-value="onSignallingUrl"
-          @update:token="onSignallingToken"
-          @test="testSignalling"
-          @save="saveSignalling"
-        />
-
         <ProSection
           v-if="!embedded"
           :email="proEmail"
@@ -77,14 +64,25 @@
           :saving="proSaving"
           :result="proStatus"
           :license-url="proLicenseUrl"
-          :license-token="proLicenseToken"
           :pro-url="APP_PRO_URL"
+          :signalling-url="signalingUrl"
+          :signalling-token="signalingToken"
+          :signalling-testing="signalingTesting"
+          :signalling-saving="signallingSaving"
+          :signal-ping-result="signalingPingResult"
+          :connect-url="APP_CONNECT_URL"
           @update:email="onProEmail"
           @update:license-url="onProLicenseUrl"
-          @update:license-token="onProLicenseToken"
-          @send="sendPro"
-          @check="checkPro"
+          @update:signalling-url="onSignallingUrl"
+          @update:signalling-token="onSignallingToken"
+          @verify="startProVerification"
+          @close-verify-dialog="closeProDialog"
+          :verify-dialog="proDialogOpen"
+          :verify-dialog-sending="proDialogSending"
+          :verify-dialog-verifying="proDialogVerifying"
           @save-config="saveLicense"
+          @test-signalling="testSignalling"
+          @save-signalling="saveSignalling"
         />
 
         <UpdateSection
@@ -241,7 +239,6 @@ import LanguageSection from './settings/LanguageSection.vue';
 import AppearanceSection from './settings/AppearanceSection.vue';
 import MaintenanceSection from './settings/MaintenanceSection.vue';
 import StorageSection from './settings/StorageSection.vue';
-import SignallingSection from './settings/SignallingSection.vue';
 import ProSection from './settings/ProSection.vue';
 import UpdateSection from './settings/UpdateSection.vue';
 import AboutSection from './settings/AboutSection.vue';
@@ -291,10 +288,13 @@ const {
   proVerifying,
   proStatus,
   proLicenseUrl,
-  proLicenseToken,
   APP_PRO_URL,
-  sendProVerification,
-  verifyProEmail,
+  APP_CONNECT_URL,
+  startProVerification,
+  closeProDialog,
+  proDialogOpen,
+  proDialogSending,
+  proDialogVerifying,
   saveLicenseConfig,
 } = useSettings();
 
@@ -348,16 +348,7 @@ function onProEmail(v: string): void {
 function onProLicenseUrl(v: string): void {
   proLicenseUrl.value = v;
 }
-function onProLicenseToken(v: string): void {
-  proLicenseToken.value = v;
-}
 
-async function sendPro(): Promise<void> {
-  await sendProVerification();
-}
-async function checkPro(): Promise<void> {
-  await verifyProEmail();
-}
 async function saveLicense(): Promise<void> {
   proSaving.value = true;
   try {
@@ -380,5 +371,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   stopClock();
+  closeProDialog();
 });
 </script>

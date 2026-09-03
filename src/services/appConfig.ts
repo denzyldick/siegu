@@ -30,6 +30,17 @@ export const APP_LANDING_URL = import.meta.env.VITE_APP_LANDING_URL || APP_WEB_B
 export const PRO_LICENSE_URL =
   import.meta.env.VITE_PRO_LICENSE_URL || 'https://siegu-pro-license.ddenzyl.workers.dev';
 
+/**
+ * Shared secret the app sends to the Pro license Worker (`x-siegu-token`) so a
+ * no-login desktop app can ask "is this email paid + verified?". This is a
+ * gate against casual abuse of the check / send-verify endpoints, NOT per-user
+ * authentication. OVERRIDE ON ROTATION: keep in sync with the Cloudflare
+ * Worker's `SIEGU_VERIFY_TOKEN` secret. Overridable at build time via
+ * `VITE_PRO_LICENSE_TOKEN`.
+ */
+export const PRO_LICENSE_TOKEN =
+  import.meta.env.VITE_PRO_LICENSE_TOKEN ||
+  '925b37c18f9fa08770c7c7cf3d5c2f72f5de2e28b4e49e19ade9544122c7ccad';
 
 /** Landing "upgrade to Pro" anchor the app points users to. */
 export const APP_PRO_URL = `${APP_LANDING_URL}/#pricing`;

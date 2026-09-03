@@ -448,7 +448,14 @@
     "pro_pro_advanced_hide": "Geavanceerd verbergen",
     "pro_pro_upsell_title": "Ontgrendel Siegu Pro",
     "pro_pro_upsell_desc": "Privé, op je apparaat, één prijs voor elk apparaat.",
-    "pro_pro_upsell_cta": "Pro kopen"
+    "pro_pro_upsell_cta": "Pro kopen",
+    "pro_verify": "Pro verifiëren",
+    "pro_steps_short": "Voer de e-mail in waarmee je hebt betaald en tik op “Pro verifiëren” — we sturen een link en ontgrendelen Pro zodra je erop tikt.",
+    "pro_dialog_sending": "Je verificatie-e-mail wordt verzonden…",
+    "pro_dialog_waiting": "Controleer je inbox",
+    "pro_dialog_waiting_desc": "We hebben een bevestigingslink gestuurd naar",
+    "pro_dialog_watching": "Wachten tot je de link tikt… hij wordt automatisch ontgrendeld.",
+    "pro_dialog_close": "Sluiten"
   },
   "open_with": {
     "opened_in_siegu": "Geopend in Siegu: {file}"

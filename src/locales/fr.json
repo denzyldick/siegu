@@ -448,7 +448,14 @@
     "pro_pro_advanced_hide": "Masquer avancé",
     "pro_pro_upsell_title": "Débloquez Siegu Pro",
     "pro_pro_upsell_desc": "Privé, sur l’appareil, un prix pour chaque appareil.",
-    "pro_pro_upsell_cta": "Obtenir Pro"
+    "pro_pro_upsell_cta": "Obtenir Pro",
+    "pro_verify": "Vérifier Pro",
+    "pro_steps_short": "Saisissez l’e-mail utilisé pour payer et touchez « Vérifier Pro » — nous envoyons un lien et débloquons Pro dès que vous le touchez.",
+    "pro_dialog_sending": "Envoi de votre e-mail de vérification…",
+    "pro_dialog_waiting": "Vérifiez votre boîte de réception",
+    "pro_dialog_waiting_desc": "Nous avons envoyé un lien de confirmation à",
+    "pro_dialog_watching": "En attente du lien… il se débloquera automatiquement.",
+    "pro_dialog_close": "Fermer"
   },
   "open_with": {
     "opened_in_siegu": "Ouvert dans Siegu : {file}"

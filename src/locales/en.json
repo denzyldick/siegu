@@ -642,7 +642,14 @@
     "pro_pro_advanced_hide": "Hide advanced",
     "pro_pro_upsell_title": "Unlock Siegu Pro",
     "pro_pro_upsell_desc": "Private, on-device, one price for every device.",
-    "pro_pro_upsell_cta": "Get Pro"
+    "pro_pro_upsell_cta": "Get Pro",
+    "pro_verify": "Verify Pro",
+    "pro_steps_short": "Enter the email you paid with and tap “Verify Pro” — we’ll send a link and unlock Pro the moment you tap it.",
+    "pro_dialog_sending": "Sending your verification email…",
+    "pro_dialog_waiting": "Check your inbox",
+    "pro_dialog_waiting_desc": "We sent a confirmation link to",
+    "pro_dialog_watching": "Waiting for you to tap the link… it will unlock automatically.",
+    "pro_dialog_close": "Close"
   },
   "open_with": {
     "opened_in_siegu": "Opened in Siegu: {file}"

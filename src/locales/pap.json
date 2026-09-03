@@ -448,7 +448,14 @@
     "pro_pro_advanced_hide": "Skonde avansá",
     "pro_pro_upsell_title": "Desbloká Siegu Pro",
     "pro_pro_upsell_desc": "Privá, na bo ekipo, un preis pa kada ekipo.",
-    "pro_pro_upsell_cta": "Obtené Pro"
+    "pro_pro_upsell_cta": "Obtené Pro",
+    "pro_verify": "Verifiká Pro",
+    "pro_steps_short": "Drentra e-mail cu bo a paga i toka “Verifiká Pro” — nos ta manda un link i lo ta desblokeá Pro ora bo toka dje.",
+    "pro_dialog_sending": "Ta manda bo e-mail di verifikashon…",
+    "pro_dialog_waiting": "Verifiká bo inbox",
+    "pro_dialog_waiting_desc": "Nos a manda un link di konfirmashon na",
+    "pro_dialog_watching": "Ta warda te bo toka e link… lo e desblokeá outomátikamente.",
+    "pro_dialog_close": "Será"
   },
   "open_with": {
     "opened_in_siegu": "Habri na Siegu: {file}"

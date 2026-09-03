@@ -36,3 +36,10 @@ coverage
 # Playwright test artifacts (generated output, never committed)
 test-results/
 playwright-report/
+
+# Cloudflare Workers generated output
+workers/pro-license/.wrangler/
+workers/pro-license/worker-configuration.d.ts
+
+# Bundled desktop installer artifacts
+*.AppImage
