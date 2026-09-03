@@ -182,24 +182,6 @@
     "load": "Carregando…",
     "skip": "Ir para o conteúdo"
   },
-  "how": {
-    "eyebrow": "Como funciona",
-    "title": "Pronto em minutos",
-    "subtitle": "Três passos, tudo fica no seu dispositivo.",
-    "step1": {
-      "title": "Baixe siegu grátis",
-      "desc": "Baixe o app para o seu dispositivo — Windows, macOS, Linux ou Android."
-    },
-    "step2": {
-      "title": "Importe suas fotos",
-      "desc": "Aponte siegu para suas pastas. Tudo fica local e privado."
-    },
-    "step3": {
-      "title": "Pesquise, compartilhe e faça upgrade para Pro",
-      "desc": "Encontre qualquer coisa em segundos. Faça upgrade para Pro quando quiser mais."
-    },
-    "demo": "Prefere testar primeiro? Abra a demo ao vivo →"
-  },
   "trust": {
     "open_source": "Código aberto",
     "no_uploads": "Sem upload",

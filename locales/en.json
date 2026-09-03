@@ -182,24 +182,6 @@
     "load": "Loading…",
     "skip": "Skip to content"
   },
-  "how": {
-    "eyebrow": "How it works",
-    "title": "Up and running in minutes",
-    "subtitle": "Three steps, all on your device.",
-    "step1": {
-      "title": "Get siegu free",
-      "desc": "Download the app for your device — Windows, macOS, Linux or Android."
-    },
-    "step2": {
-      "title": "Import your photos",
-      "desc": "Point siegu at your folders. Everything stays local and private."
-    },
-    "step3": {
-      "title": "Search, share & upgrade to Pro",
-      "desc": "Find anything in seconds. Upgrade to Pro when you want more."
-    },
-    "demo": "Prefer to try it first? Open the live demo →"
-  },
   "trust": {
     "open_source": "Open source",
     "no_uploads": "No uploads",

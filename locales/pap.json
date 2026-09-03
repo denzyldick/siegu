@@ -182,24 +182,6 @@
     "load": "Kargando…",
     "skip": "Bai na contenido"
   },
-  "how": {
-    "eyebrow": "Kon e ta traha",
-    "title": "Ready den minüt",
-    "subtitle": "Tres paso, tur kosa ta bo ekipo.",
-    "step1": {
-      "title": "Download siegu gratis",
-      "desc": "Download e app pa bo ekipo — Windows, macOS, Linux of Android."
-    },
-    "step2": {
-      "title": "Importa bo potrèt",
-      "desc": "Indiká siegu na bo folder. Tur kosa ta keda lokal i privá."
-    },
-    "step3": {
-      "title": "Buska, kompartí i Upgrade na Pro",
-      "desc": "Haña tur kos den sekònder. Upgrade na Pro ora bo kier mas."
-    },
-    "demo": "Ta preferá purba promé? Habri e demo biba →"
-  },
   "trust": {
     "open_source": "Código habrí",
     "no_uploads": "Sin upload",

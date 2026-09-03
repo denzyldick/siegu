@@ -182,24 +182,6 @@
     "load": "Laden…",
     "skip": "Naar inhoud"
   },
-  "how": {
-    "eyebrow": "Zo werkt het",
-    "title": "Binnen enkele minuten aan de slag",
-    "subtitle": "Drie stappen, alles op je apparaat.",
-    "step1": {
-      "title": "Download siegu gratis",
-      "desc": "Download de app voor je apparaat — Windows, macOS, Linux of Android."
-    },
-    "step2": {
-      "title": "Importeer je foto's",
-      "desc": "Wijs siegu naar je mappen. Alles blijft lokaal en privé."
-    },
-    "step3": {
-      "title": "Zoek, deel & upgrade naar Pro",
-      "desc": "Vind alles in seconden. Upgrade naar Pro als je meer wilt."
-    },
-    "demo": "Liever eerst proberen? Open de live demo →"
-  },
   "trust": {
     "open_source": "Open source",
     "no_uploads": "Geen uploads",

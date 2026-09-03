@@ -182,24 +182,6 @@
     "load": "Lädt…",
     "skip": "Zum Inhalt springen"
   },
-  "how": {
-    "eyebrow": "So funktioniert's",
-    "title": "In Minuten startklar",
-    "subtitle": "Drei Schritte, alles bleibt auf deinem Gerät.",
-    "step1": {
-      "title": "Hole siegu kostenlos",
-      "desc": "Lade die App für dein Gerät herunter — Windows, macOS, Linux oder Android."
-    },
-    "step2": {
-      "title": "Importiere deine Fotos",
-      "desc": "Zeige siegu deine Ordner. Alles bleibt lokal und privat."
-    },
-    "step3": {
-      "title": "Suche, teile & upgrade auf Pro",
-      "desc": "Finde alles in Sekunden. Upgrade auf Pro, wenn du mehr willst."
-    },
-    "demo": "Lieber zuerst ausprobieren? Live-Demo öffnen →"
-  },
   "trust": {
     "open_source": "Open Source",
     "no_uploads": "Keine Uploads",

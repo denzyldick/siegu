@@ -182,24 +182,6 @@
     "load": "Caricamento…",
     "skip": "Vai al contenuto"
   },
-  "how": {
-    "eyebrow": "Come funziona",
-    "title": "Pronto in pochi minuti",
-    "subtitle": "Tre passaggi, tutto rimane sul tuo dispositivo.",
-    "step1": {
-      "title": "Scarica siegu gratis",
-      "desc": "Scarica l'app per il tuo dispositivo — Windows, macOS, Linux o Android."
-    },
-    "step2": {
-      "title": "Importa le tue foto",
-      "desc": "Indica a siegu le tue cartelle. Tutto rimane locale e privato."
-    },
-    "step3": {
-      "title": "Cerca, condividi e passa a Pro",
-      "desc": "Trova tutto in pochi secondi. Passa a Pro quando vuoi di più."
-    },
-    "demo": "Preferisci provarlo prima? Apri la demo live →"
-  },
   "trust": {
     "open_source": "Open source",
     "no_uploads": "Nessun caricamento",

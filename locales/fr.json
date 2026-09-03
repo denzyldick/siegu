@@ -182,24 +182,6 @@
     "load": "Chargement…",
     "skip": "Aller au contenu"
   },
-  "how": {
-    "eyebrow": "Comment ça marche",
-    "title": "Prêt en quelques minutes",
-    "subtitle": "Trois étapes, tout reste sur votre appareil.",
-    "step1": {
-      "title": "Téléchargez siegu gratuitement",
-      "desc": "Téléchargez l'app pour votre appareil — Windows, macOS, Linux ou Android."
-    },
-    "step2": {
-      "title": "Importez vos photos",
-      "desc": "Indiquez à siegu où se trouvent vos dossiers. Tout reste local et privé."
-    },
-    "step3": {
-      "title": "Recherchez, partagez et passez à Pro",
-      "desc": "Trouvez tout en quelques secondes. Passez à Pro quand vous voulez plus."
-    },
-    "demo": "Préférez essayer d'abord ? Ouvrir la démo en direct →"
-  },
   "trust": {
     "open_source": "Open source",
     "no_uploads": "Pas d'envoi vers le cloud",
