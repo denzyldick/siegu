@@ -53,12 +53,30 @@ export function createPeerTransport(
   let dc: RTCDataChannel | null = null;
   let closed = false;
   const decoder = new TextDecoder();
+  // Guest boot sends the first RPCs (list_files, search facets, …) the moment
+  // the app mounts — which races the WebRTC handshake. Buffer outbound frames
+  // until the data channel opens; sending with a closed channel would otherwise
+  // drop the request and leave the library loading forever.
+  const outbox: GuestOutbound[] = [];
+
+  function flush(): void {
+    while (dc && dc.readyState === 'open' && outbox.length > 0) {
+      // Respect SCTP backpressure: keep the rest queued, not dropped.
+      if (dc.bufferedAmount > 1_000_000) return;
+      dc.send(JSON.stringify(outbox.shift()));
+    }
+  }
 
   const transport: PeerTransport = {
     send(msg) {
-      if (!dc || dc.readyState !== 'open') return;
-      // Respect SCTP backpressure: drop rather than queue unboundedly.
-      if (dc.bufferedAmount > 1_000_000) return;
+      if (!dc || dc.readyState !== 'open') {
+        outbox.push(msg);
+        return;
+      }
+      if (dc.bufferedAmount > 1_000_000) {
+        outbox.push(msg);
+        return;
+      }
       dc.send(JSON.stringify(msg));
     },
     onMessage(handler) {
@@ -167,6 +185,7 @@ export function createPeerTransport(
         dc.binaryType = 'arraybuffer';
         dc.onopen = () => {
           emitOpen();
+          flush();
           // Scope the guest to a single shared collection when the link carries
           // an album id; otherwise drop into view-only whole-library mode.
           if (session.albumId) {
@@ -184,7 +203,10 @@ export function createPeerTransport(
             /* ignore malformed frames */
           }
         };
-        dc.onclose = () => emitClose();
+        dc.onclose = () => {
+          outbox.length = 0;
+          emitClose();
+        };
       };
 
       await pc.setRemoteDescription(JSON.parse(sdpJson));

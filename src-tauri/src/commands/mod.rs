@@ -3,6 +3,7 @@ pub mod config;
 pub mod directories;
 pub mod geocode;
 pub mod indexing;
+pub mod license;
 pub mod logging;
 pub mod models;
 pub mod people;

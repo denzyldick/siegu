@@ -10,7 +10,6 @@
     "devices": "Dispositivos",
     "settings": "Configuracion"
   },
-
   "guest": {
     "intro_title": "Someone shared a collection with you",
     "intro_desc": "You're viewing this collection over a live, private WebRTC link. Nothing is downloaded — media streams from the owner's device and is cleared when the session ends.",
@@ -426,7 +425,30 @@
     "signalling_upsell_title": "Conéctate desde cualquier lugar",
     "signalling_upsell_desc": "Un servidor de señalización ayuda a tus dispositivos a encontrarse y conectarse. Sin él, ambos dispositivos deben estar en la misma red Wi-Fi.",
     "signalling_upsell_benefits": "Nuestro servidor alojado elimina esa restricción — sincroniza por internet, sin configurar el router. Requiere un plan Pro.",
-    "signalling_upsell_cta": "Obtener Pro"
+    "signalling_upsell_cta": "Obtener Pro",
+    "pro_pro": "Siegu Pro",
+    "pro_pro_desc": "Desbloquea Pro tras tu compra confirmando el correo con el que pagaste.",
+    "pro_pro_email": "Correo usado al pagar",
+    "pro_pro_send": "Enviar correo de verificación",
+    "pro_pro_check": "Comprobar estado",
+    "pro_pro_steps": "1) Introduce tu correo. 2) Te enviamos un enlace de verificación — tócalo. 3) Vuelve aquí y toca «Comprobar estado» para desbloquear Pro.",
+    "pro_pro_email_sent": "Correo de verificación enviado — revisa tu bandeja de entrada.",
+    "pro_pro_email_required": "Introduce el correo usado al pagar.",
+    "pro_pro_not_paid": "Aún no se encontró una compra Pro para este correo.",
+    "pro_pro_not_verified": "Pago encontrado — abre el enlace de verificación que te enviamos.",
+    "pro_pro_unlocked": "¡Pro desbloqueado! Bienvenido a la familia.",
+    "pro_pro_send_failed": "No se pudo enviar la verificación: {error}",
+    "pro_pro_check_failed": "No se pudo comprobar el estado: {error}",
+    "pro_pro_config_saved": "Ajustes de Pro guardados.",
+    "pro_pro_config_save_failed": "No se pudieron guardar los ajustes de Pro: {error}",
+    "pro_pro_license_url": "URL del servidor de licencia",
+    "pro_pro_license_token": "Token de licencia",
+    "pro_pro_save_config": "Guardar ajustes de Pro",
+    "pro_pro_advanced": "Avanzado",
+    "pro_pro_advanced_hide": "Ocultar avanzado",
+    "pro_pro_upsell_title": "Desbloquea Siegu Pro",
+    "pro_pro_upsell_desc": "Privado, en tu dispositivo, un precio para cada dispositivo.",
+    "pro_pro_upsell_cta": "Obtener Pro"
   },
   "open_with": {
     "opened_in_siegu": "Abierto en Siegu: {file}"

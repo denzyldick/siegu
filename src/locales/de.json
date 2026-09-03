@@ -10,7 +10,6 @@
     "devices": "Gerate",
     "settings": "Einstellungen"
   },
-
   "guest": {
     "intro_title": "Someone shared a collection with you",
     "intro_desc": "You're viewing this collection over a live, private WebRTC link. Nothing is downloaded — media streams from the owner's device and is cleared when the session ends.",
@@ -426,7 +425,30 @@
     "signalling_upsell_title": "Überall verbinden",
     "signalling_upsell_desc": "Ein Signalisierungsserver hilft deinen Geräten, sich zu finden und zu verbinden. Ohne ihn müssen beide Geräte im selben WLAN-Netzwerk sein.",
     "signalling_upsell_benefits": "Unser gehosteter Server hebt diese Einschränkung auf — synchronisiere über das Internet, kein Router-Setup nötig. Erfordert einen Pro-Plan.",
-    "signalling_upsell_cta": "Pro holen"
+    "signalling_upsell_cta": "Pro holen",
+    "pro_pro": "Siegu Pro",
+    "pro_pro_desc": "Entsperre Pro nach deinem Kauf, indem du die E-Mail bestätigst, mit der du bezahlt hast.",
+    "pro_pro_email": "Beim Checkout verwendete E-Mail",
+    "pro_pro_send": "Verifizierungs-E-Mail senden",
+    "pro_pro_check": "Status prüfen",
+    "pro_pro_steps": "1) E-Mail eingeben. 2) Wir senden einen Verifizierungslink — tippen. 3) Hier „Status prüfen“ antippen, um Pro zu entsperren.",
+    "pro_pro_email_sent": "Verifizierungs-E-Mail gesendet — prüfe deinen Posteingang.",
+    "pro_pro_email_required": "Bitte gib die beim Checkout verwendete E-Mail ein.",
+    "pro_pro_not_paid": "Für diese E-Mail wurde noch kein Pro-Kauf gefunden.",
+    "pro_pro_not_verified": "Zahlung gefunden — öffne den Verifizierungslink, den wir dir gemailt haben.",
+    "pro_pro_unlocked": "Pro entsperrt! Willkommen in der Familie.",
+    "pro_pro_send_failed": "Verifizierung konnte nicht gesendet werden: {error}",
+    "pro_pro_check_failed": "Status konnte nicht geprüft werden: {error}",
+    "pro_pro_config_saved": "Pro-Einstellungen gespeichert.",
+    "pro_pro_config_save_failed": "Pro-Einstellungen konnten nicht gespeichert werden: {error}",
+    "pro_pro_license_url": "Lizenzserver-URL",
+    "pro_pro_license_token": "Lizenz-Token",
+    "pro_pro_save_config": "Pro-Einstellungen speichern",
+    "pro_pro_advanced": "Erweitert",
+    "pro_pro_advanced_hide": "Erweitert ausblenden",
+    "pro_pro_upsell_title": "Siegu Pro entsperren",
+    "pro_pro_upsell_desc": "Privat, auf dem Gerät, ein Preis für jedes Gerät.",
+    "pro_pro_upsell_cta": "Pro holen"
   },
   "open_with": {
     "opened_in_siegu": "In Siegu geöffnet: {file}"

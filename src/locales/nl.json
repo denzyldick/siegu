@@ -10,7 +10,6 @@
     "devices": "Apparaten",
     "settings": "Instellingen"
   },
-
   "guest": {
     "intro_title": "Someone shared a collection with you",
     "intro_desc": "You're viewing this collection over a live, private WebRTC link. Nothing is downloaded — media streams from the owner's device and is cleared when the session ends.",
@@ -426,7 +425,30 @@
     "signalling_upsell_title": "Verbind vanaf overal",
     "signalling_upsell_desc": "Een signaleringsserver helpt je apparaten elkaar te vinden en te verbinden. Zonder dat moeten beide apparaten op hetzelfde Wi-Fi-netwerk zitten.",
     "signalling_upsell_benefits": "Onze gehoste server neemt die beperking weg — synchroniseer via internet, geen routerconfiguratie nodig. Vereist een Pro-plan.",
-    "signalling_upsell_cta": "Pro kopen"
+    "signalling_upsell_cta": "Pro kopen",
+    "pro_pro": "Siegu Pro",
+    "pro_pro_desc": "Ontgrendel Pro na je aankoop door het e-mailadres waarmee je betaalde te bevestigen.",
+    "pro_pro_email": "E-mailadres gebruikt bij afrekenen",
+    "pro_pro_send": "Verificatiemail sturen",
+    "pro_pro_check": "Status controleren",
+    "pro_pro_steps": "1) Voer je e-mail in. 2) We sturen een verificatiekoppeling — tik erop. 3) Kom terug en tik op “Status controleren” om Pro te ontgrendelen.",
+    "pro_pro_email_sent": "Verificatiemail verzonden — controleer je inbox.",
+    "pro_pro_email_required": "Voer het e-mailadres in dat je bij het afrekenen hebt gebruikt.",
+    "pro_pro_not_paid": "Nog geen Pro-aankoop gevonden voor dit e-mailadres.",
+    "pro_pro_not_verified": "Betaling gevonden — open de verificatiekoppeling die we je hebben gemaild.",
+    "pro_pro_unlocked": "Pro ontgrendeld! Welkom bij de familie.",
+    "pro_pro_send_failed": "Verificatie verzenden mislukt: {error}",
+    "pro_pro_check_failed": "Status controleren mislukt: {error}",
+    "pro_pro_config_saved": "Pro-instellingen opgeslagen.",
+    "pro_pro_config_save_failed": "Pro-instellingen opslaan mislukt: {error}",
+    "pro_pro_license_url": "Licentieserver-URL",
+    "pro_pro_license_token": "Licentietoken",
+    "pro_pro_save_config": "Pro-instellingen opslaan",
+    "pro_pro_advanced": "Geavanceerd",
+    "pro_pro_advanced_hide": "Geavanceerd verbergen",
+    "pro_pro_upsell_title": "Ontgrendel Siegu Pro",
+    "pro_pro_upsell_desc": "Privé, op je apparaat, één prijs voor elk apparaat.",
+    "pro_pro_upsell_cta": "Pro kopen"
   },
   "open_with": {
     "opened_in_siegu": "Geopend in Siegu: {file}"

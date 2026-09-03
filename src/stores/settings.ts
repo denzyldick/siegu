@@ -22,6 +22,7 @@ import type {
   IndexingMode,
   PerformancePreset,
   UpdateStatus,
+  ProStatus,
 } from '@/types/settings';
 import {
   formatBytes as formatDownloadBytes,
@@ -31,6 +32,7 @@ import {
 import type { Update } from '@tauri-apps/plugin-updater';
 import { DEFAULT_SIGNALING_URL, appendToken, pingSignalling } from '@/services/signalling';
 import type { PingResult } from '@/services/signalling';
+import { PRO_LICENSE_URL, APP_PRO_URL } from '@/services/appConfig';
 
 let listenersSetUp = false;
 const cleanupFns: Array<() => void> = [];
@@ -135,6 +137,13 @@ export const useSettingsStore = defineStore('settings', () => {
   const signalingToken = ref('');
   const signalingTesting = ref(false);
   const signalingPingResult = ref<PingResult | null>(null);
+
+  const proEmail = ref('');
+  const proSending = ref(false);
+  const proVerifying = ref(false);
+  const proStatus = ref<ProStatus | null>(null);
+  const proLicenseUrl = ref('');
+  const proLicenseToken = ref('');
 
   const uiNow = ref(Date.now());
 
@@ -275,6 +284,7 @@ export const useSettingsStore = defineStore('settings', () => {
     await loadAnalyzeExisting();
     await loadModelsLoaded();
     await loadSignallingConfig();
+    await loadProConfig();
     await fetchLogs();
     await listDirectories();
   }
@@ -708,6 +718,124 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  const proLoadError = ref('');
+
+  async function loadProConfig(): Promise<void> {
+    try {
+      const config = JSON.parse(await invoke<string>('get_config')) as Record<string, string>;
+      proEmail.value = config.paid_email || '';
+      proLicenseUrl.value = config.pro_license_url || PRO_LICENSE_URL;
+      proLicenseToken.value = config.pro_license_token || '';
+      proLoadError.value = '';
+    } catch (e) {
+      proEmail.value = '';
+      proLicenseUrl.value = PRO_LICENSE_URL;
+      proLicenseToken.value = '';
+      proLoadError.value = String(e);
+    }
+  }
+
+  async function saveLicenseConfig(): Promise<void> {
+    try {
+      await invoke('save_config', { key: 'pro_license_url', value: proLicenseUrl.value.trim() });
+      await invoke('save_config', {
+        key: 'pro_license_token',
+        value: proLicenseToken.value.trim(),
+      });
+      showSnackbar(t('settings.pro_config_saved'));
+    } catch (e) {
+      showSnackbar(t('settings.pro_config_save_failed', { error: e }), true);
+    }
+  }
+
+  function parseProStatus(raw: string): ProStatus {
+    try {
+      const parsed = JSON.parse(raw) as ProStatus;
+      return {
+        ok: !!parsed.ok,
+        paid: !!parsed.paid,
+        verified: !!parsed.verified,
+        sent: !!parsed.sent,
+        plan: parsed.plan || (parsed.paid && parsed.verified ? 'pro' : 'free'),
+        email: parsed.email,
+        error: parsed.error || '',
+        status: parsed.status,
+      };
+    } catch {
+      return { ok: false, paid: false, verified: false, error: 'bad_response' };
+    }
+  }
+
+  async function sendProVerification(): Promise<ProStatus> {
+    const email = proEmail.value.trim();
+    if (!email) {
+      showSnackbar(t('settings.pro_email_required'), true);
+      proStatus.value = null;
+      return { ok: false, paid: false, verified: false, error: 'invalid_email' };
+    }
+    proSending.value = true;
+    try {
+      const raw = await invoke<string>('send_pro_verification', {
+        email,
+        workerUrl: proLicenseUrl.value.trim() || PRO_LICENSE_URL,
+        token: proLicenseToken.value.trim(),
+      });
+      const parsed = parseProStatus(raw);
+      proStatus.value = parsed;
+      if (parsed.error === 'not_paid') {
+        showSnackbar(t('settings.pro_not_paid'), true);
+      } else if (parsed.sent) {
+        await invoke('save_config', { key: 'paid_email', value: email });
+        showSnackbar(t('settings.pro_email_sent'));
+      } else {
+        showSnackbar(t('settings.pro_send_failed', { error: parsed.error }), true);
+      }
+      return parsed;
+    } catch (e) {
+      const error = String(e);
+      proStatus.value = { ok: false, paid: false, verified: false, error };
+      showSnackbar(t('settings.pro_send_failed', { error }), true);
+      return proStatus.value;
+    } finally {
+      proSending.value = false;
+    }
+  }
+
+  async function verifyProEmail(): Promise<ProStatus> {
+    const email = proEmail.value.trim();
+    if (!email) {
+      showSnackbar(t('settings.pro_email_required'), true);
+      return { ok: false, paid: false, verified: false, error: 'invalid_email' };
+    }
+    proVerifying.value = true;
+    try {
+      const raw = await invoke<string>('verify_pro_email', {
+        email,
+        workerUrl: proLicenseUrl.value.trim() || PRO_LICENSE_URL,
+        token: proLicenseToken.value.trim(),
+      });
+      const parsed = parseProStatus(raw);
+      proStatus.value = parsed;
+      if (parsed.paid && parsed.verified) {
+        await invoke('save_config', { key: 'paid_email', value: email });
+        await invoke('save_config', { key: 'tier', value: 'paid' });
+        showSnackbar(t('settings.pro_unlocked'));
+      } else if (parsed.paid && !parsed.verified) {
+        showSnackbar(t('settings.pro_not_verified'));
+      } else {
+        showSnackbar(t('settings.pro_not_paid'), true);
+      }
+      return parsed;
+    } catch (e) {
+      const error = String(e);
+      proStatus.value = { ok: false, paid: false, verified: false, error };
+      showSnackbar(t('settings.pro_check_failed', { error }), true);
+      return proStatus.value;
+    } finally {
+      proVerifying.value = false;
+    }
+  }
+
   async function downloadModels(
     forceUpdate = false,
     specificModels: string[] | null = null,
@@ -1083,6 +1211,12 @@ export const useSettingsStore = defineStore('settings', () => {
     signalingToken,
     signalingTesting,
     signalingPingResult,
+    proEmail,
+    proSending,
+    proVerifying,
+    proStatus,
+    proLicenseUrl,
+    proLicenseToken,
     sortedModels,
     isAnyModelProcessing,
     missingSelectedCount,
@@ -1127,6 +1261,12 @@ export const useSettingsStore = defineStore('settings', () => {
     saveSignallingConfig,
     testSignalling,
     effectiveSignalingUrl,
+    loadProConfig,
+    saveLicenseConfig,
+    sendProVerification,
+    verifyProEmail,
+    proLoadError,
+    APP_PRO_URL,
     downloadModels,
     getProgress,
     getDownloadStats,

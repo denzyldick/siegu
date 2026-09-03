@@ -1,0 +1,14 @@
+name = "siegu-pro-license"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Namespace for paid-email entitlement records.
+# Create with: npx wrangler kv namespace create PAID_EMAILS
+# then set the id below (and paste the preview_id too). Never hardcode secrets.
+kv_namespaces = [
+  { binding = "PAID_EMAILS", id = "REPLACE_WITH_KV_NAMESPACE_ID", preview_id = "REPLACE_WITH_PREVIEW_ID" }
+]
+
+# workers_dev exposes https://siegu-pro-license.<account>.workers.dev
+[observability]
+enabled = true

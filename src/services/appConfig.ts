@@ -22,6 +22,17 @@ export const APP_CONNECT_URL = `${APP_WEB_BASE}/connect`;
 /** Landing page. Overridable via `VITE_APP_LANDING_URL` to run it locally. */
 export const APP_LANDING_URL = import.meta.env.VITE_APP_LANDING_URL || APP_WEB_BASE;
 
+/**
+ * Pro license verification Worker. The worker is where Stripe webhooks record
+ * who paid and where the app checks "paid + verified" to unlock Pro.
+ * Overridable via `pro_license_url` config key (see settings store).
+ */
+export const PRO_LICENSE_URL =
+  import.meta.env.VITE_PRO_LICENSE_URL || 'https://siegu-pro-license.workers.dev';
+
+/** Landing "upgrade to Pro" anchor the app points users to. */
+export const APP_PRO_URL = `${APP_LANDING_URL}/#pricing`;
+
 /** Source repository (open source project). */
 export const APP_GITHUB_URL =
   import.meta.env.VITE_APP_GITHUB_URL || 'https://github.com/denzyldick/siegu';

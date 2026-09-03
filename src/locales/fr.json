@@ -10,7 +10,6 @@
     "devices": "Peripheriques",
     "settings": "Parametres"
   },
-
   "guest": {
     "intro_title": "Someone shared a collection with you",
     "intro_desc": "You're viewing this collection over a live, private WebRTC link. Nothing is downloaded — media streams from the owner's device and is cleared when the session ends.",
@@ -426,7 +425,30 @@
     "signalling_upsell_title": "Connectez-vous de partout",
     "signalling_upsell_desc": "Un serveur de signalisation aide vos appareils à se trouver et à se connecter. Sans lui, les deux appareils doivent être sur le même réseau Wi-Fi.",
     "signalling_upsell_benefits": "Notre serveur hébergé supprime cette restriction — synchronisez via internet, aucune configuration requise. Nécessite un plan Pro.",
-    "signalling_upsell_cta": "Obtenir Pro"
+    "signalling_upsell_cta": "Obtenir Pro",
+    "pro_pro": "Siegu Pro",
+    "pro_pro_desc": "Débloquez Pro après votre achat en confirmant l’e-mail utilisé pour payer.",
+    "pro_pro_email": "E-mail utilisé lors du paiement",
+    "pro_pro_send": "Envoyer l’e-mail de vérification",
+    "pro_pro_check": "Vérifier le statut",
+    "pro_pro_steps": "1) Saisissez votre e-mail. 2) Nous envoyons un lien de vérification — touchez-le. 3) Revenez ici et touchez « Vérifier le statut » pour débloquer Pro.",
+    "pro_pro_email_sent": "E-mail de vérification envoyé — consultez votre boîte de réception.",
+    "pro_pro_email_required": "Veuillez saisir l’e-mail utilisé lors du paiement.",
+    "pro_pro_not_paid": "Aucun achat Pro trouvé pour cet e-mail pour l’instant.",
+    "pro_pro_not_verified": "Paiement trouvé — ouvrez le lien de vérification que nous vous avons envoyé.",
+    "pro_pro_unlocked": "Pro débloqué ! Bienvenue dans la famille.",
+    "pro_pro_send_failed": "Impossible d’envoyer la vérification : {error}",
+    "pro_pro_check_failed": "Impossible de vérifier le statut : {error}",
+    "pro_pro_config_saved": "Paramètres Pro enregistrés.",
+    "pro_pro_config_save_failed": "Impossible d’enregistrer les paramètres Pro : {error}",
+    "pro_pro_license_url": "URL du serveur de licence",
+    "pro_pro_license_token": "Jeton de licence",
+    "pro_pro_save_config": "Enregistrer les paramètres Pro",
+    "pro_pro_advanced": "Avancé",
+    "pro_pro_advanced_hide": "Masquer avancé",
+    "pro_pro_upsell_title": "Débloquez Siegu Pro",
+    "pro_pro_upsell_desc": "Privé, sur l’appareil, un prix pour chaque appareil.",
+    "pro_pro_upsell_cta": "Obtenir Pro"
   },
   "open_with": {
     "opened_in_siegu": "Ouvert dans Siegu : {file}"

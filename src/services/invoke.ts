@@ -241,6 +241,12 @@ const browserFallbacks: Record<string, unknown> = {
   reload_models: undefined,
   unload_models: undefined,
   clear_logs: undefined,
+
+  // Pro license verification is desktop-only (needs the Worker + secrets).
+  // Resolve a shape-correct "not found" so the Settings Pro section doesn't
+  // throw in browser / guest mode.
+  verify_pro_email: '{"ok":false,"paid":false,"verified":false}',
+  send_pro_verification: '{"ok":false,"paid":false,"verified":false}',
 };
 
 export async function invoke<T>(command: string, args?: InvokeArgs): Promise<T> {

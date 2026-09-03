@@ -65,3 +65,14 @@ export interface SnackbarState {
   text: string;
   error: boolean;
 }
+
+export interface ProStatus {
+  ok: boolean;
+  paid: boolean;
+  verified: boolean;
+  sent?: boolean;
+  plan?: string;
+  email?: string;
+  error?: string;
+  status?: number;
+}

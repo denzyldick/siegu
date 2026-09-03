@@ -352,6 +352,8 @@ pub fn run() {
             commands::config::get_os,
             commands::config::get_system_dark_mode,
             commands::signalling::ping_signaling,
+            commands::license::verify_pro_email,
+            commands::license::send_pro_verification,
             // Sync
             commands::sync::start_webrtc_session,
             commands::sync::start_lan_host,

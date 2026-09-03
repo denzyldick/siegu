@@ -69,6 +69,24 @@
           @save="saveSignalling"
         />
 
+        <ProSection
+          v-if="!embedded"
+          :email="proEmail"
+          :sending="proSending"
+          :verifying="proVerifying"
+          :saving="proSaving"
+          :result="proStatus"
+          :license-url="proLicenseUrl"
+          :license-token="proLicenseToken"
+          :pro-url="APP_PRO_URL"
+          @update:email="onProEmail"
+          @update:license-url="onProLicenseUrl"
+          @update:license-token="onProLicenseToken"
+          @send="sendPro"
+          @check="checkPro"
+          @save-config="saveLicense"
+        />
+
         <UpdateSection
           v-if="!embedded && !isStoreManaged"
           :status="updateStatus"
@@ -224,6 +242,7 @@ import AppearanceSection from './settings/AppearanceSection.vue';
 import MaintenanceSection from './settings/MaintenanceSection.vue';
 import StorageSection from './settings/StorageSection.vue';
 import SignallingSection from './settings/SignallingSection.vue';
+import ProSection from './settings/ProSection.vue';
 import UpdateSection from './settings/UpdateSection.vue';
 import AboutSection from './settings/AboutSection.vue';
 import PageLoading from './shared/PageLoading.vue';
@@ -267,6 +286,16 @@ const {
   checkUpdate,
   downloadUpdate,
   startConfirmedCleanup,
+  proEmail,
+  proSending,
+  proVerifying,
+  proStatus,
+  proLicenseUrl,
+  proLicenseToken,
+  APP_PRO_URL,
+  sendProVerification,
+  verifyProEmail,
+  saveLicenseConfig,
 } = useSettings();
 
 const currentLang = ref(localStorage.getItem('siegu_language') || 'en');
@@ -277,6 +306,7 @@ const isStoreManaged = computed(
 );
 
 const signallingSaving = ref(false);
+const proSaving = ref(false);
 const cleanupConfirming = ref(false);
 const wipeConfirming = ref(false);
 
@@ -309,6 +339,31 @@ async function saveSignalling(): Promise<void> {
     await saveSignallingConfig();
   } finally {
     signallingSaving.value = false;
+  }
+}
+
+function onProEmail(v: string): void {
+  proEmail.value = v;
+}
+function onProLicenseUrl(v: string): void {
+  proLicenseUrl.value = v;
+}
+function onProLicenseToken(v: string): void {
+  proLicenseToken.value = v;
+}
+
+async function sendPro(): Promise<void> {
+  await sendProVerification();
+}
+async function checkPro(): Promise<void> {
+  await verifyProEmail();
+}
+async function saveLicense(): Promise<void> {
+  proSaving.value = true;
+  try {
+    await saveLicenseConfig();
+  } finally {
+    proSaving.value = false;
   }
 }
 

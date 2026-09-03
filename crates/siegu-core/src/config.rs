@@ -59,6 +59,9 @@ pub const ALLOWED_CONFIG_KEYS: &[&str] = &[
     "max_storage_mb",
     "signaling_url",
     "signaling_token",
+    "paid_email",
+    "pro_license_url",
+    "pro_license_token",
 ];
 
 pub fn is_valid_config_key(key: &str) -> bool {

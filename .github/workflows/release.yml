@@ -457,4 +457,4 @@ jobs:
         run: npm run tauri ios init
 
       - name: Build iOS app for simulator (real gate)
-        run: npm run tauri ios build -- --debug --target aarch64-apple-ios-sim
+        run: npm run tauri ios build -- --debug --target aarch64-sim

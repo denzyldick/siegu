@@ -10,7 +10,6 @@
     "devices": "Dispositivo",
     "settings": "Configurashon"
   },
-
   "guest": {
     "intro_title": "Someone shared a collection with you",
     "intro_desc": "You're viewing this collection over a live, private WebRTC link. Nothing is downloaded — media streams from the owner's device and is cleared when the session ends.",
@@ -426,7 +425,30 @@
     "signalling_upsell_title": "Konectá for di tur kaminda",
     "signalling_upsell_desc": "Un servidor di señalishon ta yuda bo aparatonan haña otro i konektá. Sin dje, tur dos aparatá mester ta riba mesun red Wi-Fi.",
     "signalling_upsell_benefits": "Nos server manehá ta kita e restrishon akí — sinkronisá via internet, sin mester di konfigurá router. Mester di un plan Pro.",
-    "signalling_upsell_cta": "Obtené Pro"
+    "signalling_upsell_cta": "Obtené Pro",
+    "pro_pro": "Siegu Pro",
+    "pro_pro_desc": "Desblokeá Pro despues di bo kompra konfirmando e e-mail ku bo a paga.",
+    "pro_pro_email": "E-mail usá na pagamentu",
+    "pro_pro_send": "Manda e-mail di verifikashon",
+    "pro_pro_check": "Chek estado",
+    "pro_pro_steps": "1) Drumi bo e-mail. 2) Nos ta manda un link di verifikashon — tikié. 3) Bini bek y tiki «Chek estado» pa desbloká Pro.",
+    "pro_pro_email_sent": "E-mail di verifikashon manda — chek bo inbox.",
+    "pro_pro_email_required": "Drumi e e-mail ku bo a usa na pagamentu.",
+    "pro_pro_not_paid": "No ta haña ningun kompra Pro pa e e-mail aki ainda.",
+    "pro_pro_not_verified": "Pago haña — habri e link di verifikashon ku nos a manda pa e-mail.",
+    "pro_pro_unlocked": "Pro desbloká! Bon biní na e famia.",
+    "pro_pro_send_failed": "No por manda verifikashon: {error}",
+    "pro_pro_check_failed": "No por chek estado: {error}",
+    "pro_pro_config_saved": "Areglo di Pro wardá.",
+    "pro_pro_config_save_failed": "No por warda areglo di Pro: {error}",
+    "pro_pro_license_url": "URL di server di lisensia",
+    "pro_pro_license_token": "Token di lisensia",
+    "pro_pro_save_config": "Warda areglo di Pro",
+    "pro_pro_advanced": "Avansá",
+    "pro_pro_advanced_hide": "Skonde avansá",
+    "pro_pro_upsell_title": "Desbloká Siegu Pro",
+    "pro_pro_upsell_desc": "Privá, na bo ekipo, un preis pa kada ekipo.",
+    "pro_pro_upsell_cta": "Obtené Pro"
   },
   "open_with": {
     "opened_in_siegu": "Habri na Siegu: {file}"
