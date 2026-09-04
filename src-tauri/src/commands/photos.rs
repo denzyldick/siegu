@@ -13,6 +13,7 @@ pub use siegu_core::library::{
 #[allow(clippy::too_many_arguments)]
 pub async fn list_files(
     app: tauri::AppHandle,
+    state: tauri::State<'_, crate::WebRtcState>,
     offset: usize,
     limit: usize,
     query: String,
@@ -44,6 +45,39 @@ pub async fn list_files(
     if scan {
         crate::commands::scan::scan_files(app.clone());
     }
+    if let Ok(tx_lock) = state.sync_tx.try_lock() {
+        if tx_lock.is_some() {
+            // A live peer session is active — mirror the peer's full library
+            // over the data channel (#mirror). Falls back to local on error.
+            return list_files_via_rpc(
+                &state,
+                &path,
+                &query,
+                offset,
+                limit,
+                favorites_only,
+                videos_only,
+                person_ids,
+                person_match,
+                person_alone,
+                location,
+                tag,
+                date_from,
+                date_to,
+                has_faces,
+                aesthetics_min,
+                camera,
+                papers,
+                nsfw_only,
+                stored_only,
+                not_stored_only,
+                random,
+                order_by,
+                album_id,
+            )
+            .await;
+        }
+    }
     let database = database::Database::new(&path);
     Ok(serde_json::to_string(&do_list_files_filtered(
         &database,
@@ -71,6 +105,190 @@ pub async fn list_files(
         album_id,
     ))
     .unwrap_or("[]".to_string()))
+}
+
+/// Send a read-only `list_files` RPC to the connected peer and await the reply,
+/// returning the peer's (host's) full library as the same JSON string the local
+/// `list_files` command returns. (#mirror)
+#[allow(clippy::too_many_arguments)]
+async fn list_files_via_rpc(
+    state: &crate::WebRtcState,
+    config_path: &str,
+    query: &str,
+    offset: usize,
+    limit: usize,
+    favorites_only: bool,
+    videos_only: bool,
+    person_ids: Option<Vec<String>>,
+    person_match: Option<String>,
+    person_alone: bool,
+    location: Option<String>,
+    tag: Option<String>,
+    date_from: Option<String>,
+    date_to: Option<String>,
+    has_faces: bool,
+    aesthetics_min: Option<f64>,
+    camera: Option<String>,
+    papers: bool,
+    nsfw_only: bool,
+    stored_only: bool,
+    not_stored_only: bool,
+    random: bool,
+    order_by: Option<String>,
+    album_id: Option<String>,
+) -> Result<String, String> {
+    let mut tx_lock = state.sync_tx.lock().await;
+    let Some(tx) = tx_lock.as_mut() else {
+        return Err("Not connected to a device".to_string());
+    };
+
+    let id = state
+        .rpc_next_id
+        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let (send, recv) = tokio::sync::oneshot::channel();
+    state.rpc_pending.lock().await.insert(id, send);
+
+    let payload = serde_json::json!({
+        "query": query,
+        "offset": offset,
+        "limit": limit,
+        "favorites_only": favorites_only,
+        "videos_only": videos_only,
+        "person_ids": person_ids.unwrap_or_default(),
+        "person_match": person_match,
+        "person_alone": person_alone,
+        "location": location,
+        "tag": tag,
+        "date_from": date_from,
+        "date_to": date_to,
+        "has_faces": has_faces,
+        "aesthetics_min": aesthetics_min,
+        "camera": camera,
+        "papers": papers,
+        "nsfw_only": nsfw_only,
+        "stored_only": stored_only,
+        "not_stored_only": not_stored_only,
+        "random": random,
+        "order_by": order_by,
+        "album_id": album_id,
+    });
+
+    if tx
+        .send(crate::transport::SyncMessage::CommandRequest {
+            id,
+            name: "list_files".to_string(),
+            payload,
+        })
+        .is_err()
+    {
+        state.rpc_pending.lock().await.remove(&id);
+        return Err("Failed to send mirror request".to_string());
+    }
+    drop(tx_lock);
+
+    match tokio::time::timeout(std::time::Duration::from_secs(60), recv).await {
+        Ok(Ok((true, Some(result), _))) => {
+            // Merge: mark items not stored locally as view_only so the
+            // frontend streams them via /remote instead of 404-ing on the
+            // host's file path. (#mirror)
+            let merged = merge_mirror_result(config_path, result);
+            Ok(serde_json::to_string(&merged).unwrap_or_else(|_| "[]".to_string()))
+        }
+        Ok(Ok((false, _, Some(err)))) => Err(err),
+        Ok(_) => Err("Mirror request failed".to_string()),
+        Err(_) => Err("Mirror request timed out".to_string()),
+    }
+}
+
+/// Merge a host's `list_files` JSON response with the local database: items
+/// that exist locally keep their original shape; items NOT stored locally get
+/// `view_only: true` so the frontend streams them via /remote. (#mirror)
+fn merge_mirror_result(config_path: &str, result: serde_json::Value) -> serde_json::Value {
+    let Some(arr) = result.as_array() else {
+        return result;
+    };
+    if arr.is_empty() {
+        return result;
+    }
+    // Batch-fetch all IDs that exist in the local database.
+    let ids: Vec<String> = arr
+        .iter()
+        .filter_map(|v| v.get("id").and_then(|id| id.as_str()).map(String::from))
+        .collect();
+    let local_db = database::Database::new(config_path);
+    let local_photos = local_db.get_photos_by_ids(&ids);
+    let local_ids: std::collections::HashSet<String> =
+        local_photos.iter().map(|p| p.id.clone()).collect();
+    // Mark unstored items as view-only.
+    let mut merged = arr.clone();
+    for item in merged.iter_mut() {
+        if let Some(id) = item.get("id").and_then(|id| id.as_str()) {
+            if !local_ids.contains(id) {
+                if let Some(obj) = item.as_object_mut() {
+                    obj.insert("view_only".to_string(), serde_json::Value::Bool(true));
+                }
+            }
+        }
+    }
+    serde_json::Value::Array(merged)
+}
+
+/// Explicit mirror listing command: return the connected peer's full library.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub async fn remote_list_files(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::WebRtcState>,
+    offset: usize,
+    limit: usize,
+    query: String,
+    favorites_only: bool,
+    videos_only: bool,
+    person_ids: Option<Vec<String>>,
+    person_match: Option<String>,
+    person_alone: bool,
+    location: Option<String>,
+    tag: Option<String>,
+    date_from: Option<String>,
+    date_to: Option<String>,
+    has_faces: bool,
+    aesthetics_min: Option<f64>,
+    camera: Option<String>,
+    papers: bool,
+    nsfw_only: bool,
+    stored_only: bool,
+    not_stored_only: bool,
+    random: bool,
+    order_by: Option<String>,
+    album_id: Option<String>,
+) -> Result<String, String> {
+    list_files_via_rpc(
+        &state,
+        &get_config_path(&app),
+        &query,
+        offset,
+        limit,
+        favorites_only,
+        videos_only,
+        person_ids,
+        person_match,
+        person_alone,
+        location,
+        tag,
+        date_from,
+        date_to,
+        has_faces,
+        aesthetics_min,
+        camera,
+        papers,
+        nsfw_only,
+        stored_only,
+        not_stored_only,
+        random,
+        order_by,
+        album_id,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -409,6 +627,8 @@ mod tests {
             false,
             false,
             false,
+            false,
+            false,
             Some("best".to_string()),
             None,
         );
@@ -442,6 +662,8 @@ mod tests {
             false,
             None,
             None,
+            false,
+            false,
             false,
             false,
             false,
@@ -493,6 +715,8 @@ mod tests {
             false,
             true,
             false,
+            false,
+            false,
             None,
             None,
         );
@@ -539,6 +763,8 @@ mod tests {
             false,
             false,
             false,
+            false,
+            false,
             None,
             Some(album.id.clone()),
         );
@@ -562,6 +788,8 @@ mod tests {
             false,
             None,
             None,
+            false,
+            false,
             false,
             false,
             false,
@@ -623,6 +851,8 @@ mod tests {
             false,
             false,
             false,
+            false,
+            false,
             None,
             None,
         );
@@ -658,6 +888,8 @@ mod tests {
             false,
             None,
             None,
+            false,
+            false,
             false,
             false,
             false,
@@ -699,6 +931,8 @@ mod tests {
             false,
             false,
             false,
+            false,
+            false,
             None,
             None,
         );
@@ -733,6 +967,8 @@ mod tests {
             false,
             None,
             None,
+            false,
+            false,
             false,
             false,
             false,

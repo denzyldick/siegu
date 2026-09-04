@@ -1,9 +1,16 @@
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::Emitter;
 
 use siegu_core::{Database, PeerDevice, SyncEvent, SyncMessage, SyncPhase, SyncProgress};
+
+/// Reply to an outbound RPC (`CommandRequest`) from a peer's `CommandResponse`.
+/// `(ok, result, error)`.
+pub type RpcReply = (bool, Option<serde_json::Value>, Option<String>);
+/// Registry of in-flight RPC requests: request id -> completion channel.
+pub type RpcPending = Arc<tokio::sync::Mutex<HashMap<u64, tokio::sync::oneshot::Sender<RpcReply>>>>;
 
 /// Minimum interval between "sync-progress" IPC emissions. Per-chunk progress
 /// updates arrive several hundred times per second; this caps the JS side.
@@ -23,7 +30,9 @@ pub struct TauriSyncEvent {
     pub last_sync_progress: std::sync::Mutex<Option<Instant>>,
     /// When set, the share is a one-time view: close it as soon as the last
     /// guest's session ends so the link can't be opened again.
-    pub one_time_share: Arc<AtomicBool>,
+    pub one_time_share: Arc<std::sync::atomic::AtomicBool>,
+    /// In-flight outbound RPC requests awaiting a peer `CommandResponse`.
+    pub rpc_pending: RpcPending,
 }
 
 impl SyncEvent for TauriSyncEvent {
@@ -192,6 +201,27 @@ impl SyncEvent for TauriSyncEvent {
                 let _ = self.app.emit("view-manifest", json);
             }
             Err(e) => self.on_log(&format!("Failed to serialize view manifest: {e}")),
+        }
+    }
+
+    /// A peer answered one of our outbound RPC requests (#mirror): resolve the
+    /// awaiting `remote_*` command via the pending registry.
+    fn on_command_response(
+        &self,
+        id: u64,
+        ok: bool,
+        result: Option<&serde_json::Value>,
+        error: Option<&str>,
+    ) {
+        let tx = {
+            let mut g = match self.rpc_pending.try_lock() {
+                Ok(g) => g,
+                Err(_) => return,
+            };
+            g.remove(&id)
+        };
+        if let Some(tx) = tx {
+            let _ = tx.send((ok, result.cloned(), error.map(|s| s.to_string())));
         }
     }
 

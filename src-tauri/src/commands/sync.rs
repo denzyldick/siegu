@@ -169,6 +169,7 @@ pub async fn start_webrtc_session(
 
     let sync_tx = Arc::clone(&state.sync_tx);
     let connected = Arc::clone(&state.connected);
+    let rpc_pending = Arc::clone(&state.rpc_pending);
 
     if let Ok(mut session) = state.active_session.lock() {
         if let Some(handle) = session.take() {
@@ -190,6 +191,7 @@ pub async fn start_webrtc_session(
                 app_handle,
                 Some(sync_tx),
                 Some(connected),
+                Some(rpc_pending),
             );
             if let Err(e) = transport.start().await {
                 emit_log(&app, format!("WebRTC session failed: {e}"));
@@ -298,6 +300,7 @@ async fn start_host_internal(
 
     let sync_tx = Arc::clone(&state.sync_tx);
     let connected = Arc::clone(&state.connected);
+    let rpc_pending = Arc::clone(&state.rpc_pending);
 
     if let Ok(mut session) = state.active_session.lock() {
         if let Some(handle) = session.take() {
@@ -318,6 +321,7 @@ async fn start_host_internal(
                 app_handle.clone(),
                 Some(sync_tx),
                 Some(connected),
+                Some(rpc_pending),
             );
 
             siegu_core::mdns::unregister_service(&daemon, &hostname_for_task);
@@ -580,6 +584,7 @@ pub async fn start_album_share(
         let room_id_for_session = room_id.clone();
         let signaling_url_for_session = signaling_url.clone();
         let one_time_flag = Arc::clone(&state.one_time_share);
+        let rpc_pending = Arc::clone(&state.rpc_pending);
         let handle = tauri::async_runtime::spawn(async move {
             let transport = if one_time {
                 transport::create_transport_with_one_time(
@@ -591,9 +596,10 @@ pub async fn start_album_share(
                     Some(sync_tx),
                     Some(connected),
                     Some(one_time_flag),
+                    Some(rpc_pending),
                 )
             } else {
-                transport::create_transport(
+                transport::create_transport_with_one_time(
                     room_id_for_session.clone(),
                     true,
                     signaling_url_for_session,
@@ -601,6 +607,8 @@ pub async fn start_album_share(
                     app_handle.clone(),
                     Some(sync_tx),
                     Some(connected),
+                    None,
+                    Some(rpc_pending),
                 )
             };
             if let Err(e) = transport.start().await {
@@ -981,6 +989,7 @@ pub async fn auto_reconnect(
     let app_handle = app.clone();
     let sync_tx = Arc::clone(&state.sync_tx);
     let connected = Arc::clone(&state.connected);
+    let rpc_pending = Arc::clone(&state.rpc_pending);
     let config_path_for_session = config_path.clone();
     let room_id_for_session = session.room_id.clone();
     let room_id_for_save = room_id_for_session.clone();
@@ -1020,6 +1029,7 @@ pub async fn auto_reconnect(
                     app_handle.clone(),
                     Some(sync_tx.clone()),
                     Some(connected.clone()),
+                    Some(rpc_pending.clone()),
                 );
                 match transport.start().await {
                     Ok(()) => break,

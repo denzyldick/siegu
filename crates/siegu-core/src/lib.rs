@@ -1,5 +1,6 @@
 pub mod config;
 pub mod database;
+pub mod duplicates;
 pub mod error;
 pub mod event_bus;
 pub mod face_detector;

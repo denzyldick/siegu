@@ -989,6 +989,18 @@ impl Database {
             "CREATE INDEX IF NOT EXISTS idx_photo_deleted_at ON photo(deleted_at) WHERE deleted_at IS NOT NULL;",
             (),
         );
+        // Duplicate-detection metadata (Stage 0).
+        let _ = conn.execute("ALTER TABLE photo ADD COLUMN dup_hash TEXT;", ());
+        let _ = conn.execute("ALTER TABLE photo ADD COLUMN file_sha256 TEXT;", ());
+        let _ = conn.execute("ALTER TABLE photo ADD COLUMN clip_embedding BLOB;", ());
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_photo_file_sha256 ON photo(file_sha256) WHERE file_sha256 IS NOT NULL;",
+            (),
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_photo_dup_hash ON photo(dup_hash) WHERE dup_hash IS NOT NULL;",
+            (),
+        );
 
         // Virtual generated column mirroring video_sql_like(): lets the
         // videos-only filter use an index instead of a 14-way LIKE scan.
@@ -3244,6 +3256,121 @@ impl Database {
                 row.get(0)
             })
             .ok()
+    }
+
+    // ── Duplicate detection (Stage 0) ─────────────────────────────────
+
+    /// Photos missing duplicate hashes (file_sha256 AND dup_hash), up to
+    /// `limit` rows. Used by the duplicate scanner to lazily compute hashes.
+    pub fn photos_missing_dup_hashes(&self, limit: i64) -> Vec<(String, String)> {
+        self.connection
+            .prepare(
+                "SELECT id, location FROM photo WHERE deleted_at IS NULL AND (file_sha256 IS NULL OR dup_hash IS NULL) LIMIT ?1",
+            )
+            .map(|mut stmt| {
+                stmt.query_map([limit], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                })
+                .map(|rows| rows.flatten().collect())
+                .unwrap_or_default()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Persist a photo's exact (file SHA-256) and perceptual (dHash) hashes.
+    pub fn upsert_dup_hashes(&self, id: &str, file_sha256: &str, dup_hash: &str) {
+        let _ = self.connection.execute(
+            "UPDATE photo SET file_sha256 = ?1, dup_hash = ?2 WHERE id = ?3",
+            rusqlite::params![file_sha256, dup_hash, id],
+        );
+    }
+
+    /// Load (id, file_sha256, dup_hash, aesthetics_score, location) for every
+    /// non-deleted photo that has both hashes computed. Used for grouping.
+    pub fn all_dup_data(&self) -> Vec<(String, String, String, Option<f64>, String)> {
+        self.connection
+            .prepare(
+                "SELECT id, file_sha256, dup_hash, aesthetics_score, location FROM photo WHERE deleted_at IS NULL AND file_sha256 IS NOT NULL AND dup_hash IS NOT NULL",
+            )
+            .map(|mut stmt| {
+                stmt.query_map([], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, Option<f64>>(3)?,
+                        row.get::<_, String>(4)?,
+                    ))
+                })
+                .map(|rows| rows.flatten().collect())
+                .unwrap_or_default()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Persist a photo's CLIP embedding (raw f32 LE bytes), or clear it when
+    /// `bytes` is None.
+    pub fn set_clip_embedding(&self, id: &str, bytes: Option<&[u8]>) {
+        let _ = self.connection.execute(
+            "UPDATE photo SET clip_embedding = ?1 WHERE id = ?2",
+            rusqlite::params![bytes, id],
+        );
+    }
+
+    /// Load (id, embedding) for every non-deleted photo that has a stored CLIP
+    /// embedding. Embeddings are L2-normalized 512-dim f32 vectors.
+    pub fn list_clip_embeddings(&self) -> Vec<(String, Vec<f32>)> {
+        self.connection
+            .prepare(
+                "SELECT id, clip_embedding FROM photo WHERE deleted_at IS NULL AND clip_embedding IS NOT NULL",
+            )
+            .map(|mut stmt| {
+                stmt.query_map([], |row| {
+                    let id: String = row.get(0)?;
+                    let bytes: Option<Vec<u8>> = row.get(1)?;
+                    let emb = bytes
+                        .map(|b| {
+                            b.chunks_exact(4)
+                                .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    Ok((id, emb))
+                })
+                .map(|rows| rows.flatten().collect())
+                .unwrap_or_default()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Number of non-deleted photos that have a CLIP embedding stored.
+    pub fn count_photos_with_clip_embedding(&self) -> i64 {
+        self.connection
+            .query_row(
+                "SELECT COUNT(*) FROM photo WHERE deleted_at IS NULL AND clip_embedding IS NOT NULL",
+                (),
+                |row| row.get(0),
+            )
+            .unwrap_or(0)
+    }
+
+    /// Map of id -> aesthetics score for every non-deleted photo that has one.
+    /// Used to rank duplicate groups and pick the "best" photo to keep.
+    pub fn quality_scores(&self) -> std::collections::HashMap<String, f64> {
+        let mut map = std::collections::HashMap::new();
+        if let Ok(mut stmt) = self
+            .connection
+            .prepare("SELECT id, aesthetics_score FROM photo WHERE deleted_at IS NULL AND aesthetics_score IS NOT NULL")
+        {
+            if let Ok(iter) = stmt.query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+            }) {
+                for r in iter.flatten() {
+                    map.insert(r.0, r.1);
+                }
+            }
+        }
+        map
     }
 
     /// Update caption, aesthetics_score, and indexed level for a photo.

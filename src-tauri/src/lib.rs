@@ -37,6 +37,10 @@ struct WebRtcState {
     /// One-time-share flag shared with the transport event; set true for a
     /// one-time view so the host closes the share when its guest leaves.
     one_time_share: Arc<std::sync::atomic::AtomicBool>,
+    /// In-flight outbound RPC requests awaiting a peer `CommandResponse`.
+    rpc_pending: crate::tauri_sync_event::RpcPending,
+    /// Monotonic id counter for outbound RPC requests.
+    rpc_next_id: std::sync::atomic::AtomicU64,
 }
 
 #[derive(Clone)]
@@ -247,6 +251,8 @@ pub fn run() {
                 host_info: std::sync::Mutex::new(None),
                 share_expiry: std::sync::Mutex::new(None),
                 one_time_share: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                rpc_pending: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
+                rpc_next_id: std::sync::atomic::AtomicU64::new(1),
             });
 
             app.manage(notify::FocusState::default());
@@ -300,6 +306,7 @@ pub fn run() {
             commands::models::get_model_capabilities,
             // Photos
             commands::photos::list_files,
+            commands::photos::remote_list_files,
             commands::photos::toggle_favorite,
             commands::photos::set_favorites,
             commands::photos::get_photo_by_id,

@@ -1669,12 +1669,12 @@ onUnmounted(() => {
 .collections-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  gap: 0;
 }
 
 .collection-tile {
   cursor: pointer;
-  border-radius: 20px;
+  border-radius: 0;
   overflow: hidden;
   background: rgb(var(--v-theme-surface-light));
   transition:
@@ -1740,7 +1740,7 @@ onUnmounted(() => {
 
 .photo-row {
   display: grid;
-  gap: 8px;
+  gap: 0;
 }
 
 .trash-photo-wrapper {

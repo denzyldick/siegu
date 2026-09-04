@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useUiStore } from '@/stores/ui';
 import { useScanStore } from '@/stores/scan';
@@ -11,6 +11,38 @@ const { t } = useI18n();
 const uiStore = useUiStore();
 const scanStore = useScanStore();
 const runtimeStore = useRuntimeStore();
+
+// Hide the dock while the user is scrolling the page; it reappears once
+// scrolling stops (idle) or when hovered.
+const scrolledAway = ref(false);
+const dockHovered = ref(false);
+const idleTimer = ref<ReturnType<typeof setTimeout> | null>(null);
+
+const dockHidden = computed(() => scrolledAway.value && !dockHovered.value);
+
+function hideWhileScrolling(): void {
+  scrolledAway.value = true;
+  if (idleTimer.value) clearTimeout(idleTimer.value);
+  idleTimer.value = setTimeout(() => {
+    scrolledAway.value = false;
+  }, 350);
+}
+
+// The content area scrolls on `document` (window scrolls the page). With
+// page-mode virtual scrollers the scroll event still surfaces on document, so
+// a single capture listener on document is enough to catch all scrolls.
+function onScroll(): void {
+  hideWhileScrolling();
+}
+
+onMounted(() => {
+  document.addEventListener('scroll', onScroll, { passive: true, capture: true });
+});
+
+onUnmounted(() => {
+  document.removeEventListener('scroll', onScroll, { capture: true } as EventListenerOptions);
+  if (idleTimer.value) clearTimeout(idleTimer.value);
+});
 
 const allNavItems = [
   {
@@ -88,13 +120,15 @@ function navigate(page: 'home' | 'collections' | 'location' | 'devices' | 'setti
 </script>
 
 <template>
-  <div class="dock-container">
+  <div class="dock-container" :class="{ 'dock-hidden': dockHidden }">
     <v-sheet
       class="dock d-flex justify-space-around align-center pa-2 rounded-pill mb-8"
       elevation="0"
       width="100%"
       max-width="380"
       color="surface"
+      @mouseenter="dockHovered = true"
+      @mouseleave="dockHovered = false"
     >
       <template v-for="item in navItems" :key="item.page">
         <v-tooltip location="top">
@@ -148,6 +182,17 @@ function navigate(page: 'home' | 'collections' | 'location' | 'devices' | 'setti
   justify-content: center;
   pointer-events: none;
   z-index: 2000;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dock-container.dock-hidden {
+  opacity: 0;
+  transform: translateY(130%);
+  pointer-events: none;
 }
 
 .dock {

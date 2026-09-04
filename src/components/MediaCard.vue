@@ -341,7 +341,7 @@ onUnmounted(() => {
   width: 100%;
   aspect-ratio: 1;
   overflow: hidden;
-  border-radius: 24px;
+  border-radius: 0;
   position: relative;
   background-color: rgb(var(--v-theme-surface-light));
   border: 1px solid rgba(var(--v-theme-on-surface), 0.12);

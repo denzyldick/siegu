@@ -754,8 +754,8 @@ onUnmounted(() => {
 
 .photo-row {
   display: grid;
-  gap: 16px;
-  padding-bottom: 16px;
+  gap: 0;
+  padding-bottom: 0;
 }
 
 .month-header {

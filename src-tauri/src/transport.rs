@@ -414,6 +414,7 @@ pub fn create_transport(
         Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<SyncMessage>>>>,
     >,
     connected: Option<Arc<std::sync::atomic::AtomicBool>>,
+    rpc_pending: Option<super::tauri_sync_event::RpcPending>,
 ) -> MeshTransport {
     create_transport_with_one_time(
         room_id,
@@ -424,6 +425,7 @@ pub fn create_transport(
         external_tx,
         connected,
         None,
+        rpc_pending,
     )
 }
 
@@ -441,6 +443,7 @@ pub fn create_transport_with_one_time(
     >,
     connected: Option<Arc<std::sync::atomic::AtomicBool>>,
     one_time_share: Option<Arc<std::sync::atomic::AtomicBool>>,
+    rpc_pending: Option<super::tauri_sync_event::RpcPending>,
 ) -> MeshTransport {
     let device_id = get_or_create_device_id(&config_path);
     let db = database::Database::new(&config_path);
@@ -469,6 +472,8 @@ pub fn create_transport_with_one_time(
         last_sync_progress: std::sync::Mutex::new(None),
         one_time_share: one_time_share
             .unwrap_or_else(|| Arc::new(std::sync::atomic::AtomicBool::new(false))),
+        rpc_pending: rpc_pending
+            .unwrap_or_else(|| Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()))),
     });
 
     let mut transport = MeshTransport::new(
@@ -481,6 +486,11 @@ pub fn create_transport_with_one_time(
         models_enabled,
         event,
     );
+
+    // Let any connected peer issue read-only RPC (list_files etc.) so a paired
+    // device can mirror/stream the host library. Mutations stay blocked by the
+    // ReadOnly tier. (#mirror)
+    transport = transport.with_share_mode(siegu_core::rpc::ShareMode::ReadOnly);
 
     if let Some(ext) = external_tx {
         transport = transport.with_external_tx(ext);
