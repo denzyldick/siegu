@@ -273,13 +273,20 @@ mod tests {
 
     #[test]
     fn test_dhash_resize_invariance() {
-        // Same content at two resolutions should hash identically.
-        let small = image::DynamicImage::ImageLuma8(image::GrayImage::from_fn(4, 4, |x, y| {
-            image::Luma([(x * 40 + y * 20) as u8])
-        }));
-        let big = image::DynamicImage::ImageLuma8(image::GrayImage::from_fn(80, 80, |x, y| {
-            image::Luma([((x * 80 / 80) * 40 + (y * 80 / 80) * 20) as u8])
-        }));
+        // Same content at two resolutions should hash identically. Build the
+        // gradient from NORMALIZED coordinates so both images sample the same
+        // continuous ramp (x sweeps 0..1 in both) — the old test used raw
+        // pixel indices, so the 4x4 and 80x80 images described totally
+        // different content and could never match after resize.
+        let ramp = |size: u32| {
+            image::DynamicImage::ImageLuma8(image::GrayImage::from_fn(size, size, |x, y| {
+                let nx = (x as f32 + 0.5) / size as f32;
+                let ny = (y as f32 + 0.5) / size as f32;
+                image::Luma([(nx * 200.0 + ny * 40.0) as u8])
+            }))
+        };
+        let small = ramp(16);
+        let big = ramp(160);
         assert_eq!(dhash(&small), dhash(&big));
     }
 }
