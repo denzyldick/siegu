@@ -104,7 +104,10 @@
       "faces": "Visages",
       "papers": "Documents",
       "surprise": "Surprends-moi",
-      "nsfw": "NSFW"
+      "nsfw": "NSFW",
+      "stored": "Stockées",
+      "not_stored": "Non stockées",
+      "storage": "Stockage"
     },
     "papers": {
       "title": "Documents et captures",

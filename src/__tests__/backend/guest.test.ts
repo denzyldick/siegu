@@ -139,14 +139,8 @@ describe('GuestClient', () => {
     const thumb = client.fetchThumb('p1');
     const orig = client.fetchOriginal('p1');
     // Only the original registers a FileAssembler (thumbnails are ViewMedia).
-    const thumbReq = transport.outbound[0] as Extract<
-      GuestOutbound,
-      { type: 'FetchMediaRequest' }
-    >;
-    const origReq = transport.outbound[1] as Extract<
-      GuestOutbound,
-      { type: 'FetchMediaRequest' }
-    >;
+    const thumbReq = transport.outbound[0] as Extract<GuestOutbound, { type: 'FetchMediaRequest' }>;
+    const origReq = transport.outbound[1] as Extract<GuestOutbound, { type: 'FetchMediaRequest' }>;
     expect(thumbReq.thumbnail).toBe(true);
     expect(origReq.thumbnail).toBe(false);
 

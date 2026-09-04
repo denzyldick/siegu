@@ -155,6 +155,18 @@ pub async fn start_webrtc_session(
         return Err("Config error".to_string());
     }
 
+    // Pro gate: only verified Pro subscribers may sync through a hosted
+    // (cross-network) signalling server. Free tier is limited to a
+    // same-network LAN/localhost signaler. The hosted signaler is what lets
+    // devices sync when they are on different networks.
+    if !siegu_core::mesh::MeshManager::is_pro(&config_path)
+        && siegu_core::mesh::MeshManager::signalling_requires_pro(&signalingUrl)
+    {
+        return Err(
+            "Hosted signaler requires Pro. Sync across networks is a Pro feature.".to_string(),
+        );
+    }
+
     let sync_tx = Arc::clone(&state.sync_tx);
     let connected = Arc::clone(&state.connected);
 

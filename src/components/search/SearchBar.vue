@@ -198,14 +198,23 @@ function onDateRangeChange(range: [string, string] | null): void {
   }
 }
 
-function toggleMedia(type: 'favorites' | 'videos' | 'faces' | 'papers' | 'nsfw'): void {
+function toggleMedia(type: 'favorites' | 'videos' | 'faces' | 'papers' | 'nsfw' | 'storage'): void {
   if (type === 'favorites') searchStore.toggleFavoriteOnly();
   if (type === 'videos') searchStore.toggleVideoOnly();
   if (type === 'faces') searchStore.toggleFacesOnly();
   if (type === 'papers') searchStore.togglePapersOnly();
   if (type === 'nsfw') searchStore.toggleNsfwOnly();
+  if (type === 'storage') searchStore.cycleStorageFilter();
   closeDropdown();
 }
+
+/** Tri-state storage filter label based on the current cycle position. */
+const storageLabel = computed(() => {
+  const f = searchStore.mediaFilters;
+  if (f.storedOnly) return t('search.magic.stored');
+  if (f.notStoredOnly) return t('search.magic.not_stored');
+  return t('search.magic.storage');
+});
 
 function surpriseMe(): void {
   searchStore.clearFilters();
@@ -315,10 +324,22 @@ function isActive(type: string, value: string): boolean {
 }
 
 function isMediaActive(
-  key: 'favoritesOnly' | 'videosOnly' | 'facesOnly' | 'papersOnly' | 'nsfwOnly',
+  key:
+    | 'favoritesOnly'
+    | 'videosOnly'
+    | 'facesOnly'
+    | 'papersOnly'
+    | 'nsfwOnly'
+    | 'storedOnly'
+    | 'notStoredOnly',
 ): boolean {
   return searchStore.mediaFilters[key];
 }
+
+/** True when the tri-state storage filter is on either side (stored or not). */
+const storageActive = computed(
+  () => searchStore.mediaFilters.storedOnly || searchStore.mediaFilters.notStoredOnly,
+);
 
 function activeCount(type: string): number {
   const counts: Record<string, string | number> = {
@@ -327,6 +348,7 @@ function activeCount(type: string): number {
     faces: stats.value?.face_photos ?? 0,
     papers: (facets.value?.papers ?? []).reduce((sum, p) => sum + p.count, 0),
     nsfw: stats.value?.nsfw_photos ?? 0,
+    storage: stats.value?.photos ?? 0,
   };
   return counts[type] as number;
 }
@@ -507,6 +529,17 @@ function iconForFilter(type: string): string {
                 </div>
                 <div class="magic-label">{{ t('search.magic.nsfw') }}</div>
                 <div class="magic-count">{{ activeCount('nsfw') }}</div>
+              </v-btn>
+              <v-btn
+                class="magic-card"
+                :class="{ 'magic-card--active': storageActive }"
+                @click="toggleMedia('storage')"
+              >
+                <div class="magic-icon" style="--magic: rgb(var(--v-theme-primary))">
+                  <v-icon size="20">mdi-cloud-outline</v-icon>
+                </div>
+                <div class="magic-label">{{ storageLabel }}</div>
+                <div class="magic-count">{{ activeCount('storage') }}</div>
               </v-btn>
               <v-btn class="magic-card" @click="surpriseMe">
                 <div class="magic-icon" style="--magic: rgb(var(--v-theme-primary))">

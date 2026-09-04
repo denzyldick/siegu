@@ -68,6 +68,8 @@ export async function listFiles(options: ListFilesOptions): Promise<MediaItem[]>
     camera: options.camera ?? null,
     papers: options.papers ?? false,
     nsfwOnly: options.nsfwOnly ?? false,
+    storedOnly: options.storedOnly ?? false,
+    notStoredOnly: options.notStoredOnly ?? false,
     random: options.random ?? false,
     orderBy: options.orderBy ?? null,
     albumId: options.albumId ?? null,

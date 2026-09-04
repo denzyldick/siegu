@@ -1966,6 +1966,62 @@ impl MeshManager {
         }
         total
     }
+
+    /// Whether this device is a verified Pro subscriber. Read from the `tier`
+    /// config, which is set to `paid` only after the email-link verification
+    /// flow completes (see ProSection + license worker).
+    pub fn is_pro(config_path: &str) -> bool {
+        let db = Database::new(config_path);
+        db.get_state()
+            .get("tier")
+            .map(|v| v == "paid")
+            .unwrap_or(false)
+    }
+
+    /// A signalling URL is "hosted/remote" (requiring Pro) when it points at a
+    /// server that is NOT a loopback or private-LAN address — i.e. a signaler
+    /// reachable when the devices are on different networks. Free tier may only
+    /// sync over a same-network (LAN/localhost) signaler; communicating with a
+    /// hosted signaler to sync across networks is a Pro capability.
+    pub fn signalling_requires_pro(url: &str) -> bool {
+        let url = url.trim().trim_end_matches('/');
+        if url.is_empty() {
+            return false; // empty -> embedded LAN signaler
+        }
+        let rest = url
+            .strip_prefix("wss://")
+            .or_else(|| url.strip_prefix("ws://"))
+            .or_else(|| url.strip_prefix("https://"))
+            .or_else(|| url.strip_prefix("http://"))
+            .unwrap_or(url);
+        let hostport = rest.split('/').next().unwrap_or("");
+        let host = hostport.split(':').next().unwrap_or("").to_lowercase();
+        let host = host.trim();
+        if host.is_empty() {
+            return false;
+        }
+        // Loopback and private ranges can only be reached on the same network.
+        if host == "localhost" || host == "127.0.0.1" || host == "[::1]" {
+            return false;
+        }
+        if host.starts_with("192.168.")
+            || host.starts_with("10.")
+            || host.starts_with("172.") && is_private_172(&host)
+        {
+            return false;
+        }
+        true
+    }
+}
+
+/// 172.16.0.0/12 -> 172.31.255.255 is RFC1918 private.
+fn is_private_172(host: &str) -> bool {
+    let octet: u8 = host
+        .strip_prefix("172.")
+        .and_then(|rest| rest.split('.').next())
+        .and_then(|part| part.parse().ok())
+        .unwrap_or(0);
+    (16..=31).contains(&octet)
 }
 
 #[cfg(test)]
@@ -2090,6 +2146,66 @@ mod tests {
             350,
             "unified cap counts own imports too"
         );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_signalling_requires_pro() {
+        // Same-network / loopback / private-LAN signalers are free.
+        assert!(!MeshManager::signalling_requires_pro(""));
+        assert!(!MeshManager::signalling_requires_pro("ws://localhost:8080"));
+        assert!(!MeshManager::signalling_requires_pro("ws://127.0.0.1:8080"));
+        assert!(!MeshManager::signalling_requires_pro(
+            "ws://192.168.1.10:8080"
+        ));
+        assert!(!MeshManager::signalling_requires_pro("ws://10.0.0.5:8080"));
+        assert!(!MeshManager::signalling_requires_pro(
+            "ws://172.20.0.3:8080"
+        ));
+
+        // Hosted / remote signalers (cross-network) require Pro.
+        assert!(MeshManager::signalling_requires_pro("wss://siegu.io/ws"));
+        assert!(MeshManager::signalling_requires_pro("ws://siegu.io/ws"));
+        assert!(MeshManager::signalling_requires_pro(
+            "https://signalling.example.com"
+        ));
+        assert!(MeshManager::signalling_requires_pro("wss://8.8.8.8:443"));
+        assert!(MeshManager::signalling_requires_pro("172.32.0.1:8080")); // outside 172.16/12
+
+        // Non-private public address.
+        assert!(MeshManager::signalling_requires_pro("192.169.1.1"));
+    }
+
+    #[test]
+    fn test_is_pro_reflects_tier() {
+        let dir = std::env::temp_dir().join(format!(
+            "siegu_is_pro_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .subsec_nanos()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let config_path = dir.display().to_string();
+
+        // No tier set / free -> not Pro.
+        assert!(!MeshManager::is_pro(&config_path));
+        let db = Database::new(&config_path);
+        db.set_state(std::collections::HashMap::from([(
+            "tier".into(),
+            "free".into(),
+        )]));
+        assert!(!MeshManager::is_pro(&config_path));
+
+        // Paid tier -> Pro.
+        db.set_state(std::collections::HashMap::from([(
+            "tier".into(),
+            "paid".into(),
+        )]));
+        assert!(MeshManager::is_pro(&config_path));
 
         let _ = std::fs::remove_dir_all(&dir);
     }

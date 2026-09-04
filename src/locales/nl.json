@@ -104,7 +104,10 @@
       "faces": "Gezichten",
       "papers": "Documenten",
       "surprise": "Verrass me",
-      "nsfw": "NSFW"
+      "nsfw": "NSFW",
+      "stored": "Opgeslagen",
+      "not_stored": "Niet opgeslagen",
+      "storage": "Opslag"
     },
     "papers": {
       "title": "Documenten en schermafbeeldingen",

@@ -67,6 +67,8 @@ pub const CATALOG: &[CommandSpec] = &[
             "camera",
             "papers",
             "nsfw_only",
+            "stored_only",
+            "not_stored_only",
             "random",
             "order_by",
             "album_id",

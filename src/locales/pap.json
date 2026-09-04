@@ -104,7 +104,10 @@
       "faces": "Caranan",
       "papers": "Dokumentonan",
       "surprise": "Sorpredé mi",
-      "nsfw": "NSFW"
+      "nsfw": "NSFW",
+      "stored": "Warda",
+      "not_stored": "No warda",
+      "storage": "Almacenamentu"
     },
     "papers": {
       "title": "Dokumento i screenshot",

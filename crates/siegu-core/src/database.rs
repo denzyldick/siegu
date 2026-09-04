@@ -143,6 +143,10 @@ pub struct PhotoFilter {
     pub papers: bool,
     /// Only show photos classified as NSFW (nsfw score >= 0.8).
     pub nsfw_only: bool,
+    /// Only show photos whose originals are stored locally (not view-only).
+    pub stored_only: bool,
+    /// Only show photos that are view-only (originals not on this device).
+    pub not_stored_only: bool,
     /// Random order instead of newest-first (used by "Surprise me").
     pub random: bool,
     /// Sort order: "newest" (default), "oldest", "best" (aesthetics desc), "random".
@@ -1633,6 +1637,12 @@ impl Database {
                 " AND EXISTS(SELECT 1 FROM album_item WHERE album_id=?{slot} AND photo_id=p.id)"
             ));
             extra_params.push(Box::new(album_id.clone()));
+        }
+        if filter.stored_only {
+            facet_filters.push_str(" AND COALESCE(p.view_only, 0) = 0");
+        }
+        if filter.not_stored_only {
+            facet_filters.push_str(" AND COALESCE(p.view_only, 0) = 1");
         }
 
         let where_clause =
@@ -6148,6 +6158,49 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(random.len(), 2);
+    }
+
+    #[test]
+    fn test_stored_not_stored_filter() {
+        let mut db = test_db();
+        db.store_photo_batch(&[
+            make_photo("stored_1", "/tmp/stored.jpg"),
+            make_photo("stored_2", "/tmp/stored2.jpg"),
+            make_photo("mirror_1", "/mnt/mirror.jpg"),
+        ]);
+        // `mirror_1` has no originals on this device (view-only).
+        db.mark_view_only("mirror_1");
+
+        let stored = db.list_photos_filtered(
+            "",
+            0,
+            100,
+            false,
+            false,
+            &PhotoFilter {
+                stored_only: true,
+                ..Default::default()
+            },
+            true,
+        );
+        let mut stored_ids: Vec<&str> = stored.iter().map(|p| p.id.as_str()).collect();
+        stored_ids.sort_unstable();
+        assert_eq!(stored_ids, vec!["stored_1", "stored_2"]);
+
+        let not_stored = db.list_photos_filtered(
+            "",
+            0,
+            100,
+            false,
+            false,
+            &PhotoFilter {
+                not_stored_only: true,
+                ..Default::default()
+            },
+            true,
+        );
+        assert_eq!(not_stored.len(), 1);
+        assert_eq!(not_stored[0].id, "mirror_1");
     }
 
     fn make_photo(id: &str, location: &str) -> Photo {

@@ -104,7 +104,10 @@
       "faces": "Volti",
       "papers": "Documenti",
       "surprise": "Sorpresami",
-      "nsfw": "NSFW"
+      "nsfw": "NSFW",
+      "stored": "Salvate",
+      "not_stored": "Non salvate",
+      "storage": "Archiviazione"
     },
     "papers": {
       "title": "Documenti e screenshot",

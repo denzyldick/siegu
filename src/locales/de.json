@@ -104,7 +104,10 @@
       "faces": "Gesichter",
       "papers": "Dokumente",
       "surprise": "Überraschen",
-      "nsfw": "NSFW"
+      "nsfw": "NSFW",
+      "stored": "Gespeichert",
+      "not_stored": "Nicht gespeichert",
+      "storage": "Speicher"
     },
     "papers": {
       "title": "Dokumente & Screenshots",

@@ -11,7 +11,7 @@ export interface RpcCommandSpec {
 }
 
 export const RPC_COMMANDS: RpcCommandSpec[] = [
-  { name: "list_files", tier: "read", stringify: true, args: ["query", "offset", "limit", "favorites_only", "videos_only", "person_ids", "person_match", "person_alone", "location", "tag", "date_from", "date_to", "has_faces", "aesthetics_min", "camera", "papers", "nsfw_only", "random", "order_by", "album_id"] },
+  { name: "list_files", tier: "read", stringify: true, args: ["query", "offset", "limit", "favorites_only", "videos_only", "person_ids", "person_match", "person_alone", "location", "tag", "date_from", "date_to", "has_faces", "aesthetics_min", "camera", "papers", "nsfw_only", "stored_only", "not_stored_only", "random", "order_by", "album_id"] },
   { name: "get_photo_by_id", tier: "read", stringify: true, args: ["id"] },
   { name: "get_photos_by_ids", tier: "read", stringify: true, args: ["ids"] },
   { name: "get_photo_encoded_batch", tier: "read", stringify: true, args: ["ids"] },

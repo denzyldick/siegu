@@ -269,6 +269,8 @@ const props = withDefaults(
       facesOnly: boolean;
       papersOnly: boolean;
       nsfwOnly: boolean;
+      storedOnly: boolean;
+      notStoredOnly: boolean;
       camera: string | null;
       aestheticsMin: number | null;
       surprise: boolean;
@@ -289,6 +291,8 @@ const props = withDefaults(
       facesOnly: false,
       papersOnly: false,
       nsfwOnly: false,
+      storedOnly: false,
+      notStoredOnly: false,
       camera: null,
       aestheticsMin: null,
       surprise: false,
@@ -572,6 +576,8 @@ async function loadFiles(): Promise<void> {
         hasFaces: props.filters?.facesOnly ?? false,
         papers: props.filters?.papersOnly ?? false,
         nsfwOnly: props.filters?.nsfwOnly ?? false,
+        storedOnly: props.filters?.storedOnly ?? false,
+        notStoredOnly: props.filters?.notStoredOnly ?? false,
         camera: props.filters?.camera ?? null,
         aestheticsMin: props.filters?.aestheticsMin ?? null,
         random: props.filters?.surprise ?? false,

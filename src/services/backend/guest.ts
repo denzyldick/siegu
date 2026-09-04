@@ -90,6 +90,8 @@ export class GuestClient {
       camera: options.camera,
       papers: options.papers ?? false,
       nsfwOnly: options.nsfwOnly ?? false,
+      storedOnly: options.storedOnly ?? false,
+      notStoredOnly: options.notStoredOnly ?? false,
       random: options.random ?? false,
       orderBy: options.orderBy,
       albumId: options.albumId,

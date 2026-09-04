@@ -91,7 +91,10 @@
       "faces": "Faces",
       "papers": "Papers",
       "surprise": "Surprise me",
-      "nsfw": "NSFW"
+      "nsfw": "NSFW",
+      "stored": "Stored",
+      "not_stored": "Not stored",
+      "storage": "Storage"
     },
     "papers": {
       "title": "Papers & screenshots",

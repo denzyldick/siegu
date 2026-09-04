@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { parseHash, inferMime, assembleChunks, FileAssembler, takeNextOutbound } from '@/services/backend';
+import {
+  parseHash,
+  inferMime,
+  assembleChunks,
+  FileAssembler,
+  takeNextOutbound,
+} from '@/services/backend';
 import type { GuestOutbound } from '@/services/backend';
 
 function frame(type: string): GuestOutbound {

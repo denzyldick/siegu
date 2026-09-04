@@ -99,6 +99,8 @@ function normalizeListArgs(args?: InvokeArgs): Partial<ListFilesOptions> {
     camera: typeof a.camera === 'string' ? a.camera : undefined,
     papers: a.papers === true,
     nsfwOnly: a.nsfwOnly === true,
+    storedOnly: a.storedOnly === true,
+    notStoredOnly: a.notStoredOnly === true,
     random: a.random === true,
     orderBy: typeof a.orderBy === 'string' ? a.orderBy : undefined,
     albumId: typeof a.albumId === 'string' ? a.albumId : undefined,

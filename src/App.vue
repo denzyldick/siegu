@@ -43,6 +43,8 @@ const mediaFilters = computed(() => ({
   facesOnly: searchStore.mediaFilters.facesOnly,
   papersOnly: searchStore.mediaFilters.papersOnly,
   nsfwOnly: searchStore.mediaFilters.nsfwOnly,
+  storedOnly: searchStore.mediaFilters.storedOnly,
+  notStoredOnly: searchStore.mediaFilters.notStoredOnly,
   camera: searchStore.camera,
   aestheticsMin: searchStore.aestheticsMin,
   surprise: searchStore.surprise,

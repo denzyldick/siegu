@@ -16,6 +16,8 @@ export const useSearchStore = defineStore('search', () => {
     facesOnly: false,
     papersOnly: false,
     nsfwOnly: false,
+    storedOnly: false,
+    notStoredOnly: false,
   });
   const camera = ref<string | null>(null);
   const aestheticsMin = ref<number | null>(null);
@@ -35,6 +37,8 @@ export const useSearchStore = defineStore('search', () => {
       mediaFilters.value.facesOnly ||
       mediaFilters.value.papersOnly ||
       mediaFilters.value.nsfwOnly ||
+      mediaFilters.value.storedOnly ||
+      mediaFilters.value.notStoredOnly ||
       camera.value !== null ||
       aestheticsMin.value !== null ||
       dateRange.value !== null,
@@ -153,6 +157,8 @@ export const useSearchStore = defineStore('search', () => {
       facesOnly: false,
       papersOnly: false,
       nsfwOnly: false,
+      storedOnly: false,
+      notStoredOnly: false,
     };
     camera.value = null;
     aestheticsMin.value = null;
@@ -181,6 +187,23 @@ export const useSearchStore = defineStore('search', () => {
 
   function toggleNsfwOnly(): void {
     mediaFilters.value.nsfwOnly = !mediaFilters.value.nsfwOnly;
+  }
+
+  /**
+   * Cycle the storage availability filter: All -> Stored only -> Not stored
+   * only -> All. Only one direction is active at a time because they are
+   * mutually exclusive.
+   */
+  function cycleStorageFilter(): void {
+    const { storedOnly, notStoredOnly } = mediaFilters.value;
+    if (!storedOnly && !notStoredOnly) {
+      mediaFilters.value.storedOnly = true;
+    } else if (storedOnly) {
+      mediaFilters.value.storedOnly = false;
+      mediaFilters.value.notStoredOnly = true;
+    } else {
+      mediaFilters.value.notStoredOnly = false;
+    }
   }
 
   function addRecentSearch(term: string): void {
@@ -294,6 +317,7 @@ export const useSearchStore = defineStore('search', () => {
     toggleFacesOnly,
     togglePapersOnly,
     toggleNsfwOnly,
+    cycleStorageFilter,
     addRecentSearch,
     applyRule,
     clearRecentSearches,

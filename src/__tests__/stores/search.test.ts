@@ -141,4 +141,35 @@ describe('search store', () => {
     expect(store.personAlone).toBe(false);
     expect(store.personCount).toBe(0);
   });
+
+  it('cycleStorageFilter cycles All -> Stored -> Not stored -> All', () => {
+    const store = useSearchStore();
+    expect(store.mediaFilters.storedOnly).toBe(false);
+    expect(store.mediaFilters.notStoredOnly).toBe(false);
+
+    store.cycleStorageFilter();
+    expect(store.mediaFilters.storedOnly).toBe(true);
+    expect(store.mediaFilters.notStoredOnly).toBe(false);
+    expect(store.hasFilters).toBe(true);
+
+    store.cycleStorageFilter();
+    expect(store.mediaFilters.storedOnly).toBe(false);
+    expect(store.mediaFilters.notStoredOnly).toBe(true);
+    expect(store.hasFilters).toBe(true);
+
+    store.cycleStorageFilter();
+    expect(store.mediaFilters.storedOnly).toBe(false);
+    expect(store.mediaFilters.notStoredOnly).toBe(false);
+    expect(store.hasFilters).toBe(false);
+  });
+
+  it('clearFilters resets both storage tri-state flags', () => {
+    const store = useSearchStore();
+    store.cycleStorageFilter();
+    expect(store.mediaFilters.storedOnly).toBe(true);
+    store.clearFilters();
+    expect(store.mediaFilters.storedOnly).toBe(false);
+    expect(store.mediaFilters.notStoredOnly).toBe(false);
+    expect(store.hasFilters).toBe(false);
+  });
 });

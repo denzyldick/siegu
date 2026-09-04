@@ -104,7 +104,10 @@
       "faces": "Rostos",
       "papers": "Documentos",
       "surprise": "Surpreenda-me",
-      "nsfw": "NSFW"
+      "nsfw": "NSFW",
+      "stored": "Armazenadas",
+      "not_stored": "Não armazenadas",
+      "storage": "Armazenamento"
     },
     "papers": {
       "title": "Documentos e capturas de tela",

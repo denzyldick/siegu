@@ -99,6 +99,8 @@ export interface ListFilesOptions {
   camera?: string | null;
   papers?: boolean;
   nsfwOnly?: boolean;
+  storedOnly?: boolean;
+  notStoredOnly?: boolean;
   random?: boolean;
   orderBy?: string | null;
   albumId?: string | null;
