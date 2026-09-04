@@ -158,6 +158,13 @@ impl SyncEvent for TauriSyncEvent {
 
     fn on_peer_offline(&self) {
         self.connected.store(false, Ordering::SeqCst);
+        // Cancel all in-flight RPC requests so callers get an immediate error
+        // instead of hanging for 60s. (#mirror)
+        if let Ok(mut pending) = self.rpc_pending.try_lock() {
+            for (_, tx) in pending.drain() {
+                let _ = tx.send((false, None, Some("Peer disconnected".into())));
+            }
+        }
         if let Ok(mut peer) = self.active_peer.try_lock() {
             *peer = None;
         }

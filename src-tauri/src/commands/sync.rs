@@ -677,6 +677,12 @@ async fn do_stop_album_share(
         let mut tx = state.sync_tx.lock().await;
         *tx = None;
     }
+    // Drain any pending RPCs so callers don't hang for 60s. (#mirror)
+    if let Ok(mut pending) = state.rpc_pending.try_lock() {
+        for (_, tx) in pending.drain() {
+            let _ = tx.send((false, None, Some("Session ended".into())));
+        }
+    }
     siegu_core::view_only::state().reset_session();
     if let Ok(mut ls) = state.lan_server.lock() {
         if let Some(server) = ls.take() {
@@ -750,6 +756,12 @@ pub async fn stop_webrtc_session(
     {
         let mut tx = state.sync_tx.lock().await;
         *tx = None;
+    }
+    // Drain any pending RPCs so callers don't hang for 60s. (#mirror)
+    if let Ok(mut pending) = state.rpc_pending.try_lock() {
+        for (_, tx) in pending.drain() {
+            let _ = tx.send((false, None, Some("Session ended".into())));
+        }
     }
     // Drop any ephemeral view-only buffers/cache bound to the session.
     siegu_core::view_only::state().reset_session();
@@ -1132,8 +1144,9 @@ mod tests {
 
     #[test]
     fn list_devices_includes_host() {
-        let (db, _dir) = test_db();
-        let devices = do_list_devices(&db, "");
+        let (db, dir) = test_db();
+        let config = dir.path().display().to_string();
+        let devices = do_list_devices(&db, &config);
         assert_eq!(devices.len(), 1);
         assert!(devices[0].host);
         assert_eq!(devices[0].id, "host");
@@ -1145,12 +1158,13 @@ mod tests {
 
     #[test]
     fn peer_device_storage_fields_survive_listing() {
-        let (db, _dir) = test_db();
+        let (db, dir) = test_db();
+        let config = dir.path().display().to_string();
         do_join_network(&db, "192.168.1.10", "Phone");
         let peers = db.list_peer_devices();
         let id = peers[0].device_id.clone();
         db.update_peer_device_storage(&id, 5000, 20000);
-        let devices = do_list_devices(&db, "");
+        let devices = do_list_devices(&db, &config);
         let phone = devices
             .iter()
             .find(|d| d.title == "Phone")
@@ -1161,10 +1175,11 @@ mod tests {
 
     #[test]
     fn list_devices_with_remote_devices() {
-        let (db, _dir) = test_db();
+        let (db, dir) = test_db();
+        let config = dir.path().display().to_string();
         do_join_network(&db, "192.168.1.10", "Tablet");
         do_join_network(&db, "192.168.1.11", "Phone");
-        let devices = do_list_devices(&db, "");
+        let devices = do_list_devices(&db, &config);
         assert_eq!(devices.len(), 3);
         assert!(devices[0].host);
         let titles: Vec<&str> = devices.iter().map(|d| d.title.as_str()).collect();
@@ -1174,10 +1189,11 @@ mod tests {
 
     #[test]
     fn list_devices_host_has_media_counts() {
-        let (mut db, _dir) = test_db();
+        let (mut db, dir) = test_db();
+        let config = dir.path().display().to_string();
         db.store_photo_batch(&[make_photo("ph1", "/a.jpg"), make_photo("ph2", "/b.jpg")])
             .unwrap();
-        let devices = do_list_devices(&db, "");
+        let devices = do_list_devices(&db, &config);
         assert_eq!(devices[0].photo_count, 2);
     }
 
@@ -1194,14 +1210,15 @@ mod tests {
 
     #[test]
     fn rename_host_persists_in_state() {
-        let (db, _dir) = test_db();
+        let (db, dir) = test_db();
+        let config = dir.path().display().to_string();
         do_rename_device(&db, "host", "Living Room PC").unwrap();
         let state = db.get_state();
         assert_eq!(
             state.get("device_name").map(|s| s.as_str()),
             Some("Living Room PC")
         );
-        let devices = do_list_devices(&db, "");
+        let devices = do_list_devices(&db, &config);
         assert_eq!(devices[0].title, "Living Room PC");
     }
 

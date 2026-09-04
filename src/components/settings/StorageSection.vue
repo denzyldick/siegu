@@ -69,7 +69,7 @@
         @click="save"
       >
         <v-icon start size="16">mdi-content-save-outline</v-icon>
-        <span class="font-weight-bold">{{ $t('settings.signalling_save') }}</span>
+        <span class="font-weight-bold">{{ $t('settings.save') }}</span>
       </v-btn>
     </v-card-text>
   </v-card>

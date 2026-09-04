@@ -250,7 +250,9 @@ mod tests {
     use super::*;
 
     fn tiny_gray(v: u8) -> image::DynamicImage {
-        image::DynamicImage::ImageLuma8(image::GrayImage::from_fn(16, 16, |x, _y| v + x))
+        image::DynamicImage::ImageLuma8(image::GrayImage::from_fn(16, 16, |x, _y| {
+            image::Luma([v.saturating_add(x as u8)])
+        }))
     }
 
     #[test]
@@ -268,10 +270,10 @@ mod tests {
     fn test_dhash_resize_invariance() {
         // Same content at two resolutions should hash identically.
         let small = image::DynamicImage::ImageLuma8(image::GrayImage::from_fn(4, 4, |x, y| {
-            (x * 40 + y * 20) as u8
+            image::Luma([(x * 40 + y * 20) as u8])
         }));
         let big = image::DynamicImage::ImageLuma8(image::GrayImage::from_fn(80, 80, |x, y| {
-            ((x * 80 / 80) * 40 + (y * 80 / 80) * 20) as u8
+            image::Luma([((x * 80 / 80) * 40 + (y * 80 / 80) * 20) as u8])
         }));
         assert_eq!(dhash(&small), dhash(&big));
     }

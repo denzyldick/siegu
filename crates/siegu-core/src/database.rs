@@ -1789,7 +1789,7 @@ impl Database {
     /// of distinct photos that contain them.
     pub fn get_search_people(&self, limit: i64) -> Vec<SearchPerson> {
         let mut people = Vec::new();
-        let sql = "SELECT p.id, p.name, f.crop_path, f.encoded, \
+        let sql = "SELECT p.id, p.name, f.crop_path, NULL, \
             (SELECT COUNT(DISTINCT photo_id) FROM faces WHERE person_id = p.id) \
             FROM people p LEFT JOIN faces f ON p.id = f.person_id \
             WHERE p.name IS NOT NULL AND TRIM(p.name) != '' \
@@ -1922,7 +1922,7 @@ impl Database {
     /// Favorited photos, newest first, for the Favorites rail.
     pub fn get_favorite_photos(&self, limit: i64) -> Vec<SearchPhotoTile> {
         let mut tiles = Vec::new();
-        let sql = "SELECT p.id, p.location, p.encoded, p.created, p.aesthetics_score, 1 \
+        let sql = "SELECT p.id, p.location, NULL, p.created, p.aesthetics_score, 1 \
             FROM photo p WHERE EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite') \
             ORDER BY p.created DESC LIMIT ?1";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
@@ -4623,7 +4623,7 @@ impl Database {
 
         // People
         let people: Vec<AlbumSectionItem> = self
-            .get_search_people(100)
+            .get_search_people(20)
             .into_iter()
             .map(|p| AlbumSectionItem {
                 id: format!("person:{}", p.id),

@@ -162,6 +162,56 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
+  // --- Network change resilience ---
+  // Track whether we had an active session before going offline, so we can
+  // auto-reconnect when the OS reports the network is back (WiFi→data, etc.).
+  let hadSessionBeforeOffline = false;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function onNetworkOnline(): void {
+    // Only auto-reconnect if we previously had a live session that dropped.
+    if (!hadSessionBeforeOffline) return;
+    hadSessionBeforeOffline = false;
+    if (connected.value) return; // already reconnected somehow
+    // Small delay to let the interface settle (DHCP, etc.).
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(async () => {
+      console.log('[SyncStore] Network back online — attempting auto-reconnect');
+      try {
+        await autoReconnect();
+      } catch (e) {
+        console.error('[SyncStore] Auto-reconnect on network change failed:', e);
+      }
+    }, 1500);
+  }
+
+  function onNetworkOffline(): void {
+    // Record that we had an active session so we can reconnect later.
+    if (connection.value === 'connected' || connected.value) {
+      hadSessionBeforeOffline = true;
+    }
+  }
+
+  // Watch for peer disconnect to mark that we may need to reconnect.
+  // (The online/offline events cover network interface changes; this covers
+  // the WebRTC layer detecting the peer went away.)
+  let wasConnected = false;
+  // We use a simple polling interval to detect connected→disconnected transitions
+  // because the store's `connected` ref is the source of truth.
+  setInterval(() => {
+    if (wasConnected && !connected.value) {
+      // Connection dropped — mark for auto-reconnect on next network event.
+      hadSessionBeforeOffline = true;
+    }
+    wasConnected = connected.value;
+  }, 2000);
+
+  // Register OS-level online/offline listeners once.
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', onNetworkOnline);
+    window.addEventListener('offline', onNetworkOffline);
+  }
+
   return {
     status,
     progress,

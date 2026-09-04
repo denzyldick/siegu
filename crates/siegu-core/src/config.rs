@@ -62,6 +62,8 @@ pub const ALLOWED_CONFIG_KEYS: &[&str] = &[
     "paid_email",
     "pro_license_url",
     "pro_license_token",
+    "analysis_skip_existing",
+    "analysis_cutoff_rowid",
 ];
 
 pub fn is_valid_config_key(key: &str) -> bool {

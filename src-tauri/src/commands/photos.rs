@@ -45,38 +45,41 @@ pub async fn list_files(
     if scan {
         crate::commands::scan::scan_files(app.clone());
     }
-    if let Ok(tx_lock) = state.sync_tx.try_lock() {
-        if tx_lock.is_some() {
-            // A live peer session is active — mirror the peer's full library
-            // over the data channel (#mirror). Falls back to local on error.
-            return list_files_via_rpc(
-                &state,
-                &path,
-                &query,
-                offset,
-                limit,
-                favorites_only,
-                videos_only,
-                person_ids,
-                person_match,
-                person_alone,
-                location,
-                tag,
-                date_from,
-                date_to,
-                has_faces,
-                aesthetics_min,
-                camera,
-                papers,
-                nsfw_only,
-                stored_only,
-                not_stored_only,
-                random,
-                order_by,
-                album_id,
-            )
-            .await;
+    // A live peer session is active — mirror the peer's full library over the
+    // data channel. Use the `connected` flag (not the mutex) to avoid deadlocking
+    // when `list_files_via_rpc` also locks `sync_tx`. (#mirror)
+    if state.connected.load(std::sync::atomic::Ordering::Relaxed) {
+        if let Ok(result) = list_files_via_rpc(
+            &state,
+            &path,
+            &query,
+            offset,
+            limit,
+            favorites_only,
+            videos_only,
+            person_ids.clone(),
+            person_match.clone(),
+            person_alone,
+            location.clone(),
+            tag.clone(),
+            date_from.clone(),
+            date_to.clone(),
+            has_faces,
+            aesthetics_min,
+            camera.clone(),
+            papers,
+            nsfw_only,
+            stored_only,
+            not_stored_only,
+            random,
+            order_by.clone(),
+            album_id.clone(),
+        )
+        .await
+        {
+            return Ok(result);
         }
+        // RPC failed (peer may have just disconnected) — fall through to local.
     }
     let database = database::Database::new(&path);
     Ok(serde_json::to_string(&do_list_files_filtered(
