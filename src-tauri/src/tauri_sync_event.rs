@@ -164,16 +164,21 @@ impl SyncEvent for TauriSyncEvent {
         }
     }
 
-    fn on_peer_library_stats(&self, photo_count: i64, video_count: i64) {
+    fn on_peer_library_stats(
+        &self,
+        photo_count: i64,
+        video_count: i64,
+        storage_used: u64,
+        storage_capacity: u64,
+    ) {
         let peer_id = self.active_peer.try_lock().ok().and_then(|p| p.clone());
         if let Some(peer_id) = peer_id {
-            Database::new(&self.config_path).set_peer_remote_counts(
-                &peer_id,
-                photo_count,
-                video_count,
-            );
+            let db = Database::new(&self.config_path);
+            db.set_peer_remote_counts(&peer_id, photo_count, video_count);
+            db.update_peer_device_storage(&peer_id, storage_used as i64, storage_capacity as i64);
             self.on_log(&format!(
-                "Peer library: {photo_count} photos, {video_count} videos"
+                "Peer library: {photo_count} photos, {video_count} videos, \
+                 {storage_used}/{storage_capacity} B used"
             ));
             let _ = self.app.emit("refresh-devices", ());
         }

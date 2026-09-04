@@ -71,7 +71,7 @@ fn os_icon(os: &str) -> &'static str {
 }
 
 /// Pure business logic — lists devices and prepends the host device.
-pub fn do_list_devices(db: &database::Database) -> Vec<database::DeviceInfo> {
+pub fn do_list_devices(db: &database::Database, config_path: &str) -> Vec<database::DeviceInfo> {
     let mut devices: Vec<database::DeviceInfo> = db
         .list_peer_devices()
         .into_iter()
@@ -86,6 +86,8 @@ pub fn do_list_devices(db: &database::Database) -> Vec<database::DeviceInfo> {
             remote_photo_count: peer.remote_photo_count,
             remote_video_count: peer.remote_video_count,
             os: peer.os,
+            storage_used: peer.storage_used.max(0) as u64,
+            storage_capacity: peer.storage_capacity.max(0) as u64,
         })
         .collect();
 
@@ -112,6 +114,8 @@ pub fn do_list_devices(db: &database::Database) -> Vec<database::DeviceInfo> {
             remote_photo_count: photo_count,
             remote_video_count: video_count,
             os: std::env::consts::OS.to_string(),
+            storage_used: siegu_core::mesh::MeshManager::get_total_storage_used(config_path),
+            storage_capacity: siegu_core::mesh::MeshManager::get_storage_quota(config_path),
         },
     );
 
@@ -789,7 +793,7 @@ pub async fn list_devices(app: tauri::AppHandle) -> String {
         return "[]".to_string();
     }
     let db = database::Database::new(&path);
-    let devices = do_list_devices(&db);
+    let devices = do_list_devices(&db, &path);
     serde_json::to_string(&devices).unwrap_or("[]".to_string())
 }
 
@@ -846,7 +850,7 @@ pub async fn storage_usage(app: tauri::AppHandle) -> Result<StorageUsage, String
         return Err("Config error".to_string());
     }
     let quota = siegu_core::mesh::MeshManager::get_storage_quota(&config_path);
-    let used = siegu_core::mesh::MeshManager::get_storage_used(&config_path);
+    let used = siegu_core::mesh::MeshManager::get_total_storage_used(&config_path);
     Ok(StorageUsage { used, quota })
 }
 
@@ -980,34 +984,45 @@ pub async fn auto_reconnect(
         // pressing Rejoin shows what is happening instead of silently failing.
         let _ = app_handle.emit("webrtc-state", "Reconnecting: searching for host");
         let handle = tauri::async_runtime::spawn(async move {
-            'candidates: for url in candidates {
-                for attempt in 0..2 {
-                    use std::sync::atomic::Ordering;
-                    if connected.load(Ordering::SeqCst) {
-                        break 'candidates;
-                    }
-                    let transport = transport::create_transport(
-                        room_id_for_session.clone(),
-                        is_initiator,
-                        url.clone(),
-                        config_path_for_task.clone(),
-                        app_handle.clone(),
-                        Some(sync_tx.clone()),
-                        Some(connected.clone()),
-                    );
-                    match transport.start().await {
-                        Ok(()) => break 'candidates,
-                        Err(e) => {
-                            emit_log(
-                                &app_handle,
-                                format!("Reconnect attempt {attempt} to {url} failed: {e}"),
-                            );
-                            let _ = app_handle
-                                .emit("webrtc-state", format!("Reconnecting: {url} unreachable"));
-                        }
-                    }
-                    tokio::time::sleep(std::time::Duration::from_secs(8)).await;
+            // Retry forever (the joiner knows a host is expected from the
+            // saved session) with capped exponential backoff, so a briefly
+            // unavailable host is rejoined automatically instead of the
+            // session giving up after a couple of fixed tries.
+            use std::sync::atomic::Ordering;
+            let mut backoff_ms: u64 = 2000;
+            const BACKOFF_CAP_MS: u64 = 30_000;
+            let mut cursor = 0usize;
+            loop {
+                if connected.load(Ordering::SeqCst) {
+                    break;
                 }
+                if candidates.is_empty() {
+                    break;
+                }
+                let url = candidates[cursor % candidates.len()].clone();
+                let transport = transport::create_transport(
+                    room_id_for_session.clone(),
+                    is_initiator,
+                    url.clone(),
+                    config_path_for_task.clone(),
+                    app_handle.clone(),
+                    Some(sync_tx.clone()),
+                    Some(connected.clone()),
+                );
+                match transport.start().await {
+                    Ok(()) => break,
+                    Err(e) => {
+                        emit_log(
+                            &app_handle,
+                            format!("Reconnect to {url} failed ({backoff_ms}ms backoff): {e}"),
+                        );
+                        let _ = app_handle
+                            .emit("webrtc-state", format!("Reconnecting: {url} unreachable"));
+                    }
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(backoff_ms)).await;
+                backoff_ms = (backoff_ms * 2).min(BACKOFF_CAP_MS);
+                cursor += 1;
             }
             if !connected.load(std::sync::atomic::Ordering::SeqCst) {
                 let _ = app_handle.emit(
@@ -1096,11 +1111,30 @@ mod tests {
     #[test]
     fn list_devices_includes_host() {
         let (db, _dir) = test_db();
-        let devices = do_list_devices(&db);
+        let devices = do_list_devices(&db, "");
         assert_eq!(devices.len(), 1);
         assert!(devices[0].host);
         assert_eq!(devices[0].id, "host");
         assert!(devices[0].title.starts_with("Siegu"));
+        // Host card reports this device's own storage cap (default 10 GB) so
+        // the devices list shows real free-space numbers (#storage).
+        assert_eq!(devices[0].storage_capacity, 10240 * 1024 * 1024);
+    }
+
+    #[test]
+    fn peer_device_storage_fields_survive_listing() {
+        let (db, _dir) = test_db();
+        do_join_network(&db, "192.168.1.10", "Phone");
+        let peers = db.list_peer_devices();
+        let id = peers[0].device_id.clone();
+        db.update_peer_device_storage(&id, 5000, 20000);
+        let devices = do_list_devices(&db, "");
+        let phone = devices
+            .iter()
+            .find(|d| d.title == "Phone")
+            .expect("phone listed");
+        assert_eq!(phone.storage_used, 5000);
+        assert_eq!(phone.storage_capacity, 20000);
     }
 
     #[test]
@@ -1108,7 +1142,7 @@ mod tests {
         let (db, _dir) = test_db();
         do_join_network(&db, "192.168.1.10", "Tablet");
         do_join_network(&db, "192.168.1.11", "Phone");
-        let devices = do_list_devices(&db);
+        let devices = do_list_devices(&db, "");
         assert_eq!(devices.len(), 3);
         assert!(devices[0].host);
         let titles: Vec<&str> = devices.iter().map(|d| d.title.as_str()).collect();
@@ -1121,7 +1155,7 @@ mod tests {
         let (mut db, _dir) = test_db();
         db.store_photo_batch(&[make_photo("ph1", "/a.jpg"), make_photo("ph2", "/b.jpg")])
             .unwrap();
-        let devices = do_list_devices(&db);
+        let devices = do_list_devices(&db, "");
         assert_eq!(devices[0].photo_count, 2);
     }
 
@@ -1145,7 +1179,7 @@ mod tests {
             state.get("device_name").map(|s| s.as_str()),
             Some("Living Room PC")
         );
-        let devices = do_list_devices(&db);
+        let devices = do_list_devices(&db, "");
         assert_eq!(devices[0].title, "Living Room PC");
     }
 

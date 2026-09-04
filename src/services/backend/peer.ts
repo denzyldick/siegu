@@ -10,6 +10,7 @@
  * in `guest.ts` can be unit-tested with a fake transport.
  */
 import type { GuestInbound, GuestOutbound, GuestSession } from './protocol';
+import { takeNextOutbound } from './protocol';
 
 /** The abstract channel a guest uses to exchange JSON messages with the host. */
 export interface PeerTransport {
@@ -60,10 +61,11 @@ export function createPeerTransport(
   const outbox: GuestOutbound[] = [];
 
   function flush(): void {
-    while (dc && dc.readyState === 'open' && outbox.length > 0) {
-      // Respect SCTP backpressure: keep the rest queued, not dropped.
-      if (dc.bufferedAmount > 1_000_000) return;
-      dc.send(JSON.stringify(outbox.shift()));
+    if (!dc) return;
+    let msg = takeNextOutbound(outbox, dc.readyState === 'open', dc.bufferedAmount);
+    while (msg) {
+      dc.send(JSON.stringify(msg));
+      msg = takeNextOutbound(outbox, dc.readyState === 'open', dc.bufferedAmount);
     }
   }
 
@@ -183,6 +185,12 @@ export function createPeerTransport(
       pc.ondatachannel = (ev) => {
         dc = ev.channel;
         dc.binaryType = 'arraybuffer';
+        // Re-flush the outbox whenever SCTP backpressure lifts (`bufferedamount
+        // low` fires when bufferedAmount falls at or below the low threshold).
+        // Without this the frames parked by backpressure in `send` would sit in
+        // the outbox forever after the channel opens.
+        dc.bufferedAmountLowThreshold = 1_000_000;
+        dc.addEventListener('bufferedamountlow', () => flush());
         dc.onopen = () => {
           emitOpen();
           flush();

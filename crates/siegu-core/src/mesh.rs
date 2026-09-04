@@ -68,6 +68,13 @@ pub struct SyncProgress {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum SyncMessage {
+    /// Transport liveness probe (#heartbeat). The receiver answers with
+    /// `Pong` so a stale-but-"connected" link can be detected and torn down
+    /// instead of appearing alive for minutes.
+    Ping,
+    /// Reply to `Ping`. Carries no payload; its arrival resets the sender's
+    /// link-liveness watchdog.
+    Pong,
     ManifestRequest,
     ManifestResponse {
         photos: Vec<PhotoSyncInfo>,
@@ -124,6 +131,13 @@ pub enum SyncMessage {
     PeerLibraryStats {
         photo_count: i64,
         video_count: i64,
+        /// This device's own storage usage/cap (bytes) so each peer can show
+        /// real free-space numbers for the other device (#storage). Defaults
+        /// keep old peers interoperable when these fields are absent.
+        #[serde(default)]
+        storage_used: u64,
+        #[serde(default)]
+        storage_capacity: u64,
     },
     MetadataUpdate {
         photo_id: String,
@@ -277,7 +291,14 @@ pub trait SyncEvent: Send + Sync {
     /// Called when the connected peer drops off (transport failure / explicit leave).
     fn on_peer_offline(&self) {}
     /// Called when the peer announces its full library size (photo, video).
-    fn on_peer_library_stats(&self, _photo_count: i64, _video_count: i64) {}
+    fn on_peer_library_stats(
+        &self,
+        _photo_count: i64,
+        _video_count: i64,
+        _storage_used: u64,
+        _storage_capacity: u64,
+    ) {
+    }
     /// Called once when a view-only peer finishes receiving our manifest
     /// chunks (#9): the UI builds an ephemeral read-only gallery from it.
     fn on_view_manifest(&self, _photos: &[PhotoSyncInfo]) {}
@@ -789,17 +810,27 @@ impl MeshManager {
         session_scope: &Arc<tokio::sync::Mutex<Option<crate::view_only::AlbumScope>>>,
     ) {
         match msg {
+            // Liveness probes never enter the sync pipeline: a Ping is
+            // answered immediately, a Pong just keeps the link warm.
+            SyncMessage::Ping => {
+                let _ = Self::send_sync_message(dc, &SyncMessage::Pong).await;
+            }
+            SyncMessage::Pong => {}
             SyncMessage::ManifestRequest => {
                 event.on_log("DEBUG handle ManifestRequest");
                 let db = Database::new(config_path);
                 // Announce our full library size so the peer's linked-devices
                 // page can show real totals for this device.
                 let (photo_count, video_count) = db.get_media_counts();
+                let storage_used = Self::get_total_storage_used(config_path);
+                let storage_capacity = Self::get_storage_quota(config_path);
                 let _ = Self::send_sync_message(
                     dc,
                     &SyncMessage::PeerLibraryStats {
                         photo_count,
                         video_count,
+                        storage_used,
+                        storage_capacity,
                     },
                 )
                 .await;
@@ -1488,11 +1519,19 @@ impl MeshManager {
             SyncMessage::PeerLibraryStats {
                 photo_count,
                 video_count,
+                storage_used,
+                storage_capacity,
             } => {
                 event.on_log(&format!(
-                    "Peer library: {photo_count} photos, {video_count} videos"
+                    "Peer library: {photo_count} photos, {video_count} videos, \
+                     {storage_used}/{storage_capacity} B used"
                 ));
-                event.on_peer_library_stats(photo_count, video_count);
+                event.on_peer_library_stats(
+                    photo_count,
+                    video_count,
+                    storage_used,
+                    storage_capacity,
+                );
             }
             SyncMessage::MetadataUpdate {
                 photo_id,
@@ -1850,7 +1889,7 @@ impl MeshManager {
             .unwrap_or(10240);
         let max_bytes = max_mb * 1024 * 1024;
 
-        let used = Self::get_storage_used(config_path);
+        let used = Self::get_total_storage_used(config_path);
         used + additional_bytes > max_bytes
     }
 
@@ -1878,6 +1917,37 @@ impl MeshManager {
         let temp_dir = sync_temp_dir(config_path);
         total += Self::dir_size(&temp_dir);
         total += Self::dir_size(&target_dir);
+        total
+    }
+
+    /// Total bytes the storage cap counts against: peer-received/synced files
+    /// PLUS this device's own imported library. Files that landed inside the
+    /// sync/temp dirs are deduped so a synced file already counted by
+    /// `get_storage_used` isn't added again (#storage).
+    pub fn get_total_storage_used(config_path: &str) -> u64 {
+        let db = Database::new(config_path);
+        let state = db.get_state();
+        let sync_path = state.get("sync_path");
+        let dirs = db.list_directories();
+        let target_dir = resolve_sync_target_dir(config_path, sync_path.map(|s| s.as_str()), &dirs);
+        let temp_dir = sync_temp_dir(config_path);
+
+        let target_canon = std::fs::canonicalize(&target_dir).unwrap_or(target_dir);
+        let temp_canon = std::fs::canonicalize(&temp_dir).unwrap_or(temp_dir);
+
+        let mut total = Self::get_storage_used(config_path);
+        for photo in db.get_photo_sync_info() {
+            let path = Path::new(&photo.location);
+            let canon = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+            if canon.starts_with(&target_canon) || canon.starts_with(&temp_canon) {
+                continue;
+            }
+            if let Ok(meta) = std::fs::metadata(&canon) {
+                if meta.is_file() {
+                    total += meta.len();
+                }
+            }
+        }
         total
     }
 
@@ -1982,6 +2052,44 @@ mod tests {
         let freed_again = MeshManager::evict_originals(&config_path, 500);
         assert_eq!(freed_again, 0);
         assert!(dir.join("own.jpg").exists());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_total_storage_used_counts_own_imports() {
+        let dir = std::env::temp_dir().join(format!(
+            "siegu_total_used_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .subsec_nanos()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let config_path = dir.display().to_string();
+        let db = Database::new(&config_path);
+
+        // Own imports live outside the sync dir: sync-used stays 0 because
+        // they are not peer-received, but the unified total must count them.
+        for (name, size) in [("own_a.jpg", 100usize), ("own_b.jpg", 250usize)] {
+            let path = dir.join(name);
+            std::fs::write(&path, vec![0u8; size]).unwrap();
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded, received) VALUES (?1, ?2, '2024-01-01', '', 0)",
+                    (name.trim_end_matches(".jpg"), path.to_string_lossy().to_string()),
+                )
+                .unwrap();
+        }
+
+        assert_eq!(MeshManager::get_storage_used(&config_path), 0);
+        assert_eq!(
+            MeshManager::get_total_storage_used(&config_path),
+            350,
+            "unified cap counts own imports too"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -2215,6 +2323,17 @@ mod tests {
         let json = serde_json::to_string(&msg).unwrap();
         let decoded: SyncMessage = serde_json::from_str(&json).unwrap();
         assert!(matches!(decoded, SyncMessage::ManifestRequest));
+    }
+
+    #[test]
+    fn test_sync_message_ping_pong_roundtrip() {
+        let json = serde_json::to_string(&SyncMessage::Ping).unwrap();
+        let decoded: SyncMessage = serde_json::from_str(&json).unwrap();
+        assert!(matches!(decoded, SyncMessage::Ping));
+
+        let json = serde_json::to_string(&SyncMessage::Pong).unwrap();
+        let decoded: SyncMessage = serde_json::from_str(&json).unwrap();
+        assert!(matches!(decoded, SyncMessage::Pong));
     }
 
     #[test]

@@ -63,6 +63,24 @@ export function parseHash(hash: string): GuestSession | null {
   return result;
 }
 
+/**
+ * Decide whether the WebRTC data channel can accept the next queued frame, and
+ * if so, pop it from the outbox. This is the pure, testable core of the guest
+ * transport's SCTP backpressure handling: it only lets a frame through when
+ * the channel is open AND the buffered amount is at or below the ceiling, so a
+ * busy channel parks frames on the outbox queue instead of dropping them.
+ */
+export function takeNextOutbound(
+  outbox: GuestOutbound[],
+  channelOpen: boolean,
+  bufferedAmount: number,
+  threshold = 1_000_000,
+): GuestOutbound | null {
+  if (!channelOpen) return null;
+  if (bufferedAmount > threshold) return null;
+  return outbox.shift() ?? null;
+}
+
 /** Infer a MIME type from a filename extension (mirrors webclient/lib.ts). */
 export function inferMime(filename: string): string {
   const name = filename.toLowerCase();

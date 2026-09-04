@@ -132,6 +132,47 @@ describe('GuestClient', () => {
     expect(client.cachedUrl('thumb:p1')).toBe(url);
   });
 
+  it('does not let an original and thumbnail for the SAME id clobber each other', async () => {
+    const onMedia = vi.fn();
+    client = new GuestClient(transport, { onMedia });
+    // Fetch thumbnail first, then original, for the same photo id.
+    const thumb = client.fetchThumb('p1');
+    const orig = client.fetchOriginal('p1');
+    // Only the original registers a FileAssembler (thumbnails are ViewMedia).
+    const thumbReq = transport.outbound[0] as Extract<
+      GuestOutbound,
+      { type: 'FetchMediaRequest' }
+    >;
+    const origReq = transport.outbound[1] as Extract<
+      GuestOutbound,
+      { type: 'FetchMediaRequest' }
+    >;
+    expect(thumbReq.thumbnail).toBe(true);
+    expect(origReq.thumbnail).toBe(false);
+
+    // Thumbnail arrives inline as ViewMedia.
+    const data = btoa(String.fromCharCode(9, 9));
+    transport.push({ type: 'ViewMedia', id: 'p1', mime: 'image/jpeg', data });
+
+    // Original streams via FileHeader/Chunk/End.
+    transport.push({ type: 'FileHeader', id: 'p1', filename: 'full.jpg', size: 2 });
+    transport.push({ type: 'FileChunk', id: 'p1', index: 0, data: [0x01] });
+    transport.push({ type: 'FileChunk', id: 'p1', index: 1, data: [0x02] });
+    transport.push({ type: 'FileEnd', id: 'p1' });
+
+    await expect(orig).resolves.toBeTruthy();
+    await expect(thumb).resolves.toBeTruthy();
+
+    // Each kind resolves to a distinct cached URL (no cross-contamination).
+    const thumbUrl = client.cachedUrl('thumb:p1');
+    const origUrl = client.cachedUrl('original:p1');
+    expect(thumbUrl).toBeTruthy();
+    expect(origUrl).toBeTruthy();
+    expect(thumbUrl).not.toBe(origUrl);
+    // The original's promise resolved to the *original* URL, not the thumb's.
+    expect(await orig).toBe(origUrl);
+  });
+
   it('rejects pending requests when the session closes', async () => {
     const p = client.request('count_trash');
     client.close();

@@ -943,6 +943,7 @@ export const useSettingsStore = defineStore('settings', () => {
         proVerifying.value = false;
         proDialogVerifying.value = false;
         showSnackbar(t('settings.pro_check_failed', { error: 'timeout' }), true);
+        void closeProDialog();
         return;
       }
       void pollOnce();

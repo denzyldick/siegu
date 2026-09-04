@@ -13,7 +13,13 @@ export { bootGuest } from './bootGuest';
 export type { GuestBoot, GuestBootEvents } from './bootGuest';
 export { createPeerTransport } from './peer';
 export type { PeerTransport } from './peer';
-export { parseHash, inferMime, assembleChunks, FileAssembler } from './protocol';
+export {
+  parseHash,
+  inferMime,
+  assembleChunks,
+  FileAssembler,
+  takeNextOutbound,
+} from './protocol';
 export type { GuestSession, GuestInbound, GuestOutbound } from './protocol';
 export { tauriBackend } from './tauriBackend';
 export { guestBackend } from './guestBackend';

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc::UnboundedSender;
@@ -47,6 +47,19 @@ fn extract_token(url: &str) -> (String, Option<String>) {
         }
         None => (url.trim_end_matches('/').to_string(), None),
     }
+}
+
+const HEARTBEAT_INTERVAL_MS: u64 = 5_000;
+/// A peer that has produced no inbound frame for this long is treated as
+/// dead and the link is torn down (see also the PC-state Disconnected/Failed
+/// handling which reports the same condition for hard failures).
+const HEARTBEAT_TIMEOUT_MS: u64 = 15_000;
+
+fn now_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
 }
 
 #[derive(Clone)]
@@ -226,6 +239,24 @@ impl MeshTransport {
             let event = Arc::clone(&event_pc);
             Box::pin(async move {
                 event.on_log(&format!("Peer Connection State changed to: {s:?}"));
+                let status = match s {
+                    RTCPeerConnectionState::Connected => "Connected",
+                    RTCPeerConnectionState::Connecting => "Connecting WebRTC...",
+                    RTCPeerConnectionState::Disconnected => "Peer Disconnected",
+                    RTCPeerConnectionState::Failed => "Connection Failed",
+                    RTCPeerConnectionState::New => "Waiting for peer...",
+                    _ => "Awaiting connection...",
+                };
+                event.on_state_change(status);
+                if matches!(
+                    s,
+                    RTCPeerConnectionState::Disconnected | RTCPeerConnectionState::Failed
+                ) {
+                    // Parity with the guest loop: tear the peer down so the
+                    // host clears its "Connected" state and surfaces the
+                    // reconnect path instead of appearing alive forever.
+                    event.on_peer_offline();
+                }
             })
         }));
 
@@ -294,9 +325,14 @@ impl MeshTransport {
         let mirror_completed = Arc::new(AtomicUsize::new(0));
         let mirror_total = Arc::new(AtomicUsize::new(0));
 
+        // Heartbeat liveness (#heartbeat): millis of last inbound frame.
+        let last_seen: Arc<std::sync::atomic::AtomicU64> =
+            Arc::new(std::sync::atomic::AtomicU64::new(now_millis()));
+
         let dc_open = Arc::clone(&dc);
         let sync_rx_open = Arc::new(Mutex::new(rx));
         let event_open = Arc::clone(&self.event);
+        let last_seen_on_open = Arc::clone(&last_seen);
         let device_id_open = self.device_id.clone();
         let device_name_open = self.device_name.clone();
         let device_os_open = self.device_os.clone();
@@ -306,6 +342,7 @@ impl MeshTransport {
             let dc = Arc::clone(&dc_open);
             let sync_rx = Arc::clone(&sync_rx_open);
             let event = Arc::clone(&event_open);
+            let last_seen_open = Arc::clone(&last_seen_on_open);
             let device_id = device_id_open.clone();
             let device_name = device_name_open.clone();
             let device_os = device_os_open.clone();
@@ -335,8 +372,28 @@ impl MeshTransport {
                     event.on_log("DEBUG [host] sent CatchUp");
                 }
                 let mut rx = sync_rx.lock().await;
-                while let Some(msg) = rx.recv().await {
-                    let _ = MeshManager::send_sync_message(&dc, &msg).await;
+                let mut heartbeat =
+                    tokio::time::interval(Duration::from_millis(HEARTBEAT_INTERVAL_MS));
+                heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                loop {
+                    tokio::select! {
+                        msg = rx.recv() => {
+                            let Some(msg) = msg else { break; };
+                            let _ = MeshManager::send_sync_message(&dc, &msg).await;
+                        }
+                        _ = heartbeat.tick() => {
+                            let _ =
+                                MeshManager::send_sync_message(&dc, &SyncMessage::Ping).await;
+                            let now = now_millis();
+                            if now.saturating_sub(last_seen_open.load(Ordering::Relaxed))
+                                > HEARTBEAT_TIMEOUT_MS
+                            {
+                                event.on_log("DEBUG [host] heartbeat timeout — peer silent");
+                                event.on_peer_offline();
+                                break;
+                            }
+                        }
+                    }
                 }
             })
         }));
@@ -348,6 +405,7 @@ impl MeshTransport {
         let session_scope: std::sync::Arc<
             tokio::sync::Mutex<Option<crate::view_only::AlbumScope>>,
         > = std::sync::Arc::new(tokio::sync::Mutex::new(None));
+        let last_seen_dc = Arc::clone(&last_seen);
         dc.on_message(Box::new(move |msg: DataChannelMessage| {
             let dc = Arc::clone(&dc_msg);
             let incoming = Arc::clone(&incoming_files);
@@ -360,10 +418,12 @@ impl MeshTransport {
             let total = Arc::clone(&items_total);
             let mirror_completed = Arc::clone(&mirror_completed);
             let mirror_total = Arc::clone(&mirror_total);
+            let last_seen_msg = Arc::clone(&last_seen_dc);
             let session_scope = std::sync::Arc::clone(&session_scope);
             Box::pin(async move {
                 let text = String::from_utf8_lossy(&msg.data);
                 if let Ok(sync_msg) = serde_json::from_str::<SyncMessage>(&text) {
+                    last_seen_msg.store(now_millis(), Ordering::Relaxed);
                     MeshManager::handle_sync_message(
                         sync_msg,
                         &dc,
@@ -894,6 +954,9 @@ impl MeshTransport {
         let items_total = Arc::new(AtomicUsize::new(0));
         let mirror_completed = Arc::new(AtomicUsize::new(0));
         let mirror_total = Arc::new(AtomicUsize::new(0));
+        // Heartbeat liveness (#heartbeat): millis of last inbound frame.
+        let last_seen: Arc<std::sync::atomic::AtomicU64> =
+            Arc::new(std::sync::atomic::AtomicU64::new(now_millis()));
         let pending_ice: Arc<Mutex<Vec<RTCIceCandidateInit>>> = Arc::new(Mutex::new(Vec::new()));
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<SyncMessage>();
         *self.sync_tx.lock().await = Some(tx.clone());
@@ -1010,6 +1073,8 @@ impl MeshTransport {
 
         pc.on_data_channel(Box::new(move |d: Arc<RTCDataChannel>| {
             let share_mode_msg = share_mode;
+            let last_seen_on_msg = Arc::clone(&last_seen);
+            let last_seen_on_open = Arc::clone(&last_seen);
             let dc_outer = Arc::clone(&d);
             let incoming_msg = Arc::clone(&incoming_rcv);
             let pending_msg = Arc::clone(&pending_rcv);
@@ -1025,6 +1090,7 @@ impl MeshTransport {
             let session_scope: std::sync::Arc<
                 tokio::sync::Mutex<Option<crate::view_only::AlbumScope>>,
             > = std::sync::Arc::new(tokio::sync::Mutex::new(None));
+
             d.on_message(Box::new(move |msg: DataChannelMessage| {
                 let dc = Arc::clone(&dc_outer);
                 let incoming = Arc::clone(&incoming_msg);
@@ -1038,9 +1104,11 @@ impl MeshTransport {
                 let mirror_completed = Arc::clone(&mirror_completed_msg);
                 let mirror_total = Arc::clone(&mirror_total_msg);
                 let session_scope = std::sync::Arc::clone(&session_scope);
+                let last_seen_msg = Arc::clone(&last_seen_on_msg);
                 Box::pin(async move {
                     let text = String::from_utf8_lossy(&msg.data);
                     if let Ok(sync_msg) = serde_json::from_str::<SyncMessage>(&text) {
+                        last_seen_msg.store(now_millis(), Ordering::Relaxed);
                         MeshManager::handle_sync_message(
                             sync_msg,
                             &dc,
@@ -1061,7 +1129,6 @@ impl MeshTransport {
                     }
                 })
             }));
-
             let dc_open = Arc::clone(&d);
             let sync_rx_final = Arc::clone(&sync_rx_rcv);
             let event_open = Arc::clone(&event_rcv);
@@ -1075,6 +1142,7 @@ impl MeshTransport {
                 let dc = Arc::clone(&dc_open);
                 let sync_rx = Arc::clone(&sync_rx_final);
                 let event_open = Arc::clone(&event_open);
+                let last_seen_open = Arc::clone(&last_seen_on_open);
                 Box::pin(async move {
                     event_open.on_log("DEBUG [receiver] data channel OPENED");
                     let _ = MeshManager::send_sync_message(
@@ -1101,12 +1169,38 @@ impl MeshTransport {
                         event_open.on_log("DEBUG [receiver] sent CatchUp");
                     }
                     let mut rx = sync_rx.lock().await;
-                    while let Some(msg) = rx.recv().await {
-                        event_open.on_log(&format!(
-                            "DEBUG [receiver] forwarding sync msg: {:?}",
-                            std::mem::discriminant(&msg)
-                        ));
-                        let _ = MeshManager::send_sync_message(&dc, &msg).await;
+                    let mut heartbeat =
+                        tokio::time::interval(Duration::from_millis(HEARTBEAT_INTERVAL_MS));
+                    heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                    loop {
+                        tokio::select! {
+                            msg = rx.recv() => {
+                                let Some(msg) = msg else { break; };
+                                event_open.on_log(&format!(
+                                    "DEBUG [receiver] forwarding sync msg: {:?}",
+                                    std::mem::discriminant(&msg)
+                                ));
+                                let _ =
+                                    MeshManager::send_sync_message(&dc, &msg).await;
+                            }
+                            _ = heartbeat.tick() => {
+                                let _ = MeshManager::send_sync_message(
+                                    &dc,
+                                    &SyncMessage::Ping,
+                                )
+                                .await;
+                                let now = now_millis();
+                                if now.saturating_sub(last_seen_open.load(Ordering::Relaxed))
+                                    > HEARTBEAT_TIMEOUT_MS
+                                {
+                                    event_open.on_log(
+                                        "DEBUG [receiver] heartbeat timeout — peer silent",
+                                    );
+                                    event_open.on_peer_offline();
+                                    break;
+                                }
+                            }
+                        }
                     }
                 })
             }));

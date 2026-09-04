@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { parseHash, inferMime, assembleChunks, FileAssembler } from '@/services/backend';
+import { parseHash, inferMime, assembleChunks, FileAssembler, takeNextOutbound } from '@/services/backend';
+import type { GuestOutbound } from '@/services/backend';
+
+function frame(type: string): GuestOutbound {
+  return { type: 'CommandRequest', id: 1, name: type, payload: {} } as GuestOutbound;
+}
 
 describe('parseHash', () => {
   it('parses CODE.TOKEN', () => {
@@ -106,5 +111,34 @@ describe('FileAssembler', () => {
     asm.end();
     await Promise.resolve();
     expect(done).not.toHaveBeenCalled();
+  });
+});
+
+describe('takeNextOutbound (SCTP backpressure drain)', () => {
+  it('parks frames while the channel is closed', () => {
+    const outbox: GuestOutbound[] = [frame('a')];
+    expect(takeNextOutbound(outbox, false, 0)).toBeNull();
+    expect(outbox).toHaveLength(1);
+  });
+
+  it('parks frames while bufferedAmount exceeds the ceiling', () => {
+    const outbox: GuestOutbound[] = [frame('a')];
+    expect(takeNextOutbound(outbox, true, 2_000_000)).toBeNull();
+    expect(outbox).toHaveLength(1);
+  });
+
+  it('releases frames once the channel is open and no longer backpressured', () => {
+    // Simulate the buffered amount dropping back below the ceiling later in
+    // the session (the "bufferedamountlow" re-flush scenario). The parked
+    // frame must now drain so it is never stranded.
+    const outbox: GuestOutbound[] = [frame('a')];
+    expect(takeNextOutbound(outbox, true, 2_000_000)).toBeNull();
+    const drained = takeNextOutbound(outbox, true, 100);
+    expect(drained).toEqual(frame('a'));
+    expect(outbox).toHaveLength(0);
+  });
+
+  it('returns null when the outbox is empty', () => {
+    expect(takeNextOutbound([], true, 0)).toBeNull();
   });
 });

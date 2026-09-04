@@ -423,12 +423,35 @@ export default {
           };
           await env.PAID_EMAILS.put(`paid:${email}`, JSON.stringify(record));
 
-          // Best-effort download + setup email. Swallow failures so a mail
-          // error can't cause Stripe to retry (which would re-record + resend).
-          try {
-            await sendPurchaseEmail(env, email, session.amount_total ?? null, session.currency ?? null);
-          } catch (err) {
-            console.error('purchase email failed', err instanceof Error ? err.message : err);
+          // Idempotency: Stripe retries a webhook until it gets a 2xx. Without a
+          // per-event marker every retry would re-send the purchase email. Only
+          // mark it sent AFTER a successful send, so a transient failure still
+          // lets the retry deliver the email.
+          const eventId = String(event.id ?? '');
+          const sentMarker = `webhook_sent:${eventId}`;
+          if (!eventId || !(await env.PAID_EMAILS.get(sentMarker))) {
+            try {
+              await sendPurchaseEmail(
+                env,
+                email,
+                session.amount_total ?? null,
+                session.currency ?? null,
+              );
+              if (eventId) {
+                await env.PAID_EMAILS.put(sentMarker, new Date().toISOString(), {
+                  expirationTtl: 7 * 24 * 60 * 60,
+                });
+              }
+            } catch (err) {
+              // Best-effort download + setup email. Swallow failures so a mail
+              // error can't cause the handler to throw (Stripe would then
+              // retry, which re-records + re-sends — the marker above prevents
+              // duplicate sends on those retries once one succeeds).
+              console.error(
+                'purchase email failed',
+                err instanceof Error ? err.message : err,
+              );
+            }
           }
         }
 

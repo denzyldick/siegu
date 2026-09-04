@@ -3607,6 +3607,9 @@ pub struct DeviceInfo {
     pub remote_photo_count: i64,
     pub remote_video_count: i64,
     pub os: String,
+    /// Storage used/cap in bytes (0 until reported/backfilled).
+    pub storage_used: u64,
+    pub storage_capacity: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

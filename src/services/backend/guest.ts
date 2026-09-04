@@ -150,15 +150,21 @@ export class GuestClient {
       resolve = r;
     });
     this.inflight.set(key, { promise, resolve });
-    this.assemblers.set(
-      id,
-      new FileAssembler(id, (blob) => {
-        const url = URL.createObjectURL(blob);
-        this.caches.push({ key, url });
-        this.resolveMedia(key, url);
-        this.events.onMedia?.(id, key, url);
-      }),
-    );
+    // Only originals stream through FileHeader/Chunk/End; thumbnails arrive
+    // inline as `ViewMedia` and need no FileAssembler. Keying the assembler by
+    // the kind-scoped media key (not the bare id) keeps a thumbnail and an
+    // original for the SAME photo from clobbering each other's assembler.
+    if (!thumbnail) {
+      this.assemblers.set(
+        key,
+        new FileAssembler(id, (blob) => {
+          const url = URL.createObjectURL(blob);
+          this.caches.push({ key, url });
+          this.resolveMedia(key, url);
+          this.events.onMedia?.(id, key, url);
+        }),
+      );
+    }
     this.transport.send({ type: 'FetchMediaRequest', id, thumbnail });
     return promise;
   }
@@ -185,26 +191,28 @@ export class GuestClient {
         break;
       }
       case 'FileHeader': {
-        this.assemblers.get(msg.id)?.header(msg.filename);
+        this.assemblers.get(`original:${msg.id}`)?.header(msg.filename);
         break;
       }
       case 'FileChunk': {
-        this.assemblers.get(msg.id)?.chunk(msg.index, msg.data);
+        this.assemblers.get(`original:${msg.id}`)?.chunk(msg.index, msg.data);
         break;
       }
       case 'FileEnd': {
-        this.assemblers.get(msg.id)?.end();
-        this.assemblers.delete(msg.id);
+        const key = `original:${msg.id}`;
+        this.assemblers.get(key)?.end();
+        this.assemblers.delete(key);
         break;
       }
       case 'ViewMedia': {
-        // Mirror webclient/main.ts: base64 image delivered inline.
+        // Mirror webclient/main.ts: base64 image delivered inline (thumbnails).
         const id = msg.id;
         const raw = atob(msg.data);
         const bytes = new Uint8Array(raw.length);
         for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
         const url = URL.createObjectURL(new Blob([bytes], { type: msg.mime }));
         const key = `thumb:${id}`;
+        this.assemblers.delete(key);
         this.caches.push({ key, url });
         this.resolveMedia(key, url);
         this.events.onMedia?.(id, key, url);

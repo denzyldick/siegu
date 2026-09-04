@@ -268,8 +268,23 @@ pub async fn read_file_base64(app: tauri::AppHandle, path: String) -> String {
     read_file_base64_inner(&app, path)
 }
 
+/// Decide whether a canonicalized path may be read. `canonical` is the output
+/// of `std::fs::canonicalize`; an empty value means resolution FAILED, which
+/// must be denied (we cannot trust a path we could not resolve). Otherwise the
+/// path is allowed only when it lives under one of the allowed directories.
+/// `Path::starts_with` enforces component-boundary matching, so `/home/user`
+/// does not accidentally match `/home/user2`.
+fn path_is_allowed(canonical: &Path, allowed: &[&str]) -> bool {
+    if canonical.as_os_str().is_empty() {
+        return false;
+    }
+    allowed
+        .iter()
+        .any(|dir| !dir.is_empty() && canonical.starts_with(dir))
+}
+
 fn read_file_base64_inner(app: &tauri::AppHandle, path: String) -> String {
-    let canonical = std::fs::canonicalize(&path).unwrap_or_default();
+    let canonical = std::fs::canonicalize(&path);
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
         .unwrap_or_default();
@@ -278,10 +293,15 @@ fn read_file_base64_inner(app: &tauri::AppHandle, path: String) -> String {
         .unwrap_or_default();
     let temp = std::env::temp_dir();
     let allowed = [home.as_str(), config.as_str(), temp.to_str().unwrap_or("")];
-    let is_allowed = canonical.as_os_str().is_empty()
-        || allowed
-            .iter()
-            .any(|dir| !dir.is_empty() && canonical.starts_with(dir));
+    // On canonicalize failure, `canonicalize` returns Err and `path_is_allowed`
+    // denies (unlike the previous `unwrap_or_default()` which yielded an empty
+    // path that the allowlist then treated as "anywhere allowed"). Symlinks are
+    // resolved here too, so a link inside an allowed dir pointing outside is
+    // rejected.
+    let is_allowed = match &canonical {
+        Ok(p) => path_is_allowed(p, &allowed),
+        Err(_) => false,
+    };
     if !is_allowed {
         crate::common::debug_log(format!(
             "Access denied: {path} is outside allowed directories"
@@ -321,6 +341,7 @@ fn read_file_base64_inner(app: &tauri::AppHandle, path: String) -> String {
 }
 
 mod tests {
+    use std::path::Path;
 
     #[test]
     fn scan_folder() {
@@ -338,5 +359,45 @@ mod tests {
         dbg!(&state);
         let _ = super::scan_folder(directory.to_string(), &directory);
         */
+    }
+
+    #[test]
+    fn allowlist_denies_a_path_that_failed_to_canonicalize() {
+        // Regression: `canonicalize(...).unwrap_or_default()` produced an empty
+        // path, and the old allowlist treated empty as "allow anywhere". An
+        // unresolved path must be denied.
+        let empty = Path::new("");
+        let allowed = ["/home/denzyl", "/tmp"];
+        assert!(!super::path_is_allowed(empty, &allowed));
+    }
+
+    #[test]
+    fn allowlist_permits_paths_under_an_allowed_dir() {
+        let allowed = ["/home/denzyl", "/tmp"];
+        assert!(super::path_is_allowed(
+            Path::new("/home/denzyl/photos/a.jpg"),
+            &allowed
+        ));
+        assert!(super::path_is_allowed(
+            Path::new("/tmp/cache.bin"),
+            &allowed
+        ));
+    }
+
+    #[test]
+    fn allowlist_rejects_paths_outside_allowed_dirs() {
+        let allowed = ["/home/denzyl", "/tmp"];
+        assert!(!super::path_is_allowed(Path::new("/etc/passwd"), &allowed));
+        assert!(!super::path_is_allowed(Path::new("/usr/bin/sh"), &allowed));
+    }
+
+    #[test]
+    fn allowlist_uses_component_boundary_not_string_prefix() {
+        // /home/denzyl2 must NOT be treated as inside /home/denzyl.
+        let allowed = ["/home/denzyl"];
+        assert!(!super::path_is_allowed(
+            Path::new("/home/denzyl2/secret"),
+            &allowed
+        ));
     }
 }

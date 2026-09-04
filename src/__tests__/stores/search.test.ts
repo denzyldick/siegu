@@ -116,6 +116,21 @@ describe('search store', () => {
     expect(store.personAlone).toBe(false);
   });
 
+  it('hasFilters reflects every media filter toggle (incl. nsfwOnly)', () => {
+    const store = useSearchStore();
+    expect(store.hasFilters).toBe(false);
+    store.toggleNsfwOnly();
+    expect(store.hasFilters).toBe(true);
+    store.toggleFavoriteOnly();
+    expect(store.hasFilters).toBe(true);
+    store.toggleVideoOnly();
+    store.toggleFacesOnly();
+    store.togglePapersOnly();
+    expect(store.hasFilters).toBe(true);
+    store.clearFilters();
+    expect(store.hasFilters).toBe(false);
+  });
+
   it('clearFilters resets person match and alone state', () => {
     const store = useSearchStore();
     store.addFilter({ type: 'person', value: 'a', label: 'Alice' });

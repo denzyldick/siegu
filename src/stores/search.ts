@@ -34,6 +34,7 @@ export const useSearchStore = defineStore('search', () => {
       mediaFilters.value.videosOnly ||
       mediaFilters.value.facesOnly ||
       mediaFilters.value.papersOnly ||
+      mediaFilters.value.nsfwOnly ||
       camera.value !== null ||
       aestheticsMin.value !== null ||
       dateRange.value !== null,
