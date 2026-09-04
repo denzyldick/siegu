@@ -61,7 +61,7 @@ const SUCCESS_URL = 'https://denzyldick.github.io/siegu/#pricing';
 
 /** Direct download for the Linux (AppImage) build, sent to buyers. */
 const DOWNLOAD_URL =
-  'https://github.com/denzyldick/siegu/releases/download/v0.1.14/Siegu_0.1.14_amd64.AppImage';
+  'https://github.com/denzyldick/siegu/releases/download/v0.1.15/Siegu_0.1.15_amd64.AppImage';
 
 /** README section listing install from source / all supported platforms. */
 const RUN_OTHER_WAYS_URL = 'https://github.com/denzyldick/siegu#how-do-i-install-it';
