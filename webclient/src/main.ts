@@ -320,7 +320,7 @@ let sessionStart = 0;
 let sessionTimerRaf = 0;
 
 function startSessionTimer(): void {
-  sessionMaxMs = ((currentSession?.minutes ?? 30) % 60) * 60 * 1000;
+  sessionMaxMs = (currentSession?.minutes ?? 30) * 60 * 1000;
   if (sessionMaxMs <= 0) sessionMaxMs = DEFAULT_SESSION_MS;
   sessionStart = Date.now();
   sessionTimerEl.hidden = false;

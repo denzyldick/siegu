@@ -268,13 +268,6 @@ async fn start_host_internal(
     if let Ok(mut ls) = state.lan_server.lock() {
         *ls = Some(server);
     }
-    // Store room + port so generate_album_share_url can build the link later (#16).
-    if let Ok(mut hi) = state.host_info.lock() {
-        *hi = Some(crate::HostInfo {
-            room_id: room_id.clone(),
-            port,
-        });
-    }
 
     let ip = get_local_ip().unwrap_or_else(|| "127.0.0.1".to_string());
 
@@ -352,26 +345,6 @@ async fn start_host_internal(
     }
 
     Ok(LanHostInfo { ip, port })
-}
-
-/// Generate a shareable URL for an album (#16).
-/// Returns `http://IP:PORT/#CODE.ALBUM_ID` for LAN guests.
-#[tauri::command]
-pub async fn generate_album_share_url(
-    state: tauri::State<'_, crate::WebRtcState>,
-    album_id: String,
-) -> Result<String, String> {
-    let hi = state
-        .host_info
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clone()
-        .ok_or("No active host session — start sharing first")?;
-    let ip = get_local_ip().unwrap_or_else(|| "127.0.0.1".to_string());
-    Ok(format!(
-        "http://{}:{}/#{}.{}",
-        ip, hi.port, hi.room_id, album_id
-    ))
 }
 
 /// Result of starting a collection share.
@@ -494,7 +467,10 @@ pub async fn start_album_share(
         } else {
             configured_token.clone()
         };
-        let origin = ws_url
+        // The guest loads the web client from the bare origin (index.html at
+        // `/`); the `/ws` socket is only for WebSocket upgrades and would
+        // 404 for a browser. Convert the plain base, not the ws url.
+        let origin = base
             .replace("ws://", "http://")
             .replace("wss://", "https://");
         (
@@ -556,13 +532,6 @@ pub async fn start_album_share(
             port,
         )
     };
-
-    if let Ok(mut hi) = state.host_info.lock() {
-        *hi = Some(crate::HostInfo {
-            room_id: room_id.clone(),
-            port,
-        });
-    }
 
     let sync_tx = Arc::clone(&state.sync_tx);
     let connected = Arc::clone(&state.connected);
@@ -689,9 +658,6 @@ async fn do_stop_album_share(
             server.stop();
             emit_log(app, "Album share server stopped".to_string());
         }
-    }
-    if let Ok(mut hi) = state.host_info.lock() {
-        *hi = None;
     }
     Ok(())
 }

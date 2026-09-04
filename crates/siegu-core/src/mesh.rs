@@ -525,6 +525,15 @@ impl MeshManager {
         dc: &Arc<webrtc::data_channel::RTCDataChannel>,
         photos: Vec<PhotoSyncInfo>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // Guests never render face crops; blank the base64 `encoded` on every
+        // face to avoid shipping megabytes of useless JPEG data per album.
+        let photos: Vec<PhotoSyncInfo> = photos
+            .into_iter()
+            .map(|mut p| {
+                p.faces = Self::strip_face_crops(&p.faces);
+                p
+            })
+            .collect();
         for (chunk, more) in Self::split_manifest_chunks(photos) {
             Self::send_sync_message(
                 dc,
@@ -1629,37 +1638,62 @@ impl MeshManager {
             SyncMessage::EnterAlbumShare { album_id } => {
                 // Album-scoped share (#16): the guest only ever learns about
                 // (and can only fetch) photos that belong to this album.
-                view_state()
-                    .serving_view_only
-                    .store(true, std::sync::atomic::Ordering::SeqCst);
                 let db = Database::new(config_path);
                 let Some(album) = db.get_album(&album_id) else {
                     event.on_log(&format!(
                         "WARN album share rejected: unknown album {album_id}"
                     ));
+                    // Do NOT set serving_view_only — an invalid album
+                    // should not permanently change session state.
                     return;
                 };
+                view_state()
+                    .serving_view_only
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
                 let album_name = album.name.clone();
                 event.on_album_viewed(&album_id, &album_name);
-                let photos = db.get_album_photo_sync_info(&album_id);
-                let members: std::collections::HashSet<String> =
-                    photos.iter().map(|p| p.id.clone()).collect();
-                // Scope is PER SESSION so concurrent guests don't grant or
-                // deny each other's fetches (#16).
-                *session_scope.lock().await = Some(crate::view_only::AlbumScope {
-                    members,
-                    album_id: album_id.clone(),
+
+                // Move the heavy DB query + manifest send into a spawned
+                // task so it doesn't block the message handler loop. A
+                // large album with N+1 sync_info queries (objects, faces)
+                // can take seconds; keeping the loop free prevents the
+                // guest's timeout from firing with "Access denied".
+                let dc = Arc::clone(dc);
+                let config_path = config_path.to_string();
+                let session_scope = Arc::clone(session_scope);
+                let album_id = album_id.clone();
+                tokio::spawn(async move {
+                    let db = Database::new(&config_path);
+                    let photos = db.get_album_photo_sync_info(&album_id);
+                    let members: std::collections::HashSet<String> =
+                        photos.iter().map(|p| p.id.clone()).collect();
+                    // Scope is PER SESSION so concurrent guests don't grant
+                    // or deny each other's fetches (#16).
+                    *session_scope.lock().await = Some(crate::view_only::AlbumScope {
+                        members,
+                        album_id: album_id.clone(),
+                    });
+                    event.on_log(&format!(
+                        "DEBUG peer entered album share '{album_id}' ({} items)",
+                        photos.len()
+                    ));
+                    if let Err(e) = Self::send_manifest_view_only(&dc, photos).await {
+                        event.on_log(&format!("ERROR sending album-share manifest: {e}"));
+                    }
                 });
-                event.on_log(&format!(
-                    "DEBUG peer entered album share '{album_id}' ({} items)",
-                    photos.len()
-                ));
-                if let Err(e) = Self::send_manifest_view_only(dc, photos).await {
-                    event.on_log(&format!("ERROR sending album-share manifest: {e}"));
-                }
             }
             SyncMessage::ViewOnlyManifest { photos, more } => {
                 let mut pending = pending_view_manifest.lock().await;
+
+                // Cap view-only manifest accumulation to prevent OOM on very
+                // large shared albums (mirrors the sync manifest cap).
+                const MAX_VIEW_MANIFEST_ENTRIES: usize = 1_000_000;
+                if pending.len() + photos.len() > MAX_VIEW_MANIFEST_ENTRIES {
+                    event.on_log("WARN view-only manifest exceeded cap, dropping");
+                    pending.clear();
+                    return;
+                }
+
                 pending.extend(photos);
                 if more {
                     return;
@@ -1679,8 +1713,10 @@ impl MeshManager {
             } => {
                 // Album-scoped share (#16): refuse anything outside the
                 // shared album, or the link would leak the whole library to
-                // anyone guessing photo ids.
-                if let Some(scope) = session_scope.lock().await.clone() {
+                // anyone guessing photo ids. Borrow instead of clone: the
+                // membership set can be large, and each request used to
+                // allocate a full copy.
+                if let Some(scope) = session_scope.lock().await.as_ref() {
                     if !scope.members.contains(&id) {
                         event.on_log(&format!(
                             "DENIED FetchMediaRequest {id}: not in shared album '{}'",

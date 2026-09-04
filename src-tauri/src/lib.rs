@@ -29,8 +29,6 @@ struct WebRtcState {
         Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<transport::SyncMessage>>>>,
     connected: Arc<std::sync::atomic::AtomicBool>,
     lan_server: std::sync::Mutex<Option<siegu_core::lan_server::LanServer>>,
-    /// Populated when a LAN host session is active; used for share-link generation (#16).
-    host_info: std::sync::Mutex<Option<HostInfo>>,
     /// Abort handle for the running share's expiry timer (timed mode). Cleared
     /// when the share stops or the timer fires.
     share_expiry: std::sync::Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
@@ -41,12 +39,6 @@ struct WebRtcState {
     rpc_pending: crate::tauri_sync_event::RpcPending,
     /// Monotonic id counter for outbound RPC requests.
     rpc_next_id: std::sync::atomic::AtomicU64,
-}
-
-#[derive(Clone)]
-struct HostInfo {
-    room_id: String,
-    port: u16,
 }
 
 struct ScanState {
@@ -248,7 +240,6 @@ pub fn run() {
                 sync_tx,
                 connected: Arc::clone(&connected),
                 lan_server: std::sync::Mutex::new(None),
-                host_info: std::sync::Mutex::new(None),
                 share_expiry: std::sync::Mutex::new(None),
                 one_time_share: Arc::new(std::sync::atomic::AtomicBool::new(false)),
                 rpc_pending: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
@@ -378,7 +369,6 @@ pub fn run() {
             commands::sync::get_media_server_port,
             commands::sync::generate_pairing_codes,
             commands::sync::hash_pairing_code,
-            commands::sync::generate_album_share_url,
             commands::sync::start_album_share,
             commands::sync::stop_album_share,
             commands::sync::auto_reconnect,
