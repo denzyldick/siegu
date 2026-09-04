@@ -142,6 +142,29 @@
                   device.remote_video_count || device.video_count
                 }}</span>
               </div>
+              <div class="d-flex align-center mb-1 mt-2">
+                <v-icon size="14" color="rgba(var(--v-theme-on-surface), 0.6)" class="mr-2"
+                  >mdi-database-outline</v-icon
+                >
+                <span class="text-caption text-medium-emphasis">{{ $t('devices.storage') }}</span>
+                <v-spacer></v-spacer>
+                <span
+                  v-if="device.storage_capacity > 0"
+                  class="text-caption text-high-emphasis font-weight-bold"
+                >
+                  {{ formatBytes(device.storage_used) }} /
+                  {{ formatBytes(device.storage_capacity) }}
+                </span>
+                <span v-else class="text-caption text-disabled">—</span>
+              </div>
+              <v-progress-linear
+                v-if="device.storage_capacity > 0"
+                :model-value="storagePercent(device)"
+                :color="storageColor(device)"
+                height="6"
+                rounded
+                class="mb-1"
+              ></v-progress-linear>
             </div>
           </v-card-text>
 
@@ -402,6 +425,8 @@ interface DeviceWithSync {
   syncStatus: string;
   items_completed: number;
   items_total: number;
+  storage_used: number;
+  storage_capacity: number;
 }
 
 const devices = ref<DeviceWithSync[]>([]);
@@ -431,6 +456,26 @@ const dotTitle = computed(() => {
   if (syncStore.connection === 'offline') return t('devices.status_offline');
   return t('devices.status_idle');
 });
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+  const v = bytes / 1024 ** i;
+  return `${v >= 100 || i === 0 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
+}
+
+function storagePercent(device: DeviceWithSync): number {
+  if (!device.storage_capacity || device.storage_capacity <= 0) return 0;
+  return Math.min(100, (device.storage_used / device.storage_capacity) * 100);
+}
+
+function storageColor(device: DeviceWithSync): string {
+  const pct = storagePercent(device);
+  if (pct >= 90) return 'error';
+  if (pct >= 75) return 'warning';
+  return 'success';
+}
 
 let unlistenRefresh: UnlistenFn | null = null;
 let unlistenSync: UnlistenFn | null = null;

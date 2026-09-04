@@ -266,6 +266,7 @@
     "local_environment": "Lokale omgeving",
     "connected": "Verbonden",
     "system": "Systeem:",
+    "storage": "Opslag",
     "online": "Online",
     "remove_device_title": "Apparaat verwijderen?",
     "remove_device_confirm": "Weet je zeker dat je {name} wilt verwijderen? Dit stopt alle synchronisatie met dit apparaat.",

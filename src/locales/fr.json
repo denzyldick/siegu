@@ -266,6 +266,7 @@
     "local_environment": "Environnement local",
     "connected": "Connecté",
     "system": "Système :",
+    "storage": "Stockage",
     "online": "En ligne",
     "remove_device_title": "Supprimer l'appareil ?",
     "remove_device_confirm": "Êtes-vous sûr de vouloir supprimer {name} ? Cela arrêtera toute synchronisation avec cet appareil.",

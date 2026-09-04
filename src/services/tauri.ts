@@ -329,6 +329,8 @@ export async function listDevices(): Promise<
     remote_video_count: number;
     host: string;
     subtitle: string;
+    storage_used: number;
+    storage_capacity: number;
   }>
 > {
   const raw = await call<string>('list_devices');

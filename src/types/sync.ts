@@ -31,6 +31,9 @@ export interface Device {
   icon: string;
   host: string;
   last_seen: string;
+  /** Storage used/cap in bytes; 0 until reported/backfilled (#storage). */
+  storage_used: number;
+  storage_capacity: number;
 }
 
 export interface PairingCodes {

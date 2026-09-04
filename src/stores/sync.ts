@@ -33,6 +33,8 @@ export const useSyncStore = defineStore('sync', () => {
         icon: d.icon,
         host: d.host,
         last_seen: d.subtitle,
+        storage_used: d.storage_used ?? 0,
+        storage_capacity: d.storage_capacity ?? 0,
       }));
     } catch (e) {
       console.error('[SyncStore] Failed to load devices:', e);
