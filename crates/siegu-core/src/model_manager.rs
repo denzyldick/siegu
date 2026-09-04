@@ -389,6 +389,7 @@ pub async fn download_file(
                 }
             }
         }
+        file.sync_all().await.map_err(|e| e.to_string())?;
         drop(file);
 
         let complete = stream_error.is_none()

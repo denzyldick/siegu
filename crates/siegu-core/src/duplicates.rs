@@ -250,8 +250,11 @@ mod tests {
     use super::*;
 
     fn tiny_gray(v: u8) -> image::DynamicImage {
-        image::DynamicImage::ImageLuma8(image::GrayImage::from_fn(16, 16, |x, _y| {
-            image::Luma([v.saturating_add(x as u8)])
+        image::DynamicImage::ImageLuma8(image::GrayImage::from_fn(16, 16, |x, y| {
+            // A horizontal gradient whose direction flips with v parity, so
+            // `v` genuinely changes the resulting dHash.
+            let slope: u8 = if v % 2 == 0 { x as u8 } else { 15 - x as u8 };
+            image::Luma([v.wrapping_add(slope)])
         }))
     }
 
@@ -262,7 +265,9 @@ mod tests {
         assert_eq!(a.len(), 16);
         assert_eq!(a, b);
         assert_eq!(dhash_hamming(&a, &b), 0);
-        let c = dhash(&tiny_gray(100));
+        // Even v (increasing gradient) vs odd v (decreasing gradient) must
+        // produce visibly different hashes.
+        let c = dhash(&tiny_gray(1));
         assert_ne!(a, c);
     }
 

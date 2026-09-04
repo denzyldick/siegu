@@ -1,5 +1,5 @@
 <template>
-  <div class="media-library-container px-4 py-6">
+  <div class="media-library-container">
     <v-fade-transition>
       <div v-if="selectedIds.size > 0" class="bulk-toolbar-container">
         <v-sheet

@@ -852,6 +852,20 @@ impl MeshManager {
                 }
                 let chunk_len = photos.len();
                 let mut pending = pending_manifest.lock().await;
+
+                // Cap manifest accumulation to prevent OOM on large libraries.
+                const MAX_MANIFEST_ENTRIES: usize = 1_000_000;
+                if pending.len() + photos.len() > MAX_MANIFEST_ENTRIES {
+                    event.on_sync_error(format!(
+                        "Manifest exceeded {} entries ({}+{}), aborting sync",
+                        MAX_MANIFEST_ENTRIES,
+                        pending.len(),
+                        photos.len()
+                    ));
+                    pending.clear();
+                    return;
+                }
+
                 pending.extend(photos);
                 event.on_log(&format!(
                     "DEBUG handle ManifestResponse chunk with {} photos (more={more}, total={})",
@@ -1245,7 +1259,13 @@ impl MeshManager {
                         ));
                         return;
                     };
-                    let _ = file.flush().await;
+                    if let Err(e) = file.sync_all().await {
+                        event.on_sync_error(format!(
+                            "fsync failed for {}: {e}",
+                            file_state.filename
+                        ));
+                        return;
+                    }
 
                     let temp_path =
                         sync_temp_dir(config_path).join(sanitize_filename(&file_state.id));

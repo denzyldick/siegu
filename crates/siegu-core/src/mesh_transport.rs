@@ -83,6 +83,9 @@ pub struct MeshTransport {
     /// open: the guest drives EnterViewOnly/RPC itself and must never trigger
     /// a full sync push from the sharer (#9/#19).
     view_only_client: bool,
+    /// Backpressure counter: number of messages queued in the outbound channel.
+    /// The pump loop decrements after each successful send.
+    outbound_queued: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 /// What the signalling loop needs from a live guest connection. All the
@@ -119,6 +122,7 @@ impl MeshTransport {
             external_tx: None,
             share_mode: None,
             view_only_client: false,
+            outbound_queued: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         }
     }
 
@@ -146,8 +150,30 @@ impl MeshTransport {
         &self,
         msg: SyncMessage,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // Backpressure: drop messages if the outbound queue exceeds the
+        // high-water mark. The pump loop on the data channel may be slow
+        // (e.g. network congestion); letting thousands of serialized messages
+        // pile up risks multi-GB memory spikes.
+        const OUTBOUND_HIGH_WATER: usize = 512;
+        let queued = self
+            .outbound_queued
+            .load(std::sync::atomic::Ordering::Relaxed);
+        if queued >= OUTBOUND_HIGH_WATER {
+            // Drop non-critical messages under backpressure.
+            match &msg {
+                SyncMessage::Ping | SyncMessage::Pong => { /* always allow */ }
+                _ => {
+                    self.event.on_log(&format!(
+                        "WARN outbound queue full ({queued}), dropping message"
+                    ));
+                    return Err("Outbound queue backpressure".into());
+                }
+            }
+        }
         let tx = self.sync_tx.lock().await;
         if let Some(tx) = tx.as_ref() {
+            self.outbound_queued
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             tx.send(msg).ok();
             Ok(())
         } else {
@@ -338,6 +364,7 @@ impl MeshTransport {
         let device_os_open = self.device_os.clone();
         let models_open = self.models_enabled.clone();
         let skip_pull = self.view_only_client;
+        let outbound_queued_open = Arc::clone(&self.outbound_queued);
         dc.on_open(Box::new(move || {
             let dc = Arc::clone(&dc_open);
             let sync_rx = Arc::clone(&sync_rx_open);
@@ -380,6 +407,12 @@ impl MeshTransport {
                         msg = rx.recv() => {
                             let Some(msg) = msg else { break; };
                             let _ = MeshManager::send_sync_message(&dc, &msg).await;
+                            // Decrement backpressure counter after drain.
+                            outbound_queued_open.fetch_update(
+                                std::sync::atomic::Ordering::Relaxed,
+                                std::sync::atomic::Ordering::Relaxed,
+                                |v| Some(v.saturating_sub(1)),
+                            );
                         }
                         _ = heartbeat.tick() => {
                             let _ =
@@ -1070,6 +1103,7 @@ impl MeshTransport {
         let models_rcv = self.models_enabled.clone();
         let view_only_client_rcv = self.view_only_client;
         let share_mode = self.share_mode;
+        let outbound_queued_rcv = Arc::clone(&self.outbound_queued);
 
         pc.on_data_channel(Box::new(move |d: Arc<RTCDataChannel>| {
             let share_mode_msg = share_mode;
@@ -1137,12 +1171,14 @@ impl MeshTransport {
             let device_os = device_os_rcv.clone();
             let models = models_rcv.clone();
             let view_only_client = view_only_client_rcv;
+            let outbound_queued_rcv_inner = Arc::clone(&outbound_queued_rcv);
 
             d.on_open(Box::new(move || {
                 let dc = Arc::clone(&dc_open);
                 let sync_rx = Arc::clone(&sync_rx_final);
                 let event_open = Arc::clone(&event_open);
                 let last_seen_open = Arc::clone(&last_seen_on_open);
+                let outbound_queued_dc = Arc::clone(&outbound_queued_rcv_inner);
                 Box::pin(async move {
                     event_open.on_log("DEBUG [receiver] data channel OPENED");
                     let _ = MeshManager::send_sync_message(
@@ -1182,6 +1218,11 @@ impl MeshTransport {
                                 ));
                                 let _ =
                                     MeshManager::send_sync_message(&dc, &msg).await;
+                                outbound_queued_dc.fetch_update(
+                                    std::sync::atomic::Ordering::Relaxed,
+                                    std::sync::atomic::Ordering::Relaxed,
+                                    |v| Some(v.saturating_sub(1)),
+                                );
                             }
                             _ = heartbeat.tick() => {
                                 let _ = MeshManager::send_sync_message(

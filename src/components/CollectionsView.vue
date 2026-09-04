@@ -1,5 +1,5 @@
 <template>
-  <div class="albums-container px-4 py-6">
+  <div class="albums-container">
     <v-fade-transition>
       <div v-if="isManualAlbum && selectedIds.length > 0" class="bulk-toolbar-container">
         <v-sheet
