@@ -198,7 +198,7 @@ function removeFilterChip(index: number): void {
 
       <AppToolbar v-if="currentPage === 'home' && !runtimeStore.isGuest" />
 
-      <v-main style="--v-layout-top: 0; --v-layout-bottom: 0; padding: 0;">
+      <v-main style="--v-layout-top: 0; --v-layout-bottom: 0; padding: 0">
         <ErrorBoundary :key="currentPage">
           <div data-tour="photos" class="w-100">
             <div
