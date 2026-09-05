@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en" data-theme="system">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thanks for Siegu Pro — download & next steps</title>
+  <meta name="description" content="Payment received. Download Siegu and activate Pro in a couple of quick steps." />
+  <meta name="robots" content="noindex, follow" />
+  <script>
+    (function () {
+      try {
+        var v = localStorage.getItem('siegu_theme');
+        var mode = ['light', 'dark', 'system'].indexOf(v) !== -1 ? v : 'system';
+        var dark = mode === 'dark' ||
+          (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      } catch (e) { /* noop */ }
+    })();
+  </script>
+  <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    .thanks-wrap { min-height: 100vh; }
+    .thanks-hero {
+      padding: 96px 24px 56px;
+      text-align: center;
+      max-width: var(--max);
+      margin: 0 auto;
+    }
+    .thanks-check {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: rgba(34,197,94,.14); color: var(--success);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 34px; margin: 0 auto 20px;
+    }
+    .thanks-hero h1 { font-size: clamp(28px, 4vw, 40px); margin: 0 0 12px; font-weight: 900; }
+    .thanks-hero p { color: var(--text-2); max-width: 560px; margin: 0 auto 8px; line-height: 1.6; }
+    .thanks-hero .sub { font-size: 15px; }
+    .steps { max-width: var(--max); margin: 8px auto 64px; padding: 0 24px; }
+    .step-row {
+      display: flex; gap: 18px; align-items: flex-start;
+      padding: 20px; border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--surface); margin-bottom: 14px;
+    }
+    .step-num {
+      flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%;
+      background: var(--ink); color: var(--on-ink);
+      display: flex; align-items: center; justify-content: center; font-weight: 900;
+    }
+    .step-row h3 { margin: 0 0 4px; font-size: 17px; font-weight: 700; }
+    .step-row p { margin: 0; color: var(--text-2); font-size: 14.5px; line-height: 1.6; }
+    .step-row p a { color: var(--ink); font-weight: 700; text-decoration: underline; }
+    .dl-title { text-align: center; font-size: clamp(20px, 3vw, 26px); font-weight: 800; margin: 0 0 6px; }
+    .dl-sub { text-align: center; color: var(--text-2); margin: 0 auto 28px; max-width: 520px; }
+    .dl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; max-width: 720px; margin: 0 auto; }
+    .dl-opt {
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      padding: 18px 12px; border: 1px solid var(--border); border-radius: 12px;
+      background: var(--surface); text-align: center; transition: border-color .15s, transform .15s;
+    }
+    .dl-opt:hover { border-color: var(--ink); transform: translateY(-2px); }
+    .dl-opt small { color: var(--text-3); font-size: 12px; }
+    .dl-opt .go { font-size: 13px; font-weight: 700; }
+    .dl-opt svg { width: 26px; height: 26px; }
+    .home-link { display: block; text-align: center; margin: 48px auto 72px; color: var(--text-2); }
+    .home-link a { color: var(--ink); font-weight: 700; }
+    .thanks-foot { border-top: 1px solid var(--border); padding: 24px; text-align: center; color: var(--text-3); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main class="thanks-wrap">
+    <section class="thanks-hero">
+      <div class="thanks-check">✓</div>
+      <h1>Payment received — you're all set for Siegu Pro</h1>
+      <p class="sub">You're moments from unlocking Pro. Grab the app, then activate it with the email you used at checkout. It's a two-minute job.</p>
+    </section>
+
+    <section class="steps">
+      <div class="step-row">
+        <div class="step-num">1</div>
+        <div>
+          <h3>Download Siegu</h3>
+          <p>Pick your platform below and grab the latest build. Every download is free and private — the Pro upgrade doesn't change that.</p>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-num">2</div>
+        <div>
+          <h3>Open Settings → Pro</h3>
+          <p>Launch Siegu, go to <strong>Settings → Pro</strong>, and enter the email address you used at checkout.</p>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-num">3</div>
+        <div>
+          <h3>Tap “Verify Pro”</h3>
+          <p>Siegu sends a confirmation link to that email. Tap it, and Pro unlocks automatically — reminders, live demo sharing, and all model packs included.</p>
+        </div>
+      </div>
+    </section>
+
+    <h2 class="dl-title">Your download</h2>
+    <p class="dl-sub">Choose your platform. Running into trouble? See <a href="https://github.com/denzyldick/siegu#how-do-i-install-it" target="_blank" rel="noopener" style="color:var(--ink);font-weight:700;">the other ways to run Siegu</a> in the docs.</p>
+    <div class="dl-grid" id="dlGrid"><!-- filled below --></div>
+
+    <span class="home-link"><a href="./">← Back to siegu home</a></span>
+  </main>
+
+  <footer class="thanks-foot">© <span id="year"></span> Siegu · <a href="./">Home</a> · <a href="https://github.com/denzyldick/siegu" target="_blank" rel="noopener">GitHub</a></footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    var RELEASE_API = 'https://api.github.com/repos/denzyldick/siegu/releases/latest';
+    var RELEASE_PAGE = 'https://github.com/denzyldick/siegu/releases/latest';
+
+    function byName(assets, re) {
+      var hit = assets.find(function (a) { return re.test(a.name); });
+      return hit ? hit.browser_download_url : null;
+    }
+    function osUrl(assets, os) {
+      var isArm = /arm|aarch64/i.test(navigator.userAgent);
+      if (os === 'windows') return byName(assets, /\.exe$/) || byName(assets, /\.msi$/) || RELEASE_PAGE;
+      if (os === 'linux') return byName(assets, /\.AppImage$/) || byName(assets, /\.deb$/) || RELEASE_PAGE;
+      if (os === 'android') return byName(assets, /\.apk$/) || RELEASE_PAGE;
+      if (os === 'macos') {
+        return (isArm
+          ? byName(assets, /aarch64.*\.dmg$/)
+          : byName(assets, /(amd64|x64).*\.dmg$/)) || byName(assets, /\.dmg$/) || RELEASE_PAGE;
+      }
+      return RELEASE_PAGE;
+    }
+
+    var ICONS = {
+      windows: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>',
+      macos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 5c-1.5-1.7-3.4-2-5-1.8a6.5 6.5 0 0 0 1.4 12.9c.7 0 1.6-.5 2.8-.5s2 .6 2.8.6c1.8 0 4-2.5 4-5 .9-1.8-.3-3.6-2-4-.3-1.1-1.8-2.6-4-2.2z"/><path d="M9.5 3.2c-.2-1.3.9-2.6 2.3-2.9"/></svg>',
+      linux: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3c-3 0-5 2.4-5 5.5 0 2 .6 3.6 1.3 5.4.5 1.2 1 2.3 1.2 3.6.2 1.7.9 3.5 2.5 3.5s2.3-1.8 2.5-3.5c.2-1.3.7-2.4 1.2-3.6.7-1.8 1.3-3.4 1.3-5.4C17 5.4 15 3 12 3z"/><path d="M12 3c-1 1.3-1 3.7 0 6.6.7 2 2 4 2.5 5.4.3.9.5 1.8.5 2.5" opacity=".5"/></svg>',
+      android: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M5 9v6M19 9v6"/><rect x="5" y="9" width="14" height="10" rx="2"/><path d="M8 9l-2-3M16 9l2-3M8 19v2M16 19v2"/></svg>',
+      web: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>'
+    };
+
+    var OPTS = [
+      { key: 'windows', label: 'Windows', arch: 'x64' },
+      { key: 'macos', label: 'macOS', arch: 'Apple Silicon' },
+      { key: 'linux', label: 'Linux', arch: 'AppImage' },
+      { key: 'android', label: 'Android', arch: 'APK' },
+      { key: 'web', label: 'Web / iOS', arch: 'coming soon', soon: true }
+    ];
+
+    function render(assets) {
+      var grid = document.getElementById('dlGrid');
+      grid.innerHTML = OPTS.map(function (o) {
+        var href = o.soon ? '#' : osUrl(assets, o.key);
+        var badge = o.soon ? '<small>' + (o.arch || '') + '</small>' : '<span class="go">Download ' + o.label.toLowerCase() + ' ↓</span>';
+        return '<a class="dl-opt" href="' + href + '" target="_blank" rel="noopener">' +
+          (ICONS[o.key] || '') + '<span>' + o.label + '</span>' + '<small>' + (o.arch || '') + '</small>' + badge +
+          '</a>';
+      }).join('');
+    }
+
+    fetch(RELEASE_API, { headers: { Accept: 'application/vnd.github+json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (rel) { render(Array.isArray(rel && rel.assets) ? rel.assets : []); })
+      .catch(function () { render([]); });
+  </script>
+</body>
+</html>
