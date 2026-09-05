@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Siegu documentation — getting started, guides, and support</title>
-  <meta name="description" content="Documentation and guides for Siegu, the private local-first photo library. Learn how to get started, organize your library, and use on-device AI search." />
+  <title>Siegu changelog — what’s new in every release</title>
+  <meta name="description" content="The changelog for Siegu, the private local-first photo library. Latest release highlights and the complete version history, in the open." />
   <script>
     (function () {
       try {
@@ -19,22 +19,22 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Siegu" />
-  <meta property="og:title" content="Siegu documentation — getting started, guides, and support" />
-  <meta property="og:description" content="Documentation and guides for Siegu, the private local-first photo library. Learn how to get started, organize your library, and use on-device AI search." />
-  <meta property="og:url" content="https://denzyldick.github.io/siegu/docs.html" />
+  <meta property="og:title" content="Siegu changelog — what’s new in every release" />
+  <meta property="og:description" content="The changelog for Siegu, the private local-first photo library. Latest release highlights and the complete version history, in the open." />
+  <meta property="og:url" content="https://denzyldick.github.io/siegu/changelog.html" />
   <meta property="og:image" content="https://denzyldick.github.io/siegu/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Siegu documentation — getting started, guides, and support" />
-  <meta name="twitter:description" content="Documentation and guides for Siegu, the private local-first photo library. Learn how to get started, organize your library, and use on-device AI search." />
+  <meta name="twitter:title" content="Siegu changelog — what’s new in every release" />
+  <meta name="twitter:description" content="The changelog for Siegu, the private local-first photo library. Latest release highlights and the complete version history, in the open." />
   <meta name="twitter:image" content="https://denzyldick.github.io/siegu/og-image.png" />
 
   <!-- SEO -->
-  <link rel="canonical" href="https://denzyldick.github.io/siegu/docs.html" />
+  <link rel="canonical" href="https://denzyldick.github.io/siegu/changelog.html" />
   <meta name="robots" content="index, follow" />
   <meta name="author" content="Denzyl Dick" />
-  <meta name="keywords" content="siegu docs, siegu documentation, photo library guide, local photo app help, siegu support" />
+  <meta name="keywords" content="siegu changelog, siegu release notes, siegu updates, photo library changelog, siegu versions" />
   <meta name="theme-color" content="#0b0b0b" />
   <meta property="og:locale" content="en_US" />
 
@@ -44,9 +44,9 @@
     "@graph": [
       {
         "@type": "WebPage",
-        "@id": "https://denzyldick.github.io/siegu/docs.html",
-        "url": "https://denzyldick.github.io/siegu/docs.html",
-        "name": "Siegu documentation — getting started, guides, and support",
+        "@id": "https://denzyldick.github.io/siegu/changelog.html",
+        "url": "https://denzyldick.github.io/siegu/changelog.html",
+        "name": "Siegu changelog — what’s new in every release",
         "isPartOf": { "@id": "https://denzyldick.github.io/siegu/#website" },
         "inLanguage": "en",
         "publisher": { "@id": "https://denzyldick.github.io/siegu/#organization" }
@@ -90,7 +90,7 @@
         <a href="index.html#features" data-i18n="nav.features">Features</a>
         <a href="pricing.html" data-i18n="nav.pricing">Pricing</a>
         <a href="faq.html" data-i18n="nav.faq">FAQ</a>
-        <a href="docs.html" class="is-active" data-i18n="nav.docs">Docs</a>
+        <a href="docs.html" data-i18n="nav.docs">Docs</a>
         <a href="download.html" data-i18n="nav.download">Download</a>
         <a href="https://siegu.onrender.com" data-i18n="nav.demo" target="_blank" rel="noopener" data-track="demo_clicked">Live demo</a>
       </nav>
@@ -116,22 +116,42 @@
 
     <section class="page-hero">
       <div class="container">
-        <p class="eyebrow">Documentation</p>
-        <h1>Siegu docs</h1>
-        <p class="sub">Guides, troubleshooting, and everything you need to get the most out of Siegu.</p>
+        <p class="eyebrow">Changelog</p>
+        <h1>What's new in Siegu</h1>
+        <p class="sub">Every release, in the open. Tags and full history live <a href="https://github.com/denzyldick/siegu/releases" target="_blank" rel="noopener" class="is-link">on GitHub</a>.</p>
       </div>
     </section>
 
     <section class="section page-body">
       <div class="container">
         <div class="narrow">
-          <p>Siegu is a private, local-first photo library. Your photos and metadata stay on your device, organized and searchable with on-device AI. You own your library — no cloud, no uploads, no lock-in.</p>
-          <p>The full documentation lives on GitHub, alongside the open-source code.</p>
-          <p>Popular topics:</p>
+          <h2>v0.1.17 &mdash; Latest</h2>
           <ul>
-            <li><a href="https://github.com/denzyldick/siegu/tree/main/docs" target="_blank" rel="noopener">Documentation home</a></li>
-            <li><a href="https://github.com/denzyldick/siegu/blob/main/README.md" target="_blank" rel="noopener">Readme &amp; getting started</a></li>
-            <li><a href="https://github.com/denzyldick/siegu" target="_blank" rel="noopener">Source code on GitHub</a></li>
+            <li>Seamless live-mirror: changes sync between your own devices in near real time.</li>
+            <li>Better duplicate detection during import.</li>
+            <li>Reliability pass: fsync-on-write, capped manifests, backpressure, and an edge-to-edge gallery.</li>
+            <li>Collection sharing: unblocked host, scoped guest access, and correct URLs.</li>
+            <li>Fixed order-dependent face-grouping splits during bulk analysis.</li>
+          </ul>
+
+          <h2>All versions</h2>
+          <ul class="changelog-list">
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.16">v0.1.16</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.15">v0.1.15</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.14">v0.1.14</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.13">v0.1.13</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.12">v0.1.12</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.11">v0.1.11</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.10-e2842a03f">v0.1.10</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.9-8dad9c0ea">v0.1.9</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.8">v0.1.8</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.7">v0.1.7</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.6">v0.1.6</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.5">v0.1.5</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.4">v0.1.4</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.3">v0.1.3</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.2">v0.1.2</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.1">v0.1.1</a></li>
           </ul>
         </div>
       </div>

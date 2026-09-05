@@ -74,6 +74,10 @@
       "desc": "Milhões de fotos, resultados instantâneos. Seu dispositivo faz o trabalho pesado."
     }
   },
+  "about": {
+    "eyebrow": "Sobre nós",
+    "title": "Uma biblioteca de fotos privada, para sempre"
+  },
   "showcase": {
     "eyebrow": "A biblioteca",
     "title": "Um lar para cada memória",

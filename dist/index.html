@@ -7,7 +7,7 @@
   <meta name="description" content="Siegu is a private, local-first photo library with on-device AI. Browse, search, share and relive your memories without handing them to the cloud." />
   <script>
     // Apply the saved theme before first paint to avoid a flash of the wrong
-    // palette. Mirrors applyTheme() in js/main.js?v=mtogj5tl (light | dark | system).
+    // palette. Mirrors applyTheme() in js/main.js?v=mtonxlci (light | dark | system).
     (function () {
       try {
         var v = localStorage.getItem('siegu_theme');
@@ -96,14 +96,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="css/styles.css?v=mtogj5tl" />
+  <link rel="stylesheet" href="css/styles.css?v=mtonxlci" />
 
   <!--
     MARKETING / TRACKER HOOK
     Drop vendor scripts (Plausible, Fathom, GA, Meta Pixel, Hotjar, …) here.
     Each snippet can live in its own file under /trackers/*.js and be included
     with a <script src> tag, or added inline below. They load only after the
-    cookie-consent banner has been accepted (see js/main.js?v=mtogj5tl `trackersOn`).
+    cookie-consent banner has been accepted (see js/main.js?v=mtonxlci `trackersOn`).
   -->
 </head>
 <body>
@@ -146,7 +146,11 @@
   <main id="main">
     <!-- Hero -->
     <section class="hero" id="top">
-      <div class="container">
+      <div class="hero-bg" id="heroBg" aria-hidden="true">
+        <!-- slide layers injected by js/main.js?v=mtonxlci from /slides.json -->
+      </div>
+      <div class="hero-scrim" aria-hidden="true"></div>
+      <div class="container hero-content">
         <span class="hero-badge"><span class="dot"></span><span data-i18n="hero.badge">Private by design · Local-first</span></span>
         <h1>
           <span data-i18n="hero.title1">Your photo library,</span><br />
@@ -160,16 +164,8 @@
         <p class="hero-note" data-i18n="hero.note">Windows · macOS · Linux · Web</p>
         <p class="hero-trust" data-i18n="hero.trust">Free forever · No account · Cancel anytime. <a href="pricing.html" data-i18n="hero.see_pro">See Pro →</a></p>
       </div>
-      <div class="container hero-visual">
-        <div class="carousel" id="heroCarousel" aria-roledescription="carousel" aria-label="Siegu in action">
-          <div class="carousel-viewport" id="carouselViewport">
-            <!-- slides injected by js/main.js?v=mtogj5tl from /slides.json -->
-          </div>
-          <button class="carousel-arrow carousel-prev" id="carouselPrev" type="button" aria-label="Previous slide">‹</button>
-          <button class="carousel-arrow carousel-next" id="carouselNext" type="button" aria-label="Next slide">›</button>
-          <div class="carousel-dots" id="carouselDots"></div>
-        </div>
-      </div>
+      <div class="hero-dots" id="carouselDots" aria-label="Slides"></div>
+      <span class="sr-only" id="heroSlideAnnouncer" aria-live="polite"></span>
     </section>
 
     <!-- Platform strip -->
@@ -302,7 +298,7 @@
       </div>
       <div class="container">
         <div class="pricing-grid" id="pricingGrid">
-          <!-- Plan cards injected by js/main.js?v=mtogj5tl -->
+          <!-- Plan cards injected by js/main.js?v=mtonxlci -->
         </div>
         <p class="pricing-note center" data-i18n="pricing.note">Prices in USD. Cancel anytime. No extra fees for more photos.</p>
       </div>
@@ -348,8 +344,8 @@
           <h5 data-i18n="footer.product">Product</h5>
           <a href="index.html#features" data-i18n="footer.product_links.features">Features</a>
           <a href="pricing.html" data-i18n="footer.product_links.pricing">Pricing</a>
-          <a href="#" data-i18n="footer.product_links.changelog">Changelog</a>
-          <a href="#" data-i18n="footer.product_links.roadmap">Roadmap</a>
+          <a href="changelog.html" data-i18n="footer.product_links.changelog">Changelog</a>
+          <a href="roadmap.html" data-i18n="footer.product_links.roadmap">Roadmap</a>
         </div>
         <div class="footer-col">
           <h5 data-i18n="footer.resources">Resources</h5>
@@ -360,14 +356,14 @@
         </div>
         <div class="footer-col">
           <h5 data-i18n="footer.company">Company</h5>
-          <a href="#" data-i18n="footer.company_links.about">About</a>
+          <a href="about.html" data-i18n="footer.company_links.about">About</a>
           <a href="https://github.com/denzyldick/siegu" target="_blank" rel="noopener" data-i18n="footer.company_links.github">GitHub</a>
-          <a href="#" data-i18n="footer.company_links.blog">Blog</a>
+          <a href="blog.html" data-i18n="footer.company_links.blog">Blog</a>
         </div>
       </div>
       <div class="footer-bottom">
         <span>© <span id="year"></span> siegu. <span data-i18n="footer.rights">All rights reserved.</span></span>
-        <a href="#" data-i18n="footer.legal">Privacy & Terms</a>
+        <a href="privacy.html" data-i18n="footer.legal">Privacy & Terms</a>
       </div>
     </div>
   </footer>
@@ -431,6 +427,6 @@
     </div>
   </div>
 
-  <script src="js/main.js?v=mtogj5tl"></script>
+  <script src="js/main.js?v=mtonxlci"></script>
 </body>
 </html>

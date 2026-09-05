@@ -154,8 +154,8 @@ const TAIL = `  </main>
           <h5 data-i18n="footer.product">Product</h5>
           <a href="index.html#features" data-i18n="footer.product_links.features">Features</a>
           <a href="pricing.html" data-i18n="footer.product_links.pricing">Pricing</a>
-          <a href="#" data-i18n="footer.product_links.changelog">Changelog</a>
-          <a href="#" data-i18n="footer.product_links.roadmap">Roadmap</a>
+          <a href="changelog.html" data-i18n="footer.product_links.changelog">Changelog</a>
+          <a href="roadmap.html" data-i18n="footer.product_links.roadmap">Roadmap</a>
         </div>
         <div class="footer-col">
           <h5 data-i18n="footer.resources">Resources</h5>
@@ -166,14 +166,14 @@ const TAIL = `  </main>
         </div>
         <div class="footer-col">
           <h5 data-i18n="footer.company">Company</h5>
-          <a href="#" data-i18n="footer.company_links.about">About</a>
+          <a href="about.html" data-i18n="footer.company_links.about">About</a>
           <a href="https://github.com/denzyldick/siegu" target="_blank" rel="noopener" data-i18n="footer.company_links.github">GitHub</a>
-          <a href="#" data-i18n="footer.company_links.blog">Blog</a>
+          <a href="blog.html" data-i18n="footer.company_links.blog">Blog</a>
         </div>
       </div>
       <div class="footer-bottom">
         <span>© <span id="year"></span> siegu. <span data-i18n="footer.rights">All rights reserved.</span></span>
-        <a href="#" data-i18n="footer.legal">Privacy & Terms</a>
+        <a href="privacy.html" data-i18n="footer.legal">Privacy & Terms</a>
       </div>
     </div>
   </footer>
@@ -373,6 +373,199 @@ const COMPARE_MAIN = `
       </div>
     </section>`;
 
+const ABOUT_MAIN = `
+    <section class="page-hero">
+      <div class="container">
+        <p class="eyebrow" data-i18n="about.eyebrow">About</p>
+        <h1 data-i18n="about.title">A private photo library, for good</h1>
+        <p class="sub">Siegu keeps your photos and videos on your device — and nowhere else.</p>
+      </div>
+    </section>
+
+    <section class="section page-body">
+      <div class="container">
+        <div class="narrow">
+          <p>Siegu is a privacy-first, local-only media manager. It organizes your library entirely on your machine: automatic scanning, EXIF extraction, map heatmaps, on-device AI search, face grouping, and encrypted peer-to-peer sync between devices you own.</p>
+          <p>No accounts. No uploads. No telemetry. Every AI feature runs locally via ONNX Runtime &mdash; the same capability, without sending a single photo elsewhere to get it.</p>
+
+          <h2>Why we're building it</h2>
+          <p>Modern photo services charge nothing up front and collect everything in exchange: your library, your faces, your location history. We believe a photo library is personal by definition. Siegu flips the model &mdash; the software runs where your photos already live, and &ldquo;free&rdquo; means free to use, never free in exchange for your data.</p>
+
+          <h2>Who's behind it</h2>
+          <p>Siegu is built by <a href="https://github.com/denzyldick" target="_blank" rel="noopener">Denzyl Dick</a>, in the open. The entire codebase is on GitHub and the roadmap is public. Because it's open source, you can read the code, audit what it does with your data, and run it exactly the way you want. There is no service to cancel.</p>
+
+          <p>Curious how it's made? <a href="https://github.com/denzyldick/siegu" target="_blank" rel="noopener">Browse the source on GitHub &rarr;</a></p>
+        </div>
+      </div>
+    </section>`;
+
+const CHANGELOG_MAIN = `
+    <section class="page-hero">
+      <div class="container">
+        <p class="eyebrow">Changelog</p>
+        <h1>What's new in Siegu</h1>
+        <p class="sub">Every release, in the open. Tags and full history live <a href="https://github.com/denzyldick/siegu/releases" target="_blank" rel="noopener" class="is-link">on GitHub</a>.</p>
+      </div>
+    </section>
+
+    <section class="section page-body">
+      <div class="container">
+        <div class="narrow">
+          <h2>v0.1.17 &mdash; Latest</h2>
+          <ul>
+            <li>Seamless live-mirror: changes sync between your own devices in near real time.</li>
+            <li>Better duplicate detection during import.</li>
+            <li>Reliability pass: fsync-on-write, capped manifests, backpressure, and an edge-to-edge gallery.</li>
+            <li>Collection sharing: unblocked host, scoped guest access, and correct URLs.</li>
+            <li>Fixed order-dependent face-grouping splits during bulk analysis.</li>
+          </ul>
+
+          <h2>All versions</h2>
+          <ul class="changelog-list">
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.16">v0.1.16</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.15">v0.1.15</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.14">v0.1.14</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.13">v0.1.13</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.12">v0.1.12</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.11">v0.1.11</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.10-e2842a03f">v0.1.10</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.9-8dad9c0ea">v0.1.9</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.8">v0.1.8</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.7">v0.1.7</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.6">v0.1.6</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.5">v0.1.5</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.4">v0.1.4</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.3">v0.1.3</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.2">v0.1.2</a></li>
+            <li><a href="https://github.com/denzyldick/siegu/commits/v0.1.1">v0.1.1</a></li>
+          </ul>
+        </div>
+      </div>
+    </section>`;
+
+const ROADMAP_MAIN = `
+    <section class="page-hero">
+      <div class="container">
+        <p class="eyebrow">Roadmap</p>
+        <h1>Where Siegu is headed</h1>
+        <p class="sub">A living list. Priorities shift with feedback &mdash; if something's missing, say so on GitHub.</p>
+      </div>
+    </section>
+
+    <section class="section page-body">
+      <div class="container">
+        <div class="narrow">
+          <h2>Now</h2>
+          <ul>
+            <li>Family sharing with end-to-end encryption between accounts you trust.</li>
+            <li>Mobile apps, starting with Android (already in the downloads).</li>
+            <li>Video improvements: trimming, smart previews, and richer metadata.</li>
+          </ul>
+
+          <h2>Next</h2>
+          <ul>
+            <li>Opt-in cloud sync for people who want off-device redundancy &mdash; end-to-end encrypted, never an upload of your library.</li>
+            <li>More on-device AI: natural-language queries across your whole library.</li>
+            <li>Set-by-set sharing with expiry and access control.</li>
+          </ul>
+
+          <h2>Later</h2>
+          <ul>
+            <li>iOS support.</li>
+            <li>A plugin system for custom pipelines and exporters.</li>
+          </ul>
+
+          <h2>Done</h2>
+          <ul>
+            <li>Semantic search with CLIP, running on your own hardware.</li>
+            <li>Face recognition, people groups, rename, and merge.</li>
+            <li>On-device captions (BLIP), objects (YOLO), OCR, aesthetics, depth maps, and Whisper transcription.</li>
+            <li>Encrypted peer-to-peer sync over WebRTC with mesh networking.</li>
+          </ul>
+
+          <p>Track progress and weigh in: <a href="https://github.com/denzyldick/siegu/issues" target="_blank" rel="noopener">GitHub issues &rarr;</a></p>
+        </div>
+      </div>
+    </section>`;
+
+const BLOG_MAIN = `
+    <section class="page-hero">
+      <div class="container">
+        <p class="eyebrow">Blog</p>
+        <h1>Notes from the Siegu project</h1>
+        <p class="sub">What it's like building a private, local-first photo library &mdash; from the person building it.</p>
+      </div>
+    </section>
+
+    <section class="section page-body">
+      <div class="container">
+        <div class="narrow">
+          <article class="blog-post">
+            <p class="blog-date">September 2026</p>
+            <h2>Why &ldquo;private by design&rdquo; beats a privacy policy</h2>
+            <p>Every photo service has a privacy policy. And every one of them <em>can</em> upload your photos. A policy just describes what a company may legally do with your data &mdash; it doesn't prevent anything.</p>
+            <p>Private by design means there is nothing to prevent, because there's nothing to take. Siegu runs its whole pipeline &mdash; indexing, search, face recognition, captions &mdash; on your own hardware. The &ldquo;cloud&rdquo; isn't where features live; it's what we avoid. That's a small difference in marketing and a huge difference in where your memories end up.</p>
+          </article>
+
+          <article class="blog-post">
+            <p class="blog-date">August 2026</p>
+            <h2>How a search engine for one person works</h2>
+            <p>Semantic search usually means uploading your library so a server can index it. Siegu does the same job with CLIP running locally through ONNX Runtime: describe a photo (&ldquo;sunsets at the beach&rdquo;) and it's found on your drive, not a data center.</p>
+            <p>Local AI is slower per query than a warehouse of GPUs, so the app indexes in the background and answers from a pre-computed index. You get the magic without shipping your memories anywhere.</p>
+          </article>
+        </div>
+      </div>
+    </section>`;
+
+const PRIVACY_MAIN = `
+    <section class="page-hero">
+      <div class="container">
+        <p class="eyebrow">Legal</p>
+        <h1>Privacy Policy &amp; Terms</h1>
+        <p class="sub">Short version: your photos never leave your device. What follows is the short version, in full.</p>
+      </div>
+    </section>
+
+    <section class="section page-body">
+      <div class="container">
+        <div class="narrow">
+          <h1 class="privacy-h">Privacy</h1>
+
+          <h3>Your media is local</h3>
+          <p>Siegu stores your photos, videos, and metadata only on your device. Nothing is uploaded for storage or processing. All AI features run locally via ONNX Runtime. This is a property of the software, not a promise.</p>
+
+          <h3>No accounts</h3>
+          <p>Siegu does not create user accounts and has no cloud backend to sign into. Sharing works peer-to-peer over encrypted, live connections between the devices you choose.</p>
+
+          <h3>This website</h3>
+          <p>The landing site uses Google Analytics to understand which pages are visited and roughly where visitors come from. It processes anonymized, aggregate data only &mdash; no photo content ever touches it.</p>
+
+          <h3>Waitlist emails</h3>
+          <p>If you join the waitlist via the family-plan form, the address you type is sent to Formspree (our form processor) and used solely to notify you when it launches. You can ask to be removed at any time by replying to any email.</p>
+
+          <h3>Purchases</h3>
+          <p>Pro payments are handled by Stripe. Card details go directly to them over TLS; Siegu never sees or stores them.</p>
+
+          <h3>Telemetry in the app</h3>
+          <p>The Siegu app sends no telemetry, analytics, or crash reports. There is no &ldquo;home call&rdquo; &mdash; by design.</p>
+
+          <h1 class="privacy-h">Terms</h1>
+
+          <h3>License</h3>
+          <p>Siegu is open source and distributed under an open license. You may use it for any lawful purpose and modify it under the terms of that license. See the <a href="https://github.com/denzyldick/siegu" target="_blank" rel="noopener">repository</a> for the exact text.</p>
+
+          <h3>No warranty</h3>
+          <p>Siegu is provided &ldquo;as is&rdquo;, without warranty of any kind. You are responsible for backing up your own library (which, being local, is entirely in your hands).</p>
+
+          <h3>Not medical / not legal advice</h3>
+          <p>Projections, plans, and estimates on this site are aspirational and may change. Nothing here constitutes professional advice.</p>
+
+          <h3>Contact</h3>
+          <p>Questions about this policy? Open an issue on <a href="https://github.com/denzyldick/siegu" target="_blank" rel="noopener">GitHub</a> and we'll respond publicly &mdash; the most transparent inbox there is.</p>
+        </div>
+      </div>
+    </section>`;
+
 const FAQPAGE_SCHEMA = [
   { q: 'Is my data really private?', a: 'Yes. Your photos and metadata stay on your device. Siegu uses on-device AI, so nothing is uploaded for processing.' },
   { q: 'Does Siegu work offline?', a: 'Absolutely. Your library is stored locally, so you can browse and search your photos anywhere — even without a connection.' },
@@ -498,6 +691,101 @@ const PAGES = [
       },
       ${SITE_SCHEMA_ORG}`,
     main: COMPARE_MAIN,
+  },
+  {
+    file: 'about.html',
+    active: 'about.html',
+    title: 'About Siegu — the private, local-first photo library',
+    description: 'Siegu is a privacy-first, local-only media manager. No accounts, no uploads, no telemetry — your photos and the AI that organizes them live on your device.',
+    keywords: 'about siegu, siegu team, private photo library, open source photo app, local-first software',
+    url: `${BASE}/about.html`,
+    schema: `{
+        "@type": "WebPage",
+        "@id": "${BASE}/about.html",
+        "url": "${BASE}/about.html",
+        "name": "About Siegu — the private, local-first photo library",
+        "isPartOf": { "@id": "${BASE}/#website" },
+        "inLanguage": "en",
+        "publisher": { "@id": "${BASE}/#organization" }
+      },
+      ${SITE_SCHEMA_ORG}`,
+    main: ABOUT_MAIN,
+  },
+  {
+    file: 'blog.html',
+    active: 'blog.html',
+    title: 'Siegu blog — notes from building a private photo library',
+    description: 'Thoughts on building a private, local-first photo library: why private by design beats a privacy policy, how on-device AI works, and more from the Siegu project.',
+    keywords: 'siegu blog, private photo library, local AI, on-device machine learning, open source photo app',
+    url: `${BASE}/blog.html`,
+    schema: `{
+        "@type": "WebPage",
+        "@id": "${BASE}/blog.html",
+        "url": "${BASE}/blog.html",
+        "name": "Siegu blog — notes from building a private photo library",
+        "isPartOf": { "@id": "${BASE}/#website" },
+        "inLanguage": "en",
+        "publisher": { "@id": "${BASE}/#organization" }
+      },
+      ${SITE_SCHEMA_ORG}`,
+    main: BLOG_MAIN,
+  },
+  {
+    file: 'changelog.html',
+    active: 'changelog.html',
+    title: 'Siegu changelog — what\u2019s new in every release',
+    description: 'The changelog for Siegu, the private local-first photo library. Latest release highlights and the complete version history, in the open.',
+    keywords: 'siegu changelog, siegu release notes, siegu updates, photo library changelog, siegu versions',
+    url: `${BASE}/changelog.html`,
+    schema: `{
+        "@type": "WebPage",
+        "@id": "${BASE}/changelog.html",
+        "url": "${BASE}/changelog.html",
+        "name": "Siegu changelog — what\u2019s new in every release",
+        "isPartOf": { "@id": "${BASE}/#website" },
+        "inLanguage": "en",
+        "publisher": { "@id": "${BASE}/#organization" }
+      },
+      ${SITE_SCHEMA_ORG}`,
+    main: CHANGELOG_MAIN,
+  },
+  {
+    file: 'roadmap.html',
+    active: 'roadmap.html',
+    title: 'Siegu roadmap — what\u2019s next for the private photo library',
+    description: 'The public roadmap for Siegu: family sharing, mobile apps, opt-in cloud sync, and more on-device AI. Progress tracked in the open on GitHub.',
+    keywords: 'siegu roadmap, siegu roadmap plan, photo library features, private photo app roadmap, on-device AI roadmap',
+    url: `${BASE}/roadmap.html`,
+    schema: `{
+        "@type": "WebPage",
+        "@id": "${BASE}/roadmap.html",
+        "url": "${BASE}/roadmap.html",
+        "name": "Siegu roadmap — what\u2019s next for the private photo library",
+        "isPartOf": { "@id": "${BASE}/#website" },
+        "inLanguage": "en",
+        "publisher": { "@id": "${BASE}/#organization" }
+      },
+      ${SITE_SCHEMA_ORG}`,
+    main: ROADMAP_MAIN,
+  },
+  {
+    file: 'privacy.html',
+    active: 'privacy.html',
+    title: 'Siegu Privacy Policy & Terms — your photos stay on your device',
+    description: 'Siegu privacy policy and terms of use: your photos never leave your device, no accounts, no telemetry, open source. This website uses analytics and Formspree for emails.',
+    keywords: 'siegu privacy, siegu terms, photo app privacy policy, local-first privacy, siegu legal',
+    url: `${BASE}/privacy.html`,
+    schema: `{
+        "@type": "WebPage",
+        "@id": "${BASE}/privacy.html",
+        "url": "${BASE}/privacy.html",
+        "name": "Siegu Privacy Policy & Terms — your photos stay on your device",
+        "isPartOf": { "@id": "${BASE}/#website" },
+        "inLanguage": "en",
+        "publisher": { "@id": "${BASE}/#organization" }
+      },
+      ${SITE_SCHEMA_ORG}`,
+    main: PRIVACY_MAIN,
   },
 ];
 

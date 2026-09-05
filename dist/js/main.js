@@ -462,12 +462,14 @@ function initTracking() {
   });
 }
 
-/* ---------- Hero carousel ---------- */
+/* ---------- Hero slide show ---------- */
 const carousel = {
   slides: [],
   index: 0,
   timer: null,
-  interval: 5000,
+  interval: 6000,
+  swipeStartX: null,
+  reduceMotion: false,
 };
 
 async function loadSlides() {
@@ -479,50 +481,77 @@ async function loadSlides() {
 }
 
 function renderCarousel() {
-  const viewport = document.getElementById('carouselViewport');
+  const bg = document.getElementById('heroBg');
+  if (!bg) return;
+  bg.innerHTML = carousel.slides
+    .map((s, i) => `<div class="hero-bg-slide ${i === 0 ? 'is-active' : ''}" data-i="${i}" style="background-image:url('${s.src}')"></div>`)
+    .join('');
   const dots = document.getElementById('carouselDots');
-  // First slide is active immediately; others fade in when the timer advances.
-  viewport.innerHTML = carousel.slides
-    .map((s, i) => `
-      <div class="carousel-slide ${i === 0 ? 'is-active' : ''}" data-i="${i}">
-        <img src="${s.src}" alt="${s.alt || ''}" loading="${i === 0 ? 'eager' : 'lazy'}" />
-        ${s.label ? `<div class="carousel-label">${s.label}</div>` : ''}
-      </div>`)
-    .join('');
-  dots.innerHTML = carousel.slides
-    .map((_, i) => `<button type="button" class="carousel-dot ${i === 0 ? 'is-active' : ''}" data-dot="${i}" aria-label="Slide ${i + 1}"></button>`)
-    .join('');
+  if (dots) {
+    dots.innerHTML = carousel.slides
+      .map((_, i) => `<button type="button" class="hero-dot ${i === 0 ? 'is-active' : ''}" data-dot="${i}" aria-label="Slide ${i + 1}"></button>`)
+      .join('');
+  }
+}
+
+function announceSlide() {
+  const announcer = document.getElementById('heroSlideAnnouncer');
+  if (!announcer) return;
+  announcer.textContent = `Slide ${carousel.index + 1} of ${carousel.slides.length}` +
+    (carousel.slides[carousel.index]?.label ? `: ${carousel.slides[carousel.index].label}` : '');
 }
 
 function goSlide(i) {
   carousel.index = ((i % carousel.slides.length) + carousel.slides.length) % carousel.slides.length;
-  document.querySelectorAll('.carousel-slide').forEach((el, idx) => el.classList.toggle('is-active', idx === carousel.index));
-  document.querySelectorAll('.carousel-dot').forEach((el, idx) => el.classList.toggle('is-active', idx === carousel.index));
+  document.querySelectorAll('.hero-bg-slide').forEach((el, idx) => el.classList.toggle('is-active', idx === carousel.index));
+  document.querySelectorAll('.hero-dot').forEach((el, idx) => el.classList.toggle('is-active', idx === carousel.index));
+  announceSlide();
 }
 
 function startCarousel() {
+  if (carousel.reduceMotion) return;
   stopCarousel();
   carousel.timer = setInterval(() => goSlide(carousel.index + 1), carousel.interval);
 }
 function stopCarousel() { if (carousel.timer) { clearInterval(carousel.timer); carousel.timer = null; } }
 
 function initCarousel() {
-  const car = document.getElementById('heroCarousel');
-  if (!car) return;
+  const hero = document.getElementById('top');
+  const bg = document.getElementById('heroBg');
+  if (!hero || !bg) return;
+  carousel.reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   renderCarousel();
+  announceSlide();
   startCarousel();
 
-  document.getElementById('carouselPrev').addEventListener('click', () => { goSlide(carousel.index - 1); startCarousel(); });
-  document.getElementById('carouselNext').addEventListener('click', () => { goSlide(carousel.index + 1); startCarousel(); });
-  document.getElementById('carouselDots').addEventListener('click', (e) => {
+  const dotsEl = document.getElementById('carouselDots');
+  if (dotsEl) dotsEl.addEventListener('click', (e) => {
     const d = e.target.closest('[data-dot]');
     if (!d) return;
     goSlide(Number(d.getAttribute('data-dot')));
     startCarousel();
   });
 
-  car.addEventListener('mouseenter', stopCarousel);
-  car.addEventListener('mouseleave', startCarousel);
+  // keyboard: arrow keys move the slide show; autoplay only while idle
+  hero.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') { goSlide(carousel.index - 1); startCarousel(); e.preventDefault(); }
+    if (e.key === 'ArrowRight') { goSlide(carousel.index + 1); startCarousel(); e.preventDefault(); }
+  });
+
+  // pause while interacting with the hero, resume on leave (unless reduced motion)
+  hero.addEventListener('mouseenter', stopCarousel);
+  hero.addEventListener('mouseleave', startCarousel);
+  hero.addEventListener('touchstart', stopCarousel, { passive: true });
+
+  // swipe navigation
+  bg.addEventListener('touchstart', (e) => { carousel.swipeStartX = e.touches[0].clientX; }, { passive: true });
+  bg.addEventListener('touchend', (e) => {
+    if (carousel.swipeStartX === null) return;
+    const dx = e.changedTouches[0].clientX - carousel.swipeStartX;
+    if (Math.abs(dx) > 50) { goSlide(carousel.index + (dx < 0 ? 1 : -1)); startCarousel(); }
+    carousel.swipeStartX = null;
+  }, { passive: true });
+
   // pause when tab hidden
   document.addEventListener('visibilitychange', () => (document.hidden ? stopCarousel() : startCarousel()));
 }
@@ -855,7 +884,7 @@ async function boot() {
 
   initTracking();
 
-  if (document.getElementById('heroCarousel')) {
+  if (document.getElementById('heroBg')) {
     await loadSlides();
     initCarousel();
   }

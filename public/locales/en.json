@@ -74,6 +74,10 @@
       "desc": "Millions of photos, instant results. Your device does the heavy lifting."
     }
   },
+  "about": {
+    "eyebrow": "About",
+    "title": "A private photo library, for good"
+  },
   "showcase": {
     "eyebrow": "The library",
     "title": "A home for every memory",

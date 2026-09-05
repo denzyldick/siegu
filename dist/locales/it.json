@@ -74,6 +74,10 @@
       "desc": "Milioni di foto, risultati istantanei. È il tuo dispositivo a fare il lavoro pesante."
     }
   },
+  "about": {
+    "eyebrow": "Chi siamo",
+    "title": "Una fototeca privata, per sempre"
+  },
   "showcase": {
     "eyebrow": "La libreria",
     "title": "Una casa per ogni ricordo",

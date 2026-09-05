@@ -146,7 +146,11 @@
   <main id="main">
     <!-- Hero -->
     <section class="hero" id="top">
-      <div class="container">
+      <div class="hero-bg" id="heroBg" aria-hidden="true">
+        <!-- slide layers injected by js/main.js from /slides.json -->
+      </div>
+      <div class="hero-scrim" aria-hidden="true"></div>
+      <div class="container hero-content">
         <span class="hero-badge"><span class="dot"></span><span data-i18n="hero.badge">Private by design · Local-first</span></span>
         <h1>
           <span data-i18n="hero.title1">Your photo library,</span><br />
@@ -160,16 +164,8 @@
         <p class="hero-note" data-i18n="hero.note">Windows · macOS · Linux · Web</p>
         <p class="hero-trust" data-i18n="hero.trust">Free forever · No account · Cancel anytime. <a href="pricing.html" data-i18n="hero.see_pro">See Pro →</a></p>
       </div>
-      <div class="container hero-visual">
-        <div class="carousel" id="heroCarousel" aria-roledescription="carousel" aria-label="Siegu in action">
-          <div class="carousel-viewport" id="carouselViewport">
-            <!-- slides injected by js/main.js from /slides.json -->
-          </div>
-          <button class="carousel-arrow carousel-prev" id="carouselPrev" type="button" aria-label="Previous slide">‹</button>
-          <button class="carousel-arrow carousel-next" id="carouselNext" type="button" aria-label="Next slide">›</button>
-          <div class="carousel-dots" id="carouselDots"></div>
-        </div>
-      </div>
+      <div class="hero-dots" id="carouselDots" aria-label="Slides"></div>
+      <span class="sr-only" id="heroSlideAnnouncer" aria-live="polite"></span>
     </section>
 
     <!-- Platform strip -->
@@ -348,8 +344,8 @@
           <h5 data-i18n="footer.product">Product</h5>
           <a href="index.html#features" data-i18n="footer.product_links.features">Features</a>
           <a href="pricing.html" data-i18n="footer.product_links.pricing">Pricing</a>
-          <a href="#" data-i18n="footer.product_links.changelog">Changelog</a>
-          <a href="#" data-i18n="footer.product_links.roadmap">Roadmap</a>
+          <a href="changelog.html" data-i18n="footer.product_links.changelog">Changelog</a>
+          <a href="roadmap.html" data-i18n="footer.product_links.roadmap">Roadmap</a>
         </div>
         <div class="footer-col">
           <h5 data-i18n="footer.resources">Resources</h5>
@@ -360,14 +356,14 @@
         </div>
         <div class="footer-col">
           <h5 data-i18n="footer.company">Company</h5>
-          <a href="#" data-i18n="footer.company_links.about">About</a>
+          <a href="about.html" data-i18n="footer.company_links.about">About</a>
           <a href="https://github.com/denzyldick/siegu" target="_blank" rel="noopener" data-i18n="footer.company_links.github">GitHub</a>
-          <a href="#" data-i18n="footer.company_links.blog">Blog</a>
+          <a href="blog.html" data-i18n="footer.company_links.blog">Blog</a>
         </div>
       </div>
       <div class="footer-bottom">
         <span>© <span id="year"></span> siegu. <span data-i18n="footer.rights">All rights reserved.</span></span>
-        <a href="#" data-i18n="footer.legal">Privacy & Terms</a>
+        <a href="privacy.html" data-i18n="footer.legal">Privacy & Terms</a>
       </div>
     </div>
   </footer>
