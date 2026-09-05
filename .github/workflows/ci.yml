@@ -1,0 +1,60 @@
+name: verify + deploy
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: npm run check (translations, routes, page integrity)
+        run: npm run check
+
+      - name: Regenerated subpages must match what was committed
+        run: |
+          npm run build:pages
+          git diff --exit-code -- public/about.html public/blog.html public/changelog.html public/compare.html public/docs.html public/download.html public/faq.html public/pricing.html public/privacy.html public/roadmap.html
+
+      - name: Static build must succeed (dev mode, no secrets)
+        run: npm run build
+
+  deploy:
+    if: github.ref == 'refs/heads/master'
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build (STRICT) bakes Stripe Payment Links from secrets
+        env:
+          STRICT: '1'
+          STRIPE_PRO_PAYMENT_LINK_MONTHLY: ${{ secrets.STRIPE_PRO_PAYMENT_LINK_MONTHLY }}
+          STRIPE_PRO_PAYMENT_LINK_YEARLY: ${{ secrets.STRIPE_PRO_PAYMENT_LINK_YEARLY }}
+          GA_MEASUREMENT_ID: ${{ secrets.GA_MEASUREMENT_ID }}
+        run: npm run build:strict
+
+      - name: Payment regression guard — fail if Pay button would be inert
+        run: npm run check:dist
+
+      - name: Deploy ./dist to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          keep_files: true
