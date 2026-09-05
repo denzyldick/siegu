@@ -2925,6 +2925,136 @@ impl Database {
         self.update_person_centroid(to_id);
     }
 
+    /// Repair order-dependent oversplits after an analysis session.
+    ///
+    /// The streaming per-photo assignment joins a face to an existing person
+    /// only when cosine similarity to that person's centroid exceeds the match
+    /// threshold, and the centroid is initially the first face's embedding.
+    /// When two photos of the same person land just under/over the boundary in
+    /// different orders, the person can be split across anonymous groups. This
+    /// merges those split groups back together using averaged group centroids,
+    /// which are far more reliable than any single face.
+    ///
+    /// Only people in `person_ids` that still exist and are unnamed are ever
+    /// merged (named people are never modified). Returns the surviving
+    /// `(id, averaged centroid)` pairs and the ids that were merged away so
+    /// callers can keep in-memory state consistent.
+    pub fn merge_similar_anonymous_people(
+        &self,
+        person_ids: &[String],
+        threshold: f32,
+    ) -> (Vec<(String, Vec<f32>)>, Vec<String>) {
+        let centroid_of = |embs: &[Vec<f32>]| -> Option<Vec<f32>> {
+            let len = embs.first()?.len();
+            let mut sum = vec![0.0f32; len];
+            for emb in embs {
+                for (s, v) in sum.iter_mut().zip(emb.iter()) {
+                    *s += v;
+                }
+            }
+            let norm: f32 = sum.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm <= 0.0 {
+                return None;
+            }
+            for s in sum.iter_mut() {
+                *s /= norm;
+            }
+            Some(sum)
+        };
+        let cosine =
+            |a: &[f32], b: &[f32]| -> f32 { a.iter().zip(b.iter()).map(|(x, y)| x * y).sum() };
+
+        let mut candidates: Vec<(String, Vec<Vec<f32>>)> = Vec::new();
+        {
+            let Ok(mut name_stmt) = self
+                .connection
+                .prepare("SELECT name FROM people WHERE id = ?1")
+            else {
+                return (Vec::new(), Vec::new());
+            };
+            let Ok(mut face_stmt) = self
+                .connection
+                .prepare("SELECT embedding FROM faces WHERE person_id = ?1")
+            else {
+                return (Vec::new(), Vec::new());
+            };
+            for pid in person_ids {
+                // Missing people and named people are never merged.
+                let Ok(None) = name_stmt.query_row([pid], |r| r.get::<_, Option<String>>(0)) else {
+                    continue;
+                };
+                let mut embeddings = Vec::new();
+                if let Ok(rows) = face_stmt.query_map([pid], |r| r.get::<_, Vec<u8>>(0)) {
+                    for row in rows.flatten() {
+                        let emb: Vec<f32> = row
+                            .chunks_exact(4)
+                            .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+                            .collect();
+                        if emb.len() == 512 {
+                            embeddings.push(emb);
+                        }
+                    }
+                }
+                if !embeddings.is_empty() {
+                    candidates.push((pid.to_string(), embeddings));
+                }
+            }
+        }
+
+        if candidates.len() < 2 {
+            let single: Vec<(String, Vec<f32>)> = candidates
+                .into_iter()
+                .filter_map(|(id, embs)| centroid_of(&embs).map(|c| (id, c)))
+                .collect();
+            return (single, Vec::new());
+        }
+
+        // Seed from the largest groups first: their averaged centroid is the
+        // most reliable reference to absorb the (smaller) oversplit pieces.
+        candidates.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+
+        let mut groups: Vec<(String, Vec<f32>, usize)> = Vec::new();
+        let mut dropped: Vec<String> = Vec::new();
+        for (pid, embs) in &candidates {
+            let Some(centroid) = centroid_of(embs) else {
+                continue;
+            };
+            let count = embs.len();
+            let mut best: Option<(usize, f32)> = None;
+            for (gi, (_, gcentroid, _)) in groups.iter().enumerate() {
+                let sim = cosine(&centroid, gcentroid);
+                if best.map_or(true, |(_, bs)| sim > bs) {
+                    best = Some((gi, sim));
+                }
+            }
+            if let Some((gi, sim)) = best {
+                if sim > threshold {
+                    let (gid, gcentroid, gcount) = &mut groups[gi];
+                    self.merge_people(pid, gid);
+                    let total = *gcount + count;
+                    for k in 0..gcentroid.len() {
+                        gcentroid[k] = (gcentroid[k] * *gcount as f32 + centroid[k] * count as f32)
+                            / total as f32;
+                    }
+                    let gnorm: f32 = gcentroid.iter().map(|x| x * x).sum::<f32>().sqrt();
+                    if gnorm > 0.0 {
+                        for v in gcentroid.iter_mut() {
+                            *v /= gnorm;
+                        }
+                    }
+                    *gcount = total;
+                    dropped.push(pid.clone());
+                    continue;
+                }
+            }
+            groups.push((pid.clone(), centroid, count));
+        }
+
+        let survivors: Vec<(String, Vec<f32>)> =
+            groups.into_iter().map(|(id, c, _)| (id, c)).collect();
+        (survivors, dropped)
+    }
+
     /// Rename a person record.
     pub fn rename_person(&self, id: &str, new_name: &str) {
         if let Err(e) = self
@@ -5019,6 +5149,109 @@ mod tests {
         let (photos, videos) = db.get_media_counts();
         assert!(photos >= 0);
         assert!(videos >= 0);
+    }
+
+    /// 512-d unit vector lying in the first two coordinates at the given angle
+    /// (degrees). Dot products between two helpers are the cosine of the angle
+    /// difference, which makes similarity relationships easy to see.
+    fn unit_embed(deg: f32) -> Vec<f32> {
+        let rad = deg.to_radians();
+        let mut v = vec![0.0f32; 512];
+        v[0] = rad.cos();
+        v[1] = rad.sin();
+        v
+    }
+
+    fn store_face_embed(db: &Database, person: &str, face: &str, deg: f32) {
+        db.store_face(Face {
+            photo_id: "p".to_string(),
+            face_id: face.to_string(),
+            crop_path: String::new(),
+            encoded: String::new(),
+            embedding: unit_embed(deg),
+            person_id: Some(person.to_string()),
+        });
+    }
+
+    #[test]
+    fn test_merge_similar_anonymous_people_repairs_oversplit() {
+        let db = test_db();
+
+        // Group A = {25°, -25°, -20°}: every face is > 0.5 similar to every
+        // other (max 50° apart). Group B = {50°}: 0.54 similar to A's averaged
+        // centroid (> 0.5, so it must merge) yet < 0.5 similar to two of A's
+        // faces. That is exactly the order-dependent oversplit produced by the
+        // streaming per-photo assignment when it seeds a group from a single
+        // face, and what the merge pass must repair.
+        store_face_embed(&db, "A", "f1", 25.0);
+        store_face_embed(&db, "A", "f2", -25.0);
+        store_face_embed(&db, "A", "f3", -20.0);
+        store_face_embed(&db, "B", "f4", 50.0);
+        db.create_anonymous_people(&[
+            ("A".to_string(), unit_embed(25.0)),
+            ("B".to_string(), unit_embed(50.0)),
+        ]);
+
+        let (kept, dropped) =
+            db.merge_similar_anonymous_people(&["A".to_string(), "B".to_string()], 0.5);
+
+        assert_eq!(dropped, vec!["B".to_string()]);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].0, "A");
+        assert_eq!(db.get_anonymous_people_groups().len(), 1);
+
+        let grouped: Vec<Option<String>> = db
+            .connection
+            .prepare("SELECT person_id FROM faces")
+            .unwrap()
+            .query_map([], |r| r.get::<_, Option<String>>(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(grouped.len(), 4);
+        assert!(grouped.iter().all(|p| p.as_deref() == Some("A")));
+    }
+
+    #[test]
+    fn test_merge_similar_anonymous_people_never_touches_named() {
+        let db = test_db();
+        store_face_embed(&db, "A", "f1", 25.0);
+        store_face_embed(&db, "B", "f4", 50.0);
+        db.create_anonymous_people(&[
+            ("A".to_string(), unit_embed(25.0)),
+            ("B".to_string(), unit_embed(50.0)),
+        ]);
+        db.rename_person("B", "Bob");
+
+        let (_, dropped) =
+            db.merge_similar_anonymous_people(&["A".to_string(), "B".to_string()], 0.5);
+
+        assert!(dropped.is_empty(), "named person must never be merged");
+        // A stays its own anonymous group; B stays named with its own face.
+        assert_eq!(db.get_anonymous_people_groups().len(), 1);
+        let b_owner: Option<String> = db
+            .connection
+            .query_row(
+                "SELECT person_id FROM faces WHERE face_id = 'f4'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(b_owner.as_deref(), Some("B"));
+    }
+
+    #[test]
+    fn test_merge_similar_anonymous_people_single_candidate_noop() {
+        let db = test_db();
+        store_face_embed(&db, "A", "f1", 25.0);
+        db.create_anonymous_people(&[("A".to_string(), unit_embed(25.0))]);
+
+        let (kept, dropped) = db.merge_similar_anonymous_people(&["A".to_string()], 0.5);
+
+        assert!(dropped.is_empty());
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].0, "A");
+        assert_eq!(db.get_anonymous_people_groups().len(), 1);
     }
 
     #[test]

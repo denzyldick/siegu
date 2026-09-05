@@ -16,6 +16,16 @@ type ScanPool = Arc<Mutex<Option<(usize, Arc<rayon::ThreadPool>)>>>;
 /// single transaction (see [`pipeline::flush_results_batch_to_db`]).
 const FLUSH_BATCH_SIZE: usize = 32;
 
+/// Cosine-similarity gate for re-merging oversplit anonymous people after a
+/// bulk analysis job. Averaged group centroids are reliable enough that 0.5
+/// separates the same person's photos while keeping distinct people apart.
+const FACE_SIM_MERGE_THRESHOLD: f32 = 0.5;
+
+/// Upper bound on session-created anonymous people considered by the
+/// post-analysis merge pass; recombination is O(P²), so huge fresh imports
+/// simply skip it rather than stall the worker.
+const MAX_MERGE_CANDIDATES: usize = 4096;
+
 /// Pacing delay (in milliseconds) applied between batches of a bulk analysis
 /// job. Parsed from the `batch_delay_ms` config value; clamped to 0..=2000.
 pub fn batch_delay_ms_from_config(config: &HashMap<String, String>) -> u64 {
@@ -474,6 +484,13 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                         }
                     };
 
+                // Anonymous people created during this job. The streaming
+                // per-photo match can oversplit one person into several groups
+                // when a face lands just under/over the similarity threshold,
+                // so after the job drains we merge those groups again (see
+                // merge_similar_anonymous_people).
+                let mut session_people_ids: Vec<String> = Vec::new();
+
                 for batch in photo_ids_batches {
                     if abort_flag.load(Ordering::SeqCst) {
                         break;
@@ -576,6 +593,9 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                                 }
                                 new_people
                             };
+                            for (id, _) in &new_people {
+                                session_people_ids.push(id.clone());
+                            }
                             if !new_people.is_empty() {
                                 let mut m = models_ref.lock().unwrap_or_else(|e| e.into_inner());
                                 if let Some(models) = m.as_mut() {
@@ -634,6 +654,31 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
 
                     if batch_delay_ms > 0 {
                         std::thread::sleep(Duration::from_millis(batch_delay_ms));
+                    }
+                }
+
+                if !session_people_ids.is_empty()
+                    && session_people_ids.len() <= MAX_MERGE_CANDIDATES
+                {
+                    let (kept, dropped) = {
+                        let db = db_ref.lock().unwrap_or_else(|e| e.into_inner());
+                        db.merge_similar_anonymous_people(
+                            &session_people_ids,
+                            FACE_SIM_MERGE_THRESHOLD,
+                        )
+                    };
+                    if !dropped.is_empty() {
+                        let mut m = models_ref.lock().unwrap_or_else(|e| e.into_inner());
+                        if let Some(models) = m.as_mut() {
+                            models.known_people.retain(|(id, _)| !dropped.contains(id));
+                            for (id, centroid) in kept {
+                                if let Some(entry) =
+                                    models.known_people.iter_mut().find(|(kid, _)| *kid == id)
+                                {
+                                    entry.1 = centroid;
+                                }
+                            }
+                        }
                     }
                 }
 

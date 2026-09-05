@@ -73,8 +73,11 @@ echo "$OUT"
 echo "== assertions =="
 # NOTE: use grep -oE / sed (not grep -oP) so the script is portable to macOS BSD grep.
 PEOPLE_TOTAL="$(echo "$OUT" | grep -oE 'people_total=[0-9]+' | sed -E 's/people_total=//' | head -1)"
+# Grouping is now repaired by a post-analysis merge over averaged centroids, so
+# the ground truth is the final person groups in the summary (person id= lines)
+# rather than the transient per-photo assignment echoed live during analysis.
 DISTINCT_PEOPLE="$(echo "$OUT" \
-  | grep -oE 'people=\[[^]]*\]' \
+  | grep -oE 'person id=[0-9a-fA-F-]+' \
   | grep -oE '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}' \
   | sort -u | wc -l)"
 NSFW_CNT="$(echo "$OUT" | grep -oE 'nsfw=[^ ]+' | sed -E 's/nsfw=//' | grep -v '^-$' | wc -l)"
