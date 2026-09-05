@@ -46,13 +46,29 @@ const server = createServer(async (req, res) => {
   const urlPath = (req.url || '/').split('?')[0];
   let filePath = safeResolve(urlPath);
 
-  try {
-    let st = await stat(filePath);
-    if (st.isDirectory()) {
-      filePath = join(filePath, 'index.html');
-      st = await stat(filePath);
+  const tryStat = async (p) => {
+    try {
+      const st = await stat(p);
+      return st.isFile() ? st : null;
+    } catch {
+      return null;
     }
-    if (!st.isFile()) throw new Error('not a file');
+  };
+
+  try {
+    let st = await tryStat(filePath);
+    if (!st) {
+      // Directory index, then extensionless subpages (/pricing -> pricing.html).
+      const dirIndex = await tryStat(join(filePath, 'index.html'));
+      if (dirIndex) {
+        filePath = join(filePath, 'index.html');
+        st = dirIndex;
+      } else if (!extname(filePath)) {
+        const alt = await tryStat(filePath + '.html');
+        if (alt) { filePath += '.html'; st = alt; }
+      }
+    }
+    if (!st) throw new Error('not a file');
     const ext = extname(filePath).toLowerCase();
     const body = await readFile(filePath);
     res.writeHead(200, {

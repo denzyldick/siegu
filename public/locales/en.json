@@ -7,8 +7,25 @@
     "features": "Features",
     "pricing": "Pricing",
     "faq": "FAQ",
+    "compare": "vs Google Photos",
+    "docs": "Docs",
+    "download": "Download",
     "get_free": "Get siegu free",
     "demo": "Live demo"
+  },
+  "search": {
+    "trigger_label": "Search (Ctrl+K)",
+    "placeholder": "Search…",
+    "aria": "Quick search",
+    "no_results": "No results",
+    "nav": "to navigate",
+    "select": "to select",
+    "theme": "Theme",
+    "toggle": "Toggle",
+    "resources": "Resources",
+    "docs": "Guides and docs for getting the most out of Siegu.",
+    "demo": "Try Siegu live in your browser.",
+    "source": "Browse and contribute to the open-source code."
   },
   "hero": {
     "badge": "Private by design · Local-first",
@@ -109,8 +126,7 @@
       "features": [
         "Everything in Pro",
         "Up to 6 members",
-        "Invitational management",
-        "Dedicated home hub"
+        "Invitational management"
       ],
       "cta": "Choose Family"
     }

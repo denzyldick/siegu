@@ -7,6 +7,14 @@
 	encode gzip
 
 	root * /srv
+
+	# Extensionless subpages: /pricing -> pricing.html, /faq -> faq.html, etc.
+	@noext {
+		path_regexp noext ^/([a-zA-Z0-9_-]+)/?$
+		not path_regexp has_ext \.([a-z0-9]+)$
+	}
+	rewrite @noext /{re.noext.1}.html
+
 	try_files {path} {path}/ /index.html
 	file_server
 

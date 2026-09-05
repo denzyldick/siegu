@@ -7,8 +7,25 @@
     "features": "Functies",
     "pricing": "Prijzen",
     "faq": "FAQ",
+    "compare": "vs Google Foto's",
+    "docs": "Documentatie",
+    "download": "Download",
     "get_free": "Download siegu gratis",
     "demo": "Live demo"
+  },
+  "search": {
+    "trigger_label": "Zoeken (Ctrl+K)",
+    "placeholder": "Zoeken…",
+    "aria": "Snel zoeken",
+    "no_results": "Geen resultaten",
+    "nav": "om te navigeren",
+    "select": "om te selecteren",
+    "theme": "Thema",
+    "toggle": "Wisselen",
+    "resources": "Bronnen",
+    "docs": "Handleidingen en documentatie om het beste uit Siegu te halen.",
+    "demo": "Bekijk Siegu live in je browser.",
+    "source": "Bekijk en draag bij aan de open-source code."
   },
   "hero": {
     "badge": "Privé door ontwerp · Local-first",
@@ -109,8 +126,7 @@
       "features": [
         "Alles in Pro",
         "Tot 6 leden",
-        "Uitnodigingsbeheer",
-        "Gewijd home-hub"
+        "Uitnodigingsbeheer"
       ],
       "cta": "Kies Familie"
     }

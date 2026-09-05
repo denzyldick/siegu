@@ -7,8 +7,25 @@
     "features": "Funshon",
     "pricing": "Precio",
     "faq": "FAQ",
+    "compare": "vs Google Foto",
+    "docs": "Dokumentashon",
+    "download": "Download",
     "get_free": "Download siegu gratis",
     "demo": "Demo biba"
+  },
+  "search": {
+    "trigger_label": "Buska (Ctrl+K)",
+    "placeholder": "Buska…",
+    "aria": "Búskeda rápido",
+    "no_results": "Niun resultado",
+    "nav": "pa nabegá",
+    "select": "pa selekshoná",
+    "theme": "Tema",
+    "toggle": "Troka",
+    "resources": "Rekursonan",
+    "docs": "Guias i dokumentashon pa saká mihó di Siegu.",
+    "demo": "Proba Siegu biba den bo browser.",
+    "source": "Mira i kontribuí na e kódigo di fuente habrí."
   },
   "hero": {
     "badge": "Privá pa diseño · Lokal-promé",
@@ -109,8 +126,7 @@
       "features": [
         "Tur kos na Pro",
         "Tei 6 miembro",
-        "Maneho pa invitashon",
-        "Hub familiar dediká"
+        "Maneho pa invitashon"
       ],
       "cta": "Skuèchi Familia"
     }
