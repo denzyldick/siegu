@@ -318,6 +318,33 @@ pub fn dispatch(ctx: &RpcContext, name: &str, payload: &Value) -> Result<Value, 
             let id = payload.must_str("id")?;
             Ok(json!(db.get_photo_ocr(&id)))
         }
+        "get_photo_transcript" => {
+            let id = payload.must_str("id")?;
+            Ok(json!(db.get_photo_transcript(&id)))
+        }
+        "get_model_timings" => {
+            let id = payload.must_str("id")?;
+            Ok(json!(db.get_model_timings(&id)))
+        }
+        "get_model_timing_averages" => Ok(json!(db.get_model_timing_averages())),
+        "find_duplicates" => {
+            let include_clip = payload.bool_or("include_clip", false)?;
+            Ok(json!(crate::duplicates::detect_all_view(&db, include_clip)))
+        }
+        "duplicate_stats" => {
+            let include_clip = payload.bool_or("include_clip", false)?;
+            Ok(json!(crate::duplicates::duplicate_stats(&db, include_clip)))
+        }
+        "trash_duplicate_members" => {
+            let ids = payload.string_vec("ids")?;
+            let mut trashed = 0usize;
+            for id in &ids {
+                if db.trash_photo(id).is_ok() {
+                    trashed += 1;
+                }
+            }
+            Ok(json!(trashed))
+        }
         "get_heatmap_data" => Ok(to_json(&db.get_heatmap_points(), json!([]))),
         "day_counts" => {
             let from = payload.opt_str("from")?.unwrap_or_default();

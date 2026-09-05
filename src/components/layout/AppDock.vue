@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { useUiStore } from '@/stores/ui';
 import { useScanStore } from '@/stores/scan';
 import { useRuntimeStore } from '@/stores/runtime';
+import { useDuplicatesStore } from '@/stores/duplicates';
 import { normalizeIndexingCount, formatEta } from '@/composables/useMediaUtils';
 import logo from '@/assets/logo.png';
 
@@ -11,6 +12,7 @@ const { t } = useI18n();
 const uiStore = useUiStore();
 const scanStore = useScanStore();
 const runtimeStore = useRuntimeStore();
+const dupeStore = useDuplicatesStore();
 
 // Hide the dock while the user is scrolling the page; it reappears once
 // scrolling stops (idle) or when hovered.
@@ -74,6 +76,13 @@ const allNavItems = [
     label: 'dock.devices' as const,
   },
   {
+    page: 'duplicates' as const,
+    icon: 'mdi-file-multiple-outline',
+    tour: 'dock-duplicates',
+    useLogo: false,
+    label: 'dock.duplicates' as const,
+  },
+  {
     page: 'settings' as const,
     icon: 'mdi-cog-outline',
     tour: 'dock-settings',
@@ -93,6 +102,7 @@ const navItems = computed(() => {
 
 const isIndexing = computed(() => scanStore.isActive);
 const jobsLeft = computed(() => normalizeIndexingCount(scanStore.indexingCount));
+const dupeCount = computed(() => dupeStore.stats?.group_count ?? 0);
 const statusLabel = computed(() => {
   if (!scanStore.isActive) return '';
   if (scanStore.status === 'scanning') return t('sync.scanning');
@@ -114,7 +124,9 @@ const tooltipText = computed(() => {
   return statusLabel.value;
 });
 
-function navigate(page: 'home' | 'collections' | 'location' | 'devices' | 'settings'): void {
+function navigate(
+  page: 'home' | 'collections' | 'location' | 'devices' | 'duplicates' | 'settings',
+): void {
   uiStore.setPage(page);
 }
 </script>
@@ -160,11 +172,22 @@ function navigate(page: 'home' | 'collections' | 'location' | 'devices' | 'setti
                 </div>
               </template>
               <template v-else>
-                <v-icon size="24">{{ item.icon }}</v-icon>
+                <div class="siegu-dock-icon-wrap">
+                  <v-icon size="24">{{ item.icon }}</v-icon>
+                  <template v-if="item.page === 'duplicates'">
+                    <span v-if="dupeStore.scanning" class="duplicates-dot" aria-label="scanning"></span>
+                    <span v-if="dupeStore.ready && dupeCount > 0" class="duplicates-pill">{{
+                      dupeCount.toLocaleString()
+                    }}</span>
+                  </template>
+                </div>
               </template>
             </v-btn>
           </template>
           <span v-if="item.useLogo && isIndexing">{{ tooltipText }}</span>
+          <span v-else-if="item.page === 'duplicates' && dupeStore.scanning">{{
+            t('duplicates.scanning')
+          }}</span>
           <span v-else>{{ t(item.label) }}</span>
         </v-tooltip>
       </template>
@@ -262,6 +285,51 @@ function navigate(page: 'home' | 'collections' | 'location' | 'devices' | 'setti
   line-height: 16px;
   text-align: center;
   border: 2px solid rgb(var(--v-theme-surface));
+}
+
+.siegu-dock-icon-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.duplicates-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgb(var(--v-theme-primary));
+  animation: dupe-pulse 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.duplicates-pill {
+  position: absolute;
+  bottom: -5px;
+  right: -10px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  background: rgb(var(--v-theme-primary));
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
+  border: 2px solid rgb(var(--v-theme-surface));
+}
+
+@keyframes dupe-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, rgb(var(--v-theme-primary)) 60%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
 }
 
 @keyframes siegu-pulse {

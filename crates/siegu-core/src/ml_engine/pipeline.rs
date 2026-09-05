@@ -100,6 +100,8 @@ pub struct PhotoResult {
     pub aesthetics: Option<f64>,
     pub nsfw: Option<String>,
     pub ocr: Option<String>,
+    /// All unique OCR texts seen across video frames (video aggregation).
+    pub ocr_texts: Vec<String>,
     pub transcript: Option<String>,
     pub caption: Option<String>,
     pub face_count: usize,
@@ -783,7 +785,7 @@ fn aggregate_frame_results(frame_results: &[PhotoResult], _frame_count: usize) -
     let mut seen_ocr = std::collections::HashSet::new();
     for text in &ocr_texts {
         if seen_ocr.insert(text.clone()) {
-            merged.ocr = Some(text.clone());
+            merged.ocr_texts.push(text.clone());
         }
     }
 
@@ -931,7 +933,14 @@ fn flush_results_statements(
             (photo_id, class, prob),
         );
     }
-    if let Some(ref text) = result.ocr {
+    if !result.ocr_texts.is_empty() {
+        for text in &result.ocr_texts {
+            let _ = db.connection.execute(
+                "INSERT INTO ocr (photo_id, text) VALUES(?1, ?2)",
+                (photo_id, text),
+            );
+        }
+    } else if let Some(ref text) = result.ocr {
         let _ = db.connection.execute(
             "INSERT INTO ocr (photo_id, text) VALUES(?1, ?2)",
             (photo_id, text),
@@ -986,6 +995,10 @@ fn flush_results_statements(
 
     for model in &result.completed_models {
         db.update_ai_status(photo_id, model, 1);
+    }
+
+    if !result.model_timings.is_empty() {
+        db.store_model_timings(photo_id, &result.model_timings);
     }
 
     if let Some(ref transcript) = result.transcript {
@@ -1208,10 +1221,12 @@ mod tests {
             ..Default::default()
         };
         let merged = aggregate_frame_results(&[f1, f2, f3], 3);
-        // Should keep first unique text
-        assert!(merged.ocr.is_some());
-        let ocr = merged.ocr.as_ref().unwrap();
-        assert!(ocr == "Hello" || ocr == "World");
+        // Every unique frame text survives (join unique, order-preserving)
+        assert_eq!(
+            merged.ocr_texts,
+            vec!["Hello".to_string(), "World".to_string()]
+        );
+        assert_eq!(merged.ocr, None);
     }
 
     #[test]
@@ -1225,7 +1240,7 @@ mod tests {
             ..Default::default()
         };
         let merged = aggregate_frame_results(&[f1, f2], 2);
-        assert_eq!(merged.ocr, None);
+        assert!(merged.ocr_texts.is_empty());
     }
 
     #[test]
@@ -1340,7 +1355,7 @@ mod tests {
         assert!(merged.objects.is_empty());
         assert_eq!(merged.aesthetics, None);
         assert_eq!(merged.nsfw, None);
-        assert_eq!(merged.ocr, None);
+        assert!(merged.ocr_texts.is_empty());
         assert_eq!(merged.face_count, 0);
     }
 
@@ -1572,6 +1587,83 @@ mod tests {
             .unwrap();
         assert_eq!(count, 0);
 
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn flush_writes_one_ocr_row_per_unique_video_text() {
+        let dir = std::env::temp_dir().join(format!("siegu-video-ocr-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut db = crate::database::Database::new(&dir.display().to_string());
+
+        let photo = crate::database::Photo {
+            id: "vid-ocr".to_string(),
+            location: format!("{}/clip.mp4", dir.display()),
+            encoded: String::new(),
+            created: "2024-01-01".to_string(),
+            objects: Default::default(),
+            properties: Default::default(),
+            latitude: 0.0,
+            longitude: 0.0,
+            favorite: false,
+            indexed: 1,
+            caption: None,
+            aesthetics_score: None,
+            ai_status: AiStatus::default(),
+            sync_needed: false,
+            received: false,
+            view_only: false,
+            last_opened: 0,
+        };
+        db.store_photo_batch(&[photo]).unwrap();
+
+        let result = PhotoResult {
+            ocr_texts: vec!["Alpha".into(), "Beta".into()],
+            ..Default::default()
+        };
+        flush_results_statements(&db, "vid-ocr", &result, None).unwrap();
+
+        let joined = db.get_photo_ocr("vid-ocr");
+        assert_eq!(joined, "Alpha Beta");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn flush_falls_back_to_single_ocr_for_photos() {
+        let dir = std::env::temp_dir().join(format!("siegu-photo-ocr-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut db = crate::database::Database::new(&dir.display().to_string());
+
+        let photo = crate::database::Photo {
+            id: "pic-ocr".to_string(),
+            location: format!("{}/pic.jpg", dir.display()),
+            encoded: String::new(),
+            created: "2024-01-01".to_string(),
+            objects: Default::default(),
+            properties: Default::default(),
+            latitude: 0.0,
+            longitude: 0.0,
+            favorite: false,
+            indexed: 1,
+            caption: None,
+            aesthetics_score: None,
+            ai_status: AiStatus::default(),
+            sync_needed: false,
+            received: false,
+            view_only: false,
+            last_opened: 0,
+        };
+        db.store_photo_batch(&[photo]).unwrap();
+
+        let result = PhotoResult {
+            ocr: Some("Single line".into()),
+            ..Default::default()
+        };
+        flush_results_statements(&db, "pic-ocr", &result, None).unwrap();
+
+        assert_eq!(db.get_photo_ocr("pic-ocr"), "Single line");
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

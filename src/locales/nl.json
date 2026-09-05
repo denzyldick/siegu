@@ -8,7 +8,8 @@
     "collections": "Collecties",
     "map": "Kaart",
     "devices": "Apparaten",
-    "settings": "Instellingen"
+    "settings": "Instellingen",
+    "duplicates": "Space saver"
   },
   "guest": {
     "intro_title": "Someone shared a collection with you",
@@ -293,6 +294,7 @@
     "ai_models": "AI Modellen",
     "analyze_existing": "Bestaande bibliotheek analyseren",
     "analyze_existing_hint": "Uitgeschakeld worden alleen nieuw toegevoegde foto's geanalyseerd. Je huidige bibliotheek blijft ongeanalyseerd tot je dit weer inschakelt.",
+    "model_performance": "Modelprestaties",
     "analyze_existing_set": "Analysevoorkeur bijgewerkt",
     "current_model": "Huidig AI-model",
     "latest_model": "Laatste AI-model",
@@ -519,6 +521,7 @@
     "not_synced": "Niet geback-upt op een ander apparaat — tik om opnieuw te verbinden",
     "nsfw": "NSFW gedetecteerd",
     "view_only": "Opgeslagen op je andere apparaat — open om te bekijken",
+    "aesthetics": "AI-kwaliteitsscore",
     "ai_analyzed": "Geanalyseerd door AI"
   },
   "media_thumbnail": {
@@ -632,6 +635,10 @@
     "opened_in_explorer": "Geopend in bestandsverkenner",
     "explorer_error": "Openen in bestandsverkenner mislukt",
     "recognized_text": "Herkennde tekst",
+    "transcript": "Transcriptie",
+    "transcript_empty": "Geen transcriptie beschikbaar.",
+    "transcript_overlay": "Transcriptie tonen",
+    "model_performance": "Modelprestaties (ms)",
     "copy": "Kopiëren",
     "copy_text": "Tekst kopiëren",
     "copied": "Tekst gekopieerd",
@@ -859,5 +866,42 @@
     "about_desc": "Hier vind je versie-informatie en de open-source licenties die Siegu gebruikt.",
     "done_title": "Je kent de instellingen nu!",
     "done_desc": "Dat was de hele instellingenpagina. Kijk gerust rond – elke optie is optioneel en kan op elk moment worden gewijzigd."
+  },
+  "duplicates": {
+    "title": "Space saver",
+    "desc": "Find exact, near-identical and visually similar copies, then free up space.",
+    "refresh": "Scan again",
+    "groups": "Groups",
+    "duplicates": "Duplicates",
+    "reclaimable": "Reclaimable",
+    "storage_total": "Library size",
+    "contents": "Contents",
+    "media_count": "{photos} photos · {videos} videos",
+    "in_use": "In use",
+    "reclaim_share": "of your library",
+    "no_duplicates": "No duplicates found",
+    "no_duplicates_desc": "Siegu compares photos by file hash, perceptual hash and CLIP embeddings to group copies. Nothing to clean up right now.",
+    "keep": "Keep",
+    "unknown_best": "No quality score yet — tap a photo to pick the one to keep",
+    "kind_exact": "Exact",
+    "kind_perceptual": "Perceptual",
+    "kind_clip": "Similar",
+    "trash_duplicates": "Remove duplicates ({count})",
+    "removed": "Removed {count} duplicate(s)",
+    "scanning": "Analyzing your library…",
+    "scanning_count": "{done} / {total} photos",
+    "scanning_hint": "The first scan reads every photo to detect duplicates. This can take a few minutes; later scans are instant.",
+    "scan_done": "Space saver: {groups} group(s) found — {size} could be freed",
+    "scan_clean": "Space saver: no duplicates found"
+  },
+  "video_player": {
+    "speed": "Playback speed",
+    "volume": "Volume",
+    "fullscreen": "Toggle fullscreen",
+    "pip": "Picture in picture",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "transcript": "Show transcript",
+    "tap_to_unmute": "Tap to unmute"
   }
 }

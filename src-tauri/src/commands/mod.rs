@@ -1,6 +1,7 @@
 pub mod albums;
 pub mod config;
 pub mod directories;
+pub mod duplicates;
 pub mod geocode;
 pub mod indexing;
 pub mod license;

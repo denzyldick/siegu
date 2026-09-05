@@ -103,6 +103,8 @@
                       :src="computedVideoUrl"
                       :type="videoType"
                       :auto-play="true"
+                      :transcript="photoTranscript"
+                      :title="currentPhotoName"
                       @error="onVideoError($event)"
                     />
                   </template>
@@ -318,6 +320,20 @@
 
             <v-divider class="opacity-5 mb-4" v-if="currentPhoto?.caption"></v-divider>
 
+            <div class="mb-6" v-if="aestheticsDisplay != null">
+              <div class="text-caption text-disabled mb-1 text-uppercase tracking-widest">
+                {{ $t('media_viewer.aesthetics_score') }}
+              </div>
+              <div class="d-flex align-center text-body-2 text-medium-emphasis">
+                <v-icon size="18" color="rgba(var(--v-theme-on-surface), 0.6)" class="mr-2"
+                  >mdi-star</v-icon
+                >
+                <span>{{ aestheticsDisplay }}</span>
+              </div>
+            </div>
+
+            <v-divider class="opacity-5 mb-4" v-if="aestheticsDisplay != null"></v-divider>
+
             <div class="mb-6" v-if="photoOcr && !ocrLoading">
               <div class="text-caption text-disabled mb-1 text-uppercase tracking-widest">
                 {{ $t('media_viewer.recognized_text') }}
@@ -336,6 +352,54 @@
             </div>
 
             <v-divider class="opacity-5 mb-4" v-if="photoOcr && !ocrLoading && hasExif"></v-divider>
+
+            <div class="mb-6" v-if="photoTranscript && !transcriptLoading">
+              <div class="text-caption text-disabled mb-1 text-uppercase tracking-widest">
+                {{ $t('media_viewer.transcript') }}
+              </div>
+              <div class="text-body-2 text-medium-emphasis ocr-text">{{ photoTranscript }}</div>
+              <v-btn
+                size="x-small"
+                variant="text"
+                class="mt-1 text-none"
+                :title="$t('media_viewer.copy_text')"
+                @click="copyTranscriptText"
+              >
+                <v-icon size="14" class="mr-1">mdi-content-copy</v-icon>
+                {{ $t('media_viewer.copy') }}
+              </v-btn>
+            </div>
+
+            <div class="mb-6" v-if="isVideo && !photoTranscript && !transcriptLoading">
+              <div class="text-caption text-disabled mb-1 text-uppercase tracking-widest">
+                {{ $t('media_viewer.transcript') }}
+              </div>
+              <div class="text-body-2 text-medium-emphasis">
+                {{ $t('media_viewer.transcript_empty') }}
+              </div>
+            </div>
+
+            <div class="mb-6" v-if="sortedModelTimings.length > 0">
+              <div class="text-caption text-disabled mb-2 text-uppercase tracking-widest">
+                {{ $t('media_viewer.model_performance') }}
+              </div>
+              <div v-for="[model, ms] in sortedModelTimings" :key="model" class="d-flex align-center mb-1">
+                <span class="text-body-2 text-medium-emphasis" style="width: 90px">
+                  {{ model }}
+                </span>
+                <div class="model-timing-track">
+                  <div class="model-timing-fill" :style="{ width: timingBarWidth(ms) }" />
+                </div>
+                <span class="text-body-2 text-medium-emphasis ml-2" style="width: 52px; text-align: right">
+                  {{ ms.toFixed(0) }}ms
+                </span>
+              </div>
+            </div>
+
+            <v-divider
+              class="opacity-5 mb-4"
+              v-if="(photoTranscript || (isVideo && !transcriptLoading)) && hasExif"
+            ></v-divider>
 
             <div class="mb-6" v-if="hasExif">
               <div class="text-caption text-disabled mb-3 text-uppercase tracking-widest">
@@ -542,6 +606,9 @@ const addToAlbumOpen = ref(false);
 const detectedFaces = ref<DetectedFace[]>([]);
 const photoOcr = ref('');
 const ocrLoading = ref(false);
+const photoTranscript = ref('');
+const transcriptLoading = ref(false);
+const modelTimings = ref<Record<string, number>>({});
 const isAnalyzing = ref(false);
 const isAnalyzingModel = ref<string | null>(null);
 const runStartTime = ref(0);
@@ -733,12 +800,34 @@ const currentPhotoRef = computed(() => currentPhoto.value);
 const currentThumb = mediaSrcRef(currentPhotoRef, 'thumb');
 const currentOriginal = mediaSrcRef(currentPhotoRef, 'original');
 
+const currentPhotoName = computed(() => {
+  const loc = currentPhoto.value?.location;
+  if (!loc) return '';
+  return loc.split('/').pop() ?? loc;
+});
+
 const isVideo = computed(() => {
   if (!currentPhoto.value?.location) return false;
   return checkIsVideo(currentPhoto.value.location);
 });
 
 const isViewOnly = computed((): boolean => !!currentPhoto.value?.view_only);
+
+const aestheticsDisplay = computed((): string | null => {
+  const score = currentPhoto.value?.aesthetics_score;
+  if (score == null || !Number.isFinite(score)) return null;
+  return score.toFixed(1);
+});
+
+const sortedModelTimings = computed((): [string, number][] => {
+  return Object.entries(modelTimings.value).sort((a, b) => b[1] - a[1]);
+});
+
+function timingBarWidth(ms: number): string {
+  const max = sortedModelTimings.value[0]?.[1] ?? 1;
+  const pct = max > 0 ? (ms / max) * 100 : 0;
+  return `${Math.max(3, Math.min(100, pct))}%`;
+}
 
 const computedVideoUrl = computed(() => {
   if (!currentPhoto.value || !isVideo.value) return '';
@@ -913,6 +1002,47 @@ async function copyOcrText(): Promise<void> {
   }
 }
 
+async function loadTranscript(): Promise<void> {
+  if (!currentPhoto.value || !isVideo.value) {
+    photoTranscript.value = '';
+    return;
+  }
+  transcriptLoading.value = true;
+  try {
+    photoTranscript.value = await invoke<string>('get_photo_transcript', { id: currentPhoto.value.id });
+  } catch (e) {
+    console.error('Failed to fetch transcript', e);
+    photoTranscript.value = '';
+  } finally {
+    transcriptLoading.value = false;
+  }
+}
+
+async function copyTranscriptText(): Promise<void> {
+  if (!photoTranscript.value) return;
+  try {
+    await navigator.clipboard.writeText(photoTranscript.value);
+    snackbar.value = { show: true, text: t('media_viewer.copied'), error: false };
+  } catch {
+    snackbar.value = { show: true, text: t('media_viewer.copy_failed'), error: true };
+  }
+}
+
+async function loadModelTimings(): Promise<void> {
+  if (!currentPhoto.value) {
+    modelTimings.value = {};
+    return;
+  }
+  try {
+    modelTimings.value = await invoke<Record<string, number>>('get_model_timings', {
+      id: currentPhoto.value.id,
+    });
+  } catch (e) {
+    console.error('Failed to fetch model timings', e);
+    modelTimings.value = {};
+  }
+}
+
 function goToPerson(face: DetectedFace): void {
   if (!face.person_id) return;
   emit('navigate-to-person', {
@@ -952,6 +1082,7 @@ async function analyzePhoto(): Promise<void> {
         snackbar.value.text = `Analysis complete: ${parts.join(', ')} (${elapsed}s)`;
         snackbar.value.show = true;
         refreshPhoto(photoId);
+        loadModelTimings();
         showInfo.value = true;
       }
     });
@@ -1224,6 +1355,8 @@ watch(
     }
     fetchFaces();
     loadOcr();
+    loadTranscript();
+    loadModelTimings();
     scrollToActiveThumb();
     if (isVideo.value) {
       showInfo.value = false;
@@ -1292,6 +1425,21 @@ onUnmounted(() => {
   word-break: break-word;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.model-timing-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(var(--v-theme-on-surface), 0.12);
+  overflow: hidden;
+}
+
+.model-timing-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: rgb(var(--v-theme-primary));
+  transition: width 0.3s ease;
 }
 
 .viewer-content-container {

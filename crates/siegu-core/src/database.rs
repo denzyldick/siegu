@@ -1124,6 +1124,10 @@ impl Database {
         );
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS faces (photo_id STRING, face_id STRING PRIMARY KEY, crop_path STRING, encoded STRING, embedding BLOB, person_id STRING);", ());
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS people (id STRING PRIMARY KEY, name STRING, embedding BLOB);", ());
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS model_timings (photo_id TEXT, model TEXT, ms REAL, PRIMARY KEY(photo_id, model));",
+            (),
+        );
         // Must run after the faces/people tables exist: created here (not above)
         // so fresh databases get these indexes too — previously the CREATE
         // INDEX statements ran before the tables and silently failed, leaving
@@ -2373,6 +2377,18 @@ impl Database {
         parts.join(" ")
     }
 
+    /// Fetch the Whisper transcript for a video (single value in properties).
+    pub fn get_photo_transcript(&self, photo_id: &str) -> String {
+        if let Ok(value) = self.connection.query_row(
+            "SELECT value FROM properties WHERE photo_id = ?1 AND key = 'transcript' LIMIT 1",
+            [photo_id],
+            |r| r.get::<_, String>(0),
+        ) {
+            return value.trim().to_string();
+        }
+        String::new()
+    }
+
     pub fn get_photo_by_id(&self, photo_id: &str) -> Option<Photo> {
         let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, \
              s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received, COALESCE(p.view_only, 0), COALESCE(p.last_opened, 0) \
@@ -3230,6 +3246,21 @@ impl Database {
         (photo_count, video_count)
     }
 
+    /// Every photo/video source-file path currently in the library (excluding
+    /// rows with no location), used for on-disk size accounting.
+    pub fn all_photo_locations(&self) -> Vec<String> {
+        let mut stmt = self
+            .connection
+            .prepare("SELECT location FROM photo WHERE location IS NOT NULL AND location != ''")
+            .unwrap_or_else(|e| panic!("prepare failed: {e}"));
+        let locations = stmt
+            .query_map([], |r| r.get::<_, String>(0))
+            .unwrap_or_else(|e| panic!("query failed: {e}"))
+            .filter_map(Result::ok)
+            .collect();
+        locations
+    }
+
     /// Return (pending_photo_count, pending_video_count) of items that still need
     /// to be backed up to another device (originals not yet received by a peer).
     pub fn get_pending_sync_counts(&self) -> (i64, i64) {
@@ -3390,12 +3421,15 @@ impl Database {
 
     // ── Duplicate detection (Stage 0) ─────────────────────────────────
 
-    /// Photos missing duplicate hashes (file_sha256 AND dup_hash), up to
-    /// `limit` rows. Used by the duplicate scanner to lazily compute hashes.
+    /// Photos that still need an exact (file SHA-256) hash computed, up to
+    /// `limit` rows. Perceptual dHash is a separate, best-effort pass that may
+    /// stay empty when no thumbnail is stored, so the file hash alone decides
+    /// whether a photo has been visited. Used by the duplicate scanner to
+    /// lazily compute hashes without re-reading every file each time.
     pub fn photos_missing_dup_hashes(&self, limit: i64) -> Vec<(String, String)> {
         self.connection
             .prepare(
-                "SELECT id, location FROM photo WHERE deleted_at IS NULL AND (file_sha256 IS NULL OR dup_hash IS NULL) LIMIT ?1",
+                "SELECT id, location FROM photo WHERE deleted_at IS NULL AND location IS NOT NULL AND location <> '' AND file_sha256 IS NULL LIMIT ?1",
             )
             .map(|mut stmt| {
                 stmt.query_map([limit], |row| {
@@ -3409,18 +3443,34 @@ impl Database {
 
     /// Persist a photo's exact (file SHA-256) and perceptual (dHash) hashes.
     pub fn upsert_dup_hashes(&self, id: &str, file_sha256: &str, dup_hash: &str) {
+        self.upsert_dup_hashes_partial(id, Some(file_sha256), Some(dup_hash));
+    }
+
+    /// Persist whichever of the exact/perceptual hashes were computed this run,
+    /// leaving previously stored values untouched. Either hash may be `None`
+    /// (e.g. the file was unreadable or no thumbnail existed), but storing the
+    /// file hash alone is enough to mark the photo as visited so future scans
+    /// do not re-read it.
+    pub fn upsert_dup_hashes_partial(
+        &self,
+        id: &str,
+        file_sha256: Option<&str>,
+        dup_hash: Option<&str>,
+    ) {
         let _ = self.connection.execute(
-            "UPDATE photo SET file_sha256 = ?1, dup_hash = ?2 WHERE id = ?3",
+            "UPDATE photo SET file_sha256 = COALESCE(?1, file_sha256), dup_hash = COALESCE(?2, dup_hash) WHERE id = ?3",
             rusqlite::params![file_sha256, dup_hash, id],
         );
     }
 
     /// Load (id, file_sha256, dup_hash, aesthetics_score, location) for every
-    /// non-deleted photo that has both hashes computed. Used for grouping.
+    /// non-deleted photo that has an exact hash computed. `dup_hash` is empty
+    /// when the perceptual hash could not be produced (no stored thumbnail).
+    /// Used for grouping.
     pub fn all_dup_data(&self) -> Vec<(String, String, String, Option<f64>, String)> {
         self.connection
             .prepare(
-                "SELECT id, file_sha256, dup_hash, aesthetics_score, location FROM photo WHERE deleted_at IS NULL AND file_sha256 IS NOT NULL AND dup_hash IS NOT NULL",
+                "SELECT id, file_sha256, COALESCE(dup_hash, ''), aesthetics_score, location FROM photo WHERE deleted_at IS NULL AND file_sha256 IS NOT NULL",
             )
             .map(|mut stmt| {
                 stmt.query_map([], |row| {
@@ -3599,6 +3649,55 @@ impl Database {
         }
         let sql = format!("INSERT INTO ai_status (photo_id, {model}) VALUES (?1, ?2) ON CONFLICT(photo_id) DO UPDATE SET {model} = ?2");
         let _ = self.connection.execute(&sql, (photo_id, status));
+    }
+
+    /// Persist per-model inference timings (ms) for a photo, upserting by photo+model.
+    pub fn store_model_timings(
+        &self,
+        photo_id: &str,
+        timings: &std::collections::HashMap<String, f64>,
+    ) {
+        for (model, ms) in timings {
+            let _ = self.connection.execute(
+                "INSERT OR REPLACE INTO model_timings (photo_id, model, ms) VALUES(?1, ?2, ?3)",
+                (photo_id, model, *ms),
+            );
+        }
+    }
+
+    /// Fetch per-model inference timings (ms) for a photo.
+    pub fn get_model_timings(&self, photo_id: &str) -> std::collections::HashMap<String, f64> {
+        let mut out = std::collections::HashMap::new();
+        if let Ok(mut stmt) = self
+            .connection
+            .prepare("SELECT model, ms FROM model_timings WHERE photo_id = ?1")
+        {
+            if let Ok(rows) = stmt.query_map([photo_id], |r| {
+                Ok((r.get::<_, String>(0)?, r.get::<_, f64>(1)?))
+            }) {
+                for row in rows.flatten() {
+                    out.insert(row.0, row.1);
+                }
+            }
+        }
+        out
+    }
+
+    /// Aggregate timing averages (ms) per model across all persisted analyses.
+    pub fn get_model_timing_averages(&self) -> Vec<(String, f64, i64)> {
+        let mut out = Vec::new();
+        if let Ok(mut stmt) = self.connection.prepare(
+            "SELECT model, AVG(ms), COUNT(*) FROM model_timings GROUP BY model ORDER BY AVG(ms) DESC",
+        ) {
+            if let Ok(rows) = stmt.query_map([], |r| {
+                Ok((r.get::<_, String>(0)?, r.get::<_, f64>(1)?, r.get::<_, i64>(2)?))
+            }) {
+                for row in rows.flatten() {
+                    out.push(row);
+                }
+            }
+        }
+        out
     }
 
     /// Get up to 50 photos that have not yet been fully AI-processed.
@@ -6304,6 +6403,41 @@ mod tests {
         let result = db.get_photo_ocr("p1");
         assert_eq!(result, "hello world");
         assert_eq!(db.get_photo_ocr("missing"), "");
+    }
+
+    #[test]
+    fn test_get_photo_transcript_reads_property() {
+        let db = test_db();
+        let _ = db.connection.execute(
+            "INSERT INTO photo (id, location, created, encoded) VALUES ('p1', '/a.mp4', '2026-01-01', '')",
+            (),
+        );
+        let _ = db.connection.execute(
+            "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'transcript', '  hello from the video  ')",
+            (),
+        );
+        assert_eq!(db.get_photo_transcript("p1"), "hello from the video");
+        assert_eq!(db.get_photo_transcript("missing"), "");
+    }
+
+    #[test]
+    fn test_model_timings_persist_and_aggregate() {
+        let db = test_db();
+        let mut map = std::collections::HashMap::new();
+        map.insert("clip".to_string(), 120.5);
+        map.insert("yolo".to_string(), 80.25);
+        db.store_model_timings("p1", &map);
+
+        let read = db.get_model_timings("p1");
+        assert_eq!(read.get("clip"), Some(&120.5));
+        assert_eq!(read.get("yolo"), Some(&80.25));
+        assert!(db.get_model_timings("missing").is_empty());
+
+        db.store_model_timings("p2", &map);
+        let avgs = db.get_model_timing_averages();
+        let clip = avgs.iter().find(|(m, _, _)| m == "clip").unwrap();
+        assert_eq!(clip.1, 120.5);
+        assert_eq!(clip.2, 2);
     }
 
     #[test]

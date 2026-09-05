@@ -135,24 +135,49 @@ impl UnionFind {
 /// photos missing them, then group duplicates. Returns the groups and how many
 /// photos had hashes computed this run.
 pub fn detect_non_ai(db: &Database) -> (Vec<DuplicateGroup>, usize) {
+    detect_non_ai_progress(db, &mut |_, _| {})
+}
+
+/// `detect_non_ai` with a progress callback `(done, total)` fired after each
+/// photo's hashes are computed. `total` is the number of photos needing a
+/// hash this run; a second call is nearly free once file hashes are stored.
+pub fn detect_non_ai_progress(
+    db: &Database,
+    progress: &mut dyn FnMut(usize, usize),
+) -> (Vec<DuplicateGroup>, usize) {
     let missing = db.photos_missing_dup_hashes(100_000);
+    let total = missing.len();
     let mut computed = 0usize;
-    for (id, location) in &missing {
-        let file_sha = std::fs::read(location).ok().map(|bytes| {
-            use sha2::{Digest, Sha256};
-            let mut h = Sha256::new();
-            h.update(&bytes);
-            format!("{:x}", h.finalize())
-        });
-        let dh = image_from_thumb(db, id).map(|img| dhash(&img));
-        if let (Some(fs), Some(dh)) = (file_sha, dh) {
-            db.upsert_dup_hashes(id, &fs, &dh);
+    for (done, (id, location)) in missing.into_iter().enumerate() {
+        let file_sha = sha256_file(&location);
+        let dh = image_from_thumb(db, &id).map(|img| dhash(&img));
+        if file_sha.is_some() {
+            db.upsert_dup_hashes_partial(&id, file_sha.as_deref(), dh.as_deref());
+            computed += 1;
         }
-        computed += 1;
+        progress(done + 1, total);
     }
 
     let groups = group_non_ai(db);
     (groups, computed)
+}
+
+/// Streaming SHA-256 of a file (avoids loading whole files into memory).
+fn sha256_file(path: &str) -> Option<String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+    let file = std::fs::File::open(path).ok()?;
+    let mut reader = std::io::BufReader::with_capacity(256 * 1024, file);
+    let mut h = Sha256::new();
+    let mut buf = [0u8; 256 * 1024];
+    loop {
+        match reader.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => h.update(&buf[..n]),
+            Err(_) => return None,
+        }
+    }
+    Some(format!("{:x}", h.finalize()))
 }
 
 /// Group persisted (id, sha, dhash) rows into duplicate clusters using exact
@@ -184,6 +209,11 @@ fn group_non_ai(db: &Database) -> Vec<DuplicateGroup> {
     for idxs in buckets.values() {
         for a in 0..idxs.len() {
             for b in (a + 1)..idxs.len() {
+                // Skip pairs whose perceptual hash is missing (no thumbnail);
+                // exact hashing still covered them above.
+                if rows[idxs[a]].2.is_empty() || rows[idxs[b]].2.is_empty() {
+                    continue;
+                }
                 if dhash_hamming(&rows[idxs[a]].2, &rows[idxs[b]].2) <= DHASH_HAMMING_THRESHOLD {
                     uf.union(idxs[a], idxs[b]);
                 }
@@ -245,6 +275,193 @@ pub fn detect_all(db: &Database, include_clip: bool) -> Vec<DuplicateGroup> {
     groups
 }
 
+// ── User-facing view ────────────────────────────────────────────────────
+
+/// A single member of a duplicate group for the UI, with everything the card
+/// needs to render a thumbnail and let the user keep/trash it.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DuplicateMemberView {
+    pub id: String,
+    pub location: String,
+    pub aesthetics: Option<f64>,
+    pub is_best: bool,
+}
+
+/// A duplicate group enriched for the UI: per-member metadata, a human label,
+/// and how many bytes could be reclaimed by trashing the non-best members.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DuplicateGroupView {
+    pub members: Vec<DuplicateMemberView>,
+    pub best_id: Option<String>,
+    pub unknown_best: bool,
+    /// "exact" (identical SHA-256), "perceptual" (dHash), or "clip" (AI).
+    pub kind: String,
+    /// Number of bytes that would be freed by trashing every non-best member.
+    pub reclaimable_bytes: u64,
+}
+
+/// Bytes on disk for a photo's source file (from its location path).
+fn file_bytes(db: &Database, id: &str) -> u64 {
+    db.get_photo_location(id)
+        .and_then(|p| std::fs::metadata(&p).ok())
+        .map(|m| m.len())
+        .unwrap_or(0)
+}
+
+/// Total on-disk bytes of every photo/video currently in the library: the sum
+/// of the source file size for each item whose file still exists.
+pub fn library_total_bytes(db: &Database) -> u64 {
+    db.all_photo_locations()
+        .iter()
+        .filter_map(|p| std::fs::metadata(p).ok())
+        .map(|m| m.len())
+        .sum()
+}
+
+/// Combined photo/video counts and total on-disk library size.
+pub struct LibraryOverview {
+    pub photo_count: i64,
+    pub video_count: i64,
+    pub library_bytes: u64,
+}
+
+/// Counts plus the on-disk size of the library, ready for storage views.
+pub fn library_overview(db: &Database) -> LibraryOverview {
+    let (photo_count, video_count) = db.get_media_counts();
+    LibraryOverview {
+        photo_count,
+        video_count,
+        library_bytes: library_total_bytes(db),
+    }
+}
+
+fn enrich(db: &Database, group: &DuplicateGroup, kind: &str) -> DuplicateGroupView {
+    let mut members: Vec<DuplicateMemberView> = group
+        .members
+        .iter()
+        .map(|id| DuplicateMemberView {
+            id: id.clone(),
+            location: db.get_photo_location(id).unwrap_or_default(),
+            aesthetics: db.quality_scores().get(id).copied(),
+            is_best: Some(id.as_str()) == group.best_id.as_deref(),
+        })
+        .collect();
+    members.sort_by(|a, b| {
+        b.aesthetics
+            .partial_cmp(&a.aesthetics)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let reclaimable_bytes = members
+        .iter()
+        .filter(|m| !m.is_best)
+        .map(|m| file_bytes(db, &m.id))
+        .sum();
+
+    DuplicateGroupView {
+        members,
+        best_id: group.best_id.clone(),
+        unknown_best: group.unknown_best,
+        kind: kind.to_string(),
+        reclaimable_bytes,
+    }
+}
+
+/// Combined non-AI groups with kind labels. Exact groups (all members share the
+/// same file SHA-256) are labeled "exact", everything else "perceptual".
+pub fn detect_all_view(db: &Database, include_clip: bool) -> Vec<DuplicateGroupView> {
+    detect_all_view_progress(db, include_clip, &mut |_, _| {})
+}
+
+/// `detect_all_view` with a progress callback `(done, total)` forwarded from
+/// the hash-computation stage. Fired only while hashes are being computed.
+pub fn detect_all_view_progress(
+    db: &Database,
+    include_clip: bool,
+    progress: &mut dyn FnMut(usize, usize),
+) -> Vec<DuplicateGroupView> {
+    let (mut groups, _) = detect_non_ai_progress(db, progress);
+
+    let by_id: HashMap<String, (String, String)> = db
+        .all_dup_data()
+        .into_iter()
+        .map(|(id, sha, dh, _, _)| (id, (sha, dh)))
+        .collect();
+
+    let views: Vec<DuplicateGroupView> = groups
+        .drain(..)
+        .map(|g| {
+            let shas: Vec<&str> = g
+                .members
+                .iter()
+                .filter_map(|id| by_id.get(id).map(|(sha, _)| sha.as_str()))
+                .collect();
+            let exact = shas.len() == g.members.len()
+                && !shas.is_empty()
+                && shas.windows(2).all(|w| w[0] == w[1]);
+            let kind = if exact { "exact" } else { "perceptual" };
+            enrich(db, &g, kind)
+        })
+        .collect();
+
+    if include_clip {
+        let clip = detect_clip(db);
+        views
+            .into_iter()
+            .chain(clip.into_iter().map(|g| enrich(db, &g, "clip")))
+            .collect()
+    } else {
+        views
+    }
+}
+
+/// Aggregate stats over duplicate groups for a status banner.
+#[derive(Debug, Clone, serde::Serialize, Default)]
+pub struct DuplicateStats {
+    pub group_count: usize,
+    pub duplicate_count: usize,
+    pub reclaimable_bytes: u64,
+}
+
+pub fn duplicate_stats(db: &Database, include_clip: bool) -> DuplicateStats {
+    duplicate_stats_from_views(&detect_all_view(db, include_clip))
+}
+
+/// Aggregate stats directly from already-detected views (no re-scan).
+pub fn duplicate_stats_from_views(views: &[DuplicateGroupView]) -> DuplicateStats {
+    let mut stats = DuplicateStats {
+        group_count: views.len(),
+        ..Default::default()
+    };
+    for v in views {
+        stats.reclaimable_bytes += v.reclaimable_bytes;
+        stats.duplicate_count += v.members.len().saturating_sub(1);
+    }
+    stats
+}
+
+/// Trash every non-best member of the given duplicate group; returns how many
+/// photos were trashed. When no quality-based "best" exists, the first member
+/// (highest aesthetics, else first in group order) is kept and never trashed.
+pub fn trash_group_non_best(db: &Database, group: &DuplicateGroupView) -> usize {
+    let keep_id = group
+        .members
+        .iter()
+        .find(|m| m.is_best)
+        .map(|m| m.id.as_str())
+        .unwrap_or_else(|| group.members.first().map(|m| m.id.as_str()).unwrap_or(""));
+    let mut trashed = 0usize;
+    for m in &group.members {
+        if m.id == keep_id {
+            continue;
+        }
+        if db.trash_photo(&m.id).is_ok() {
+            trashed += 1;
+        }
+    }
+    trashed
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -288,5 +505,66 @@ mod tests {
         let small = ramp(16);
         let big = ramp(160);
         assert_eq!(dhash(&small), dhash(&big));
+    }
+
+    #[test]
+    fn test_enrich_marks_best_and_sorts() {
+        let dir = std::env::temp_dir().join(format!("siegu-dup-enrich-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = crate::database::Database::new(&dir.display().to_string());
+
+        let group = DuplicateGroup {
+            members: vec!["a".to_string(), "b".to_string()],
+            best_id: Some("b".to_string()),
+            unknown_best: false,
+        };
+        let view = enrich(&db, &group, "exact");
+        assert_eq!(view.kind, "exact");
+        assert_eq!(view.best_id.as_deref(), Some("b"));
+        assert!(view.members.iter().any(|m| m.is_best));
+        assert_eq!(view.reclaimable_bytes, 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_trash_group_non_best_trashes_only_non_best() {
+        let dir = std::env::temp_dir().join(format!("siegu-dup-trash-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut db = crate::database::Database::new(&dir.display().to_string());
+        for (id, path) in [("a", "/a.jpg"), ("b", "/b.jpg"), ("c", "/c.jpg")] {
+            let photo = crate::database::Photo {
+                id: id.to_string(),
+                location: path.to_string(),
+                encoded: String::new(),
+                created: "2024-01-01".to_string(),
+                objects: Default::default(),
+                properties: Default::default(),
+                latitude: 0.0,
+                longitude: 0.0,
+                favorite: false,
+                indexed: 1,
+                caption: None,
+                aesthetics_score: None,
+                ai_status: Default::default(),
+                sync_needed: false,
+                received: false,
+                view_only: false,
+                last_opened: 0,
+            };
+            db.store_photo_batch(&[photo]).unwrap();
+        }
+        db.upsert_dup_hashes("a", "same", "0000000000000000");
+        db.upsert_dup_hashes("b", "same", "0000000000000000");
+        db.upsert_dup_hashes("c", "other", "ffffffffffffffff");
+
+        let views = detect_all_view(&db, false);
+        assert_eq!(views.len(), 1);
+        let view = &views[0];
+        assert_eq!(view.members.len(), 2);
+        let trashed = trash_group_non_best(&db, view);
+        assert!(trashed >= 1);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

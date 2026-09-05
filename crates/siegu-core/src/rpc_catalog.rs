@@ -78,6 +78,12 @@ pub const CATALOG: &[CommandSpec] = &[
     spec("get_photos_by_ids", Tier::ReadOnly, true, &["ids"]),
     spec("get_photo_encoded_batch", Tier::ReadOnly, true, &["ids"]),
     spec("get_photo_ocr", Tier::ReadOnly, false, &["id"]),
+    spec("get_photo_transcript", Tier::ReadOnly, false, &["id"]),
+    spec("get_model_timings", Tier::ReadOnly, false, &["id"]),
+    spec("get_model_timing_averages", Tier::ReadOnly, false, &[]),
+    spec("find_duplicates", Tier::ReadWrite, false, &[]),
+    spec("duplicate_stats", Tier::ReadWrite, false, &[]),
+    spec("trash_duplicate_members", Tier::ReadWrite, false, &["ids"]),
     spec("get_heatmap_data", Tier::ReadOnly, true, &[]),
     spec("day_counts", Tier::ReadOnly, true, &["from", "to"]),
     // ── search, facets, tags, geo (read-only) ─────────────────────────────

@@ -71,6 +71,32 @@
       ></v-switch>
     </v-sheet>
 
+    <v-sheet
+      v-if="timingAverages.length > 0"
+      class="mb-4 px-4 py-3 rounded-lg"
+      border
+    >
+      <div class="text-caption font-weight-bold text-disabled tracking-widest uppercase mb-2">
+        {{ $t('settings.model_performance') }}
+      </div>
+      <div
+        v-for="[model, avg, count] in timingAverages"
+        :key="model"
+        class="d-flex align-center mb-1"
+      >
+        <span class="text-body-2 text-medium-emphasis" style="width: 90px">{{ model }}</span>
+        <div class="model-timing-track">
+          <div
+            class="model-timing-fill"
+            :style="{ width: (avg / maxTimingMs()) * 100 + '%' }"
+          />
+        </div>
+        <span class="text-body-2 text-medium-emphasis ml-2" style="width: 96px; text-align: right">
+          {{ avg.toFixed(0) }}ms · {{ count }} runs
+        </span>
+      </div>
+    </v-sheet>
+
     <v-row dense>
       <v-col v-for="model in sortedModels" :key="model.id" cols="12" md="6" class="mb-2">
         <v-card
@@ -369,6 +395,8 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
 import { useSettingsStore } from '@/stores/settings';
+import { ref, onMounted } from 'vue';
+import { invoke } from '@/services/invoke';
 
 defineProps<{
   embedded?: boolean;
@@ -444,11 +472,47 @@ function toggleModelSelection(modelId: string): void {
 function toggleAnalyzeExisting(value: boolean | null): void {
   void setAnalyzeExisting(value === true);
 }
+
+const timingAverages = ref<[string, number, number][]>([]);
+
+async function loadTimingAverages(): Promise<void> {
+  try {
+    const raw = await invoke<[string, number, number][]>('get_model_timing_averages', {});
+    timingAverages.value = raw;
+  } catch {
+    timingAverages.value = [];
+  }
+}
+
+function maxTimingMs(): number {
+  let max = 1;
+  for (const [, avg] of timingAverages.value) {
+    if (avg > max) max = avg;
+  }
+  return max;
+}
+
+onMounted(() => {
+  void loadTimingAverages();
+});
 </script>
 
 <style scoped>
 .min-width-0 {
   min-width: 0;
+}
+.model-timing-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(var(--v-theme-on-surface), 0.12);
+  overflow: hidden;
+}
+.model-timing-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: rgb(var(--v-theme-primary));
+  transition: width 0.3s ease;
 }
 .ai-model-card {
   transition:

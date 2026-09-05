@@ -18,6 +18,7 @@ import MediaLibrary from '@/components/MediaLibrary.vue';
 import CollectionsView from '@/components/CollectionsView.vue';
 import MapView from '@/components/MapView.vue';
 import DeviceList from '@/components/DeviceList.vue';
+import DuplicateManager from '@/components/DuplicateManager.vue';
 import SettingsView from '@/components/SettingsView.vue';
 import GuestIntroOverlay from '@/components/guest/GuestIntroOverlay.vue';
 import GuestUpsellView from '@/components/guest/GuestUpsellView.vue';
@@ -26,6 +27,7 @@ import ErrorBoundary from '@/components/shared/ErrorBoundary.vue';
 import PersonMatchControls from '@/components/search/PersonMatchControls.vue';
 import ScanExperience from '@/components/ScanExperience.vue';
 import ProgressBanner from '@/components/layout/ProgressBanner.vue';
+import { useGlobalSnackbar } from '@/composables/useGlobalSnackbar';
 import { settingsTourSteps } from '@/components/GuidedTourSteps';
 
 const { t } = useI18n();
@@ -67,6 +69,7 @@ watch(
 );
 
 const openedFile = ref<string | null>(null);
+const globalSnackbar = useGlobalSnackbar();
 const fileSnackbar = ref(false);
 
 function openedFileName(path: string): string {
@@ -243,6 +246,9 @@ function removeFilterChip(index: number): void {
           <CollectionsView v-if="currentPage === 'collections' && !runtimeStore.isGuest" />
           <MapView v-if="currentPage === 'location' && !runtimeStore.isGuest" />
           <DeviceList v-if="currentPage === 'devices' && !runtimeStore.isGuest" />
+          <DuplicateManager
+            v-if="currentPage === 'duplicates' && !runtimeStore.isGuest"
+          />
           <GuestUpsellView v-if="runtimeStore.isGuest && currentPage === 'settings'" />
           <SettingsView
             v-else-if="currentPage === 'settings' && !runtimeStore.isGuest"
@@ -257,6 +263,14 @@ function removeFilterChip(index: number): void {
     </template>
 
     <SyncStatusBanner v-if="!runtimeStore.isGuest" />
+    <v-snackbar
+      v-model="globalSnackbar.state.show"
+      :timeout="6000"
+      :color="globalSnackbar.state.color ?? 'primary'"
+      location="bottom"
+    >
+      {{ globalSnackbar.state.text }}
+    </v-snackbar>
     <v-snackbar v-model="fileSnackbar" timeout="5000" color="surface" location="bottom">
       <div class="d-flex align-center ga-2">
         <v-icon color="primary" size="20">mdi-file-image-outline</v-icon>

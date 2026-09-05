@@ -88,6 +88,15 @@
           <span>{{ Math.round(nsfwScore * 100) }}%</span>
         </div>
 
+        <div
+          v-if="aestheticsDisplay != null"
+          class="aesthetics-badge"
+          :title="$t('media_card.aesthetics')"
+        >
+          <v-icon size="14" color="white">mdi-star</v-icon>
+          <span>{{ aestheticsDisplay }}</span>
+        </div>
+
         <div v-if="selectionMode" class="selection-indicator">
           <div class="check-circle" :class="{ checked: selected }">
             <v-icon v-if="selected" color="white" size="16">mdi-check</v-icon>
@@ -231,6 +240,12 @@ const nsfwScore = computed((): number => {
   const v = props.path.properties['nsfw'];
   const score = parseFloat(String(v));
   return Number.isFinite(score) ? score : 0;
+});
+
+const aestheticsDisplay = computed((): string | null => {
+  const score = props.path?.aesthetics_score;
+  if (score == null || !Number.isFinite(score)) return null;
+  return score.toFixed(1);
 });
 
 const isAnalyzed = computed((): boolean => {
@@ -481,6 +496,28 @@ onUnmounted(() => {
   font-weight: 700;
   color: white;
   background: color-mix(in srgb, rgb(var(--v-theme-error)) 90%, transparent);
+  backdrop-filter: blur(8px);
+  border-radius: 9999px;
+  padding: 3px 8px;
+  z-index: 5;
+}
+
+.nsfw-badge:hover {
+  background: rgb(var(--v-theme-error));
+}
+
+.aesthetics-badge {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(8px);
   border-radius: 9999px;
   padding: 3px 8px;

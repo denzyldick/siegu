@@ -325,6 +325,39 @@ pub async fn get_photo_ocr(app: tauri::AppHandle, id: String) -> String {
 }
 
 #[tauri::command]
+pub async fn get_photo_transcript(app: tauri::AppHandle, id: String) -> String {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return String::new();
+    }
+    let database = database::Database::new(&path);
+    database.get_photo_transcript(&id)
+}
+
+#[tauri::command]
+pub async fn get_model_timings(
+    app: tauri::AppHandle,
+    id: String,
+) -> std::collections::HashMap<String, f64> {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return Default::default();
+    }
+    let database = database::Database::new(&path);
+    database.get_model_timings(&id)
+}
+
+#[tauri::command]
+pub async fn get_model_timing_averages(app: tauri::AppHandle) -> Vec<(String, f64, i64)> {
+    let path = get_config_path(&app);
+    if path.is_empty() {
+        return Vec::new();
+    }
+    let database = database::Database::new(&path);
+    database.get_model_timing_averages()
+}
+
+#[tauri::command]
 pub async fn get_photo_by_id(app: tauri::AppHandle, id: String) -> String {
     let path = get_config_path(&app);
     if path.is_empty() {

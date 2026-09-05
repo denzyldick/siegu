@@ -8,7 +8,8 @@
     "collections": "Colecionnan",
     "map": "Mapa",
     "devices": "Dispositivo",
-    "settings": "Configurashon"
+    "settings": "Configurashon",
+    "duplicates": "Space saver"
   },
   "guest": {
     "intro_title": "Someone shared a collection with you",
@@ -293,6 +294,7 @@
     "ai_models": "Modelonan di AI",
     "analyze_existing": "Analisa biblioteka eksistente",
     "analyze_existing_hint": "Ora desaktivá, solamente foto nan añadi despó ta wòrdu analizá. Bo biblioteka aktual keda sin analisa te bo aktivá e opshon akí atrobe.",
+    "model_performance": "Emeshon di modelonan",
     "analyze_existing_set": "Preferensia di analisa aktualisá",
     "current_model": "Modelo di AI aktual",
     "latest_model": "Último modelo di AI",
@@ -519,6 +521,7 @@
     "not_synced": "No respaldá na otro aparato — toca pa reconectá",
     "nsfw": "NSFW detektá",
     "view_only": "Stashá ribo bo otro device — habri pa mira",
+    "aesthetics": "Puntashon di kalidat IA",
     "ai_analyzed": "Analisa pa AI"
   },
   "media_thumbnail": {
@@ -632,6 +635,10 @@
     "opened_in_explorer": "Habri den exploradó di archivo",
     "explorer_error": "No a logra habri den exploradó di archivo",
     "recognized_text": "Teksto rekonosí",
+    "transcript": "Transkripshon",
+    "transcript_empty": "No tin transkripshon disponibel.",
+    "transcript_overlay": "Mostra transkripshon",
+    "model_performance": "Emeshon di modelonan (ms)",
     "copy": "Kopia",
     "copy_text": "Kopia teksto",
     "copied": "Teksto kopia",
@@ -859,5 +866,42 @@
     "about_desc": "E informashon di vershon i e lisensianan open source ku Siegu ta usa ta aki.",
     "done_title": "Awor bo sa e konfigurashonnan!",
     "done_desc": "Esénan ta kubrí henter e página di konfigurashon. Explorá na bo gustu: kada opcion ta opshonal i por wòrdu kambia na kualke momento."
+  },
+  "duplicates": {
+    "title": "Space saver",
+    "desc": "Find exact, near-identical and visually similar copies, then free up space.",
+    "refresh": "Scan again",
+    "groups": "Groups",
+    "duplicates": "Duplicates",
+    "reclaimable": "Reclaimable",
+    "storage_total": "Library size",
+    "contents": "Contents",
+    "media_count": "{photos} photos · {videos} videos",
+    "in_use": "In use",
+    "reclaim_share": "of your library",
+    "no_duplicates": "No duplicates found",
+    "no_duplicates_desc": "Siegu compares photos by file hash, perceptual hash and CLIP embeddings to group copies. Nothing to clean up right now.",
+    "keep": "Keep",
+    "unknown_best": "No quality score yet — tap a photo to pick the one to keep",
+    "kind_exact": "Exact",
+    "kind_perceptual": "Perceptual",
+    "kind_clip": "Similar",
+    "trash_duplicates": "Remove duplicates ({count})",
+    "removed": "Removed {count} duplicate(s)",
+    "scanning": "Analyzing your library…",
+    "scanning_count": "{done} / {total} photos",
+    "scanning_hint": "The first scan reads every photo to detect duplicates. This can take a few minutes; later scans are instant.",
+    "scan_done": "Space saver: {groups} group(s) found — {size} could be freed",
+    "scan_clean": "Space saver: no duplicates found"
+  },
+  "video_player": {
+    "speed": "Playback speed",
+    "volume": "Volume",
+    "fullscreen": "Toggle fullscreen",
+    "pip": "Picture in picture",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "transcript": "Show transcript",
+    "tap_to_unmute": "Tap to unmute"
   }
 }

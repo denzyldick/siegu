@@ -302,6 +302,9 @@ pub fn run() {
             commands::photos::set_favorites,
             commands::photos::get_photo_by_id,
             commands::photos::get_photo_ocr,
+            commands::photos::get_photo_transcript,
+            commands::photos::get_model_timings,
+            commands::photos::get_model_timing_averages,
             commands::photos::get_photo_encoded_batch,
             commands::photos::get_photos_by_ids,
             commands::photos::get_heatmap_data,
@@ -310,6 +313,11 @@ pub fn run() {
             commands::photos::empty_trash,
             commands::photos::count_trash,
             commands::photos::list_trash,
+            // Duplicates
+            commands::duplicates::start_duplicate_scan,
+            commands::duplicates::find_duplicates,
+            commands::duplicates::duplicate_stats,
+            commands::duplicates::trash_duplicate_members,
             // Albums
             commands::albums::create_album,
             commands::albums::create_smart_album,

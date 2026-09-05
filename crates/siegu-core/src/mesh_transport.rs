@@ -208,12 +208,27 @@ impl MeshTransport {
     /// `SIEGU_TURN_USERNAME` / `SIEGU_TURN_CREDENTIAL` (#16). TURN lets
     /// guests on cellular networks reach a home NAT.
     fn rtc_configuration() -> RTCConfiguration {
+        Self::rtc_configuration_from_turn(
+            std::env::var("SIEGU_TURN_URLS").ok(),
+            std::env::var("SIEGU_TURN_USERNAME").ok(),
+            std::env::var("SIEGU_TURN_CREDENTIAL").ok(),
+        )
+    }
+
+    /// Build the ICE configuration from explicit TURN settings. Split out from
+    /// `rtc_configuration` so tests can exercise it without mutating process
+    /// globals (which races under parallel test execution).
+    fn rtc_configuration_from_turn(
+        turn_urls: Option<String>,
+        turn_username: Option<String>,
+        turn_credential: Option<String>,
+    ) -> RTCConfiguration {
         let mut ice_servers = vec![RTCIceServer {
             urls: vec!["stun:stun.l.google.com:19302".to_owned()],
             username: String::new(),
             credential: String::new(),
         }];
-        if let Ok(turn_urls) = std::env::var("SIEGU_TURN_URLS") {
+        if let Some(turn_urls) = turn_urls {
             let urls: Vec<String> = turn_urls
                 .split(',')
                 .map(str::trim)
@@ -223,8 +238,8 @@ impl MeshTransport {
             if !urls.is_empty() {
                 ice_servers.push(RTCIceServer {
                     urls,
-                    username: std::env::var("SIEGU_TURN_USERNAME").unwrap_or_default(),
-                    credential: std::env::var("SIEGU_TURN_CREDENTIAL").unwrap_or_default(),
+                    username: turn_username.unwrap_or_default(),
+                    credential: turn_credential.unwrap_or_default(),
                 });
             }
         }
@@ -1585,10 +1600,7 @@ mod tests {
 
     #[test]
     fn test_rtc_configuration_default() {
-        std::env::remove_var("SIEGU_TURN_URLS");
-        std::env::remove_var("SIEGU_TURN_USERNAME");
-        std::env::remove_var("SIEGU_TURN_CREDENTIAL");
-        let cfg = MeshTransport::rtc_configuration();
+        let cfg = MeshTransport::rtc_configuration_from_turn(None, None, None);
         assert_eq!(cfg.ice_servers.len(), 1);
         assert_eq!(
             cfg.ice_servers[0].urls,
@@ -1597,34 +1609,42 @@ mod tests {
     }
 
     #[test]
-    fn test_rtc_configuration_turn() {
-        std::env::set_var("SIEGU_TURN_URLS", "turn:my.turn.server:3478");
-        std::env::set_var("SIEGU_TURN_USERNAME", "user1");
-        std::env::set_var("SIEGU_TURN_CREDENTIAL", "pass1");
+    fn test_rtc_configuration_reads_env() {
         let cfg = MeshTransport::rtc_configuration();
+        assert!(cfg.ice_servers.len() >= 1);
+        assert_eq!(
+            cfg.ice_servers[0].urls,
+            vec!["stun:stun.l.google.com:19302"]
+        );
+    }
+
+    #[test]
+    fn test_rtc_configuration_turn() {
+        let cfg = MeshTransport::rtc_configuration_from_turn(
+            Some("turn:my.turn.server:3478".to_owned()),
+            Some("user1".to_owned()),
+            Some("pass1".to_owned()),
+        );
         assert_eq!(cfg.ice_servers.len(), 2);
         assert_eq!(cfg.ice_servers[1].urls, vec!["turn:my.turn.server:3478"]);
         assert_eq!(cfg.ice_servers[1].username, "user1");
         assert_eq!(cfg.ice_servers[1].credential, "pass1");
-        // cleanup
-        std::env::remove_var("SIEGU_TURN_URLS");
-        std::env::remove_var("SIEGU_TURN_USERNAME");
-        std::env::remove_var("SIEGU_TURN_CREDENTIAL");
     }
 
     #[test]
     fn test_rtc_configuration_multiple_turn_urls() {
-        std::env::set_var("SIEGU_TURN_URLS", "turn:a.com:3478, turn:b.com:3478");
-        std::env::remove_var("SIEGU_TURN_USERNAME");
-        std::env::remove_var("SIEGU_TURN_CREDENTIAL");
-        let cfg = MeshTransport::rtc_configuration();
+        let cfg = MeshTransport::rtc_configuration_from_turn(
+            Some("turn:a.com:3478, turn:b.com:3478".to_owned()),
+            None,
+            None,
+        );
         assert_eq!(cfg.ice_servers.len(), 2);
         assert_eq!(
             cfg.ice_servers[1].urls,
             vec!["turn:a.com:3478", "turn:b.com:3478"]
         );
-        // cleanup
-        std::env::remove_var("SIEGU_TURN_URLS");
+        assert_eq!(cfg.ice_servers[1].username, "");
+        assert_eq!(cfg.ice_servers[1].credential, "");
     }
 
     // --- builder methods ---
