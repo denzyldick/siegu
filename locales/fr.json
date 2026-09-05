@@ -74,6 +74,10 @@
       "desc": "Des millions de photos, des résultats instantanés. Votre appareil fait le travail."
     }
   },
+  "about": {
+    "eyebrow": "À propos",
+    "title": "Une photothèque privée, pour de bon"
+  },
   "showcase": {
     "eyebrow": "La photothèque",
     "title": "Une maison pour chaque souvenir",

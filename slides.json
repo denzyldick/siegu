@@ -1,11 +1,11 @@
 {
-  "_comment": "Hero carousel slides. Each slide: { src, alt, label? }. Real UI captures from the Siegu app in /shots/.",
+  "_comment": "Hero slide show. Each slide: { src, alt, label? }. Real UI captures from the Siegu app in /shots/.",
   "slides": [
-    { "src": "shots/library.png", "alt": "Siegu photo library", "label": "Your whole library, at a glance" },
-    { "src": "shots/album.png", "alt": "Siegu album grid", "label": "Every album, beautifully organized" },
-    { "src": "shots/locations.png", "alt": "Siegu places map", "label": "Places, clustered automatically" },
-    { "src": "shots/viewer.png", "alt": "Siegu photo viewer", "label": "Relive your memories, full screen" },
-    { "src": "shots/share.png", "alt": "Siegu private sharing", "label": "Privately share a whole collection" },
-    { "src": "shots/banner.png", "alt": "Siegu library overview", "label": "Fast, calm and made for memories" }
+    { "src": "shots/library.webp", "alt": "Siegu photo library", "label": "Your whole library, at a glance" },
+    { "src": "shots/album.webp", "alt": "Siegu album grid", "label": "Every album, beautifully organized" },
+    { "src": "shots/locations.webp", "alt": "Siegu places map", "label": "Places, clustered automatically" },
+    { "src": "shots/viewer.webp", "alt": "Siegu photo viewer", "label": "Relive your memories, full screen" },
+    { "src": "shots/share.webp", "alt": "Siegu private sharing", "label": "Privately share a whole collection" },
+    { "src": "shots/banner.webp", "alt": "Siegu library overview", "label": "Fast, calm and made for memories" }
   ]
 }

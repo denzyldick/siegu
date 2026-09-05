@@ -74,6 +74,10 @@
       "desc": "Millionen Fotos, sofortige Ergebnisse. Dein Gerät erledigt die harte Arbeit."
     }
   },
+  "about": {
+    "eyebrow": "Über uns",
+    "title": "Eine private Fotobibliothek, für immer"
+  },
   "showcase": {
     "eyebrow": "Die Bibliothek",
     "title": "Ein Zuhause für jede Erinnerung",
