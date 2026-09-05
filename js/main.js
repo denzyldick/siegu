@@ -229,8 +229,8 @@ function trackersOn() {
    side. A build script (scripts/build-static.mjs) substitutes the real links
    into these placeholders. Monthly and Yearly are separate prices (Yearly is
    ~20% off), so the Pro button hands off to whichever period is selected. */
-const STRIPE_PRO_PAYMENT_LINK_MONTHLY = '';
-const STRIPE_PRO_PAYMENT_LINK_YEARLY = '';
+const STRIPE_PRO_PAYMENT_LINK_MONTHLY = 'https://buy.stripe.com/test_cNiaEX8HIdZc1e7fLL9MY00';
+const STRIPE_PRO_PAYMENT_LINK_YEARLY = 'https://buy.stripe.com/test_cNieVd3nocV8cWP2YZ9MY01';
 // The currently-selected period is read from state.billing by proPaymentLink().
 function proPaymentLink() {
   return state.billing === 'yearly'
