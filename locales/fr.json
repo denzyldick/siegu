@@ -7,8 +7,25 @@
     "features": "Fonctionnalités",
     "pricing": "Tarifs",
     "faq": "FAQ",
+    "compare": "vs Google Photos",
+    "docs": "Docs",
+    "download": "Télécharger",
     "get_free": "Télécharger siegu gratuitement",
     "demo": "Démo en direct"
+  },
+  "search": {
+    "trigger_label": "Rechercher (Ctrl+K)",
+    "placeholder": "Rechercher…",
+    "aria": "Recherche rapide",
+    "no_results": "Aucun résultat",
+    "nav": "pour naviguer",
+    "select": "pour sélectionner",
+    "theme": "Thème",
+    "toggle": "Basculer",
+    "resources": "Ressources",
+    "docs": "Guides et documentation pour tirer le meilleur de Siegu.",
+    "demo": "Essayez Siegu en direct dans votre navigateur.",
+    "source": "Parcourez et contribuez au code open source."
   },
   "hero": {
     "badge": "Privé par conception · Local d'abord",
@@ -109,8 +126,7 @@
       "features": [
         "Tout le plan Pro",
         "Jusqu'à 6 membres",
-        "Gestion par invitation",
-        "Hub familial dédié"
+        "Gestion par invitation"
       ],
       "cta": "Choisir Famille"
     }

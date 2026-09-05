@@ -7,7 +7,7 @@
   <meta name="description" content="Siegu is a private, local-first photo library with on-device AI. Browse, search, share and relive your memories without handing them to the cloud." />
   <script>
     // Apply the saved theme before first paint to avoid a flash of the wrong
-    // palette. Mirrors applyTheme() in js/main.js?v=mtlegike (light | dark | system).
+    // palette. Mirrors applyTheme() in js/main.js?v=mtogj5tl (light | dark | system).
     (function () {
       try {
         var v = localStorage.getItem('siegu_theme');
@@ -46,7 +46,17 @@
     "@context": "https://schema.org",
     "@graph": [
       {
+        "@type": "WebSite",
+        "@id": "https://denzyldick.github.io/siegu/#website",
+        "url": "https://denzyldick.github.io/siegu/",
+        "name": "Siegu",
+        "description": "Siegu is a private, local-first photo library with on-device AI. Browse, search, share and relive your memories without handing them to the cloud.",
+        "publisher": { "@id": "https://denzyldick.github.io/siegu/#organization" },
+        "inLanguage": "en"
+      },
+      {
         "@type": "SoftwareApplication",
+        "@id": "https://denzyldick.github.io/siegu/#software",
         "name": "Siegu",
         "applicationCategory": "MultimediaApplication",
         "operatingSystem": "Windows, macOS, Linux, Android",
@@ -57,10 +67,12 @@
         },
         "description": "Siegu is a private, local-first photo library with on-device AI. Browse, search, share and relive your memories without handing them to the cloud.",
         "url": "https://denzyldick.github.io/siegu/",
-        "image": "https://denzyldick.github.io/siegu/og-image.png"
+        "image": "https://denzyldick.github.io/siegu/og-image.png",
+        "isPartOf": { "@id": "https://denzyldick.github.io/siegu/#website" }
       },
       {
         "@type": "Organization",
+        "@id": "https://denzyldick.github.io/siegu/#organization",
         "name": "Siegu",
         "url": "https://denzyldick.github.io/siegu/",
         "logo": "https://denzyldick.github.io/siegu/logo.png",
@@ -84,14 +96,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="css/styles.css?v=mtlegike" />
+  <link rel="stylesheet" href="css/styles.css?v=mtogj5tl" />
 
   <!--
     MARKETING / TRACKER HOOK
     Drop vendor scripts (Plausible, Fathom, GA, Meta Pixel, Hotjar, …) here.
     Each snippet can live in its own file under /trackers/*.js and be included
     with a <script src> tag, or added inline below. They load only after the
-    cookie-consent banner has been accepted (see js/main.js?v=mtlegike `trackersOn`).
+    cookie-consent banner has been accepted (see js/main.js?v=mtogj5tl `trackersOn`).
   -->
 </head>
 <body>
@@ -106,12 +118,18 @@
     <div class="container header-inner">
       <a href="#top" class="brand"><img src="logo.png" alt="siegu" /><span>siegu</span></a>
       <nav class="nav" aria-label="Primary">
-        <a href="#features" data-i18n="nav.features">Features</a>
-        <a href="#pricing" data-i18n="nav.pricing">Pricing</a>
-        <a href="#faq" data-i18n="nav.faq">FAQ</a>
+        <a href="index.html#features" data-i18n="nav.features">Features</a>
+        <a href="pricing.html" data-i18n="nav.pricing">Pricing</a>
+        <a href="faq.html" data-i18n="nav.faq">FAQ</a>
+        <a href="docs.html" data-i18n="nav.docs">Docs</a>
+        <a href="download.html" data-i18n="nav.download">Download</a>
         <a href="https://siegu.onrender.com" target="_blank" rel="noopener" data-track="demo_clicked" data-i18n="nav.demo">Live demo</a>
       </nav>
       <div class="header-actions">
+        <button class="search-trigger" id="searchTrigger" type="button" aria-label="Search (Ctrl+K)" data-i18n-aria="search.trigger_label">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span class="search-shortcut">⌘K</span>
+        </button>
         <button class="theme-btn" id="themeBtn" type="button" aria-label="Toggle theme">☾</button>
         <div class="lang-switch">
           <button class="lang-btn" id="langBtn" type="button">
@@ -140,12 +158,12 @@
           <a class="btn btn-ghost" href="https://siegu.onrender.com" target="_blank" rel="noopener" data-track="demo_clicked" data-i18n="hero.cta_demo">Try the live demo</a>
         </div>
         <p class="hero-note" data-i18n="hero.note">Windows · macOS · Linux · Web</p>
-        <p class="hero-trust" data-i18n="hero.trust">Free forever · No account · Cancel anytime. <a href="#pricing" data-i18n="hero.see_pro">See Pro →</a></p>
+        <p class="hero-trust" data-i18n="hero.trust">Free forever · No account · Cancel anytime. <a href="pricing.html" data-i18n="hero.see_pro">See Pro →</a></p>
       </div>
       <div class="container hero-visual">
         <div class="carousel" id="heroCarousel" aria-roledescription="carousel" aria-label="Siegu in action">
           <div class="carousel-viewport" id="carouselViewport">
-            <!-- slides injected by js/main.js?v=mtlegike from /slides.json -->
+            <!-- slides injected by js/main.js?v=mtogj5tl from /slides.json -->
           </div>
           <button class="carousel-arrow carousel-prev" id="carouselPrev" type="button" aria-label="Previous slide">‹</button>
           <button class="carousel-arrow carousel-next" id="carouselNext" type="button" aria-label="Next slide">›</button>
@@ -180,8 +198,10 @@
               <rect x="9" y="10.5" width="6" height="4" rx="1"/>
               <path d="M12 10.5V9a1.6 1.6 0 0 1 3 0"/>
             </svg></div>
+            <div class="text">
             <h3 data-i18n="features.listen.title">Private by design</h3>
             <p data-i18n="features.listen.desc">Your photos never leave your device. No servers, no cloud, no uploads. Ever.</p>
+          </div>
           </div>
           <div class="feature">
             <div class="ico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
@@ -189,8 +209,10 @@
               <line x1="16" y1="16" x2="20.5" y2="20.5"/>
               <path class="fill" d="M17 4l.7 1.8L19.5 6.5l-1.8.7L17 9l-.7-1.8-1.8-.7 1.8-.7L17 4z"/>
             </svg></div>
+            <div class="text">
             <h3 data-i18n="features.search.title">Natural-language search</h3>
             <p data-i18n="features.search.desc">“beach in 2021” or “birthday cake” — find any moment in an instant with on-device AI.</p>
+          </div>
           </div>
           <div class="feature">
             <div class="ico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
@@ -198,8 +220,10 @@
               <path d="M3 12.5l9 4.5 9-4.5"/>
               <path d="M3 17.5l9 4.5 9-4.5"/>
             </svg></div>
+            <div class="text">
             <h3 data-i18n="features.organized.title">Auto-organized</h3>
             <p data-i18n="features.organized.desc">Faces, places, trips and events, clustered automatically and kept private.</p>
+          </div>
           </div>
           <div class="feature">
             <div class="ico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
@@ -208,23 +232,29 @@
               <circle cx="18" cy="18" r="2.5"/>
               <path d="M7.2 10.8l8.5-3.6M7.2 13.2l8.5 3.6"/>
             </svg></div>
+            <div class="text">
             <h3 data-i18n="features.share.title">Privately share</h3>
             <p data-i18n="features.share.desc">Share a whole collection over a live, encrypted link. Guests see only what you allow.</p>
+          </div>
           </div>
           <div class="feature">
             <div class="ico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M21 15.5c0 .9-.5 1.7-1.4 2.1a3 3 0 0 1-2.9 3.2H6.3a3.3 3.3 0 0 1-2.3-5.6A4 4 0 0 1 7 11a5.5 5.5 0 0 1 10.6 1.1A3 3 0 0 1 21 15.5z"/>
               <path d="M16 9V4l-2 2-2-2 2 5"/>
             </svg></div>
+            <div class="text">
             <h3 data-i18n="features.offline.title">Works offline</h3>
             <p data-i18n="features.offline.desc">Your library is local, so it works on a plane, in a cabin, anywhere.</p>
+          </div>
           </div>
           <div class="feature">
             <div class="ico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/>
             </svg></div>
+            <div class="text">
             <h3 data-i18n="features.speed.title">Blazing fast</h3>
             <p data-i18n="features.speed.desc">Millions of photos, instant results. Your device does the heavy lifting.</p>
+          </div>
           </div>
         </div>
       </div>
@@ -272,7 +302,7 @@
       </div>
       <div class="container">
         <div class="pricing-grid" id="pricingGrid">
-          <!-- Plan cards injected by js/main.js?v=mtlegike -->
+          <!-- Plan cards injected by js/main.js?v=mtogj5tl -->
         </div>
         <p class="pricing-note center" data-i18n="pricing.note">Prices in USD. Cancel anytime. No extra fees for more photos.</p>
       </div>
@@ -311,20 +341,21 @@
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <a href="#top" class="brand"><img src="logo.png" alt="siegu" /><span>siegu</span></a>
+          <a href="index.html#top" class="brand"><img src="logo.png" alt="siegu" /><span>siegu</span></a>
           <p data-i18n="footer.tagline">A private, local-first photo library.</p>
         </div>
         <div class="footer-col">
           <h5 data-i18n="footer.product">Product</h5>
-          <a href="#features" data-i18n="footer.product_links.features">Features</a>
-          <a href="#pricing" data-i18n="footer.product_links.pricing">Pricing</a>
+          <a href="index.html#features" data-i18n="footer.product_links.features">Features</a>
+          <a href="pricing.html" data-i18n="footer.product_links.pricing">Pricing</a>
           <a href="#" data-i18n="footer.product_links.changelog">Changelog</a>
           <a href="#" data-i18n="footer.product_links.roadmap">Roadmap</a>
         </div>
         <div class="footer-col">
           <h5 data-i18n="footer.resources">Resources</h5>
           <a href="https://github.com/denzyldick/siegu/tree/main/docs" target="_blank" rel="noopener" data-i18n="footer.resources_links.docs">Documentation</a>
-          <a href="#" data-action="platform-download" data-track="cta_get_started" data-i18n="footer.resources_links.download">Download</a>
+          <a href="download.html" data-track="cta_get_started" data-i18n="footer.resources_links.download">Download</a>
+          <a href="compare.html" data-i18n="footer.resources_links.compare">vs Google Photos</a>
           <a href="https://siegu.onrender.com" target="_blank" rel="noopener" data-track="demo_clicked" data-i18n="footer.resources_links.demo">Live demo</a>
         </div>
         <div class="footer-col">
@@ -382,6 +413,24 @@
     </div>
   </div>
 
-  <script src="js/main.js?v=mtlegike"></script>
+  <!-- Command palette / quick search (Ctrl+K / ⌘K) -->
+  <div class="cmd-overlay" id="cmdPalette" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Quick search" data-i18n-aria="search.aria">
+    <div class="cmd-dialog">
+      <div class="cmd-input-wrap">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="cmdInput" autocomplete="off" spellcheck="false" placeholder="Search…" data-i18n-placeholder="search.placeholder" />
+        <kbd class="cmd-kbd">ESC</kbd>
+      </div>
+      <div class="cmd-groups" id="cmdGroups"><!-- filled by main.js --></div>
+      <div class="cmd-empty" id="cmdEmpty" data-i18n="search.no_results" hidden>No results</div>
+      <div class="cmd-footer">
+        <span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="search.nav">to navigate</span></span>
+        <span><kbd>↵</kbd> <span data-i18n="search.select">to select</span></span>
+        <span><span data-i18n="search.theme">Theme</span>: <button id="cmdTheme" type="button"><span data-i18n="search.toggle">Toggle</span></button></span>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/main.js?v=mtogj5tl"></script>
 </body>
 </html>

@@ -57,6 +57,14 @@ function applyTexts() {
     const v = t(el.getAttribute('data-i18n'));
     if (v !== el.getAttribute('data-i18n')) el.textContent = v;
   });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+    const v = t(el.getAttribute('data-i18n-placeholder'));
+    if (v !== el.getAttribute('data-i18n-placeholder')) el.setAttribute('placeholder', v);
+  });
+  document.querySelectorAll('[data-i18n-aria]').forEach((el) => {
+    const v = t(el.getAttribute('data-i18n-aria'));
+    if (v !== el.getAttribute('data-i18n-aria')) el.setAttribute('aria-label', v);
+  });
   document.title = t('meta.title');
   const meta = document.querySelector('meta[name="description"]');
   if (meta) meta.setAttribute('content', t('meta.description'));
@@ -71,8 +79,10 @@ function renderLangMenu() {
     en: 'English', nl: 'Nederlands', fr: 'Français', es: 'Español',
     pap: 'Papiamentu', de: 'Deutsch', it: 'Italiano', pt: 'Português',
   };
-  document.getElementById('langCode').textContent = state.locale.toUpperCase();
+  const langCode = document.getElementById('langCode');
+  if (langCode) langCode.textContent = state.locale.toUpperCase();
   const menu = document.getElementById('langMenu');
+  if (!menu) return;
   menu.innerHTML = SUPPORTED
     .map((c) => {
       const active = c === state.locale;
@@ -99,12 +109,13 @@ function renderPricing() {
   const d = state.dict || {};
   const plans = ['free', 'pro', 'team'];
   const grid = document.getElementById('pricingGrid');
+  if (!grid) return;
   let html = plans
     .map((key) => {
       const p = lookup('pricing.' + key, d) || {};
       const featured = key === 'pro';
       const isYearly = state.billing === 'yearly';
-      const price = { free: 0, pro: 9.99, team: 9.99 }[key];
+      const price = { free: 0, pro: 9.99, team: 29.99 }[key];
       const feats = Array.isArray(p.features) ? p.features : [];
       const isWaitlist = key === 'team';
       // Waitlist (Team) is a secondary action; Free/Pro are primary.
@@ -146,6 +157,7 @@ function renderPricing() {
 function renderFaq() {
   const items = lookup('faq.items', state.dict) || [];
   const list = document.getElementById('faqList');
+  if (!list) return;
   list.innerHTML = items
     .map((it, i) => `
       <div class="faq-item" id="faq-${i}">
@@ -193,7 +205,7 @@ function cycleTheme() {
    GA4: the Docker build injects the real Measurement ID into GA_MEASUREMENT_ID
    (see deploy/Caddyfile + README). When the ID is still the public placeholder
    or absent, GA stays off — including under plain `npm run dev`. */
-const GA_MEASUREMENT_ID = 'G-8Q72K460VG';
+const GA_MEASUREMENT_ID = '';
 const GA_ENABLED = /^G-[A-Z0-9]+$/.test(GA_MEASUREMENT_ID);
 
 function trackersOn() {
@@ -217,8 +229,8 @@ function trackersOn() {
    side. A build script (scripts/build-static.mjs) substitutes the real links
    into these placeholders. Monthly and Yearly are separate prices (Yearly is
    ~20% off), so the Pro button hands off to whichever period is selected. */
-const STRIPE_PRO_PAYMENT_LINK_MONTHLY = 'https://buy.stripe.com/test_cNiaEX8HIdZc1e7fLL9MY00';
-const STRIPE_PRO_PAYMENT_LINK_YEARLY = 'https://buy.stripe.com/test_cNieVd3nocV8cWP2YZ9MY01';
+const STRIPE_PRO_PAYMENT_LINK_MONTHLY = '';
+const STRIPE_PRO_PAYMENT_LINK_YEARLY = '';
 // The currently-selected period is read from state.billing by proPaymentLink().
 function proPaymentLink() {
   return state.billing === 'yearly'
@@ -320,10 +332,10 @@ const DL_OPTIONS = [
 ];
 
 function buildDownloadDialog() {
-  const grid = document.getElementById('dlGrid');
-  if (!grid) return;
+  const grids = document.querySelectorAll('.dl-grid');
+  if (!grids.length) return;
   const { os: curOs, arch: curArch } = detectPlatform();
-  grid.innerHTML = DL_OPTIONS.map((opt) => {
+  const content = DL_OPTIONS.map((opt) => {
     let href = '#';
     let soon = opt.soon;
     if (!soon) {
@@ -349,6 +361,7 @@ function buildDownloadDialog() {
       ? `<button type="button" class="dl-opt" data-action="open-waitlist" data-waitlist-source="${opt.key}" data-track="download_${opt.key}">${content}</button>`
       : `<a class="dl-opt" href="${href}" target="_blank" rel="noopener" ${track}>${content}</a>`;
   }).join('');
+  grids.forEach((grid) => { grid.innerHTML = content; });
 }
 
 /* ---------- Pro dialog (explain + Stripe pay) ---------- */
@@ -514,8 +527,176 @@ function initCarousel() {
   document.addEventListener('visibilitychange', () => (document.hidden ? stopCarousel() : startCarousel()));
 }
 
+/* ---------- Command palette (⌘K / Ctrl+K) ---------- */
+// Quick-jump links surfaced by the palette, with search keywords so the
+// natural-language query maps to the right destination.
+const COMMANDS = [
+  { group: 'nav.download', label: 'download.title', desc: 'download.desc',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>',
+    action: () => document.querySelector('[data-action="open-download"]')?.click(), keywords: ['download', 'install', 'get', 'app', 'download', 'windows', 'mac', 'linux', 'android', 'web', 'apk', 'dmg', 'deb', 'appimage'] },
+  { group: 'nav.pricing', label: 'pricing.title', desc: 'pricing.subtitle',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5z"/><path d="M12 22V12"/><path d="M3 7l9 5 9-5"/></svg>',
+    href: 'pricing.html', keywords: ['pricing', 'price', 'cost', 'pro', 'free', 'plan', 'plans', 'upgrade', 'family', 'team', 'billing', 'subscription', 'pay', 'buy', 'monthly', 'yearly'] },
+  { group: 'nav.faq', label: 'faq.title', desc: 'faq.eyebrow',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.5 9.2a2.5 2.5 0 1 1 3.4 2.8c-.6.3-1 .7-1 1.5V14"/><path d="M12 17h.01"/></svg>',
+    href: 'faq.html', keywords: ['faq', 'questions', 'help', 'support', 'privacy', 'offline', 'share', 'platforms', 'import', 'google', 'icloud'] },
+  { group: 'resources', label: 'footer.resources_links.docs', desc: 'resources.docs',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>',
+    href: 'docs.html', keywords: ['docs', 'documentation', 'guide', 'manual', 'help', 'tutorial'] },
+  { group: 'resources', label: 'footer.resources_links.demo', desc: 'resources.demo',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>',
+    href: 'https://siegu.onrender.com', external: true, keywords: ['demo', 'live', 'try', 'trial', 'preview', 'web app'] },
+  { group: 'resources', label: 'footer.company_links.github', desc: 'resources.source',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.9a3.4 3.4 0 0 0-.9-2.6c3-.3 6.2-1.5 6.2-6.8a5.3 5.3 0 0 0-1.4-3.7 4.9 4.9 0 0 0-.1-3.7s-1.1-.4-3.7 1.4a12.7 12.7 0 0 0-6.7 0C6.3 2.9 5.2 3.3 5.2 3.3a4.9 4.9 0 0 0-.1 3.7A5.3 5.3 0 0 0 3.7 10.7c0 5.3 3.2 6.5 6.2 6.8a3.4 3.4 0 0 0-.9 2.6V22"/></svg>',
+    href: 'https://github.com/denzyldick/siegu', external: true, keywords: ['github', 'source', 'code', 'open source', 'repository'] },
+];
+
+function cmdIcon(svg) { return `<span class="cmd-ico">${svg}</span>`; }
+
+function renderCommands(filter) {
+  const groups = document.getElementById('cmdGroups');
+  const empty = document.getElementById('cmdEmpty');
+  const q = (filter || '').trim().toLowerCase();
+  const d = state.dict || {};
+
+  let matches = COMMANDS;
+  if (q) {
+    matches = COMMANDS.filter((c) => {
+      const label = (lookup(c.label, d) || '').toLowerCase();
+      const kw = (c.keywords || []).join(' ').toLowerCase();
+      return label.includes(q) || kw.includes(q);
+    });
+  }
+  cmdList = matches;
+
+  let html = '';
+  const byGroup = {};
+  matches.forEach((c) => { (byGroup[c.group] = byGroup[c.group] || []).push(c); });
+
+  const groupLabels = { 'nav.download': t('nav.download'), 'nav.pricing': t('nav.pricing'), 'nav.faq': t('nav.faq'), resources: t('search.resources') };
+  let cmdIdx = 0;
+  Object.keys(byGroup).forEach((g) => {
+    html += `<div class="cmd-group-label">${groupLabels[g] || g}</div>`;
+    byGroup[g].forEach((c) => {
+      const label = t(c.label);
+      const desc = t(c.desc);
+      const idxAttr = `data-idx="${cmdIdx++}"`;
+      html += c.href
+        ? `<a class="cmd-item" href="${c.href}" ${c.external ? 'target="_blank" rel="noopener"' : ''} ${idxAttr} data-action="cmd-goto">${cmdIcon(c.icon)}<span class="cmd-label">${label}${desc ? `<span class="cmd-desc">${desc}</span>` : ''}</span></a>`
+        : `<button type="button" class="cmd-item" ${idxAttr} data-action="cmd-act">${cmdIcon(c.icon)}<span class="cmd-label">${label}${desc ? `<span class="cmd-desc">${desc}</span>` : ''}</span></button>`;
+    });
+  });
+
+  groups.innerHTML = html;
+  empty.hidden = matches.length > 0;
+  activeCmdIndex = 0;
+  updateCmdActive();
+}
+
+let activeCmdIndex = 0;
+let cmdList = [];
+
+function cmdItems() { return Array.from(document.querySelectorAll('#cmdGroups .cmd-item')); }
+
+function updateCmdActive() {
+  const items = cmdItems();
+  items.forEach((el, i) => el.classList.toggle('is-active', i === activeCmdIndex));
+  const active = items[activeCmdIndex];
+  if (active) active.scrollIntoView({ block: 'nearest' });
+}
+
+function cmdMove(dir) {
+  const items = cmdItems();
+  if (!items.length) return;
+  activeCmdIndex = (activeCmdIndex + dir + items.length) % items.length;
+  updateCmdActive();
+}
+
+function cmdSelect() {
+  const items = cmdItems();
+  const el = items[activeCmdIndex];
+  if (!el) return;
+  const href = el.getAttribute('href') || '';
+  closeCmdPalette();
+  if (el.getAttribute('data-action') === 'cmd-goto') {
+    if (el.target === '_blank') { window.open(el.href, '_blank'); }
+    else if (href.startsWith('#')) {
+      const id = href.slice(1);
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    } else { window.location.href = el.href; }
+  } else {
+    const c = cmdList[Number(el.getAttribute('data-idx')) || 0];
+    c?.action?.();
+  }
+}
+
+function openCmdPalette() {
+  const pal = document.getElementById('cmdPalette');
+  if (!pal) return;
+  document.getElementById('cmdInput').value = '';
+  renderCommands('');
+  pal.setAttribute('aria-hidden', 'false');
+  pal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => document.getElementById('cmdInput').focus(), 30);
+  pushEvent('cmd_opened', { locale: state.locale });
+}
+function closeCmdPalette() {
+  const pal = document.getElementById('cmdPalette');
+  if (!pal) return;
+  pal.setAttribute('aria-hidden', 'true');
+  pal.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function initCmdPalette() {
+  const pal = document.getElementById('cmdPalette');
+  const input = document.getElementById('cmdInput');
+  if (!pal || !input) return;
+
+  document.getElementById('searchTrigger')?.addEventListener('click', openCmdPalette);
+  input.addEventListener('input', () => renderCommands(input.value));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); cmdMove(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); cmdMove(-1); }
+    else if (e.key === 'Enter') { e.preventDefault(); cmdSelect(); }
+  });
+  pal.addEventListener('click', (e) => {
+    if (e.target === pal) closeCmdPalette();
+  });
+  document.getElementById('cmdGroups')?.addEventListener('click', (e) => {
+    const item = e.target.closest('.cmd-item');
+    if (!item) return;
+    closeCmdPalette();
+    if (item.getAttribute('data-action') === 'cmd-goto') {
+      const href = item.getAttribute('href') || '';
+      if (item.target === '_blank') {
+        window.open(href, '_blank');
+      } else if (href.startsWith('#')) {
+        document.getElementById(href.slice(1))?.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        window.location.href = href;
+      }
+    } else {
+      const c = cmdList[Number(item.getAttribute('data-idx')) || 0];
+      c?.action?.();
+    }
+  });
+  document.getElementById('cmdTheme')?.addEventListener('click', () => { cycleTheme(); closeCmdPalette(); });
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openCmdPalette(); }
+    if (e.key === 'Escape') closeCmdPalette();
+  });
+}
+
 /* ---------- Boot ---------- */
 async function boot() {
+  // The command palette must work no matter what happens below: initialize it
+  // first so a failure in any other component can't take down the keyboard
+  // shortcut or the search UX.
+  initCmdPalette();
+
   const saved = localStorage.getItem('siegu_lang');
   const nav = (navigator.language || 'en').split('-')[0];
   state.locale = SUPPORTED.includes(saved) ? saved : SUPPORTED.includes(nav) ? nav : FALLBACK;
@@ -523,33 +704,40 @@ async function boot() {
   applyTexts();
   applyCtas();
 
-  document.getElementById('year').textContent = new Date().getFullYear();
+  const yearEl = document.getElementById('year');
+  if (yearEl) yearEl.textContent = new Date().getFullYear();
 
-  document.getElementById('langBtn').addEventListener('click', () => toggleLangMenu());
-  document.addEventListener('click', (e) => {
-    const b = document.querySelector('#langMenu');
-    if (!b.classList.contains('open')) return;
-    if (e.target.closest('#langBtn') || e.target.closest('#langMenu')) return;
-    toggleLangMenu(false);
-  });
-  document.getElementById('langMenu').addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-lang]');
-    if (!btn) return;
-    state.locale = btn.getAttribute('data-lang');
-    localStorage.setItem('siegu_lang', state.locale);
-    state.dict = await loadLocale(state.locale);
-    applyTexts();
-    toggleLangMenu(false);
-  });
+  const langBtn = document.getElementById('langBtn');
+  const langMenu = document.getElementById('langMenu');
+  if (langBtn && langMenu) {
+    langBtn.addEventListener('click', () => toggleLangMenu());
+    document.addEventListener('click', (e) => {
+      if (!langMenu.classList.contains('open')) return;
+      if (e.target.closest('#langBtn') || e.target.closest('#langMenu')) return;
+      toggleLangMenu(false);
+    });
+    langMenu.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-lang]');
+      if (!btn) return;
+      state.locale = btn.getAttribute('data-lang');
+      localStorage.setItem('siegu_lang', state.locale);
+      state.dict = await loadLocale(state.locale);
+      applyTexts();
+      toggleLangMenu(false);
+    });
+  }
 
-  document.getElementById('billingToggle').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-period]');
-    if (!btn) return;
-    state.billing = btn.getAttribute('data-period');
-    document.querySelectorAll('#billingToggle button').forEach((b) => b.classList.toggle('active', b === btn));
-    renderPricing();
-    buildProDialog();
-  });
+  const billingToggle = document.getElementById('billingToggle');
+  if (billingToggle) {
+    billingToggle.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-period]');
+      if (!btn) return;
+      state.billing = btn.getAttribute('data-period');
+      document.querySelectorAll('#billingToggle button').forEach((b) => b.classList.toggle('active', b === btn));
+      renderPricing();
+      buildProDialog();
+    });
+  }
 
   /* Download + Pro dialogs */
   const dlModal = document.getElementById('downloadModal');
@@ -644,18 +832,21 @@ async function boot() {
     });
   }
 
-  document.getElementById('faqList').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-faq]');
-    if (!btn) return;
-    const item = btn.closest('.faq-item');
-    const isOpen = item.classList.contains('open');
-    document.querySelectorAll('.faq-item').forEach((x) => { x.classList.remove('open'); x.querySelector('.faq-a').style.maxHeight = '0px'; });
-    if (!isOpen) {
-      item.classList.add('open');
-      const a = item.querySelector('.faq-a');
-      a.style.maxHeight = a.scrollHeight + 'px';
-    }
-  });
+  const faqList = document.getElementById('faqList');
+  if (faqList) {
+    faqList.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-faq]');
+      if (!btn) return;
+      const item = btn.closest('.faq-item');
+      const isOpen = item.classList.contains('open');
+      document.querySelectorAll('.faq-item').forEach((x) => { x.classList.remove('open'); x.querySelector('.faq-a').style.maxHeight = '0px'; });
+      if (!isOpen) {
+        item.classList.add('open');
+        const a = item.querySelector('.faq-a');
+        a.style.maxHeight = a.scrollHeight + 'px';
+      }
+    });
+  }
 
   applyTheme();
   const themeBtn = document.getElementById('themeBtn');
@@ -664,11 +855,48 @@ async function boot() {
 
   initTracking();
 
-  await loadSlides();
-  initCarousel();
+  if (document.getElementById('heroCarousel')) {
+    await loadSlides();
+    initCarousel();
+  }
 
   // Fire trackers after a short delay (or after consent). For now, auto-enable.
   setTimeout(trackersOn, 800);
+
+  initReveal();
 }
 
-document.addEventListener('DOMContentLoaded', boot);
+function initReveal() {
+  const cards = document.querySelectorAll('.features-grid .feature');
+  if (!cards.length) return;
+  // Skip if the user prefers reduced motion — cards stay visible via CSS.
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) return;
+
+  cards.forEach((card, i) => {
+    const dir = i % 2 === 0 ? 'left' : 'right';
+    card.classList.add('reveal-' + dir);
+  });
+
+  if (!('IntersectionObserver' in window)) {
+    cards.forEach((c) => c.classList.add('is-visible'));
+    return;
+  }
+
+  const io = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          io.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.18, rootMargin: '0px 0px -40px 0px' },
+  );
+  cards.forEach((c) => io.observe(c));
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  boot().catch((e) => console.error('[siegu] boot failed:', e));
+});

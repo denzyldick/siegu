@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en" data-theme="system">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Siegu FAQ — privacy, offline, sharing, and platforms</title>
+  <meta name="description" content="Frequently asked questions about Siegu: is my data private, does it work offline, how does sharing work, which platforms are supported, and how to import from Google Photos or iCloud." />
+  <script>
+    (function () {
+      try {
+        var v = localStorage.getItem('siegu_theme');
+        var mode = ['light', 'dark', 'system'].indexOf(v) !== -1 ? v : 'system';
+        var dark = mode === 'dark' ||
+          (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      } catch (e) { /* fallback to CSS media query */ }
+    })();
+  </script>
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Siegu" />
+  <meta property="og:title" content="Siegu FAQ — privacy, offline, sharing, and platforms" />
+  <meta property="og:description" content="Frequently asked questions about Siegu: is my data private, does it work offline, how does sharing work, which platforms are supported, and how to import from Google Photos or iCloud." />
+  <meta property="og:url" content="https://denzyldick.github.io/siegu/faq.html" />
+  <meta property="og:image" content="https://denzyldick.github.io/siegu/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Siegu FAQ — privacy, offline, sharing, and platforms" />
+  <meta name="twitter:description" content="Frequently asked questions about Siegu: is my data private, does it work offline, how does sharing work, which platforms are supported, and how to import from Google Photos or iCloud." />
+  <meta name="twitter:image" content="https://denzyldick.github.io/siegu/og-image.png" />
+
+  <!-- SEO -->
+  <link rel="canonical" href="https://denzyldick.github.io/siegu/faq.html" />
+  <meta name="robots" content="index, follow" />
+  <meta name="author" content="Denzyl Dick" />
+  <meta name="keywords" content="siegu faq, siegu help, photo app faq, is my photo data private, offline photo library, import google photos" />
+  <meta name="theme-color" content="#0b0b0b" />
+  <meta property="og:locale" content="en_US" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "@id": "https://denzyldick.github.io/siegu/faq.html",
+        "url": "https://denzyldick.github.io/siegu/faq.html",
+        "name": "Siegu FAQ — privacy, offline, sharing, and platforms",
+        "isPartOf": { "@id": "https://denzyldick.github.io/siegu/#website" },
+        "inLanguage": "en",
+        "publisher": { "@id": "https://denzyldick.github.io/siegu/#organization" }
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+{
+          "@type": "Question",
+          "name": "Is my data really private?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Your photos and metadata stay on your device. Siegu uses on-device AI, so nothing is uploaded for processing."
+          }
+        },
+{
+          "@type": "Question",
+          "name": "Does Siegu work offline?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Absolutely. Your library is stored locally, so you can browse and search your photos anywhere — even without a connection."
+          }
+        },
+{
+          "@type": "Question",
+          "name": "How does sharing work?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "You can share a collection over a live, end-to-end-encrypted link. Guests only see what you choose to share, and nothing is stored on our side."
+          }
+        },
+{
+          "@type": "Question",
+          "name": "What platforms are supported?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Siegu runs on Windows, macOS and Linux, with a full web experience for guests."
+          }
+        },
+{
+          "@type": "Question",
+          "name": "Can I import from Google Photos or iCloud?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes — Siegu imports your existing library, then processes it all locally and privately."
+          }
+        },
+{
+          "@type": "Question",
+          "name": "Is there a demo I can try?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes! Open the live demo to see Siegu in action right in your browser — no install or account needed."
+          }
+        }
+        ]
+      },
+      {
+    "@type": "Organization",
+    "@id": "https://denzyldick.github.io/siegu/#organization",
+    "name": "Siegu",
+    "url": "https://denzyldick.github.io/siegu/",
+    "logo": "https://denzyldick.github.io/siegu/logo.png",
+    "sameAs": ["https://github.com/denzyldick/siegu"]
+  }
+    ]
+  }
+  </script>
+
+  <link rel="icon" href="favicon.png" />
+  <link rel="icon" href="favicon-white.png" media="(prefers-color-scheme: dark)" />
+  <link rel="apple-touch-icon" href="logo.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<body>
+  <a class="skip" href="#main" style="position:absolute;left:-9999px;top:-9999px">Skip to content</a>
+  <noscript>
+    <p style="background:#1f1f1f;color:#e8e8e8;text-align:center;padding:10px 16px;margin:0;font-size:14px">
+      Siegu needs JavaScript to show the download buttons and live demo. It's free, private, and works offline.
+    </p>
+  </noscript>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html#top" class="brand"><img src="logo.png" alt="siegu" /><span>siegu</span></a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html#features" data-i18n="nav.features">Features</a>
+        <a href="pricing.html" data-i18n="nav.pricing">Pricing</a>
+        <a href="faq.html" class="is-active" data-i18n="nav.faq">FAQ</a>
+        <a href="docs.html" data-i18n="nav.docs">Docs</a>
+        <a href="download.html" data-i18n="nav.download">Download</a>
+        <a href="https://siegu.onrender.com" data-i18n="nav.demo" target="_blank" rel="noopener" data-track="demo_clicked">Live demo</a>
+      </nav>
+      <div class="header-actions">
+        <button class="search-trigger" id="searchTrigger" type="button" aria-label="Search (Ctrl+K)" data-i18n-aria="search.trigger_label">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span class="search-shortcut">⌘K</span>
+        </button>
+        <button class="theme-btn" id="themeBtn" type="button" aria-label="Toggle theme">☾</button>
+        <div class="lang-switch">
+          <button class="lang-btn" id="langBtn" type="button">
+            <span id="langCode">EN</span>
+            <span>▾</span>
+          </button>
+          <div class="lang-menu" id="langMenu"></div>
+        </div>
+        <a class="btn btn-ink btn-sm" href="#" data-track="cta_get_started" data-i18n="nav.get_free">Get siegu free</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <section class="page-hero">
+      <div class="container">
+        <p class="eyebrow" data-i18n="faq.eyebrow">FAQ</p>
+        <h1 data-i18n="faq.title">Questions, answered</h1>
+        <p class="sub">Everything about Siegu, your privacy, and how it works.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="faq-list faq-page-list" id="faqList"><!-- injected --></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html#top" class="brand"><img src="logo.png" alt="siegu" /><span>siegu</span></a>
+          <p data-i18n="footer.tagline">A private, local-first photo library.</p>
+        </div>
+        <div class="footer-col">
+          <h5 data-i18n="footer.product">Product</h5>
+          <a href="index.html#features" data-i18n="footer.product_links.features">Features</a>
+          <a href="pricing.html" data-i18n="footer.product_links.pricing">Pricing</a>
+          <a href="#" data-i18n="footer.product_links.changelog">Changelog</a>
+          <a href="#" data-i18n="footer.product_links.roadmap">Roadmap</a>
+        </div>
+        <div class="footer-col">
+          <h5 data-i18n="footer.resources">Resources</h5>
+          <a href="https://github.com/denzyldick/siegu/tree/main/docs" target="_blank" rel="noopener" data-i18n="footer.resources_links.docs">Documentation</a>
+          <a href="download.html" data-track="cta_get_started" data-i18n="footer.resources_links.download">Download</a>
+          <a href="compare.html" data-i18n="footer.resources_links.compare">vs Google Photos</a>
+          <a href="https://siegu.onrender.com" target="_blank" rel="noopener" data-track="demo_clicked" data-i18n="footer.resources_links.demo">Live demo</a>
+        </div>
+        <div class="footer-col">
+          <h5 data-i18n="footer.company">Company</h5>
+          <a href="#" data-i18n="footer.company_links.about">About</a>
+          <a href="https://github.com/denzyldick/siegu" target="_blank" rel="noopener" data-i18n="footer.company_links.github">GitHub</a>
+          <a href="#" data-i18n="footer.company_links.blog">Blog</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© <span id="year"></span> siegu. <span data-i18n="footer.rights">All rights reserved.</span></span>
+        <a href="#" data-i18n="footer.legal">Privacy & Terms</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Download modal: pick your OS -->
+  <div class="dl-overlay" id="downloadModal" aria-hidden="true" role="dialog" aria-label="Download Siegu">
+    <div class="dl-dialog">
+      <button class="dl-close" data-dl-close type="button" aria-label="Close">&times;</button>
+      <h3 data-i18n="download.title">Get Siegu free</h3>
+      <p class="dl-sub" data-i18n="download.desc">Free forever, private, and yours. Pick your platform to download the latest build.</p>
+      <div class="dl-grid" id="dlGrid"><!-- filled by main.js --></div>
+      <p class="dl-note" data-i18n="download.note">All downloads check in at zero cost — no account, no cloud.</p>
+    </div>
+  </div>
+
+  <!-- Pro modal: explain + pay -->
+  <div class="dl-overlay" id="proModal" aria-hidden="true" role="dialog" aria-label="Upgrade to Pro">
+    <div class="dl-dialog">
+      <button class="dl-close" data-pro-close type="button" aria-label="Close">&times;</button>
+      <h3 data-i18n="pro.title">Upgrade to Pro</h3>
+      <p class="dl-sub" data-i18n="pro.desc">Unlock everything. One price, every device, no subscriptions quirks.</p>
+      <ul class="pro-benefits" id="proBenefits"><!-- filled by main.js --></ul>
+      <div class="pro-pay-row">
+        <span class="pro-price" id="proPrice">$9.99<span data-i18n="pro.per_month"> /month</span></span>
+        <a class="btn btn-ink btn-lg" id="proPayBtn" data-track="upgrade_clicked" target="_blank" rel="noopener" data-i18n="pro.pay">Pay with card</a>
+      </div>
+      <p class="dl-note" data-i18n="pro.note">Secure checkout by Stripe. Cancel anytime.</p>
+    </div>
+  </div>
+
+  <!-- Waitlist modal (Family plan) -->
+  <div class="waitlist-overlay" id="waitlistModal" aria-hidden="true" role="dialog" aria-label="Join waitlist">
+    <div class="waitlist-dialog">
+      <button class="waitlist-close" id="waitlistClose" type="button" aria-label="Close">&times;</button>
+      <h3 data-i18n="waitlist.title">You're early — and that's a great thing.</h3>
+      <p data-i18n="waitlist.desc">Family sharing is launching soon. Drop your email and we'll let you know the moment it's ready — plus an early-bird discount.</p>
+      <form class="waitlist-modal-form" action="https://formspree.io/f/mrpgkbyj" method="POST">
+        <input type="email" name="email" placeholder="your@email.com" required aria-label="Email address" />
+        <input type="hidden" name="source" id="waitlistSource" value="family" />
+        <button type="submit" class="btn btn-ink btn-lg" data-track="waitlist_submit" data-i18n="waitlist.cta">Join waitlist</button>
+      </form>
+      <p class="waitlist-note" data-i18n="waitlist.note">No spam. Just a heads-up when it's ready.</p>
+    </div>
+  </div>
+
+  <!-- Command palette / quick search (Ctrl+K / ⌘K) -->
+  <div class="cmd-overlay" id="cmdPalette" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Quick search" data-i18n-aria="search.aria">
+    <div class="cmd-dialog">
+      <div class="cmd-input-wrap">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="cmdInput" autocomplete="off" spellcheck="false" placeholder="Search…" data-i18n-placeholder="search.placeholder" />
+        <kbd class="cmd-kbd">ESC</kbd>
+      </div>
+      <div class="cmd-groups" id="cmdGroups"><!-- filled by main.js --></div>
+      <div class="cmd-empty" id="cmdEmpty" data-i18n="search.no_results" hidden>No results</div>
+      <div class="cmd-footer">
+        <span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="search.nav">to navigate</span></span>
+        <span><kbd>↵</kbd> <span data-i18n="search.select">to select</span></span>
+        <span><span data-i18n="search.theme">Theme</span>: <button id="cmdTheme" type="button"><span data-i18n="search.toggle">Toggle</span></button></span>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
