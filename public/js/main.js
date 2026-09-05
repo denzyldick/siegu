@@ -107,7 +107,7 @@ function priceFor(plan, price) {
 
 function renderPricing() {
   const d = state.dict || {};
-  const plans = ['free', 'pro', 'team'];
+  const plans = ['free', 'team', 'pro'];
   const grid = document.getElementById('pricingGrid');
   if (!grid) return;
   let html = plans
