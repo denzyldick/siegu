@@ -53,13 +53,13 @@ function headFor({ title, description, keywords, url, ogTitle, ogDesc, schema })
   <meta property="og:title" content="${ogTitle || title}" />
   <meta property="og:description" content="${ogDesc || description}" />
   <meta property="og:url" content="${url}" />
-  <meta property="og:image" content="${BASE}/og-image.png" />
+  <meta property="og:image" content="${BASE}/og-image.jpg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${ogTitle || title}" />
   <meta name="twitter:description" content="${ogDesc || description}" />
-  <meta name="twitter:image" content="${BASE}/og-image.png" />
+  <meta name="twitter:image" content="${BASE}/og-image.jpg" />
 
   <!-- SEO -->
   <link rel="canonical" href="${url}" />
@@ -576,7 +576,7 @@ const PRIVACY_MAIN = `
           <p>To reach devices that aren't on the same network, Siegu can use a signalling server (the default is <code>wss://siegu.io/ws</code>, and you can self-host your own or point the app at any URL). Its only job is to introduce two of your devices to each other: it relays the brief WebRTC offer/answer/ICE handshake &mdash; just connection details, nothing else. Once the peer-to-peer link is established, your photos and videos travel directly between your devices over an end-to-end encrypted channel, and the signalling server is out of the data path. It never sees file contents, metadata, or manifests. On the same LAN, Siegu uses a built-in server embedded in the app instead, so no external server is involved at all.</p>
 
           <h3>This website</h3>
-          <p>The landing site uses Google Analytics to understand which pages are visited and roughly where visitors come from. It processes anonymized, aggregate data only &mdash; no photo content ever touches it.</p>
+          <p>This website uses Google Analytics to understand which pages are visited and roughly where visitors come from. It records aggregate, anonymized page-view traffic over HTTPS &mdash; no photo content ever touches it. If your browser blocks the tracker or you browse with cookies disabled, no data is sent at all.</p>
 
           <h3>Waitlist emails</h3>
           <p>If you join the waitlist via the family-plan form, the address you type is sent to Formspree (our form processor) and used solely to notify you when it launches. You can ask to be removed at any time by replying to any email.</p>

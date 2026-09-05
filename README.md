@@ -57,8 +57,8 @@ public/
   js/main.js            # i18n loader, pricing toggle, FAQ accordion, theme, trackers
   locales/*.json        # one file per language
   logo.svg|png          # brand mark
-  banner.png            # hero/showcase imagery
-  screenshot.png        # app screenshot
+  banner.webp           # hero/showcase imagery
+  og-image.jpg          # social share card (1200x630)
 scripts/
   generate-pages.mjs    # builds the subpages from templates
   build-static.mjs      # bakes env config (GA, Stripe) into ./dist
