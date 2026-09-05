@@ -77,8 +77,15 @@ const server = createServer(async (req, res) => {
     });
     res.end(body);
   } catch {
-    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('404 Not Found');
+    // Mirror GitHub Pages behavior: unknown routes get the custom 404 page.
+    try {
+      const notFound = await readFile(join(ROOT, '404.html'));
+      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(notFound);
+    } catch {
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('404 Not Found');
+    }
   }
 });
 

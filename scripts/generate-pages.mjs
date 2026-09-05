@@ -102,12 +102,14 @@ const NAV_ITEMS = [
 
 function bodyTop(activeHref) {
   const nav = NAV_ITEMS.map((n) => {
-    const active = n.href === activeHref ? ' class="is-active"' : '';
+    const active = n.href === activeHref
+      ? ' class="is-active" aria-current="page"'
+      : n.external ? '' : '';
     const ext = n.external ? ' target="_blank" rel="noopener" data-track="demo_clicked"' : '';
     return `        <a href="${n.href}"${active} data-i18n="${n.key}"${ext}>${n.label}</a>`;
   }).join('\n');
   return `<body>
-  <a class="skip" href="#main" style="position:absolute;left:-9999px;top:-9999px">Skip to content</a>
+  <a class="skip" href="#main">Skip to content</a>
   <noscript>
     <p style="background:#1f1f1f;color:#e8e8e8;text-align:center;padding:10px 16px;margin:0;font-size:14px">
       Siegu needs JavaScript to show the download buttons and live demo. It's free, private, and works offline.
@@ -134,9 +136,17 @@ ${nav}
           <div class="lang-menu" id="langMenu"></div>
         </div>
         <a class="btn btn-ink btn-sm" href="#" data-track="cta_get_started" data-i18n="nav.get_free">Get siegu free</a>
+        <button class="menu-btn" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="navOverlay">☰</button>
       </div>
     </div>
   </header>
+
+  <div id="navOverlay" class="nav-overlay" aria-hidden="true">
+    <button class="nav-close" type="button" aria-label="Close menu">✕</button>
+    <nav class="nav" aria-label="Primary">
+${nav}
+    </nav>
+  </div>
 
   <main id="main">`;
 }
@@ -536,6 +546,9 @@ const PRIVACY_MAIN = `
 
           <h3>No accounts</h3>
           <p>Siegu does not create user accounts and has no cloud backend to sign into. Sharing works peer-to-peer over encrypted, live connections between the devices you choose.</p>
+
+          <h3>Sync and the signalling server</h3>
+          <p>To reach devices that aren't on the same network, Siegu can use a signalling server (the default is <code>wss://siegu.io/ws</code>, and you can self-host your own or point the app at any URL). Its only job is to introduce two of your devices to each other: it relays the brief WebRTC offer/answer/ICE handshake &mdash; just connection details, nothing else. Once the peer-to-peer link is established, your photos and videos travel directly between your devices over an end-to-end encrypted channel, and the signalling server is out of the data path. It never sees file contents, metadata, or manifests. On the same LAN, Siegu uses a built-in server embedded in the app instead, so no external server is involved at all.</p>
 
           <h3>This website</h3>
           <p>The landing site uses Google Analytics to understand which pages are visited and roughly where visitors come from. It processes anonymized, aggregate data only &mdash; no photo content ever touches it.</p>

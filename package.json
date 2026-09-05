@@ -6,6 +6,11 @@
   "scripts": {
     "dev": "node scripts/serve.mjs",
     "start": "node scripts/serve.mjs",
+    "build": "node scripts/build-static.mjs",
+    "build:strict": "STRICT=1 node scripts/build-static.mjs",
+    "build:pages": "node scripts/generate-pages.mjs",
+    "check": "node scripts/check.mjs",
+    "check:dist": "node scripts/check.mjs --require-payment",
     "check:translations": "node scripts/check-translations.js"
   },
   "license": "UNLICENSED"

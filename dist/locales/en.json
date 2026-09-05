@@ -33,7 +33,6 @@
     "title2": "privately yours",
     "subtitle": "Siegu keeps every photo and video on your device. Powerful search, on-device AI, and seamless sharing — no cloud, no uploads, no compromises.",
     "cta_primary": "Get siegu free",
-    "note": "Windows · macOS · Linux · Web",
     "trust": "Free forever · No account · Cancel anytime.",
     "cta_demo": "Try the live demo",
     "see_pro": "See Pro →"
@@ -169,7 +168,6 @@
     "title": "Take your photos back",
     "subtitle": "Private, local, and yours. Siegu is ready when you are.",
     "button": "Get siegu free",
-    "note": "No account, no uploads, no lock-in.",
     "upgrade": "Upgrade to Pro",
     "demo": "Try the live demo"
   },
@@ -205,7 +203,7 @@
   "trust": {
     "open_source": "Open source",
     "no_uploads": "No uploads",
-    "local": "Your photos never leave your device"
+    "local": "Runs 100% on-device"
   },
   "waitlist": {
     "title": "You're early — and that's a great thing.",

@@ -31,6 +31,23 @@ Validate translations (every locale must define all `en.json` keys non-empty):
 npm run check:translations
 ```
 
+## Health checks & payment guard
+
+```sh
+npm run check                 # translations + routes + page integrity + builds
+npm run build:strict          # build ./dist, FAILING if Stripe Payment Links
+                              #   are not wired (never ships an inert Pay button)
+npm run check:dist            # assert built dist/js/main.js has real Stripe links
+npm run build:pages           # regenerate subpages (pricing, faq, …, privacy)
+```
+
+CI (` .github/workflows/ci.yml`) runs `npm run check` on every push/PR. On
+`master` it then builds strictly with `STRIPE_PRO_PAYMENT_LINK_MONTHLY` /
+`STRIPE_PRO_PAYMENT_LINK_YEARLY` (and optional `GA_MEASUREMENT_ID`) from repo
+secrets, asserts the pay button is wired, and deploys `./dist` to `gh-pages`.
+Without those secrets set, the deploy fails loudly instead of shipping a dead
+"Pay with card" button.
+
 ## Structure
 
 ```
@@ -43,6 +60,9 @@ public/
   banner.png            # hero/showcase imagery
   screenshot.png        # app screenshot
 scripts/
+  generate-pages.mjs    # builds the subpages from templates
+  build-static.mjs      # bakes env config (GA, Stripe) into ./dist
+  check.mjs             # full health check + payment-wiring guard
   serve.mjs             # zero-dep static server
   check-translations.js # locale completeness check
 ```
