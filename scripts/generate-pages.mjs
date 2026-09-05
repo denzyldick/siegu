@@ -11,6 +11,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildDocsMain } from './docs-from-md.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -314,30 +315,6 @@ const DOWNLOAD_MAIN = `
       </div>
     </section>`;
 
-const DOCS_MAIN = `
-    <section class="page-hero">
-      <div class="container">
-        <p class="eyebrow">Documentation</p>
-        <h1>Siegu docs</h1>
-        <p class="sub">Guides, troubleshooting, and everything you need to get the most out of Siegu.</p>
-      </div>
-    </section>
-
-    <section class="section page-body">
-      <div class="container">
-        <div class="narrow">
-          <p>Siegu is a private, local-first photo library. Your photos and metadata stay on your device, organized and searchable with on-device AI. You own your library — no cloud, no uploads, no lock-in.</p>
-          <p>The full documentation lives on GitHub, alongside the open-source code.</p>
-          <p>Popular topics:</p>
-          <ul>
-            <li><a href="https://github.com/denzyldick/siegu/tree/main/docs" target="_blank" rel="noopener">Documentation home</a></li>
-            <li><a href="https://github.com/denzyldick/siegu/blob/main/README.md" target="_blank" rel="noopener">Readme &amp; getting started</a></li>
-            <li><a href="https://github.com/denzyldick/siegu" target="_blank" rel="noopener">Source code on GitHub</a></li>
-          </ul>
-        </div>
-      </div>
-    </section>`;
-
 const COMPARE_MAIN = `
     <section class="page-hero">
       <div class="container">
@@ -539,7 +516,7 @@ const PRIVACY_MAIN = `
     <section class="section page-body">
       <div class="container">
         <div class="narrow">
-          <h1 class="privacy-h">Privacy</h1>
+          <h2 class="privacy-h">Privacy</h2>
 
           <h3>Your media is local</h3>
           <p>Siegu stores your photos, videos, and metadata only on your device. Nothing is uploaded for storage or processing. All AI features run locally via ONNX Runtime. This is a property of the software, not a promise.</p>
@@ -562,7 +539,7 @@ const PRIVACY_MAIN = `
           <h3>Telemetry in the app</h3>
           <p>The Siegu app sends no telemetry, analytics, or crash reports. There is no &ldquo;home call&rdquo; &mdash; by design.</p>
 
-          <h1 class="privacy-h">Terms</h1>
+          <h2 class="privacy-h">Terms</h2>
 
           <h3>License</h3>
           <p>Siegu is open source and distributed under an open license. You may use it for any lawful purpose and modify it under the terms of that license. See the <a href="https://github.com/denzyldick/siegu" target="_blank" rel="noopener">repository</a> for the exact text.</p>
@@ -669,9 +646,9 @@ const PAGES = [
   {
     file: 'docs.html',
     active: 'docs.html',
-    title: 'Siegu documentation — getting started, guides, and support',
-    description: 'Documentation and guides for Siegu, the private local-first photo library. Learn how to get started, organize your library, and use on-device AI search.',
-    keywords: 'siegu docs, siegu documentation, photo library guide, local photo app help, siegu support',
+    title: 'Siegu docs — getting started, sync, sharing, and configuration',
+    description: 'Siegu documentation: get started with the private local-first photo library, sync and share collections, configure the app, and understand its security model.',
+    keywords: 'siegu docs, siegu documentation, siegu sync, siegu sharing, siegu configuration, siegu security, photo library guide, local photo app help, siegu support',
     url: `${BASE}/docs.html`,
     schema: `{
         "@type": "WebPage",
@@ -683,7 +660,7 @@ const PAGES = [
         "publisher": { "@id": "${BASE}/#organization" }
       },
       ${SITE_SCHEMA_ORG}`,
-    main: DOCS_MAIN,
+    main: '', // filled by buildDocsMain() in main()
   },
   {
     file: 'compare.html',
@@ -803,10 +780,26 @@ const PAGES = [
 ];
 
 async function main() {
+  /* Docs page: build from the app repo's real markdown when available. */
+  const docs = buildDocsMain();
+  const docsPage = PAGES.find((p) => p.file === 'docs.html');
+  docsPage.main = docs.main;
+
   for (const p of PAGES) {
     const html = headFor(p) + '\n' + bodyTop(p.active) + '\n' + p.main + '\n' + TAIL + '\n';
     await writeFile(join(SRC, p.file), html, 'utf8');
     console.log(`[generate-pages] wrote ${p.file}`);
+  }
+
+  /* Keep the sitemap's docs lastmod in sync with the app's doc commits. */
+  if (docs.ok) {
+    const sitemapPath = join(SRC, 'sitemap.xml');
+    const sitemap = await readFile(sitemapPath, 'utf8');
+    const from = /(<url>\s*<loc>https:\/\/denzyldick\.github\.io\/siegu\/docs\.html<\/loc>\s*<lastmod>)[^<]+/;
+    if (from.test(sitemap)) {
+      await writeFile(sitemapPath, sitemap.replace(from, `$1${docs.lastMod}`), 'utf8');
+      console.log(`[generate-pages] sitemap docs.html lastmod → ${docs.lastMod}`);
+    }
   }
 }
 

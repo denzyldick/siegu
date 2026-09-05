@@ -65,6 +65,10 @@ pick up the real subpages (Pricing / FAQ / Docs / Download) as sitelinks.
 
 - After any deploy with content changes, bump `lastmod` in
   `public/sitemap.xml` and request indexing for changed pages.
+- `docs.html` is generated from the app repo's real docs
+  (`scripts/docs-from-md.mjs`, pulled from `../siegu/docs` during
+  `npm run build:pages`). Its sitemap `lastmod` updates automatically from the
+  app's doc commits — so every release refreshes a content-dated docs URL.
 - Watch Search Console **Performance → Queries** for "siegu" clicks once a
   month. The goal: site (not repo) is the entry, sitelinks appear within a
   few weeks of indexing.

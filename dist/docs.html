@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Siegu documentation — getting started, guides, and support</title>
-  <meta name="description" content="Documentation and guides for Siegu, the private local-first photo library. Learn how to get started, organize your library, and use on-device AI search." />
+  <title>Siegu docs — getting started, sync, sharing, and configuration</title>
+  <meta name="description" content="Siegu documentation: get started with the private local-first photo library, sync and share collections, configure the app, and understand its security model." />
   <script>
     (function () {
       try {
@@ -19,22 +19,22 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Siegu" />
-  <meta property="og:title" content="Siegu documentation — getting started, guides, and support" />
-  <meta property="og:description" content="Documentation and guides for Siegu, the private local-first photo library. Learn how to get started, organize your library, and use on-device AI search." />
+  <meta property="og:title" content="Siegu docs — getting started, sync, sharing, and configuration" />
+  <meta property="og:description" content="Siegu documentation: get started with the private local-first photo library, sync and share collections, configure the app, and understand its security model." />
   <meta property="og:url" content="https://denzyldick.github.io/siegu/docs.html" />
   <meta property="og:image" content="https://denzyldick.github.io/siegu/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Siegu documentation — getting started, guides, and support" />
-  <meta name="twitter:description" content="Documentation and guides for Siegu, the private local-first photo library. Learn how to get started, organize your library, and use on-device AI search." />
+  <meta name="twitter:title" content="Siegu docs — getting started, sync, sharing, and configuration" />
+  <meta name="twitter:description" content="Siegu documentation: get started with the private local-first photo library, sync and share collections, configure the app, and understand its security model." />
   <meta name="twitter:image" content="https://denzyldick.github.io/siegu/og-image.png" />
 
   <!-- SEO -->
   <link rel="canonical" href="https://denzyldick.github.io/siegu/docs.html" />
   <meta name="robots" content="index, follow" />
   <meta name="author" content="Denzyl Dick" />
-  <meta name="keywords" content="siegu docs, siegu documentation, photo library guide, local photo app help, siegu support" />
+  <meta name="keywords" content="siegu docs, siegu documentation, siegu sync, siegu sharing, siegu configuration, siegu security, photo library guide, local photo app help, siegu support" />
   <meta name="theme-color" content="#0b0b0b" />
   <meta property="og:locale" content="en_US" />
 
@@ -126,26 +126,429 @@
   </div>
 
   <main id="main">
-
-    <section class="page-hero">
+<section class="page-hero">
       <div class="container">
         <p class="eyebrow">Documentation</p>
         <h1>Siegu docs</h1>
-        <p class="sub">Guides, troubleshooting, and everything you need to get the most out of Siegu.</p>
+        <p class="sub">Guides, sync &amp; sharing, configuration, and security &mdash; straight from the open-source project, updated with every release.</p>
       </div>
     </section>
 
     <section class="section page-body">
       <div class="container">
         <div class="narrow">
-          <p>Siegu is a private, local-first photo library. Your photos and metadata stay on your device, organized and searchable with on-device AI. You own your library — no cloud, no uploads, no lock-in.</p>
-          <p>The full documentation lives on GitHub, alongside the open-source code.</p>
-          <p>Popular topics:</p>
-          <ul>
-            <li><a href="https://github.com/denzyldick/siegu/tree/main/docs" target="_blank" rel="noopener">Documentation home</a></li>
-            <li><a href="https://github.com/denzyldick/siegu/blob/main/README.md" target="_blank" rel="noopener">Readme &amp; getting started</a></li>
-            <li><a href="https://github.com/denzyldick/siegu" target="_blank" rel="noopener">Source code on GitHub</a></li>
+        <nav class="docs-toc" aria-label="Documentation sections">
+          <h2>On this page</h2>
+          <ul>          <li>
+            <a href="#getting-started">Getting started</a>
+            <ul class="docs-toc-sub">
+            <li><a href="#about-siegu">About Siegu</a></li>
+            <li><a href="#device-support">Device Support</a></li>
+            </ul>
+          </li>
+          <li>
+            <a href="#mesh-sync">Mesh synchronization</a>
+            <ul class="docs-toc-sub">
+            <li><a href="#how-it-works">How it works</a></li>
+            <li><a href="#connectivity-methods">Connectivity Methods</a></li>
+            <li><a href="#signaling-server">Signaling Server</a></li>
+            <li><a href="#sync-protocol">Sync Protocol</a></li>
+            <li><a href="#tips">Tips</a></li>
+            </ul>
+          </li>
+          <li>
+            <a href="#collection-sharing">Collection sharing</a>
+            <ul class="docs-toc-sub">
+            <li><a href="#how-it-works-2">How It Works</a></li>
+            <li><a href="#sharing-requirements">Sharing Requirements</a></li>
+            <li><a href="#desktop-app-local-for-now">Desktop App (local, for now)</a></li>
+            <li><a href="#what-the-viewer-can-see">What the Viewer Can See</a></li>
+            <li><a href="#what-the-viewer-cannot-see">What the Viewer Cannot See</a></li>
+            <li><a href="#privacy-security">Privacy &amp;amp; Security</a></li>
+            <li><a href="#mobile-photo-viewer">Mobile Photo Viewer</a></li>
+            <li><a href="#troubleshooting">Troubleshooting</a></li>
+            <li><a href="#architecture">Architecture</a></li>
+            </ul>
+          </li>
+          <li>
+            <a href="#web-client-view-only-viewer">Web client (view-only)</a>
+            <ul class="docs-toc-sub">
+            <li><a href="#how-it-works-3">How It Works</a></li>
+            <li><a href="#running-locally">Running Locally</a></li>
+            <li><a href="#docker-quick-test">Docker (Quick Test)</a></li>
+            <li><a href="#url-format">URL Format</a></li>
+            <li><a href="#security-features">Security Features</a></li>
+            <li><a href="#mobile-gestures">Mobile Gestures</a></li>
+            <li><a href="#keyboard-shortcuts">Keyboard Shortcuts</a></li>
+            <li><a href="#architecture-2">Architecture</a></li>
+            <li><a href="#dependencies">Dependencies</a></li>
+            </ul>
+          </li>
+          <li>
+            <a href="#configuration">Configuration</a>
+            <ul class="docs-toc-sub">
+            <li><a href="#config-file-location">Config file location</a></li>
+            <li><a href="#all-config-keys">All Config Keys</a></li>
+            <li><a href="#cli-usage">CLI Usage</a></li>
+            </ul>
+          </li>
+          <li>
+            <a href="#security-privacy">Security &amp; privacy</a>
+            <ul class="docs-toc-sub">
+            <li><a href="#core-principles">Core Principles</a></li>
+            <li><a href="#data-protection">Data Protection</a></li>
+            <li><a href="#application-security">Application Security</a></li>
+            <li><a href="#vulnerability-reporting">Vulnerability Reporting</a></li>
+            </ul>
+          </li>
+          <li>
+            <a href="#cli-reference">Command line (siegu-cli)</a>
+            <ul class="docs-toc-sub">
+            <li><a href="#install">Install</a></li>
+            <li><a href="#global-flags">Global Flags</a></li>
+            <li><a href="#commands">Commands</a></li>
+            </ul>
+          </li>
           </ul>
+        </nav>
+<section class="doc-section" id="getting-started">
+        <h2 class="doc-title">Getting started</h2>
+<h3 id="about-siegu">About Siegu</h3>
+<p><strong>Siegu</strong> (pronounced <em>see-goo</em>) is a privacy-first, local-only media manager for your photo and video library. It scans the folders you choose, builds a searchable library entirely on your machine, and never uploads your media anywhere. Every AI feature runs on-device via ONNX Runtime — no cloud, no accounts, no telemetry.</p>
+<h4 id="what-siegu-can-do">What Siegu can do</h4>
+<ul><li><strong>Organize</strong> — Automatic scanning, EXIF metadata extraction, thumbnails, video indexing, and a map view with heatmaps.</li><li><strong>Semantic search</strong> — Describe a photo in your own words ("sunset at the beach") and CLIP finds it. Text search also matches file names, recognized text, object tags, captions, and locations.</li><li><strong>Discover</strong> — The search dropdown shows rails at a glance: Best shots, Favorites, Recent, People, Locations, Tags, Papers &amp; screenshots, Cameras, and Months, plus one-tap filters (Favorites, Videos, Faces, Papers, NSFW, Surprise me).</li><li><strong>People</strong> — Automatic face detection and grouping. Name people, merge duplicates, and jump to every photo of a person.</li><li><strong>Analyze</strong> — On-device models enrich each photo with captions (BLIP), objects (YOLO), recognized text (OCR), aesthetics scores, depth maps (MiDaS), and audio transcription for videos (Whisper).</li><li><strong>Sync</strong> — Encrypted peer-to-peer sync between your own devices over the network (WebRTC), with mesh networking via LAN discovery or 6-word mnemonic phrases.</li></ul>
+<h4 id="privacy-model">Privacy model</h4>
+<p>Everything happens on your computer. There are no accounts, no analytics, no cloud uploads. AI models are downloaded once from public sources (e.g. HuggingFace) and then run locally forever after. See <a href="#security-privacy">docs/security.md</a> for details.</p>
+<h3 id="device-support">Device Support</h3>
+<p>Siegu is verified against the platforms below. Which device you use also decides how the on-device AI models are accelerated (via ONNX Runtime):</p>
+<div class="table-wrap"><table><thead><tr><th>Platform</th><th>Devices</th><th>AI acceleration</th></tr></thead><tbody><tr><td><strong>Windows</strong></td><td>Any x64 Windows 10/11 PC or laptop</td><td>DirectML (NVIDIA/AMD/Intel GPU)</td></tr><tr><td><strong>Windows on ARM</strong></td><td>Snapdragon X / Arm64 laptops</td><td>CPU</td></tr><tr><td><strong>macOS</strong></td><td>Apple Silicon Macs (M1–M4: MacBook Air/Pro, iMac, Mac mini, Mac Studio, Mac Pro)</td><td>CoreML (GPU + Neural Engine)</td></tr><tr><td><strong>Linux</strong></td><td>x86_64 desktops/laptops (Ubuntu, Debian, Fedora, Arch, …)</td><td>CPU</td></tr><tr><td><strong>Linux ARM64</strong></td><td>Raspberry Pi 4/5, ARM single-board computers</td><td>CPU</td></tr><tr><td><strong>Android</strong></td><td>arm64 (arm64-v8a) phones and tablets, ~2017 and newer</td><td>CPU</td></tr><tr><td><strong>iOS / iPadOS</strong></td><td>iPhone and iPad (arm64, iOS 12+)</td><td>CPU (CoreML is used on macOS)</td></tr></tbody></table></div>
+<p><strong>Not supported</strong>: Intel Macs, 32-bit platforms, and Alpine Linux (musl). Android x86_64 (arm64 emulator images also work) and the iOS Simulator are supported for development; production Android builds target arm64-v8a.</p>
+<p>Sync works between any two of the supported devices — e.g. an Android phone and a Windows PC — over your own network.</p>
+      </section>
+<section class="doc-section" id="mesh-sync">
+        <h2 class="doc-title">Mesh synchronization</h2>
+<p>Siegu syncs your media library between devices over encrypted peer-to-peer connections — no cloud, no accounts.</p>
+<h3 id="how-it-works">How it works</h3>
+<pre><code>┌─────────────┐     WebRTC DTLS      ┌─────────────┐
+│   Device A   │ ◄──────────────────► │   Device B   │
+│  (Host)      │    encrypted P2P     │  (Joiner)    │
+└──────┬───────┘                      └──────┬───────┘
+       │                                      │
+       └────────── Signaling ────────────────┘
+                  (WebSocket)</code></pre>
+<ol><li><strong>Host</strong> starts a signaling server + mDNS broadcast</li><li><strong>Joiner</strong> discovers the host (mDNS, QR code, or mnemonic phrase)</li><li>Devices exchange WebRTC SDP/ICE via the signaling channel</li><li>A direct DTLS-encrypted data channel is established</li><li>Devices exchange manifests (lists of photo IDs) and transfer only missing files</li></ol>
+<h3 id="connectivity-methods">Connectivity Methods</h3>
+<h4 id="lan-local-network">LAN (Local Network)</h4>
+<p>Both devices on the same local network:</p>
+<ol><li><strong>Host</strong>: Open the Connect panel → tap <strong>Host</strong>. A QR code and 4-word mnemonic are displayed.</li><li><strong>Joiner</strong>: Open the Connect panel → tap <strong>Join</strong>. Devices appear automatically via mDNS. Alternatively, scan the QR code or type the mnemonic.</li></ol>
+<h4 id="remote-wan">Remote (WAN)</h4>
+<p>For devices on different networks:</p>
+<ol><li>Deploy the Go signaling server (see below)</li><li>Host enters the signaling server URL</li><li>Joiner connects using the same room ID</li></ol>
+<h3 id="signaling-server">Signaling Server</h3>
+<p>LAN mode runs a built-in signaling server (embedded in the app). For remote connections, a standalone signaling server (<code>siegu-signal</code>, written in Rust) is available.</p>
+<h4 id="self-hosting">Self-hosting</h4>
+<pre><code>docker compose up -d</code></pre>
+<p>The server runs on port <code>8080</code> with these env vars:</p>
+<div class="table-wrap"><table><thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>PORT</code></td><td><code>8080</code></td><td>Listen address</td></tr><tr><td><code>SIEGU_SIGNAL_TOKEN</code></td><td><em>(unset)</em></td><td>If set, every join/room request must include this token</td></tr></tbody></table></div>
+<h4 id="pre-built-image">Pre-built image</h4>
+<pre><code>ghcr.io/denzyldick/siegu-signal:latest</code></pre>
+<h3 id="sync-protocol">Sync Protocol</h3>
+<p>Once connected, the sync protocol transfers only what's missing:</p>
+<ol><li><strong>Manifest exchange</strong>: Both sides share lists of photo IDs and their <code>sync_needed</code> flags</li><li><strong>File transfer</strong>: Missing files are chunked into 64KB blocks over the WebRTC data channel</li><li><strong>Metadata sync</strong>: AI results (captions, scores) are propagated as lightweight metadata updates</li><li><strong>Storage quota</strong>: Configurable via <code>max_storage_mb</code> config key (default: unlimited)</li></ol>
+<h4 id="delta-sync">Delta sync</h4>
+<p>Only photos with <code>sync_needed = 1</code> are transferred. After a full sync, subsequent connections only transfer new/changed files.</p>
+<h3 id="tips">Tips</h3>
+<ul><li>Both devices must have the AI models downloaded to sync AI metadata</li><li>Storage quota is enforced per-device — configure on each device separately</li><li>For best performance, keep devices on the same LAN</li><li>The signaling server never sees your files — only encrypted handshake data</li></ul>
+      </section>
+<section class="doc-section" id="collection-sharing">
+        <h2 class="doc-title">Collection sharing</h2>
+<p>Siegu allows you to share individual collections (albums) with others in a read-only, view-only mode.</p>
+<h3 id="how-it-works-2">How It Works</h3>
+<pre><code>You (Host)                           Friend (Guest)
+     │                                    │
+     │  1. Open a collection              │
+     │     → tap "Share" in menu          │
+     │     → see sharing info             │
+     │                                    │
+     │  2. Share via signalling server    │
+     │     → connection coordinated       │
+     │     → WebRTC data channel opens    │
+     │                                    │
+     │  3. Friend views in browser        │
+     │     → opens share link             │
+     │     → sees ONLY your collection    │
+     │     → photos stream, not downloaded│
+     │                                    │
+     │  4. Session ends                   │
+     │     → all data cleared             │</code></pre>
+<h3 id="sharing-requirements">Sharing Requirements</h3>
+<p>Collection sharing requires a <strong>signalling server</strong> to coordinate the secure WebRTC connection between your device and the viewer's browser.</p>
+<h4 id="hosted-service">Hosted Service</h4>
+<p>The easiest option: <a href="https://siegu.io/connect" target="_blank" rel="noopener">siegu.io/connect</a></p>
+<ul><li>No setup required</li><li>Works across networks (not just LAN)</li><li>Secure, encrypted connections</li></ul>
+<h4 id="self-hosted">Self-Hosted</h4>
+<p>Run your own signalling server. See <a href="https://github.com/denzyldick/siegu/tree/main/docs/signalling.md">SIGNALLING.md</a> for setup instructions.</p>
+<h3 id="desktop-app-local-for-now">Desktop App (local, for now)</h3>
+<p>The desktop app's <strong>Share Collection</strong> action (<code>… → Share Collection</code>) starts a local signalling + web server and generates a browser share link (<code>http://127.0.0.1:PORT/#CODE.TOKEN.ALBUM</code>). Opening it loads the view-only web client and shows only that collection; granting/copying/stopping happens right in the dialog. For now the link works on the same computer — cross-network sharing via the hosted <code>siegu.io</code> relay is the upcoming default (see <code>src/services/appConfig.ts</code> for the single base-domain switch).</p>
+<h3 id="what-the-viewer-can-see">What the Viewer Can See</h3>
+<ul><li><strong>Only the shared collection</strong> — the viewer cannot access other photos or collections</li><li><strong>Read-only</strong> — no editing, deleting, or modifying capabilities</li><li><strong>Streaming only</strong> — photos are not downloaded to the viewer's device</li></ul>
+<h3 id="what-the-viewer-cannot-see">What the Viewer Cannot See</h3>
+<ul><li>Other collections or the full library</li><li>File system paths or device information</li><li>AI analysis results (unless included in the stream)</li><li>Any metadata beyond what's in the shared photos</li></ul>
+<h3 id="privacy-security">Privacy &amp; Security</h3>
+<h4 id="data-flow">Data Flow</h4>
+<ol><li>Photos stream directly from your device to the viewer via WebRTC</li><li>No photos pass through any server</li><li>The signalling server only coordinates the connection (relays encrypted SDP/ICE data)</li></ol>
+<h4 id="session-security">Session Security</h4>
+<ul><li>Sessions auto-expire after 30 minutes</li><li>All data is cleared from the viewer's browser when the session ends</li><li>Blob URLs are revoked to prevent cached access</li><li>The URL hash is cleared to prevent re-loading</li></ul>
+<h4 id="anti-crawling">Anti-Crawling</h4>
+<ul><li><code>robots.txt</code> blocks all search engines</li><li>Meta tags prevent indexing of shared content</li><li>No server-side caching of shared photos</li></ul>
+<h3 id="mobile-photo-viewer">Mobile Photo Viewer</h3>
+<p>When viewing shared photos on mobile:</p>
+<ul><li><strong>Swipe left/right</strong> — navigate between photos</li><li><strong>Swipe up</strong> — jump to previous time period</li><li><strong>Swipe down</strong> — jump to next time period</li><li><strong>Double-tap</strong> — toggle favorite (if connected to your library)</li></ul>
+<h3 id="troubleshooting">Troubleshooting</h3>
+<h4 id="session-ended-immediately">"Session ended" immediately</h4>
+<ul><li>The signalling server may not be running</li><li>Check that the URL is correct (includes CODE.TOKEN in the hash)</li></ul>
+<h4 id="photos-not-loading">Photos not loading</h4>
+<ul><li>Ensure both devices can reach the signalling server</li><li>Check firewall settings for WebRTC (STUN/TURN ports)</li><li>Try a different network if on restrictive WiFi</li></ul>
+<h4 id="viewer-sees-access-denied">Viewer sees "Access denied"</h4>
+<ul><li>The collection may not exist or the link may be expired</li><li>Ask the host to generate a new share link</li></ul>
+<h3 id="architecture">Architecture</h3>
+<pre><code>Host Device (Tauri)
+  │
+  ├── Embedded web server (serves webclient/dist/)
+  ├── Embedded signalling server (LAN mode)
+  │
+  └── WebRTC data channel
+        │
+        └── Guest Browser
+              ├── webclient/index.html
+              ├── WebRTC peer connection
+              └── Gallery + Preview UI</code></pre>
+      </section>
+<section class="doc-section" id="web-client-view-only-viewer">
+        <h2 class="doc-title">Web client (view-only)</h2>
+<p>The web client is a standalone, zero-dependency browser app that lets someone view photos shared from a Siegu host — without installing anything.</p>
+<h3 id="how-it-works-3">How It Works</h3>
+<pre><code>Host (Tauri app)                    Guest (Browser)
+     │                                    │
+     │  1. Host runs `siegu-cli web`          │
+     │     → starts signalling server     │
+     │     → starts embedded web server   │
+     │     → prints share URL             │
+     │                                    │
+     │  2. Guest opens URL ───────────────│
+     │     → WebSocket to /ws             │
+     │     → WebRTC offer/answer          │
+     │     → Data channel established     │
+     │                                    │
+     │  3. Guest browses gallery          │
+     │     ← thumbnails stream via DC     │
+     │     ← full-res on demand           │
+     │                                    │
+     │  4. Session ends                   │
+     │     → all blob URLs revoked        │
+     │     → all data cleared from memory │
+     │     → URL hash wiped               │</code></pre>
+<h3 id="running-locally">Running Locally</h3>
+<h4 id="prerequisites">Prerequisites</h4>
+<ul><li>Node.js 18+</li><li>A running Siegu host (Tauri app with <code>siegu-cli web</code> active)</li></ul>
+<h4 id="development-server">Development Server</h4>
+<pre><code>cd webclient
+npm install
+npm run dev
+# → http://localhost:5173</code></pre>
+<p>The dev server proxies WebSocket connections to the host's signalling server. Open the share URL printed by <code>siegu-cli web</code> in your browser.</p>
+<h4 id="build-for-production">Build for Production</h4>
+<pre><code>cd webclient
+npm run build
+# → dist/</code></pre>
+<p>The <code>dist/</code> folder is served by the host's embedded web server when running <code>siegu-cli web</code>.</p>
+<h3 id="docker-quick-test">Docker (Quick Test)</h3>
+<p>Test everything with one command:</p>
+<pre><code>docker compose up
+# → http://localhost:8080</code></pre>
+<p>This starts both the signalling server and web client on <strong>port 8080</strong>. Nginx serves the web client and proxies WebSocket connections to the internal signalling server.</p>
+<h3 id="url-format">URL Format</h3>
+<p>The share URL contains all connection info in the hash fragment:</p>
+<pre><code>http://HOST:PORT/#CODE.TOKEN
+http://HOST:PORT/#CODE.TOKEN.ALBUM_ID</code></pre>
+<ul><li><strong>CODE</strong>: Room code for the signalling server</li><li><strong>TOKEN</strong>: Authentication token</li><li><strong>ALBUM_ID</strong> (optional): If present, the viewer enters album-scoped mode (can only see photos in that album)</li></ul>
+<h3 id="security-features">Security Features</h3>
+<h4 id="no-persistence">No Persistence</h4>
+<ul><li>Photos stream via WebRTC data channel — nothing is downloaded to disk</li><li>Blob URLs are revoked when the preview dialog closes</li><li>All blob URLs are revoked when the session ends</li></ul>
+<h4 id="session-timeout">Session Timeout</h4>
+<ul><li>Sessions auto-expire after <strong>30 minutes</strong></li><li>A countdown timer is displayed in the header</li><li>When expired, all data is wiped and the page shows "Session ended"</li></ul>
+<h4 id="tab-visibility">Tab Visibility</h4>
+<ul><li>If the browser tab is hidden for <strong>5 minutes</strong>, the session is destroyed</li><li>Prevents abandoned sessions from staying active</li></ul>
+<h4 id="anti-crawling-2">Anti-Crawling</h4>
+<ul><li><code>robots.txt</code> blocks all crawlers: <code>User-agent: * Disallow: /</code></li><li>Meta tags: <code>noindex, nofollow, noarchive, nosnippet, noimageindex</code></li><li><code>Referrer-Policy: no-referrer</code></li></ul>
+<h4 id="destructor">Destructor</h4>
+<p>On session end (disconnect, timeout, page close), the web client:</p>
+<ol><li>Revokes all blob URLs (<code>URL.revokeObjectURL</code>)</li><li>Clears all in-memory caches</li><li>Closes WebRTC peer connection and data channel</li><li>Wipes the gallery DOM</li><li>Replaces the URL hash (prevents re-loading the session link)</li></ol>
+<h3 id="mobile-gestures">Mobile Gestures</h3>
+<p>The web client is designed for mobile browsers:</p>
+<ul><li><strong>Tap</strong> a thumbnail to open the full-res preview</li><li><strong>Swipe left/right</strong> in the preview to navigate between photos</li><li>Close the preview with the × button</li></ul>
+<h3 id="keyboard-shortcuts">Keyboard Shortcuts</h3>
+<p>None — the web client is intentionally minimal.</p>
+<h3 id="architecture-2">Architecture</h3>
+<div class="table-wrap"><table><thead><tr><th>File</th><th>Purpose</th></tr></thead><tbody><tr><td><code>index.html</code></td><td>Entry point, minimal HTML shell</td></tr><tr><td><code>src/main.ts</code></td><td>All logic: signalling, WebRTC, gallery rendering, preview</td></tr><tr><td><code>src/lib.ts</code></td><td>Pure utilities: <code>parseHash</code>, <code>inferMime</code>, <code>assembleChunks</code></td></tr><tr><td><code>src/style.css</code></td><td>Dark theme, grid layout, responsive design</td></tr><tr><td><code>public/robots.txt</code></td><td>Blocks search engine crawlers</td></tr></tbody></table></div>
+<h3 id="dependencies">Dependencies</h3>
+<p>Zero runtime dependencies. The web client is vanilla TypeScript bundled with Vite.</p>
+      </section>
+<section class="doc-section" id="configuration">
+        <h2 class="doc-title">Configuration</h2>
+<p>Config is stored in the app's SQLite database (<code>siegu.db</code>) as key-value pairs.</p>
+<h3 id="config-file-location">Config file location</h3>
+<div class="table-wrap"><table><thead><tr><th>Platform</th><th>Path</th></tr></thead><tbody><tr><td>Linux</td><td><code>~/.config/io.denzyl.siegu/siegu.db</code></td></tr><tr><td>macOS</td><td><code>~/Library/Application Support/io.denzyl.siegu/siegu.db</code></td></tr><tr><td>Windows</td><td><code>%APPDATA%\io.denzyl.siegu\siegu.db</code></td></tr><tr><td>Android</td><td><code>/data/data/io.denzyl.siegu/files/siegu.db</code></td></tr><tr><td>iOS</td><td><code>~/Library/Application Support/io.denzyl.siegu/siegu.db</code></td></tr></tbody></table></div>
+<p>Override with <code>--config-dir</code> flag on CLI commands.</p>
+<h3 id="all-config-keys">All Config Keys</h3>
+<div class="table-wrap"><table><thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>theme</code></td><td>string</td><td><code>system</code></td><td><code>light</code>, <code>dark</code>, or <code>system</code></td></tr><tr><td><code>language</code></td><td>string</td><td><code>en</code></td><td>UI language code</td></tr><tr><td><code>scan_threads</code></td><td>integer</td><td><code>4</code></td><td>Parallel scan threads (1–32)</td></tr><tr><td><code>indexing_mode</code></td><td>string</td><td><code>immediate</code></td><td><code>immediate</code>, <code>idle</code>, or <code>manual</code></td></tr><tr><td><code>tier</code></td><td>string</td><td><code>free</code></td><td>Feature tier: <code>free</code> or <code>paid</code></td></tr><tr><td><code>sync_path</code></td><td>string</td><td>—</td><td>Custom sync download directory</td></tr><tr><td><code>auto_scan</code></td><td>string</td><td>—</td><td>Enable automatic scanning (<code>true</code>/<code>false</code>)</td></tr><tr><td><code>sync_enabled</code></td><td>string</td><td>—</td><td>Enable mesh sync (<code>true</code>/<code>false</code>)</td></tr><tr><td><code>max_storage_mb</code></td><td>integer</td><td><code>0</code> (unlimited)</td><td>Max storage for synced files (1–1,000,000)</td></tr><tr><td><code>model_enabled_clip</code></td><td>string</td><td>—</td><td>Enable CLIP model (<code>true</code>/<code>false</code>)</td></tr><tr><td><code>model_enabled_face</code></td><td>string</td><td>—</td><td>Enable face detection, recognition and grouping</td></tr><tr><td><code>model_enabled_ocr</code></td><td>string</td><td>—</td><td>Enable OCR</td></tr><tr><td><code>model_enabled_nsfw</code></td><td>string</td><td>—</td><td>Enable NSFW detection</td></tr><tr><td><code>model_enabled_aesthetics</code></td><td>string</td><td>—</td><td>Enable aesthetics scoring</td></tr><tr><td><code>model_enabled_yolo</code></td><td>string</td><td>—</td><td>Enable object detection</td></tr><tr><td><code>model_enabled_blip</code></td><td>string</td><td>—</td><td>Enable image captioning</td></tr><tr><td><code>model_enabled_arcface</code></td><td>string</td><td>—</td><td>Legacy alias of <code>model_enabled_face</code> (kept in sync by the app)</td></tr><tr><td><code>model_enabled_midas</code></td><td>string</td><td>—</td><td>Enable depth estimation</td></tr><tr><td><code>model_enabled_whisper</code></td><td>string</td><td>—</td><td>Enable audio transcription</td></tr><tr><td><code>model_enabled_sam</code></td><td>string</td><td>—</td><td>Enable SAM segmentation</td></tr><tr><td><code>model_enabled_superres</code></td><td>string</td><td>—</td><td>Enable super-resolution</td></tr><tr><td><code>last_scan_completed</code></td><td>string</td><td>—</td><td>Timestamp of last scan (read-only)</td></tr></tbody></table></div>
+<h3 id="cli-usage">CLI Usage</h3>
+<pre><code># View all config
+siegu-cli config get
+
+# Get a specific key
+siegu-cli config get-key theme
+
+# Set a value
+siegu-cli config set theme dark
+
+# List all valid keys
+siegu-cli config keys</code></pre>
+<p>Config key validation: keys are whitelisted, values have type/range checking. Invalid values are rejected with a descriptive error.</p>
+      </section>
+<section class="doc-section" id="security-privacy">
+        <h2 class="doc-title">Security &amp; privacy</h2>
+<h3 id="core-principles">Core Principles</h3>
+<ul><li><strong>Local-First AI</strong>: All 9 AI models run on-device via ONNX Runtime. No data leaves your computer.</li><li><strong>Zero Telemetry</strong>: No analytics, crash reporting, or usage tracking.</li><li><strong>No Accounts</strong>: No user accounts, no cloud sync, no sign-up.</li></ul>
+<h3 id="data-protection">Data Protection</h3>
+<h4 id="model-downloads">Model Downloads</h4>
+<ul><li>Model files are downloaded from HuggingFace and other sources over HTTPS</li><li>SHA-256 hash verification ensures file integrity</li><li>Files with mismatched hashes are deleted automatically</li></ul>
+<h4 id="peer-to-peer-sync">Peer-to-Peer Sync</h4>
+<ul><li><strong>DTLS Encryption</strong>: WebRTC data channels are encrypted with DTLS in transit</li><li><strong>Zero-Knowledge Signaling</strong>: The signaling server relays only encrypted SDP/ICE data — it never sees files, metadata, or manifests</li><li><strong>No Persistent Server</strong>: LAN mode uses a local signaling server; remote mode uses a minimal relay that has no access to content</li></ul>
+<h4 id="file-handling">File Handling</h4>
+<ul><li><strong>Filename Sanitization</strong>: Synced filenames are sanitized to prevent path traversal and control character injection</li><li><strong>Temp Landing</strong>: Received files land in <code>sync_temp/</code> first, are verified, then moved to the library</li><li><strong>Storage Quota</strong>: Configurable limit prevents disk exhaustion</li></ul>
+<h3 id="application-security">Application Security</h3>
+<h4 id="graceful-shutdown">Graceful Shutdown</h4>
+<p><code>ShutdownCoordinator</code> signals all background tasks (scan, sync, ML) before exit, preventing data corruption.</p>
+<h4 id="transaction-safety">Transaction Safety</h4>
+<ul><li>All ML batch writes use <code>BEGIN</code> / <code>COMMIT</code> / <code>ROLLBACK</code></li><li>Periodically runs <code>VACUUM</code> for database maintenance</li></ul>
+<h4 id="config-validation">Config Validation</h4>
+<ul><li>All 22 config keys are whitelisted (unknown keys rejected)</li><li>Values are type-checked with range constraints (e.g., <code>scan_threads</code>: 1–32)</li><li>Invalid values are rejected with a descriptive error</li></ul>
+<h4 id="scan-deduplication">Scan Deduplication</h4>
+<ul><li><code>ScanGuard</code> prevents concurrent scan operations</li><li>Each scan skips paths already in the database</li></ul>
+<h3 id="vulnerability-reporting">Vulnerability Reporting</h3>
+<p>Report security issues to the project maintainer via GitHub Issues or direct contact. Do not file public issues for critical vulnerabilities.</p>
+      </section>
+<section class="doc-section" id="cli-reference">
+        <h2 class="doc-title">Command line (siegu-cli)</h2>
+<p>The <code>siegu-cli</code> binary provides headless access to all core features.</p>
+<h3 id="install">Install</h3>
+<pre><code>cargo install --path crates/siegu-cli</code></pre>
+<h3 id="global-flags">Global Flags</h3>
+<div class="table-wrap"><table><thead><tr><th>Flag</th><th>Description</th></tr></thead><tbody><tr><td><code>--config-dir &amp;lt;path&amp;gt;</code></td><td>Override config directory (default: OS-appropriate path)</td></tr></tbody></table></div>
+<h3 id="commands">Commands</h3>
+<h4 id="siegu-cli-scan"><code>siegu-cli scan</code></h4>
+<p>Scan directories for media files and import into the library.</p>
+<pre><code># Scan a specific folder (and add it to watched directories)
+siegu-cli scan /path/to/photos
+
+# Scan all configured watched directories
+siegu-cli scan</code></pre>
+<h4 id="siegu-cli-analyze"><code>siegu-cli analyze</code></h4>
+<p>Run ML analysis on photos.</p>
+<pre><code># Analyze all unprocessed photos
+siegu-cli analyze all
+
+# Analyze a single photo by ID
+siegu-cli analyze photo &lt;photo-id&gt;
+
+# Run a specific model on all photos
+siegu-cli analyze model &lt;model-id&gt;</code></pre>
+<p>Model IDs: <code>clip</code>, <code>face</code>, <code>ocr</code>, <code>nsfw</code>, <code>aesthetics</code>, <code>yolo</code>, <code>blip</code>, <code>midas</code>, <code>whisper</code> (<code>ultraface</code>/<code>arcface</code> are accepted as aliases of <code>face</code>)</p>
+<p>All three forms accept <code>--headless</code>, which prints progress lines and an E2E summary instead of showing the interactive TUI (used by CI scripts).</p>
+<h4 id="siegu-cli-models"><code>siegu-cli models</code></h4>
+<p>Manage AI model files.</p>
+<pre><code># List all models with download status
+siegu-cli models list
+
+# Download all models
+siegu-cli models download
+
+# Download specific models
+siegu-cli models download clip face nsfw
+
+# Show disk usage per model
+siegu-cli models usage</code></pre>
+<h4 id="siegu-cli-config"><code>siegu-cli config</code></h4>
+<p>Manage configuration.</p>
+<pre><code># View all config
+siegu-cli config get
+
+# Get a specific key
+siegu-cli config get-key theme
+
+# Set a config value
+siegu-cli config set theme dark
+
+# List valid config keys
+siegu-cli config keys</code></pre>
+<h4 id="siegu-cli-mesh"><code>siegu-cli mesh</code></h4>
+<p>Peer-to-peer mesh synchronization.</p>
+<pre><code># Host a LAN sync session (starts a signaling server + mDNS)
+siegu-cli mesh host
+
+# Host on a specific port (default 0 = pick a free port)
+siegu-cli mesh host --port 9090
+
+# Host against an existing signaling server, joining/creating a room
+siegu-cli mesh host --server ws://192.168.1.100:8080 --room myroom
+
+# Join a mesh room (room ID is positional; URL goes in --server)
+siegu-cli mesh join myroom
+siegu-cli mesh join myroom --server ws://192.168.1.100:8080
+
+# When joining a --server host with a pre-agreed room, create the WebRTC offer
+siegu-cli mesh join myroom --server ws://192.168.1.100:8080 --initiator
+
+# Show session status / disconnect / storage quota usage
+siegu-cli mesh status
+siegu-cli mesh disconnect
+siegu-cli mesh quota
+
+# Browse a peer's library view-only and verify the manifest (#9, e2e helper)
+siegu-cli mesh browse myroom --server ws://192.168.1.100:8080
+
+# Browse in album-share mode for a specific album (#16)
+siegu-cli mesh browse myroom --album &lt;album-id&gt;
+
+# Send a single RPC command to the peer and print its reply (#19, e2e helper)
+siegu-cli mesh rpc myroom list_files --server ws://192.168.1.100:8080
+siegu-cli mesh rpc myroom toggle_favorite '{"id": "&lt;photo-id&gt;"}'
+
+# Seed a manual album with the first N photos (prints ALBUM ID, e2e helper)
+siegu-cli mesh seed-album --name "Shared" --take-first 5</code></pre>
+<p>Availability and defaults:</p>
+<ul><li><code>host</code> — <code>--server</code> connects to an existing signaling server instead of starting a local one; <code>--room</code> names the room (required with <code>--server</code>). <code>--share-mode &amp;lt;ro|rw&amp;gt;</code> sets the permission level for connected peers (default <code>ro</code>): <code>ro</code> allows browsing only, <code>rw</code> also allows favorites/trash mutations.</li><li><code>join</code> — <code>--initiator</code> makes this peer create the WebRTC offer (needed when joining a <code>--server</code> host).</li><li><code>browse</code>, <code>rpc</code>, and <code>seed-album</code> are e2e test helpers; they print greppable <code>VIEWONLY</code>, <code>RPC RESULT</code>, and <code>ALBUM ID</code> markers used by <code>scripts/e2e-view-only.sh</code>.</li><li>All mesh subcommands accept <code>-c/--config</code> to point at a config directory.</li></ul>
+<h4 id="remote-sync-via-mesh">Remote sync via mesh</h4>
+<p>There is no separate <code>siegu-cli sync</code> command. Remote (non-LAN) sync is done with the mesh commands above — host on one machine, join on the other — using a signaling server URL in <code>--server</code>.</p>
+<h4 id="siegu-cli-serve"><code>siegu-cli serve</code></h4>
+<p>Start a standalone LAN signaling server.</p>
+<pre><code>siegu-cli serve --port 8080</code></pre>
+<h4 id="siegu-cli-web"><code>siegu-cli web</code></h4>
+<p>Share this machine's library as a browser gallery (#11, #19). Starts an embedded signaling server plus a small static web server and prints a one-off link. Opening the link is the consent step — anyone holding it can browse the library until the command stops. Nothing is downloaded or written on the viewing device; media streams over the WebRTC data channel on demand.</p>
+<pre><code>siegu-cli web
+# Open in a browser on this machine:
+#   http://127.0.0.1:8787/#&lt;code&gt;.&lt;token&gt;
+# Or from another device on this network:
+#   http://192.168.1.45:8787/#&lt;code&gt;.&lt;token&gt;</code></pre>
+<p>Flags: <code>--port</code> for the static client port (default 8787), <code>--config</code> as usual, and <code>--share-mode &amp;lt;ro|rw&amp;gt;</code> (default <code>ro</code>). The default <code>ro</code> is view-only — guests can browse but not change anything. <code>rw</code> additionally lets guests toggle favorites and trash photos. The browser webclient itself is read-only; the <code>rw</code> mode is consumed by the mesh <code>browse</code>/<code>rpc</code> test helpers.</p>
+<p>The web bundle lives in <code>webclient/</code>; build it once with <code>cd webclient &amp;amp;&amp;amp; bun install &amp;amp;&amp;amp; bun run build</code> (npm also works), or point <code>SIEGU_WEB_DIST</code> at a built <code>dist/</code> directory.</p>
+<h4 id="siegu-cli-status"><code>siegu-cli status</code></h4>
+<p>Show app overview.</p>
+<pre><code>siegu-cli status</code></pre>
+<p>Output includes: config directory, database status, photo/video counts, watched folders, config values, model disk usage, available memory.</p>
+      </section>
+          <p class="docs-more">Looking for the full developer documentation? <a href="https://github.com/denzyldick/siegu/tree/main/docs" target="_blank" rel="noopener">Browse the GitHub docs</a>.</p>
         </div>
       </div>
     </section>

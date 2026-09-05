@@ -183,6 +183,47 @@ img { max-width: 100%; display: block; }
 .changelog-list a { text-decoration: none; font-weight: 700; }
 .changelog-list a:hover { text-decoration: underline; }
 
+/* Docs page: TOC + real markdown-rendered sections */
+.docs-toc {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 0 0 40px;
+}
+.docs-toc h2 { font-size: 0.85rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); margin: 0 0 12px; }
+.docs-toc > ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.docs-toc > ul > li > a { font-weight: 750; text-decoration: none; }
+.docs-toc > ul > li > a:hover { text-decoration: underline; }
+.docs-toc .docs-toc-sub { list-style: none; padding: 6px 0 0 14px; margin: 0; display: grid; gap: 4px; }
+.docs-toc .docs-toc-sub a { font-weight: 500; color: var(--text-2); text-decoration: none; font-size: 14px; }
+.docs-toc .docs-toc-sub a:hover { text-decoration: underline; }
+
+.doc-section { display: grid; gap: 18px; }
+.doc-section + .doc-section { margin-top: 44px; }
+.doc-section .doc-title { padding-top: 24px; border-top: 1px solid var(--border); }
+.doc-section:first-of-type .doc-title { border-top: 0; padding-top: 0; }
+.page-body h4 { font-size: 1.02rem; font-weight: 750; margin: 8px 0 6px; }
+.page-body ol { padding-left: 20px; }
+.page-body .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+.page-body table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.page-body th, .page-body td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.page-body th { font-weight: 800; color: var(--text); background: var(--surface); }
+.page-body tbody tr:last-child td { border-bottom: none; }
+.page-body blockquote { margin: 0; padding: 4px 18px; border-left: 3px solid var(--text-3); color: var(--text-2); }
+.page-body pre {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  overflow-x: auto;
+  margin: 4px 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.page-body pre code { background: none; color: var(--text); padding: 0; font-size: inherit; }
+.docs-more { margin-top: 40px; font-size: 13px; color: var(--text-3); }
+
 /* Comparison table (compare.html) */
 .compare-wrap { overflow-x: auto; margin: 1.4rem 0 2rem; }
 .compare-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
