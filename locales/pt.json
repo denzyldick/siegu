@@ -33,7 +33,6 @@
     "title2": "privada para você",
     "subtitle": "Siegu mantém cada foto e vídeo no seu dispositivo. Busca poderosa, IA no dispositivo e compartilhamento fluido — sem nuvem, sem uploads, sem concessões.",
     "cta_primary": "Baixe siegu grátis",
-    "note": "Windows · macOS · Linux · Web",
     "trust": "Grátis para sempre · Sem conta · Cancele quando quiser.",
     "cta_demo": "Experimente a demo",
     "see_pro": "Ver Pro →"
@@ -169,7 +168,6 @@
     "title": "Recupere suas fotos",
     "subtitle": "Privado, local e seu. Siegu está pronto quando você estiver.",
     "button": "Baixe siegu grátis",
-    "note": "Sem conta, sem uploads, sem aprisionamento.",
     "upgrade": "Fazer upgrade para Pro",
     "demo": "Experimente a demo"
   },
@@ -205,7 +203,7 @@
   "trust": {
     "open_source": "Código aberto",
     "no_uploads": "Sem upload",
-    "local": "Suas fotos nunca saem do seu dispositivo"
+    "local": "Funciona 100% no seu dispositivo"
   },
   "waitlist": {
     "title": "Você está na frente — e isso é ótimo.",

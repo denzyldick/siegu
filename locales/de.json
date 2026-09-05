@@ -33,7 +33,6 @@
     "title2": "privat für dich",
     "subtitle": "Siegu bewahrt jedes Foto und Video auf deinem Gerät. Leistungsstarke Suche, KI auf dem Gerät und nahtloses Teilen – keine Cloud, keine Uploads, keine Kompromisse.",
     "cta_primary": "Kostenlos herunterladen",
-    "note": "Windows · macOS · Linux · Web",
     "trust": "Für immer kostenlos · Kein Konto · Jederzeit kündbar.",
     "cta_demo": "Live-Demo testen",
     "see_pro": "Siehe Pro →"
@@ -169,7 +168,6 @@
     "title": "Hol dir deine Fotos zurück",
     "subtitle": "Privat, lokal und deins. Siegu ist bereit, wenn du es bist.",
     "button": "Kostenlos herunterladen",
-    "note": "Kein Konto, keine Uploads, keine Bindung.",
     "upgrade": "Auf Pro upgraden",
     "demo": "Live-Demo testen"
   },
@@ -205,7 +203,7 @@
   "trust": {
     "open_source": "Open Source",
     "no_uploads": "Keine Uploads",
-    "local": "Deine Fotos verlassen nie dein Gerät"
+    "local": "Läuft 100% auf deinem Gerät"
   },
   "waitlist": {
     "title": "Du bist früher da — und das ist großartig.",

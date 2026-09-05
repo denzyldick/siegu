@@ -678,6 +678,29 @@ function closeCmdPalette() {
   document.body.style.overflow = '';
 }
 
+function initMobileNav() {
+  const menuBtn = document.getElementById('menuBtn');
+  const overlay = document.getElementById('navOverlay');
+  if (!menuBtn || !overlay) return;
+  const closeBtn = overlay.querySelector('.nav-close');
+  const toggle = (open) => {
+    overlay.classList.toggle('open', open);
+    overlay.setAttribute('aria-hidden', String(!open));
+    menuBtn.setAttribute('aria-expanded', String(open));
+  };
+  menuBtn.addEventListener('click', () => toggle(!overlay.classList.contains('open')));
+  closeBtn?.addEventListener('click', () => toggle(false));
+  overlay.addEventListener('click', (e) => {
+    if (e.target.closest('a') || e.target === overlay) toggle(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) toggle(false);
+  });
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 820) toggle(false);
+  });
+}
+
 function initCmdPalette() {
   const pal = document.getElementById('cmdPalette');
   const input = document.getElementById('cmdInput');
@@ -725,6 +748,7 @@ async function boot() {
   // first so a failure in any other component can't take down the keyboard
   // shortcut or the search UX.
   initCmdPalette();
+  initMobileNav();
 
   const saved = localStorage.getItem('siegu_lang');
   const nav = (navigator.language || 'en').split('-')[0];
