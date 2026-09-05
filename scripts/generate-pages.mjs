@@ -165,6 +165,7 @@ const TAIL = `  </main>
           <h5 data-i18n="footer.product">Product</h5>
           <a href="index.html#features" data-i18n="footer.product_links.features">Features</a>
           <a href="pricing.html" data-i18n="footer.product_links.pricing">Pricing</a>
+          <a href="connect.html" data-i18n="footer.product_links.connect">Connect</a>
           <a href="changelog.html" data-i18n="footer.product_links.changelog">Changelog</a>
           <a href="roadmap.html" data-i18n="footer.product_links.roadmap">Roadmap</a>
         </div>
@@ -312,6 +313,53 @@ const DOWNLOAD_MAIN = `
       <div class="container">
         <div class="dl-grid dl-page-grid" id="dlPageGrid"><!-- filled by main.js --></div>
         <p class="dl-page-note" data-i18n="download.note">All downloads are free — no account, no cloud.</p>
+      </div>
+    </section>`;
+
+const CONNECT_MAIN = `
+    <section class="page-hero">
+      <div class="container">
+        <p class="eyebrow">Siegu Connect</p>
+        <h1>Sync, share, and keep the family together</h1>
+        <p class="sub">Siegu Connect is the hosted relay behind sync &amp; sharing. It helps your devices find each other across the internet &mdash; while your photos and videos never leave your devices.</p>
+        <div class="trust-row">
+          <span>Open source</span><span class="tdot">&middot;</span>
+          <span>End-to-end encrypted</span><span class="tdot">&middot;</span>
+          <span>Files never touch the relay</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container center pricing-head">
+        <div class="toggle-row" id="billingToggle">
+          <button type="button" data-period="monthly" data-i18n="pricing.toggle.monthly">Monthly</button>
+          <button type="button" class="active" data-period="yearly" data-i18n="pricing.toggle.yearly">Yearly</button>
+          <span class="save-tag" data-i18n="pricing.toggle.save">Save 20%</span>
+        </div>
+      </div>
+      <div class="container">
+        <div class="pricing-grid" id="pricingGrid">
+          <!-- Plan cards injected by js/main.js -->
+        </div>
+        <p class="pricing-note center" data-i18n="pricing.note">Prices in USD. Cancel anytime. No extra fees for more photos.</p>
+      </div>
+    </section>
+
+    <section class="section page-body">
+      <div class="container">
+        <div class="narrow">
+          <h2>What Siegu Connect does</h2>
+          <p>Siegu is local-first by design, but your devices still need to meet when they aren&rsquo;t on the same network. Connect provides a minimal relay that introduces your devices to each other with an encrypted WebRTC handshake &mdash; then steps out of the way. Your data travels directly between your devices, end-to-end encrypted.</p>
+          <ul>
+            <li><strong>Sync between your own devices</strong> over the internet &mdash; phone to PC, on any network.</li>
+            <li><strong>Share collections</strong> with anyone through the view-only web client.</li>
+            <li><strong>Hosted by the Siegu team</strong> &mdash; no ports to open, no servers to run.</li>
+            <li><strong>Included with Pro and Family</strong> &mdash; no separate subscription.</li>
+          </ul>
+          <p class="docs-more">The relay only ever sees encrypted connection details &mdash; never your files, metadata, or manifests. See <a href="docs.html#security-privacy">the security model</a> and the <a href="privacy.html">privacy policy</a>.</p>
+          <p>Not sure where to start? <a href="download.html">Download Siegu for free</a> &mdash; the app is free, local, and fully yours; upgrade any time.</p>
+        </div>
       </div>
     </section>`;
 
@@ -661,6 +709,26 @@ const PAGES = [
       },
       ${SITE_SCHEMA_ORG}`,
     main: '', // filled by buildDocsMain() in main()
+  },
+  {
+    file: 'connect.html',
+    active: 'connect.html',
+    title: 'Siegu Connect — Pro & Family — private sync and sharing',
+    description: 'Buy Siegu Pro or join the Family plan. Siegu Connect syncs your library between devices over the internet and shares collections with anyone — end-to-end encrypted, relay never sees your files.',
+    keywords: 'siegu connect, buy siegu pro, siegu pro, siegu family, siegu family plan, private sync, family photo sharing, siegu upgrade, purchase siegu, photo sync, share photos privately, siegu subscription',
+    url: `${BASE}/connect.html`,
+    schema: `{
+        "@type": "WebPage",
+        "@id": "${BASE}/connect.html",
+        "url": "${BASE}/connect.html",
+        "name": "Siegu Connect — Pro & Family — private sync and sharing",
+        "description": "Buy Siegu Pro or join the Family plan. Siegu Connect syncs and shares your library — end-to-end encrypted, with the relay never seeing your files.",
+        "isPartOf": { "@id": "${BASE}/#website" },
+        "inLanguage": "en",
+        "publisher": { "@id": "${BASE}/#organization" }
+      },
+      ${SITE_SCHEMA_ORG}`,
+    main: CONNECT_MAIN,
   },
   {
     file: 'compare.html',

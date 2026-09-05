@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Siegu roadmap — what’s next for the private photo library</title>
-  <meta name="description" content="The public roadmap for Siegu: family sharing, mobile apps, opt-in cloud sync, and more on-device AI. Progress tracked in the open on GitHub." />
+  <title>Siegu Connect — Pro & Family — private sync and sharing</title>
+  <meta name="description" content="Buy Siegu Pro or join the Family plan. Siegu Connect syncs your library between devices over the internet and shares collections with anyone — end-to-end encrypted, relay never sees your files." />
   <script>
     (function () {
       try {
@@ -19,22 +19,22 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Siegu" />
-  <meta property="og:title" content="Siegu roadmap — what’s next for the private photo library" />
-  <meta property="og:description" content="The public roadmap for Siegu: family sharing, mobile apps, opt-in cloud sync, and more on-device AI. Progress tracked in the open on GitHub." />
-  <meta property="og:url" content="https://denzyldick.github.io/siegu/roadmap.html" />
+  <meta property="og:title" content="Siegu Connect — Pro & Family — private sync and sharing" />
+  <meta property="og:description" content="Buy Siegu Pro or join the Family plan. Siegu Connect syncs your library between devices over the internet and shares collections with anyone — end-to-end encrypted, relay never sees your files." />
+  <meta property="og:url" content="https://denzyldick.github.io/siegu/connect.html" />
   <meta property="og:image" content="https://denzyldick.github.io/siegu/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Siegu roadmap — what’s next for the private photo library" />
-  <meta name="twitter:description" content="The public roadmap for Siegu: family sharing, mobile apps, opt-in cloud sync, and more on-device AI. Progress tracked in the open on GitHub." />
+  <meta name="twitter:title" content="Siegu Connect — Pro & Family — private sync and sharing" />
+  <meta name="twitter:description" content="Buy Siegu Pro or join the Family plan. Siegu Connect syncs your library between devices over the internet and shares collections with anyone — end-to-end encrypted, relay never sees your files." />
   <meta name="twitter:image" content="https://denzyldick.github.io/siegu/og-image.png" />
 
   <!-- SEO -->
-  <link rel="canonical" href="https://denzyldick.github.io/siegu/roadmap.html" />
+  <link rel="canonical" href="https://denzyldick.github.io/siegu/connect.html" />
   <meta name="robots" content="index, follow" />
   <meta name="author" content="Denzyl Dick" />
-  <meta name="keywords" content="siegu roadmap, siegu roadmap plan, photo library features, private photo app roadmap, on-device AI roadmap" />
+  <meta name="keywords" content="siegu connect, buy siegu pro, siegu pro, siegu family, siegu family plan, private sync, family photo sharing, siegu upgrade, purchase siegu, photo sync, share photos privately, siegu subscription" />
   <meta name="theme-color" content="#0b0b0b" />
   <meta property="og:locale" content="en_US" />
 
@@ -44,9 +44,10 @@
     "@graph": [
       {
         "@type": "WebPage",
-        "@id": "https://denzyldick.github.io/siegu/roadmap.html",
-        "url": "https://denzyldick.github.io/siegu/roadmap.html",
-        "name": "Siegu roadmap — what’s next for the private photo library",
+        "@id": "https://denzyldick.github.io/siegu/connect.html",
+        "url": "https://denzyldick.github.io/siegu/connect.html",
+        "name": "Siegu Connect — Pro & Family — private sync and sharing",
+        "description": "Buy Siegu Pro or join the Family plan. Siegu Connect syncs and shares your library — end-to-end encrypted, with the relay never seeing your files.",
         "isPartOf": { "@id": "https://denzyldick.github.io/siegu/#website" },
         "inLanguage": "en",
         "publisher": { "@id": "https://denzyldick.github.io/siegu/#organization" }
@@ -129,44 +130,46 @@
 
     <section class="page-hero">
       <div class="container">
-        <p class="eyebrow">Roadmap</p>
-        <h1>Where Siegu is headed</h1>
-        <p class="sub">A living list. Priorities shift with feedback &mdash; if something's missing, say so on GitHub.</p>
+        <p class="eyebrow">Siegu Connect</p>
+        <h1>Sync, share, and keep the family together</h1>
+        <p class="sub">Siegu Connect is the hosted relay behind sync &amp; sharing. It helps your devices find each other across the internet &mdash; while your photos and videos never leave your devices.</p>
+        <div class="trust-row">
+          <span>Open source</span><span class="tdot">&middot;</span>
+          <span>End-to-end encrypted</span><span class="tdot">&middot;</span>
+          <span>Files never touch the relay</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container center pricing-head">
+        <div class="toggle-row" id="billingToggle">
+          <button type="button" data-period="monthly" data-i18n="pricing.toggle.monthly">Monthly</button>
+          <button type="button" class="active" data-period="yearly" data-i18n="pricing.toggle.yearly">Yearly</button>
+          <span class="save-tag" data-i18n="pricing.toggle.save">Save 20%</span>
+        </div>
+      </div>
+      <div class="container">
+        <div class="pricing-grid" id="pricingGrid">
+          <!-- Plan cards injected by js/main.js -->
+        </div>
+        <p class="pricing-note center" data-i18n="pricing.note">Prices in USD. Cancel anytime. No extra fees for more photos.</p>
       </div>
     </section>
 
     <section class="section page-body">
       <div class="container">
         <div class="narrow">
-          <h2>Now</h2>
+          <h2>What Siegu Connect does</h2>
+          <p>Siegu is local-first by design, but your devices still need to meet when they aren&rsquo;t on the same network. Connect provides a minimal relay that introduces your devices to each other with an encrypted WebRTC handshake &mdash; then steps out of the way. Your data travels directly between your devices, end-to-end encrypted.</p>
           <ul>
-            <li>Family sharing with end-to-end encryption between accounts you trust.</li>
-            <li>Mobile apps, starting with Android (already in the downloads).</li>
-            <li>Video improvements: trimming, smart previews, and richer metadata.</li>
+            <li><strong>Sync between your own devices</strong> over the internet &mdash; phone to PC, on any network.</li>
+            <li><strong>Share collections</strong> with anyone through the view-only web client.</li>
+            <li><strong>Hosted by the Siegu team</strong> &mdash; no ports to open, no servers to run.</li>
+            <li><strong>Included with Pro and Family</strong> &mdash; no separate subscription.</li>
           </ul>
-
-          <h2>Next</h2>
-          <ul>
-            <li>Opt-in cloud sync for people who want off-device redundancy &mdash; end-to-end encrypted, never an upload of your library.</li>
-            <li>More on-device AI: natural-language queries across your whole library.</li>
-            <li>Set-by-set sharing with expiry and access control.</li>
-          </ul>
-
-          <h2>Later</h2>
-          <ul>
-            <li>iOS support.</li>
-            <li>A plugin system for custom pipelines and exporters.</li>
-          </ul>
-
-          <h2>Done</h2>
-          <ul>
-            <li>Semantic search with CLIP, running on your own hardware.</li>
-            <li>Face recognition, people groups, rename, and merge.</li>
-            <li>On-device captions (BLIP), objects (YOLO), OCR, aesthetics, depth maps, and Whisper transcription.</li>
-            <li>Encrypted peer-to-peer sync over WebRTC with mesh networking.</li>
-          </ul>
-
-          <p>Track progress and weigh in: <a href="https://github.com/denzyldick/siegu/issues" target="_blank" rel="noopener">GitHub issues &rarr;</a></p>
+          <p class="docs-more">The relay only ever sees encrypted connection details &mdash; never your files, metadata, or manifests. See <a href="docs.html#security-privacy">the security model</a> and the <a href="privacy.html">privacy policy</a>.</p>
+          <p>Not sure where to start? <a href="download.html">Download Siegu for free</a> &mdash; the app is free, local, and fully yours; upgrade any time.</p>
         </div>
       </div>
     </section>

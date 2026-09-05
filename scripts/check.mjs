@@ -131,7 +131,10 @@ async function main() {
       const path = page === 'index.html' ? '' : page.replace(/\.html$/, '');
       let pageOk = true;
       if (!/css\/styles\.css/.test(html)) { fail(`${page}: missing css/styles.css`); pageOk = false; }
-      if (page !== '404.html') {
+      /* Minimal standalone pages (404, post-purchase thanks) keep their own
+         slim chrome; every content page gets the full landing shell. */
+      const minimal = page === '404.html' || page === 'thanks.html';
+      if (!minimal) {
         if (!/js\/main\.js/.test(html)) { fail(`${page}: missing js/main.js`); pageOk = false; }
         if (!/data-i18n=/.test(html)) { fail(`${page}: no data-i18n hooks`); pageOk = false; }
       }
@@ -153,8 +156,8 @@ async function main() {
           if (!html.includes(`id="${id}"`)) { fail(`index.html missing #${id}`); pageOk = false; }
         }
       }
-      // Mobile nav + skip link on content pages (404 is a minimal standalone page)
-      if (page !== '404.html') {
+      // Mobile nav + skip link on content pages (404/thanks are minimal standalone pages)
+      if (page !== '404.html' && page !== 'thanks.html') {
         if (!html.includes('id="menuBtn"') || !html.includes('id="navOverlay"')) {
           fail(`${page}: missing mobile hamburger (#menuBtn / #navOverlay)`);
           pageOk = false;

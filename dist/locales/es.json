@@ -224,5 +224,9 @@
     "per_year": " /año",
     "pay": "Pagar con tarjeta",
     "note": "Pago seguro con Stripe. Cancela cuando quieras."
+  },
+  "connect": {
+    "title": "Siegu Connect",
+    "subtitle": "Private sync and sharing for you and your family"
   }
 }

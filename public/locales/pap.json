@@ -224,5 +224,9 @@
     "per_year": " /aña",
     "pay": "Paga ku tarheta",
     "note": "Checkout segur dor di Stripe. Kanselá ora bo ke."
+  },
+  "connect": {
+    "title": "Siegu Connect",
+    "subtitle": "Private sync and sharing for you and your family"
   }
 }
