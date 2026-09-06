@@ -33,7 +33,7 @@
     "title2": "privately yours",
     "subtitle": "Siegu keeps every photo and video on your device. Powerful search, on-device AI, and seamless sharing — no cloud, no uploads, no compromises.",
     "cta_primary": "Get siegu free",
-    "trust": "Free forever · No account · Cancel anytime.",
+    "trust": "Free forever · No account.",
     "cta_demo": "Try the live demo",
     "see_pro": "See Pro →"
   },
@@ -120,7 +120,7 @@
       "cta": "Go Pro",
       "yearly_badge": "billed yearly"
     },
-    "note": "Prices in USD. Cancel anytime. No extra fees for more photos.",
+    "note": "Prices in USD. No extra fees for more photos.",
     "team": {
       "name": "Family",
       "price": "$9",
@@ -223,7 +223,7 @@
     "per_month": " /month",
     "per_year": " /year",
     "pay": "Pay with card",
-    "note": "Secure checkout by Stripe. Cancel anytime."
+    "note": "Secure checkout by Stripe."
   },
   "connect": {
     "title": "Siegu Connect",
@@ -233,5 +233,5 @@
   "pricing.anchor_title": "Google Photos charges by the gigabyte, and it sees whatever you upload.",
   "pricing.anchor_body": "Siegu is a flat fee for a private, infinite library that lives on your device. Pay once — upgrades included. Your memories aren't training data.",
   "pricing.anchor_cta": "See the comparison",
-  "pricing.sticky": "Save 20% with the annual plan — cancel anytime."
+  "pricing.sticky": "Save 20% with the annual plan."
 }
