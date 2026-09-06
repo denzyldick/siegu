@@ -739,18 +739,18 @@ const VIDEO_MAIN = `
     <section class="section page-body">
       <div class="container">
         <div class="video-stage">
-          <video controls preload="metadata" playsinline poster="video/video-cover.png">
+          <video controls preload="metadata" playsinline poster="video/video-cover.jpg">
             <source src="video/siegu-intro.mp4" type="video/mp4" />
             Your browser doesn't support HTML5 video. <a href="video/siegu-intro.mp4">Download the trailer instead.</a>
           </video>
         </div>
         <div class="video-frames">
-          <img src="video/frame-00.png" alt="Siegu trailer — opening frame" width="640" height="360" loading="lazy" decoding="async" />
-          <img src="video/frame-60.png" alt="Siegu trailer — title reveal" width="640" height="360" loading="lazy" decoding="async" />
-          <img src="video/frame-120.png" alt="Siegu trailer — full frame" width="640" height="360" loading="lazy" decoding="async" />
+          <img src="video/frame-1.jpg" alt="Siegu trailer — the library" width="640" height="360" loading="lazy" decoding="async" />
+          <img src="video/frame-2.jpg" alt="Siegu trailer — auto-organized" width="640" height="360" loading="lazy" decoding="async" />
+          <img src="video/frame-3.jpg" alt="Siegu trailer — private by design" width="640" height="360" loading="lazy" decoding="async" />
         </div>
         <div class="narrow center">
-          <p class="sub" style="margin-top:32px">The trailer is silent and loops the core promise: <strong>your photos stay on your device</strong>. Voiceover can be added later — the project is fully editable (Remotion source in the repo).</p>
+          <p class="sub" style="margin-top:32px">A silent, loopable overview: the private local-first photo library with on-device AI. Voiceover can be added later — the Remotion project is fully editable in the repo.</p>
           <a class="btn btn-ink btn-lg" href="video/siegu-intro.mp4" target="_blank" rel="noopener" download>Download the trailer (.mp4)</a>
         </div>
       </div>
