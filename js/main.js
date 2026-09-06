@@ -1063,39 +1063,37 @@ async function boot() {
 
 function initReveal() {
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!('IntersectionObserver' in window)) {
-    document.querySelectorAll('.sr, .pricing-grid .card, .price-anchor').forEach((el) => el.classList.add('is-visible'));
+  if (!('IntersectionObserver' in window) || reduce) {
+    document.querySelectorAll('.features-grid .feature, .sr-elem, .pricing-grid .plan').forEach((el) => el.classList.add('is-visible'));
     return;
   }
 
-  // Feature cards: alternating left/right slide-in
-  const cards = document.querySelectorAll('.features-grid .feature');
-  cards.forEach((card, i) => {
-    if (reduce) return;
-    const dir = i % 2 === 0 ? 'left' : 'right';
-    card.classList.add('reveal-' + dir);
-  });
-
-  // Section-level elements: fade up on scroll
-  const srTargets = document.querySelectorAll('.section, .page-hero, .cta-band, .pricing-note, .founding-note, .price-anchor');
-  srTargets.forEach((el) => { if (!reduce) el.classList.add('sr'); });
-
   const io = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('is-visible');
-          io.unobserve(entry.target);
-        }
-      });
-    },
-    { threshold: 0.12, rootMargin: '0px 0px -60px 0px' },
+    (entries) => entries.forEach((e) => {
+      if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); }
+    }),
+    { threshold: 0.12, rootMargin: '0px 0px -50px 0px' },
   );
+  const observe = (sel) => { document.querySelectorAll(sel).forEach((el) => io.observe(el)); };
 
-  if (!reduce) {
-    cards.forEach((c) => io.observe(c));
-    srTargets.forEach((el) => io.observe(el));
-  }
+  // Feature cards: alternate L/R slide
+  document.querySelectorAll('.features-grid .feature').forEach((card, i) => {
+    card.classList.add(i % 2 === 0 ? 'reveal-left' : 'reveal-right');
+  });
+  observe('.features-grid .feature');
+
+  // Pricing cards: pop up
+  observe('.pricing-grid .plan');
+
+  // Section ripple: tag heading blocks + containers, cascade via CSS nth-child
+  document.querySelectorAll('.section, .cta-band, .page-hero').forEach((sec) => {
+    const blocks = sec.querySelectorAll('.section-eyebrow, .section-title, .section-sub, .narrow, .pricing-head, .price-anchor, .pricing-note, .guarantee, .founding-note, .point');
+    blocks.forEach((el, i) => {
+      el.classList.add('sr-elem');
+      el.style.setProperty('--d', `${i * 110}ms`);
+    });
+    blocks.forEach((el) => io.observe(el));
+  });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
