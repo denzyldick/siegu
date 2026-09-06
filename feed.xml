@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Siegu blog — notes from building a private photo library</title>
+  <link href="https://denzyldick.github.io/siegu/blog.html" rel="alternate"/>
+  <link href="https://denzyldick.github.io/siegu/feed.xml" rel="self" type="application/atom+xml"/>
+  <id>https://denzyldick.github.io/siegu/</id>
+  <updated>2026-09-01T00:00:00Z</updated>
+  <subtitle>Thoughts on building a private, local-first photo library: why private by design beats a privacy policy, how on-device AI works, and more from the Siegu project.</subtitle>
+  <author><name>Siegu</name></author>
+  <entry>
+    <title>Why “private by design” beats a privacy policy</title>
+    <link href="https://denzyldick.github.io/siegu/blog.html#private-by-design" rel="alternate"/>
+    <id>https://denzyldick.github.io/siegu/blog.html#private-by-design</id>
+    <updated>2026-09-01T00:00:00Z</updated>
+    <published>2026-09-01T00:00:00Z</published>
+    <summary>Every photo service has a privacy policy. And every one of them can upload your photos. A policy just describes what a company may legally do with your data — it doesn't prevent anything. Private by design means there is nothing to prevent, because there's nothing to take. Siegu runs its whole pipeline — indexing, search, face recognition, captions — on your own hardware. The “cloud” isn't where features live; it's what we avoid. That's a small difference in marketing and a huge difference in where your memories end up.</summary>
+  </entry>
+  <entry>
+    <title>How a search engine for one person works</title>
+    <link href="https://denzyldick.github.io/siegu/blog.html#search-engine-for-one-person" rel="alternate"/>
+    <id>https://denzyldick.github.io/siegu/blog.html#search-engine-for-one-person</id>
+    <updated>2026-08-01T00:00:00Z</updated>
+    <published>2026-08-01T00:00:00Z</published>
+    <summary>Semantic search usually means uploading your library so a server can index it. Siegu does the same job with CLIP running locally through ONNX Runtime: describe a photo (“sunsets at the beach”) and it's found on your drive, not a data center. Local AI is slower per query than a warehouse of GPUs, so the app indexes in the background and answers from a pre-computed index. You get the magic without shipping your memories anywhere.</summary>
+  </entry>
+</feed>
