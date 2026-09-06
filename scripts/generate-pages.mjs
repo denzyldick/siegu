@@ -176,6 +176,7 @@ const TAIL = `  </main>
           <a href="download.html" data-track="cta_get_started" data-i18n="footer.resources_links.download">Download</a>
           <a href="compare.html" data-i18n="footer.resources_links.compare">vs Google Photos</a>
           <a href="https://siegu.onrender.com" target="_blank" rel="noopener" data-track="demo_clicked" data-i18n="footer.resources_links.demo">Live demo</a>
+          <a href="video.html" data-track="video_viewed" data-i18n="footer.resources_links.video">Watch the trailer</a>
         </div>
         <div class="footer-col">
           <h5 data-i18n="footer.company">Company</h5>
@@ -726,6 +727,35 @@ ${mainEntity}
       ${SITE_SCHEMA_ORG}`;
 }
 
+const VIDEO_MAIN = `
+    <section class="page-hero">
+      <div class="container center">
+        <p class="eyebrow">Siegu trailer</p>
+        <h1>See Siegu in motion</h1>
+        <p class="sub">A 5-second first look: your photo library — private, local, and fast. No cloud, no uploads.</p>
+      </div>
+    </section>
+
+    <section class="section page-body">
+      <div class="container">
+        <div class="video-stage">
+          <video controls preload="metadata" playsinline poster="video/video-cover.png">
+            <source src="video/siegu-intro.mp4" type="video/mp4" />
+            Your browser doesn't support HTML5 video. <a href="video/siegu-intro.mp4">Download the trailer instead.</a>
+          </video>
+        </div>
+        <div class="video-frames">
+          <img src="video/frame-00.png" alt="Siegu trailer — opening frame" width="640" height="360" loading="lazy" decoding="async" />
+          <img src="video/frame-60.png" alt="Siegu trailer — title reveal" width="640" height="360" loading="lazy" decoding="async" />
+          <img src="video/frame-120.png" alt="Siegu trailer — full frame" width="640" height="360" loading="lazy" decoding="async" />
+        </div>
+        <div class="narrow center">
+          <p class="sub" style="margin-top:32px">The trailer is silent and loops the core promise: <strong>your photos stay on your device</strong>. Voiceover can be added later — the project is fully editable (Remotion source in the repo).</p>
+          <a class="btn btn-ink btn-lg" href="video/siegu-intro.mp4" target="_blank" rel="noopener" download>Download the trailer (.mp4)</a>
+        </div>
+      </div>
+    </section>`;
+
 /* ---------- Page configs ---------- */
 
 const PAGES = [
@@ -931,6 +961,25 @@ const PAGES = [
       },
       ${SITE_SCHEMA_ORG}`,
     main: PRIVACY_MAIN,
+  },
+  {
+    file: 'video.html',
+    active: 'video.html',
+    title: 'Siegu trailer — your photo library, privately yours',
+    description: 'Watch the Siegu trailer: a private, local-first photo library with on-device AI. Your photos never leave your device. No cloud, no uploads.',
+    keywords: 'siegu video, siegu trailer, photo library demo, private photo app video, local-first photos',
+    url: `${BASE}/video.html`,
+    schema: `{
+        "@type": "WebPage",
+        "@id": "${BASE}/video.html",
+        "url": "${BASE}/video.html",
+        "name": "Siegu trailer — your photo library, privately yours",
+        "isPartOf": { "@id": "${BASE}/#website" },
+        "inLanguage": "en",
+        "publisher": { "@id": "${BASE}/#organization" }
+      },
+      ${SITE_SCHEMA_ORG}`,
+    main: VIDEO_MAIN,
   },
 ];
 

@@ -101,7 +101,8 @@
         "Fotos locais ilimitadas",
         "Busca com IA no dispositivo",
         "Organização automática",
-        "Compartilhamento local na sua rede"
+        "Compartilhamento local na sua rede",
+        "Acesso remoto auto-hospedado (DIY)"
       ],
       "cta": "Começar"
     },
@@ -109,12 +110,12 @@
       "name": "Pro",
       "price": "$5",
       "period": "por mês",
-      "tagline": "Tudo, em qualquer lugar.",
+      "tagline": "Em qualquer lugar, em qualquer rede.",
       "highlight": "Mais popular",
       "features": [
         "Tudo no Grátis",
-        "Links de compartilhamento instantâneo para coleções com outros",
-        "Links para qualquer pessoa, em qualquer lugar",
+        "Sincronize e compartilhe pela internet — até com dados móveis",
+        "Relé hospedado, sem tocar no roteador nem no NAT",
         "Acesso antecipado a novos recursos"
       ],
       "cta": "Assinar Pro",
@@ -151,6 +152,14 @@
         "a": "Você pode compartilhar uma coleção por um link criptografado de ponta a ponta e ao vivo. Os convidados veem apenas o que você escolher compartilhar, e nada é armazenado no nosso lado."
       },
       {
+        "q": "Posso acessar minhas fotos com dados móveis ou viajando?",
+        "a": "Sim. Usuários gratuitos podem apontar o app para um relé auto-hospedado em uma máquina própria (abrindo uma porta UDP). O relé hospedado do Pro faz o mesmo sem configuração — funciona até em redes móveis que bloqueiam conexões diretas."
+      },
+      {
+        "q": "Por que preciso de um relé?",
+        "a": "Para se conectar pela internet, dois dispositivos precisam se encontrar. A maioria das redes domésticas funciona de imediato, mas algumas (principalmente dados móveis) estão atrás de NATs que uma conexão direta não alcança. Nesse caso, um relé — TURN — encaminha o fluxo criptografado entre seus dispositivos. Ele nunca armazena nem lê sua mídia."
+      },
+      {
         "q": "Quais plataformas são suportadas?",
         "a": "Siegu roda no Windows, macOS e Linux, com uma experiência web completa para convidados."
       },
@@ -184,7 +193,8 @@
     "resources_links": {
       "docs": "Documentação",
       "download": "Baixar",
-      "demo": "Demo ao vivo"
+      "demo": "Demo ao vivo",
+      "video": "Watch the trailer"
     },
     "company": "Empresa",
     "company_links": {

@@ -101,7 +101,8 @@
         "Unbegrenzte lokale Fotos",
         "KI-Suche auf dem Gerät",
         "Automatische Organisation",
-        "Lokales Teilen im Netzwerk"
+        "Lokales Teilen im Netzwerk",
+        "Selbst gehosteter Remote-Zugriff (DIY)"
       ],
       "cta": "Loslegen"
     },
@@ -109,12 +110,12 @@
       "name": "Pro",
       "price": "$5",
       "period": "pro Monat",
-      "tagline": "Alles. Überall.",
+      "tagline": "Überall, in jedem Netzwerk.",
       "highlight": "Am beliebtesten",
       "features": [
         "Alles aus Kostenlos",
-        "Sofortige Share-Links zu Sammlungen mit anderen",
-        "Links für jeden, überall",
+        "Sync & Teilen über das Internet — auch über mobile Daten",
+        "Gehosteter Relay — keine Router- oder NAT-Konfiguration nötig",
         "Früher Zugang zu neuen Funktionen"
       ],
       "cta": "Pro holen",
@@ -151,6 +152,14 @@
         "a": "Du kannst eine Sammlung über einen Ende-zu-Ende-verschlüsselten Live-Link teilen. Gäste sehen nur, was du teilst, und nichts wird auf unserer Seite gespeichert."
       },
       {
+        "q": "Kann ich unterwegs mit mobilen Daten auf meine Fotos zugreifen?",
+        "a": "Ja. Kostenlose Nutzer können ihre App auf einen selbst gehosteten Relay auf einer eigenen Maschine richten (ein UDP-Port wird weitergeleitet). Der gehostete Relay von Pro macht dasselbe ohne Konfiguration — er funktioniert sogar in Mobilfunknetzen, die direkte Verbindungen blockieren."
+      },
+      {
+        "q": "Warum brauche ich überhaupt einen Relay?",
+        "a": "Um sich über das Internet zu verbinden, müssen zwei Geräte sich gegenseitig finden. Die meisten Heimnetzwerke funktionieren direkt, aber manche (vor allem mobile Daten) sitzen hinter NATs, die eine direkte Verbindung unmöglich machen. Ein Relay — TURN — leitet den verschlüsselten Datenstrom zwischen deinen Geräten weiter, wenn das passiert. Er speichert oder liest deine Medien nie."
+      },
+      {
         "q": "Welche Plattformen werden unterstützt?",
         "a": "Siegu läuft auf Windows, macOS und Linux, mit einem vollständigen Weberlebnis für Gäste."
       },
@@ -184,7 +193,8 @@
     "resources_links": {
       "docs": "Dokumentation",
       "download": "Download",
-      "demo": "Live-Demo"
+      "demo": "Live-Demo",
+      "video": "Watch the trailer"
     },
     "company": "Unternehmen",
     "company_links": {

@@ -101,7 +101,8 @@
         "Photos locales illimitées",
         "Recherche IA embarquée",
         "Organisation automatique",
-        "Partage local sur votre réseau"
+        "Partage local sur votre réseau",
+        "Accès à distance auto-hébergé (DIY)"
       ],
       "cta": "Commencer"
     },
@@ -109,12 +110,12 @@
       "name": "Pro",
       "price": "$5",
       "period": "par mois",
-      "tagline": "Tout, partout.",
+      "tagline": "Partout, sur n'importe quel réseau.",
       "highlight": "Le plus populaire",
       "features": [
         "Tout le plan Gratuit",
-        "Liens de partage instantanés vers des collections avec d'autres",
-        "Liens pour tout le monde, partout",
+        "Synchronisez et partagez sur Internet — même en données mobiles",
+        "Relais hébergé, sans jamais toucher au routeur ni au NAT",
         "Accès anticipé aux nouveautés"
       ],
       "cta": "Passer Pro",
@@ -151,6 +152,14 @@
         "a": "Vous pouvez partager une collection via un lien chiffré de bout en bout et en direct. Les invités ne voient que ce que vous choisissez de partager, et rien n'est stocké de notre côté."
       },
       {
+        "q": "Puis-je accéder à mes photos en données mobiles ou en voyage ?",
+        "a": "Oui. Les utilisateurs gratuits peuvent pointer leur app vers un relais auto-hébergé sur une machine qu'ils possèdent (un port UDP à rediriger). Le relais hébergé de Pro fait la même chose sans configuration — il fonctionne même sur les réseaux mobiles qui bloquent les connexions directes."
+      },
+      {
+        "q": "Pourquoi ai-je besoin d'un relais ?",
+        "a": "Pour se connecter sur Internet, deux appareils doivent se trouver. La plupart des réseaux domestiques fonctionnent directement, mais certains (surtout la data mobile) sont derrière des NAT qu'une connexion directe ne peut pas atteindre. Un relais — TURN — transmet le flux chiffré entre vos appareils dans ce cas. Il ne stocke ni ne lit jamais vos médias."
+      },
+      {
         "q": "Quelles plateformes sont prises en charge ?",
         "a": "Siegu fonctionne sur Windows, macOS et Linux, avec une expérience web complète pour les invités."
       },
@@ -184,7 +193,8 @@
     "resources_links": {
       "docs": "Documentation",
       "download": "Télécharger",
-      "demo": "Démo en direct"
+      "demo": "Démo en direct",
+      "video": "Watch the trailer"
     },
     "company": "Entreprise",
     "company_links": {

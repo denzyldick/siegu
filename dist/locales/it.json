@@ -101,7 +101,8 @@
         "Foto locali illimitate",
         "Ricerca IA sul dispositivo",
         "Organizzazione automatica",
-        "Condivisione locale sulla tua rete"
+        "Condivisione locale sulla tua rete",
+        "Accesso remoto self-hostato (DIY)"
       ],
       "cta": "Inizia"
     },
@@ -109,12 +110,12 @@
       "name": "Pro",
       "price": "$5",
       "period": "al mese",
-      "tagline": "Tutto, ovunque.",
+      "tagline": "Ovunque, su qualsiasi rete.",
       "highlight": "Più popolare",
       "features": [
         "Tutto nel piano Gratis",
-        "Link di condivisione istantanea verso collezioni con altri",
-        "Collegamenti per chiunque, ovunque",
+        "Sincronizza e condividi su internet — anche con la connessione mobile",
+        "Relay ospitato, senza mai toccare router o NAT",
         "Accesso anticipato alle novità"
       ],
       "cta": "Passa a Pro",
@@ -151,6 +152,14 @@
         "a": "Puoi condividere una raccolta tramite un collegamento crittografato end-to-end e live. Gli ospiti vedono solo ciò che scegli di condividere e nulla viene archiviato dal nostro lato."
       },
       {
+        "q": "Posso accedere alle foto con la connessione mobile o in viaggio?",
+        "a": "Sì. Gli utenti gratis possono puntare l'app a un relay self-hostato su una macchina propria (aprendo una porta UDP). Il relay ospitato di Pro fa lo stesso senza configurazione — funziona anche su reti mobili che bloccano le connessioni dirette."
+      },
+      {
+        "q": "Perché serve un relay?",
+        "a": "Per connettersi tramite internet, due dispositivi devono trovarsi. La maggior parte delle reti domestiche funziona direttamente, ma alcune (soprattutto i dati mobili) sono dietro a NAT irraggiungibili da una connessione diretta. In quel caso un relay — TURN — inoltra il flusso cifrato tra i dispositivi. Non salva né legge mai i tuoi media."
+      },
+      {
         "q": "Quali piattaforme sono supportate?",
         "a": "Siegu funziona su Windows, macOS e Linux, con un'esperienza web completa per gli ospiti."
       },
@@ -184,7 +193,8 @@
     "resources_links": {
       "docs": "Documentazione",
       "download": "Scarica",
-      "demo": "Demo live"
+      "demo": "Demo live",
+      "video": "Watch the trailer"
     },
     "company": "Azienda",
     "company_links": {
