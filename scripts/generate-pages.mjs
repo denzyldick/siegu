@@ -219,7 +219,7 @@ const TAIL = `  </main>
       <p class="pro-founding" id="proFounding" hidden data-founding>
         <a id="proFoundingBtn" target="_blank" rel="noopener">Or get <strong>Lifetime Pro</strong> for $99 &mdash; one-time payment, yours forever.</a>
       </p>
-      <p class="dl-note" data-i18n="pro.note">Secure checkout by Stripe. Cancel anytime.</p>
+      <p class="dl-note" data-i18n="pro.note">Secure checkout by Stripe.</p>
     </div>
   </div>
 
@@ -289,7 +289,7 @@ const PRICING_MAIN = `
         <div class="pricing-grid" id="pricingGrid">
           <!-- Plan cards injected by js/main.js -->
         </div>
-        <p class="pricing-note center" data-i18n="pricing.note">Prices in USD. Cancel anytime. No extra fees for more photos.</p>
+        <p class="pricing-note center" data-i18n="pricing.note">Prices in USD. No extra fees for more photos.</p>
         <p class="pricing-note center guarantee" data-i18n="pricing.guarantee">14-day money-back guarantee on every paid plan — no questions asked.</p>
       </div>
     </section>
@@ -370,7 +370,7 @@ const CONNECT_MAIN = `
         <div class="pricing-grid" id="pricingGrid">
           <!-- Plan cards injected by js/main.js -->
         </div>
-        <p class="pricing-note center" data-i18n="pricing.note">Prices in USD. Cancel anytime. No extra fees for more photos.</p>
+        <p class="pricing-note center" data-i18n="pricing.note">Prices in USD. No extra fees for more photos.</p>
         <p class="pricing-note center guarantee" data-i18n="pricing.guarantee">14-day money-back guarantee on every paid plan — no questions asked.</p>
       </div>
     </section>
