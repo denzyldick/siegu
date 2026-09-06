@@ -338,7 +338,7 @@ img { max-width: 100%; display: block; }
 .hero-content .hero-trust a { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
 
 /* ---------- Sections ---------- */
-.section { padding: 96px 0; }
+.section { padding: 120px 0; }
 .section-eyebrow {
   text-transform: uppercase; letter-spacing: .14em; font-size: 12.5px; font-weight: 800;
   color: var(--text-3); margin: 0 0 16px;
@@ -429,6 +429,38 @@ img { max-width: 100%; display: block; }
 .feature.reveal-left.is-visible, .feature.reveal-right.is-visible {
   opacity: 1; transform: none;
 }
+
+/* ---------- Section-level scroll reveal ---------- */
+.sr { opacity: 0; transform: translateY(36px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); will-change: opacity, transform; }
+.sr.sr-left { transform: translateX(-40px); }
+.sr.sr-right { transform: translateX(40px); }
+.sr.is-visible { opacity: 1; transform: none; }
+
+/* Page hero entrance on load */
+.page-hero .container { animation: heroEnter .8s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes heroEnter {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Pricing grid card stagger */
+.pricing-grid .card { opacity: 0; transform: translateY(20px); transition: opacity .5s ease, transform .5s cubic-bezier(.2,.7,.2,1); }
+.pricing-grid .card.is-visible { opacity: 1; transform: none; }
+.pricing-grid .card:nth-child(1) { transition-delay: 0s; }
+.pricing-grid .card:nth-child(2) { transition-delay: .1s; }
+.pricing-grid .card:nth-child(3) { transition-delay: .2s; }
+
+/* Billing toggle pulse on switch */
+.toggle-row button.active { animation: togglePop .25s ease; }
+@keyframes togglePop { 50% { transform: scale(1.05); } }
+
+/* Price anchor band entrance */
+.price-anchor { opacity: 0; transform: translateY(20px); transition: opacity .6s ease, transform .6s cubic-bezier(.2,.7,.2,1); }
+.price-anchor.is-visible { opacity: 1; transform: none; }
+
+/* Sticky Pro bar slide up */
+.sticky-pro { animation: stickyIn .35s cubic-bezier(.2,.7,.2,1); }
+@keyframes stickyIn { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
 /* ---------- Showcase ---------- */
 .showcase-wrap { display: grid; grid-template-columns: 1.3fr 1fr; gap: 48px; align-items: center; }
@@ -715,32 +747,50 @@ img { max-width: 100%; display: block; }
   .feature .ico { width: 48px; height: 48px; }
   .feature .ico svg { width: 24px; height: 24px; }
   .section-sub { font-size: 1rem; }
-  /* stack the big CTA buttons vertically on phones */
   .cta-band .btn { width: 100%; margin: 6px 0; }
   .cta-band .btn-ghost { margin-left: 0; }
   .cta-band { padding: 72px 20px; }
   .cta-band p { margin-bottom: 18px; }
   .hero-cta .btn { width: 100%; max-width: 360px; }
+  /* Mobile pricing: stacked full-width cards, bigger tap targets */
+  .pricing-grid { grid-template-columns: 1fr; gap: 16px; }
+  .plan { padding: 28px 22px; }
+  .plan-price { font-size: 2.2rem; }
+  .plan .btn { padding: 14px; font-size: 15px; min-height: 48px; }
+  .toggle-row { width: 100%; }
+  .toggle-row button { flex: 1; padding: 12px 14px; font-size: 14px; min-height: 44px; }
+  .pricing-head { margin-bottom: 28px; }
+  .price-anchor { flex-direction: column; gap: 16px; text-align: center; padding: 24px 20px; }
+  .price-anchor .btn { width: 100%; }
+  .guarantee { font-size: 12px; }
+  .sticky-pro { bottom: 76px; font-size: 13px; padding: 8px 16px; gap: 10px; }
+  .sticky-pro .btn { padding: 10px 16px; font-size: 13px; min-height: 40px; }
 }
 @media (max-width: 540px) {
   .footer-grid { grid-template-columns: 1fr; }
-  /* tighten the header so it fits a phone: smaller CTA, tighter gaps */
   .header-actions { gap: 8px; }
   .site-header .btn-sm { padding: 8px 12px; font-size: 13px; }
   .brand span { display: none; }
   .brand img { width: 30px; height: 30px; }
+  .plan-price { font-size: 2rem; }
+  .plan li { font-size: 14px; }
 }
 
 /* reduced motion */
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
-  .feature, .hero-frame, .showcase-frame { transition: none !important; }
+  .feature, .hero-frame, .showcase-frame, .page-hero .container,
+  .sr, .pricing-grid .card, .price-anchor, .sticky-pro,
+  .toggle-row button.active { transition: none !important; animation: none !important; }
   .hero-bg-slide { transition: opacity .6s ease !important; }
   .feature .ico,
   .feature .ico .ic .fill { animation: none !important; }
   .feature.reveal-left, .feature.reveal-right {
     opacity: 1 !important; transform: none !important; transition: none !important;
   }
+  .sr { opacity: 1 !important; transform: none !important; }
+  .pricing-grid .card { opacity: 1 !important; transform: none !important; }
+  .price-anchor { opacity: 1 !important; transform: none !important; }
   .feature:hover .ico .ic path,
   .feature:hover .ico .ic circle,
   .feature:hover .ico .ic line,

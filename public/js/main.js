@@ -145,7 +145,7 @@ function renderPricing() {
         ${isYearly && key !== 'free' ? `<p class="yearly-badge">${p.yearly_badge || ''}</p>` : ''}
         <p class="tagline">${p.tagline || ''}</p>
         <ul>${feats.map((f) => `<li><span class="check">✓</span><span>${f}</span></li>`).join('')}</ul>
-        ${key !== 'free' ? '<p class="plan-risk">Cancel anytime</p>' : ''}
+        ${key !== 'free' ? '<p class="plan-risk">14-day money-back guarantee</p>' : ''}
         <a class="btn ${btnClass}" href="${btnHref}" data-action="${btnAction}" ${btnTarget} ${btnExtra} ${dataPlatform} ${btnTrack}>${p.cta || ''}</a>
       </div>`;
     })
@@ -1062,21 +1062,23 @@ async function boot() {
 }
 
 function initReveal() {
-  const cards = document.querySelectorAll('.features-grid .feature');
-  if (!cards.length) return;
-  // Skip if the user prefers reduced motion — cards stay visible via CSS.
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (reduce) return;
+  if (!('IntersectionObserver' in window)) {
+    document.querySelectorAll('.sr, .pricing-grid .card, .price-anchor').forEach((el) => el.classList.add('is-visible'));
+    return;
+  }
 
+  // Feature cards: alternating left/right slide-in
+  const cards = document.querySelectorAll('.features-grid .feature');
   cards.forEach((card, i) => {
+    if (reduce) return;
     const dir = i % 2 === 0 ? 'left' : 'right';
     card.classList.add('reveal-' + dir);
   });
 
-  if (!('IntersectionObserver' in window)) {
-    cards.forEach((c) => c.classList.add('is-visible'));
-    return;
-  }
+  // Section-level elements: fade up on scroll
+  const srTargets = document.querySelectorAll('.section, .page-hero, .cta-band, .pricing-note, .founding-note, .price-anchor');
+  srTargets.forEach((el) => { if (!reduce) el.classList.add('sr'); });
 
   const io = new IntersectionObserver(
     (entries) => {
@@ -1087,9 +1089,13 @@ function initReveal() {
         }
       });
     },
-    { threshold: 0.18, rootMargin: '0px 0px -40px 0px' },
+    { threshold: 0.12, rootMargin: '0px 0px -60px 0px' },
   );
-  cards.forEach((c) => io.observe(c));
+
+  if (!reduce) {
+    cards.forEach((c) => io.observe(c));
+    srTargets.forEach((el) => io.observe(el));
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
