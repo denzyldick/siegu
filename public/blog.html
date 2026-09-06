@@ -22,16 +22,17 @@
   <meta property="og:title" content="Siegu blog — notes from building a private photo library" />
   <meta property="og:description" content="Thoughts on building a private, local-first photo library: why private by design beats a privacy policy, how on-device AI works, and more from the Siegu project." />
   <meta property="og:url" content="https://denzyldick.github.io/siegu/blog.html" />
-  <meta property="og:image" content="https://denzyldick.github.io/siegu/og-image.jpg" />
+  <meta property="og:image" content="https://denzyldick.github.io/siegu/social-card.jpg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Siegu blog — notes from building a private photo library" />
   <meta name="twitter:description" content="Thoughts on building a private, local-first photo library: why private by design beats a privacy policy, how on-device AI works, and more from the Siegu project." />
-  <meta name="twitter:image" content="https://denzyldick.github.io/siegu/og-image.jpg" />
+  <meta name="twitter:image" content="https://denzyldick.github.io/siegu/social-card.jpg" />
 
   <!-- SEO -->
   <link rel="canonical" href="https://denzyldick.github.io/siegu/blog.html" />
+  <link rel="alternate" type="application/atom+xml" title="Siegu blog — notes from building a private photo library — Atom feed" href="https://denzyldick.github.io/siegu/feed.xml" />
   <meta name="robots" content="index, follow" />
   <meta name="author" content="Denzyl Dick" />
   <meta name="keywords" content="siegu blog, private photo library, local AI, on-device machine learning, open source photo app" />
@@ -138,16 +139,19 @@
     <section class="section page-body">
       <div class="container">
         <div class="narrow">
-          <article class="blog-post">
+          
+          <article class="blog-post" id="private-by-design">
             <p class="blog-date">September 2026</p>
             <h2>Why &ldquo;private by design&rdquo; beats a privacy policy</h2>
+            
             <p>Every photo service has a privacy policy. And every one of them <em>can</em> upload your photos. A policy just describes what a company may legally do with your data &mdash; it doesn't prevent anything.</p>
             <p>Private by design means there is nothing to prevent, because there's nothing to take. Siegu runs its whole pipeline &mdash; indexing, search, face recognition, captions &mdash; on your own hardware. The &ldquo;cloud&rdquo; isn't where features live; it's what we avoid. That's a small difference in marketing and a huge difference in where your memories end up.</p>
           </article>
 
-          <article class="blog-post">
+          <article class="blog-post" id="search-engine-for-one-person">
             <p class="blog-date">August 2026</p>
             <h2>How a search engine for one person works</h2>
+            
             <p>Semantic search usually means uploading your library so a server can index it. Siegu does the same job with CLIP running locally through ONNX Runtime: describe a photo (&ldquo;sunsets at the beach&rdquo;) and it's found on your drive, not a data center.</p>
             <p>Local AI is slower per query than a warehouse of GPUs, so the app indexes in the background and answers from a pre-computed index. You get the magic without shipping your memories anywhere.</p>
           </article>

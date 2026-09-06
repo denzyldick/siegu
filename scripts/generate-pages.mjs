@@ -28,7 +28,7 @@ const SITE_SCHEMA_ORG = `{
     "sameAs": ["https://github.com/denzyldick/siegu"]
   }`;
 
-function headFor({ title, description, keywords, url, ogTitle, ogDesc, schema }) {
+function headFor({ title, description, keywords, url, ogTitle, ogDesc, schema, feedUrl }) {
   return `<!doctype html>
 <html lang="en" data-theme="system">
 <head>
@@ -53,16 +53,17 @@ function headFor({ title, description, keywords, url, ogTitle, ogDesc, schema })
   <meta property="og:title" content="${ogTitle || title}" />
   <meta property="og:description" content="${ogDesc || description}" />
   <meta property="og:url" content="${url}" />
-  <meta property="og:image" content="${BASE}/og-image.jpg" />
+  <meta property="og:image" content="${BASE}/social-card.jpg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${ogTitle || title}" />
   <meta name="twitter:description" content="${ogDesc || description}" />
-  <meta name="twitter:image" content="${BASE}/og-image.jpg" />
+  <meta name="twitter:image" content="${BASE}/social-card.jpg" />
 
   <!-- SEO -->
   <link rel="canonical" href="${url}" />
+  ${feedUrl ? `<link rel="alternate" type="application/atom+xml" title="${title} — Atom feed" href="${feedUrl}" />` : ''}
   <meta name="robots" content="index, follow" />
   <meta name="author" content="Denzyl Dick" />
   <meta name="keywords" content="${keywords}" />
@@ -523,6 +524,27 @@ const ROADMAP_MAIN = `
       </div>
     </section>`;
 
+const BLOG_POSTS = [
+  {
+    id: 'private-by-design',
+    date: '2026-09-01',
+    label: 'September 2026',
+    title: 'Why &ldquo;private by design&rdquo; beats a privacy policy',
+    body: `
+            <p>Every photo service has a privacy policy. And every one of them <em>can</em> upload your photos. A policy just describes what a company may legally do with your data &mdash; it doesn't prevent anything.</p>
+            <p>Private by design means there is nothing to prevent, because there's nothing to take. Siegu runs its whole pipeline &mdash; indexing, search, face recognition, captions &mdash; on your own hardware. The &ldquo;cloud&rdquo; isn't where features live; it's what we avoid. That's a small difference in marketing and a huge difference in where your memories end up.</p>`,
+  },
+  {
+    id: 'search-engine-for-one-person',
+    date: '2026-08-01',
+    label: 'August 2026',
+    title: 'How a search engine for one person works',
+    body: `
+            <p>Semantic search usually means uploading your library so a server can index it. Siegu does the same job with CLIP running locally through ONNX Runtime: describe a photo (&ldquo;sunsets at the beach&rdquo;) and it's found on your drive, not a data center.</p>
+            <p>Local AI is slower per query than a warehouse of GPUs, so the app indexes in the background and answers from a pre-computed index. You get the magic without shipping your memories anywhere.</p>`,
+  },
+];
+
 const BLOG_MAIN = `
     <section class="page-hero">
       <div class="container">
@@ -535,22 +557,52 @@ const BLOG_MAIN = `
     <section class="section page-body">
       <div class="container">
         <div class="narrow">
-          <article class="blog-post">
-            <p class="blog-date">September 2026</p>
-            <h2>Why &ldquo;private by design&rdquo; beats a privacy policy</h2>
-            <p>Every photo service has a privacy policy. And every one of them <em>can</em> upload your photos. A policy just describes what a company may legally do with your data &mdash; it doesn't prevent anything.</p>
-            <p>Private by design means there is nothing to prevent, because there's nothing to take. Siegu runs its whole pipeline &mdash; indexing, search, face recognition, captions &mdash; on your own hardware. The &ldquo;cloud&rdquo; isn't where features live; it's what we avoid. That's a small difference in marketing and a huge difference in where your memories end up.</p>
-          </article>
-
-          <article class="blog-post">
-            <p class="blog-date">August 2026</p>
-            <h2>How a search engine for one person works</h2>
-            <p>Semantic search usually means uploading your library so a server can index it. Siegu does the same job with CLIP running locally through ONNX Runtime: describe a photo (&ldquo;sunsets at the beach&rdquo;) and it's found on your drive, not a data center.</p>
-            <p>Local AI is slower per query than a warehouse of GPUs, so the app indexes in the background and answers from a pre-computed index. You get the magic without shipping your memories anywhere.</p>
-          </article>
+          ${BLOG_POSTS.map((b) => `
+          <article class="blog-post" id="${b.id}">
+            <p class="blog-date">${b.label}</p>
+            <h2>${b.title}</h2>
+            ${b.body}
+          </article>`).join('\n')}
         </div>
       </div>
     </section>`;
+
+function feedText(html) {
+  const entities = {
+    '&ldquo;': '\u201C', '&rdquo;': '\u201D', '&lsquo;': '\u2018', '&rsquo;': '\u2019',
+    '&mdash;': '\u2014', '&ndash;': '\u2013', '&amp;': '&', '&lt;': '<', '&gt;': '>',
+  };
+  let s = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  s = s.replace(/&(ldquo|rdquo|lsquo|rsquo|mdash|ndash|amp|lt|gt);/g, (m) => entities[m]);
+  return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
+
+function buildBlogFeed({ url, title, description }) {
+  const updated = BLOG_POSTS[0] ? BLOG_POSTS[0].date : null;
+  const entries = BLOG_POSTS.map((b) => {
+    const postUrl = `${url}#${b.id}`;
+    return `<entry>
+    <title>${feedText(b.title)}</title>
+    <link href="${postUrl}" rel="alternate"/>
+    <id>${postUrl}</id>
+    <updated>${b.date}T00:00:00Z</updated>
+    <published>${b.date}T00:00:00Z</published>
+    <summary>${feedText(b.body)}</summary>
+  </entry>`;
+  }).join('\n  ');
+  return `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>${feedText(title)}</title>
+  <link href="${url}" rel="alternate"/>
+  <link href="${url.replace(/blog\.html$/, 'feed.xml')}" rel="self" type="application/atom+xml"/>
+  <id>${BASE}/</id>
+  <updated>${updated || new Date().toISOString().slice(0, 10)}T00:00:00Z</updated>
+  <subtitle>${feedText(description)}</subtitle>
+  <author><name>Siegu</name></author>
+  ${entries}
+</feed>
+`;
+}
 
 const PRIVACY_MAIN = `
     <section class="page-hero">
@@ -776,6 +828,7 @@ const PAGES = [
     description: 'Thoughts on building a private, local-first photo library: why private by design beats a privacy policy, how on-device AI works, and more from the Siegu project.',
     keywords: 'siegu blog, private photo library, local AI, on-device machine learning, open source photo app',
     url: `${BASE}/blog.html`,
+    feedUrl: `${BASE}/feed.xml`,
     schema: `{
         "@type": "WebPage",
         "@id": "${BASE}/blog.html",
@@ -858,6 +911,15 @@ async function main() {
     await writeFile(join(SRC, p.file), html, 'utf8');
     console.log(`[generate-pages] wrote ${p.file}`);
   }
+
+  /* Atom feed for the blog. */
+  const blogPage = PAGES.find((p) => p.file === 'blog.html');
+  await writeFile(
+    join(SRC, 'feed.xml'),
+    buildBlogFeed({ url: blogPage.url, title: blogPage.title, description: blogPage.description }),
+    'utf8'
+  );
+  console.log('[generate-pages] wrote feed.xml');
 
   /* Keep the sitemap's docs lastmod in sync with the app's doc commits. */
   if (docs.ok) {

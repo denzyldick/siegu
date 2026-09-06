@@ -102,7 +102,7 @@ async function main() {
       'logo.png',
       'logo.svg',
       'banner.webp',
-      'og-image.jpg',
+      'social-card.jpg',
       'favicon.png',
       'favicon-white.png',
       'manifest.webmanifest',
