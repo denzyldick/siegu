@@ -418,56 +418,65 @@ img { max-width: 100%; display: block; }
 .feature h3 { margin: 0 0 8px; font-size: 1.15rem; font-weight: 750; }
 .feature p { margin: 0; color: var(--text-2); font-size: 15px; }
 
-/* Scroll reveal: cards enter from left/right as they cross the viewport. */
+/* Scroll reveal: cards sweep in from left/right as they cross the viewport. */
 .feature.reveal-left, .feature.reveal-right {
   opacity: 0;
-  transition: opacity .6s ease, transform .6s cubic-bezier(.2,.7,.2,1);
+  transition: opacity .95s ease, transform .95s cubic-bezier(.22,1,.36,1);
   will-change: opacity, transform;
 }
-.feature.reveal-left { transform: translateX(-28px); }
-.feature.reveal-right { transform: translateX(28px); }
+.feature.reveal-left { transform: translateX(-60px); }
+.feature.reveal-right { transform: translateX(60px); }
 .feature.reveal-left.is-visible, .feature.reveal-right.is-visible {
   opacity: 1; transform: none;
 }
 
-/* ---------- Section-level scroll reveal ---------- */
-.sr { opacity: 0; transform: translateY(36px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); will-change: opacity, transform; }
-.sr.sr-left { transform: translateX(-40px); }
-.sr.sr-right { transform: translateX(40px); }
-.sr.is-visible { opacity: 1; transform: none; }
-
-/* Page hero entrance on load */
-.page-hero .container { animation: heroEnter .8s cubic-bezier(.2,.7,.2,1) both; }
-@keyframes heroEnter {
-  from { opacity: 0; transform: translateY(24px); }
-  to   { opacity: 1; transform: none; }
+/* ---------- Section ripple reveal ----------
+   Each heading / block inside a section rises in sequence with a spring. */
+.sr-elem {
+  opacity: 0; transform: translateY(56px) scale(.95);
+  transition: opacity 1s cubic-bezier(.22,1,.36,1), transform 1s cubic-bezier(.22,1,.36,1);
+  transition-delay: var(--d, 0s);
+  will-change: opacity, transform;
 }
+.sr-elem.is-visible { opacity: 1; transform: none; }
 
-/* Pricing grid card stagger */
-.pricing-grid .card { opacity: 0; transform: translateY(20px); transition: opacity .5s ease, transform .5s cubic-bezier(.2,.7,.2,1); }
-.pricing-grid .card.is-visible { opacity: 1; transform: none; }
-.pricing-grid .card:nth-child(1) { transition-delay: 0s; }
-.pricing-grid .card:nth-child(2) { transition-delay: .1s; }
-.pricing-grid .card:nth-child(3) { transition-delay: .2s; }
+/* Pricing grid card stagger — springy pop up */
+.pricing-grid .plan { opacity: 0; transform: translateY(48px) scale(.93); transition: opacity .7s cubic-bezier(.22,1,.36,1), transform .7s cubic-bezier(.22,1,.36,1); }
+.pricing-grid .plan.is-visible { opacity: 1; transform: none; }
+.pricing-grid .plan:nth-child(1) { transition-delay: 0s; }
+.pricing-grid .plan:nth-child(2) { transition-delay: .12s; }
+.pricing-grid .plan:nth-child(3) { transition-delay: .24s; }
 
 /* Billing toggle pulse on switch */
-.toggle-row button.active { animation: togglePop .25s ease; }
-@keyframes togglePop { 50% { transform: scale(1.05); } }
+.toggle-row button.active { animation: togglePop .38s ease; }
+@keyframes togglePop { 50% { transform: scale(1.09); } }
 
-/* Price anchor band entrance */
-.price-anchor { opacity: 0; transform: translateY(20px); transition: opacity .6s ease, transform .6s cubic-bezier(.2,.7,.2,1); }
-.price-anchor.is-visible { opacity: 1; transform: none; }
+/* Sticky Pro bar slides up */
+.sticky-pro { animation: stickyIn .5s cubic-bezier(.22,1,.36,1); }
+@keyframes stickyIn { from { opacity: 0; transform: translate(-50%, 26px) scale(.92); } to { opacity: 1; transform: translate(-50%, 0); } }
 
-/* Sticky Pro bar slide up */
-.sticky-pro { animation: stickyIn .35s cubic-bezier(.2,.7,.2,1); }
-@keyframes stickyIn { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+/* Download / Pro modal pop-in */
+.dl-overlay.open .dl-dialog { animation: dlPop .42s cubic-bezier(.22,1,.36,1); }
+@keyframes dlPop { from { opacity: 0; transform: scale(.88) translateY(24px); } to { opacity: 1; transform: none; } }
+
+/* Showcase window gently floats */
+.showcase-frame { animation: floatY 7s ease-in-out infinite; }
+@keyframes floatY { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+
+/* CTA primary button glow pulse */
+.cta-band .btn-ink { animation: glowPulse 2.8s ease-in-out infinite; }
+@keyframes glowPulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(255,255,255,.45); }
+  50%     { box-shadow: 0 0 0 16px rgba(255,255,255,0); }
+}
 
 /* ---------- Showcase ---------- */
-.showcase-wrap { display: grid; grid-template-columns: 1.3fr 1fr; gap: 48px; align-items: center; }
-.showcase-frame { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); box-shadow: 0 30px 80px rgba(0,0,0,.16); }
-.showcase-frame img { width: 100%; }
-.showcase-copy .section-sub { margin-bottom: 0; }
-.point { display: flex; gap: 14px; margin-top: 22px; align-items: flex-start; }
+.showcase-wrap { display: flex; flex-direction: column; gap: 40px; align-items: center; text-align: center; }
+.showcase-frame { width: 100%; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); box-shadow: 0 30px 80px rgba(0,0,0,.16); }
+.showcase-frame img { width: 100%; display: block; }
+.showcase-copy { max-width: 720px; }
+.showcase-copy .section-sub { margin-bottom: 0; margin-inline: auto; }
+.point { display: flex; gap: 14px; margin-top: 26px; align-items: flex-start; max-width: 640px; text-align: left; }
 .point .pico { width: 36px; height: 36px; flex: none; border-radius: 10px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 1px var(--border); }
 .point .pico svg { width: 18px; height: 18px; }
 .point .pico svg path, .point .pico svg rect, .point .pico svg polygon { stroke: var(--text); stroke-width: 1.7; fill: none; stroke-linecap: round; stroke-linejoin: round; }
@@ -736,7 +745,6 @@ img { max-width: 100%; display: block; }
   .nav { display: none; }
   .menu-btn { display: inline-flex; }
   .nav-overlay .nav { display: flex; }
-  .showcase-wrap { grid-template-columns: 1fr; }
   .footer-grid { grid-template-columns: 1fr 1fr; }
   .section { padding: 68px 0; }
   /* single-column feature cards get a bit more breathing room on tablets */
@@ -779,18 +787,14 @@ img { max-width: 100%; display: block; }
 /* reduced motion */
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
-  .feature, .hero-frame, .showcase-frame, .page-hero .container,
-  .sr, .pricing-grid .card, .price-anchor, .sticky-pro,
-  .toggle-row button.active { transition: none !important; animation: none !important; }
-  .hero-bg-slide { transition: opacity .6s ease !important; }
-  .feature .ico,
-  .feature .ico .ic .fill { animation: none !important; }
+  .feature, .hero-frame, .showcase-frame, .dl-dialog, .sticky-pro,
+  .toggle-row button.active, .cta-band .btn-ink { animation: none !important; transition: none !important; }
+  .sr-elem, .pricing-grid .plan { opacity: 1 !important; transform: none !important; transition: none !important; }
   .feature.reveal-left, .feature.reveal-right {
     opacity: 1 !important; transform: none !important; transition: none !important;
   }
-  .sr { opacity: 1 !important; transform: none !important; }
-  .pricing-grid .card { opacity: 1 !important; transform: none !important; }
-  .price-anchor { opacity: 1 !important; transform: none !important; }
+  .feature .ico,
+  .feature .ico .ic .fill { animation: none !important; }
   .feature:hover .ico .ic path,
   .feature:hover .ico .ic circle,
   .feature:hover .ico .ic line,

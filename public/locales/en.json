@@ -101,7 +101,8 @@
         "Unlimited local photos",
         "On-device AI search",
         "Automatic organization",
-        "Local sharing on your network"
+        "Local sharing on your network",
+        "Self-hosted remote access (DIY)"
       ],
       "cta": "Get started"
     },
@@ -109,12 +110,12 @@
       "name": "Pro",
       "price": "$5",
       "period": "per month",
-      "tagline": "Everything, everywhere.",
+      "tagline": "Everywhere, on any network.",
       "highlight": "Most popular",
       "features": [
         "Everything in Free",
-        "Instant sharing links to collections with others",
-        "Anyone, anywhere links",
+        "Sync & share over the internet — even on mobile data",
+        "Hosted relay, so you never touch router or NAT settings",
         "Early access to new features"
       ],
       "cta": "Go Pro",
@@ -149,6 +150,14 @@
       {
         "q": "How does sharing work?",
         "a": "You can share a collection over a live, end-to-end-encrypted link. Guests only see what you choose to share, and nothing is stored on our side."
+      },
+      {
+        "q": "Can I access my photos over mobile data or while traveling?",
+        "a": "Yes. Free users can point their app at a self-hosted relay on a machine they own (port-forwarding one UDP port). Pro's hosted relay does the same with zero setup — it works even on cellular networks that block direct connections."
+      },
+      {
+        "q": "Why do I need a relay at all?",
+        "a": "To connect over the internet, two devices have to find each other. Most home networks work out of the box, but some networks (especially mobile data) sit behind NATs a direct connection can't reach. A relay — TURN — forwards the encrypted stream between your devices when that happens. It never stores or reads your media."
       },
       {
         "q": "What platforms are supported?",

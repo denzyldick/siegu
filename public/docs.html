@@ -191,6 +191,7 @@
             <li><a href="#config-file-location">Config file location</a></li>
             <li><a href="#all-config-keys">All Config Keys</a></li>
             <li><a href="#cli-usage">CLI Usage</a></li>
+            <li><a href="#network-turn-host-environment-variables">Network / TURN (host environment variables)</a></li>
             </ul>
           </li>
           <li>
@@ -289,15 +290,18 @@
 <ul><li>No setup required</li><li>Works across networks (not just LAN)</li><li>Secure, encrypted connections</li></ul>
 <h4 id="self-hosted">Self-Hosted</h4>
 <p>Run your own signalling server. See <a href="https://github.com/denzyldick/siegu/tree/main/docs/signalling.md">SIGNALLING.md</a> for setup instructions.</p>
+<h4 id="over-the-internet-mobile-data">Over the internet / mobile data</h4>
+<p>Sharing across networks (including guests on <strong>cellular data</strong>) depends on the two devices finding a path to each other. When the networks block a direct connection (symmetric NAT, carrier-grade NAT on mobile data), a TURN relay carries the encrypted stream. You have two ways to provide one:</p>
+<ul><li><strong>Free, DIY</strong>: run a TURN relay on a machine you own and port-forward UDP/3478 — see <a href="https://github.com/denzyldick/siegu/tree/main/docs/turn.md">NAT Traversal &amp; TURN</a>.</li><li><strong>Pro</strong>: the hosted <code>siegu.io</code> relay includes TURN, so sharing works from any network with zero router configuration.</li></ul>
 <h3 id="desktop-app-local-for-now">Desktop App (local, for now)</h3>
-<p>The desktop app's <strong>Share Collection</strong> action (<code>… → Share Collection</code>) starts a local signalling + web server and generates a browser share link (<code>http://127.0.0.1:PORT/#CODE.TOKEN.ALBUM</code>). Opening it loads the view-only web client and shows only that collection; granting/copying/stopping happens right in the dialog. For now the link works on the same computer — cross-network sharing via the hosted <code>siegu.io</code> relay is the upcoming default (see <code>src/services/appConfig.ts</code> for the single base-domain switch).</p>
+<p>The desktop app's <strong>Share Collection</strong> action (<code>… → Share Collection</code>) starts a local signalling + web server and generates a browser share link (<code>http://127.0.0.1:PORT/#CODE.TOKEN.ALBUM</code>). Opening it loads the view-only web client and shows only that collection; granting/copying/stopping happens right in the dialog. For now the link works on the same computer — cross-network sharing goes through a signalling server (see <a href="#collection-sharing#sharing-requirements">Remote &amp; hosted</a> and the single base-domain switch in <code>src/services/appConfig.ts</code>).</p>
 <h3 id="what-the-viewer-can-see">What the Viewer Can See</h3>
 <ul><li><strong>Only the shared collection</strong> — the viewer cannot access other photos or collections</li><li><strong>Read-only</strong> — no editing, deleting, or modifying capabilities</li><li><strong>Streaming only</strong> — photos are not downloaded to the viewer's device</li></ul>
 <h3 id="what-the-viewer-cannot-see">What the Viewer Cannot See</h3>
 <ul><li>Other collections or the full library</li><li>File system paths or device information</li><li>AI analysis results (unless included in the stream)</li><li>Any metadata beyond what's in the shared photos</li></ul>
 <h3 id="privacy-security">Privacy &amp; Security</h3>
 <h4 id="data-flow">Data Flow</h4>
-<ol><li>Photos stream directly from your device to the viewer via WebRTC</li><li>No photos pass through any server</li><li>The signalling server only coordinates the connection (relays encrypted SDP/ICE data)</li></ol>
+<ol><li>Photos stream directly from your device to the viewer via WebRTC</li><li>No photos are stored anywhere in between</li><li>The signalling server only coordinates the connection (relays encrypted SDP/ICE data)</li><li>If no direct path exists, a TURN relay forwards the encrypted stream between the devices — it never stores or reads the content</li></ol>
 <h4 id="session-security">Session Security</h4>
 <ul><li>Sessions auto-expire after 30 minutes</li><li>All data is cleared from the viewer's browser when the session ends</li><li>Blob URLs are revoked to prevent cached access</li><li>The URL hash is cleared to prevent re-loading</li></ul>
 <h4 id="anti-crawling">Anti-Crawling</h4>
@@ -309,7 +313,7 @@
 <h4 id="session-ended-immediately">"Session ended" immediately</h4>
 <ul><li>The signalling server may not be running</li><li>Check that the URL is correct (includes CODE.TOKEN in the hash)</li></ul>
 <h4 id="photos-not-loading">Photos not loading</h4>
-<ul><li>Ensure both devices can reach the signalling server</li><li>Check firewall settings for WebRTC (STUN/TURN ports)</li><li>Try a different network if on restrictive WiFi</li></ul>
+<ul><li>Ensure both devices can reach the signalling server</li><li>Check firewall settings for WebRTC (STUN/TURN ports)</li><li>Try a different network if on restrictive WiFi</li><li>On mobile data, a TURN relay is usually required — see <a href="https://github.com/denzyldick/siegu/tree/main/docs/turn.md">NAT Traversal &amp; TURN</a></li></ul>
 <h4 id="viewer-sees-access-denied">Viewer sees "Access denied"</h4>
 <ul><li>The collection may not exist or the link may be expired</li><li>Ask the host to generate a new share link</li></ul>
 <h3 id="architecture">Architecture</h3>
@@ -416,6 +420,9 @@ siegu-cli config set theme dark
 # List all valid keys
 siegu-cli config keys</code></pre>
 <p>Config key validation: keys are whitelisted, values have type/range checking. Invalid values are rejected with a descriptive error.</p>
+<h3 id="network-turn-host-environment-variables">Network / TURN (host environment variables)</h3>
+<p>The host reads these from its environment when creating WebRTC connections, so guests behind restrictive networks (mobile data, carrier-grade NAT) can still connect through a relay. See <a href="https://github.com/denzyldick/siegu/tree/main/docs/turn.md">NAT Traversal &amp; TURN</a> for the full setup.</p>
+<div class="table-wrap"><table><thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>SIEGU_TURN_URLS</code></td><td>None</td><td>Comma-separated TURN URLs, e.g. <code>turn:home.example.com:3478</code></td></tr><tr><td><code>SIEGU_TURN_USERNAME</code></td><td>None</td><td>TURN username (only needed if the relay has auth)</td></tr><tr><td><code>SIEGU_TURN_CREDENTIAL</code></td><td>None</td><td>TURN password/credential</td></tr></tbody></table></div>
       </section>
 <section class="doc-section" id="security-privacy">
         <h2 class="doc-title">Security &amp; privacy</h2>
