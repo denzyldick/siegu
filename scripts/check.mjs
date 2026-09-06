@@ -160,7 +160,9 @@ async function main() {
       }
       if (page === 'index.html') {
         for (const id of ['searchTrigger', 'themeBtn', 'pricingGrid', 'faqList', 'heroBg', 'proModal', 'proPayBtn']) {
-          if (!html.includes(`id="${id}"`)) { fail(`index.html missing #${id}`); pageOk = false; }
+          if (!html.includes(`id="${id}"`) && !(id === 'heroBg' && /hero-video/.test(html))) {
+            fail(`index.html missing #${id}`); pageOk = false;
+          }
         }
       }
       // Mobile nav + skip link on content pages (404/thanks are minimal standalone pages)

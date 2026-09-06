@@ -160,9 +160,9 @@
   <main id="main">
     <!-- Hero -->
     <section class="hero" id="top">
-      <div class="hero-bg" id="heroBg" aria-hidden="true">
-        <!-- slide layers injected by js/main.js from /slides.json -->
-      </div>
+      <video class="hero-video" autoplay muted loop playsinline preload="metadata" poster="video/video-cover.png" aria-hidden="true">
+        <source src="video/siegu-intro.mp4" type="video/mp4" />
+      </video>
       <div class="hero-scrim" aria-hidden="true"></div>
       <div class="container hero-content">
         <span class="hero-badge"><span class="dot"></span><span data-i18n="hero.badge">Private by design · Local-first</span></span>
@@ -177,8 +177,6 @@
         </div>
         <p class="hero-trust" data-i18n="hero.trust">Free forever · No account. <a href="pricing.html" data-i18n="hero.see_pro">See Pro →</a></p>
       </div>
-      <div class="hero-dots" id="carouselDots" aria-label="Slides"></div>
-      <span class="sr-only" id="heroSlideAnnouncer" aria-live="polite"></span>
     </section>
 
     <!-- Platform strip -->
