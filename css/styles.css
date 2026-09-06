@@ -821,6 +821,14 @@ img { max-width: 100%; display: block; }
 .footer-legal a { color: var(--text-muted, #a1a1aa); }
 .footer-legal a + a { margin-left: 14px; }
 
+/* Video page */
+.video-stage { max-width: 960px; margin: 0 auto; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: #000; box-shadow: 0 30px 80px rgba(0,0,0,.25); }
+.video-stage video { display: block; width: 100%; aspect-ratio: 16/9; background: #000; }
+.video-frames { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-width: 960px; margin: 28px auto 0; }
+.video-frames img { width: 100%; border-radius: 12px; border: 1px solid var(--border); }
+.page-body .video-stage a, .page-body .video-stage a:visited { color: #a1a1aa; text-decoration: underline; }
+@media (max-width: 640px) { .video-frames { grid-template-columns: 1fr; } }
+
 /* GitHub stars badge (filled by JS from public repo API) */
 .gh-stars { display: none; white-space: nowrap; color: var(--text-2); font-size: 13px; }
 .gh-stars[aria-hidden="false"] { display: inline; }
