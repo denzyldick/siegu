@@ -56,6 +56,7 @@ if (STRICT) {
 
 const placeholders = {
   __GA_MEASUREMENT_ID__: process.env.GA_MEASUREMENT_ID || '',
+  __CLARITY_PROJECT_ID__: process.env.CLARITY_PROJECT_ID || '',
   __STRIPE_PRO_PAYMENT_LINK_MONTHLY__: monthly,
   __STRIPE_PRO_PAYMENT_LINK_YEARLY__: yearly,
 };

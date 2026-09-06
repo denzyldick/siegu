@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Siegu Privacy Policy & Terms — your photos stay on your device</title>
-  <meta name="description" content="Siegu privacy policy and terms of use: your photos never leave your device, no accounts, no telemetry, open source. This website uses analytics and Formspree for emails." />
+  <meta name="description" content="Siegu privacy policy and terms of use: your photos never leave your device, no accounts, no telemetry, open source. This website uses consent-gated analytics and Formspree for emails." />
   <script>
     (function () {
       try {
@@ -20,14 +20,14 @@
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Siegu" />
   <meta property="og:title" content="Siegu Privacy Policy & Terms — your photos stay on your device" />
-  <meta property="og:description" content="Siegu privacy policy and terms of use: your photos never leave your device, no accounts, no telemetry, open source. This website uses analytics and Formspree for emails." />
+  <meta property="og:description" content="Siegu privacy policy and terms of use: your photos never leave your device, no accounts, no telemetry, open source. This website uses consent-gated analytics and Formspree for emails." />
   <meta property="og:url" content="https://denzyldick.github.io/siegu/privacy.html" />
   <meta property="og:image" content="https://denzyldick.github.io/siegu/social-card.jpg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Siegu Privacy Policy & Terms — your photos stay on your device" />
-  <meta name="twitter:description" content="Siegu privacy policy and terms of use: your photos never leave your device, no accounts, no telemetry, open source. This website uses analytics and Formspree for emails." />
+  <meta name="twitter:description" content="Siegu privacy policy and terms of use: your photos never leave your device, no accounts, no telemetry, open source. This website uses consent-gated analytics and Formspree for emails." />
   <meta name="twitter:image" content="https://denzyldick.github.io/siegu/social-card.jpg" />
 
   <!-- SEO -->
@@ -151,7 +151,7 @@
           <p>To reach devices that aren't on the same network, Siegu can use a signalling server (the default is <code>wss://siegu.io/ws</code>, and you can self-host your own or point the app at any URL). Its only job is to introduce two of your devices to each other: it relays the brief WebRTC offer/answer/ICE handshake &mdash; just connection details, nothing else. Once the peer-to-peer link is established, your photos and videos travel directly between your devices over an end-to-end encrypted channel, and the signalling server is out of the data path. It never sees file contents, metadata, or manifests. On the same LAN, Siegu uses a built-in server embedded in the app instead, so no external server is involved at all.</p>
 
           <h3>This website</h3>
-          <p>This website uses Google Analytics to understand which pages are visited and roughly where visitors come from. It records aggregate, anonymized page-view traffic over HTTPS &mdash; no photo content ever touches it. If your browser blocks the tracker or you browse with cookies disabled, no data is sent at all.</p>
+          <p>This website uses Google Analytics and Microsoft Clarity &mdash; but only after you accept the consent banner. Google Analytics counts which pages are useful and roughly where visitors come from, as aggregate data. Microsoft Clarity records heatmaps and anonymized session replays so we can spot where the page is confusing. Both run over HTTPS, never touch photo content, and nothing at all is loaded if you decline or make no choice. You can change your mind any time via the &ldquo;cookie preferences&rdquo; link in the footer.</p>
 
           <h3>Waitlist emails</h3>
           <p>If you join the waitlist via the family-plan form, the address you type is sent to Formspree (our form processor) and used solely to notify you when it launches. You can ask to be removed at any time by replying to any email.</p>
@@ -211,7 +211,10 @@
       </div>
       <div class="footer-bottom">
         <span>© <span id="year"></span> siegu. <span data-i18n="footer.rights">All rights reserved.</span></span>
-        <a href="privacy.html" data-i18n="footer.legal">Privacy & Terms</a>
+        <span class="footer-legal">
+          <a href="#" data-cookie-prefs>Cookie preferences</a>
+          <a href="privacy.html" data-i18n="footer.legal">Privacy & Terms</a>
+        </span>
       </div>
     </div>
   </footer>

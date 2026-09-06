@@ -747,3 +747,22 @@ img { max-width: 100%; display: block; }
   .feature:hover .ico .ic polyline,
   .feature:hover .ico .ic rect { animation: none !important; stroke-dashoffset: 0 !important; }
 }
+
+/* ---------- Analytics consent banner ---------- */
+.consent-banner {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: 18px; z-index: 1200; width: min(720px, calc(100vw - 32px));
+  display: flex; align-items: center; gap: 18px; justify-content: space-between;
+  flex-wrap: wrap;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px 18px; box-shadow: 0 12px 40px rgba(0, 0, 0, .28);
+  font-size: 14px; line-height: 1.5;
+}
+.consent-banner.is-hidden { display: none; }
+.consent-text { flex: 1 1 380px; margin: 0; }
+.consent-text a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+.consent-actions { display: flex; gap: 10px; flex: 0 0 auto; }
+.consent-actions .btn-ghost { background: transparent; }
+.footer-legal a { color: var(--text-muted, #a1a1aa); }
+.footer-legal a + a { margin-left: 14px; }

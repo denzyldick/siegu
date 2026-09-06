@@ -139,7 +139,10 @@ async function main() {
         if (!/data-i18n=/.test(html)) { fail(`${page}: no data-i18n hooks`); pageOk = false; }
       }
       const footer = html.slice(html.indexOf('<footer')).slice(0, 20000);
-      if (/href="#"/.test(footer)) { fail(`${page}: dead href="#" in footer`); pageOk = false; }
+      /* href="#" is only valid on the JS-driven cookie-preferences link. */
+      const deadFooter = [...footer.matchAll(/<a[^>]*href="#"([^>]*)>/gi)];
+      const badFooter = deadFooter.filter((m) => !m[0].includes('data-cookie-prefs'));
+      if (badFooter.length) { fail(`${page}: dead href="#" in footer`); pageOk = false; }
       // Local link checker: ignore cross-page canonical <link> and external URLs.
       const localLinks = [...html.matchAll(/href="((?!https?:\/\/)[^"#]+\.html(?:#[^"']*)?)"/g)].map((m) => m[1].split('#')[0]);
       for (const link of new Set(localLinks)) {

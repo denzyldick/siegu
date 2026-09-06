@@ -109,3 +109,9 @@ GA4 is only enabled when `SIEGU_GA_ID` is a real `G-…` measurement ID (baked
 into `js/main.js` at build time; placeholder/unset keeps GA off, including for
 `npm run dev`). CTA clicks are sent as GA4 `cta` events with
 `cta_name` + `locale`.
+
+Analytics consent: nothing loads until a visitor accepts the consent banner
+(choice persisted in `localStorage[siegu_consent]`). Decline blocks every
+tracking script. `CLARITY_PROJECT_ID` enables Microsoft Clarity (heatmaps +
+session replays) under the same consent gate — pass it as an env var or GitHub
+secret like the others.

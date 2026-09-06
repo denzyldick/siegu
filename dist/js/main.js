@@ -207,20 +207,106 @@ function cycleTheme() {
    or absent, GA stays off — including under plain `npm run dev`. */
 const GA_MEASUREMENT_ID = '';
 const GA_ENABLED = /^G-[A-Z0-9]+$/.test(GA_MEASUREMENT_ID);
+const CLARITY_PROJECT_ID = '';
+const CLARITY_ENABLED = /^[a-z0-9]+$/i.test(CLARITY_PROJECT_ID);
 
 function trackersOn() {
   state.trackersOn = true;
-  if (!GA_ENABLED) return;
-  const s = document.createElement('script');
-  s.async = true;
-  s.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
-  document.head.appendChild(s);
-  window.dataLayer = window.dataLayer || [];
-  window.gtag = function () {
-    window.dataLayer.push(arguments);
-  };
-  window.gtag('js', new Date());
-  window.gtag('config', GA_MEASUREMENT_ID);
+  if (GA_ENABLED) {
+    const s = document.createElement('script');
+    s.async = true;
+    s.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
+    document.head.appendChild(s);
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () {
+      window.dataLayer.push(arguments);
+    };
+    window.gtag('js', new Date());
+    window.gtag('config', GA_MEASUREMENT_ID);
+  }
+  if (CLARITY_ENABLED) {
+    (function (c, l, a, r, i, t, y) {
+      c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
+      t = l.createElement(r);
+      t.async = 1;
+      t.src = 'https://www.clarity.ms/tag/' + i;
+      y = l.getElementsByTagName(r)[0];
+      y.parentNode.insertBefore(t, y);
+    })(window, document, 'clarity', 'script', CLARITY_PROJECT_ID);
+  }
+}
+
+/* ---------- Analytics consent ----------
+   Siegu promises no telemetry — and this website honors that too. Google
+   Analytics only loads after the visitor explicitly accepts the consent
+   banner (choice persisted in localStorage). Declining — or ignoring it —
+   means no analytics script ever loads, no cookies, nothing sent. The
+   dataLayer wiring stays inert until consent is granted. */
+const CONSENT_KEY = 'siegu_consent';
+
+function readConsent() {
+  try {
+    return localStorage.getItem(CONSENT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function applyConsent(value) {
+  try {
+    localStorage.setItem(CONSENT_KEY, value);
+  } catch { /* private mode: choice lasts this session only */ }
+  const band = document.getElementById('consentBanner');
+  if (band) band.classList.add('is-hidden');
+  if (value === 'granted') trackersOn();
+}
+
+function ensureConsentBanner() {
+  if (document.getElementById('consentBanner') || (!GA_ENABLED && !CLARITY_ENABLED)) return;
+  const band = document.createElement('div');
+  band.id = 'consentBanner';
+  band.setAttribute('role', 'dialog');
+  band.setAttribute('aria-label', 'Cookie consent');
+  band.classList.add('consent-banner');
+  band.innerHTML = [
+    '<p class="consent-text">Siegu never tracks your photos — not in the app, and on this site we only use privacy-respecting analytics',
+    'if you say yes. We use Google Analytics to count visits and Microsoft Clarity to spot where the page could be more helpful.',
+    'No photo content ever touches them. <a href="privacy.html">Privacy&nbsp;policy</a></p>',
+    '<div class="consent-actions">',
+    '  <button type="button" class="btn-ghost" data-consent="decline">Decline</button>',
+    '  <button type="button" class="btn btn-ink" data-consent="accept">Accept</button>',
+    '</div>',
+  ].join(' ');
+  document.body.appendChild(band);
+  band.querySelectorAll('[data-consent]').forEach((btn) => {
+    btn.addEventListener('click', () => applyConsent(btn.dataset.consent === 'accept' ? 'granted' : 'denied'));
+  });
+}
+
+function reopenConsent(e) {
+  if (!e.target.closest('[data-cookie-prefs]')) return;
+  e.preventDefault();
+  try {
+    localStorage.removeItem(CONSENT_KEY);
+  } catch { /* ignore */ }
+  if (GA_ENABLED || CLARITY_ENABLED) {
+    ensureConsentBanner();
+    const band = document.getElementById('consentBanner');
+    if (band) band.classList.remove('is-hidden');
+  }
+}
+
+function initConsent() {
+  const band = document.getElementById('consentBanner');
+  const choice = readConsent();
+  if (choice === 'granted') {
+    if (band) band.classList.add('is-hidden');
+    trackersOn();
+    return;
+  }
+  if (choice === 'denied') return; /* nothing ever loads */
+  ensureConsentBanner(); /* no choice yet — ask */
+  document.addEventListener('click', reopenConsent);
 }
 
 /* ---------- Pro checkout (Stripe Payment Links) ----------
@@ -229,8 +315,8 @@ function trackersOn() {
    side. A build script (scripts/build-static.mjs) substitutes the real links
    into these placeholders. Monthly and Yearly are separate prices (Yearly is
    ~20% off), so the Pro button hands off to whichever period is selected. */
-const STRIPE_PRO_PAYMENT_LINK_MONTHLY = 'https://buy.stripe.com/test_cNiaEX8HIdZc1e7fLL9MY00';
-const STRIPE_PRO_PAYMENT_LINK_YEARLY = 'https://buy.stripe.com/test_cNieVd3nocV8cWP2YZ9MY01';
+const STRIPE_PRO_PAYMENT_LINK_MONTHLY = '';
+const STRIPE_PRO_PAYMENT_LINK_YEARLY = '';
 // The currently-selected period is read from state.billing by proPaymentLink().
 function proPaymentLink() {
   return state.billing === 'yearly'

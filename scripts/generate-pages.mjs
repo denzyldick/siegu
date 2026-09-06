@@ -186,7 +186,10 @@ const TAIL = `  </main>
       </div>
       <div class="footer-bottom">
         <span>© <span id="year"></span> siegu. <span data-i18n="footer.rights">All rights reserved.</span></span>
-        <a href="privacy.html" data-i18n="footer.legal">Privacy & Terms</a>
+        <span class="footer-legal">
+          <a href="#" data-cookie-prefs>Cookie preferences</a>
+          <a href="privacy.html" data-i18n="footer.legal">Privacy & Terms</a>
+        </span>
       </div>
     </div>
   </footer>
@@ -628,7 +631,7 @@ const PRIVACY_MAIN = `
           <p>To reach devices that aren't on the same network, Siegu can use a signalling server (the default is <code>wss://siegu.io/ws</code>, and you can self-host your own or point the app at any URL). Its only job is to introduce two of your devices to each other: it relays the brief WebRTC offer/answer/ICE handshake &mdash; just connection details, nothing else. Once the peer-to-peer link is established, your photos and videos travel directly between your devices over an end-to-end encrypted channel, and the signalling server is out of the data path. It never sees file contents, metadata, or manifests. On the same LAN, Siegu uses a built-in server embedded in the app instead, so no external server is involved at all.</p>
 
           <h3>This website</h3>
-          <p>This website uses Google Analytics to understand which pages are visited and roughly where visitors come from. It records aggregate, anonymized page-view traffic over HTTPS &mdash; no photo content ever touches it. If your browser blocks the tracker or you browse with cookies disabled, no data is sent at all.</p>
+          <p>This website uses Google Analytics and Microsoft Clarity &mdash; but only after you accept the consent banner. Google Analytics counts which pages are useful and roughly where visitors come from, as aggregate data. Microsoft Clarity records heatmaps and anonymized session replays so we can spot where the page is confusing. Both run over HTTPS, never touch photo content, and nothing at all is loaded if you decline or make no choice. You can change your mind any time via the &ldquo;cookie preferences&rdquo; link in the footer.</p>
 
           <h3>Waitlist emails</h3>
           <p>If you join the waitlist via the family-plan form, the address you type is sent to Formspree (our form processor) and used solely to notify you when it launches. You can ask to be removed at any time by replying to any email.</p>
@@ -883,7 +886,7 @@ const PAGES = [
     file: 'privacy.html',
     active: 'privacy.html',
     title: 'Siegu Privacy Policy & Terms — your photos stay on your device',
-    description: 'Siegu privacy policy and terms of use: your photos never leave your device, no accounts, no telemetry, open source. This website uses analytics and Formspree for emails.',
+    description: 'Siegu privacy policy and terms of use: your photos never leave your device, no accounts, no telemetry, open source. This website uses consent-gated analytics and Formspree for emails.',
     keywords: 'siegu privacy, siegu terms, photo app privacy policy, local-first privacy, siegu legal',
     url: `${BASE}/privacy.html`,
     schema: `{
