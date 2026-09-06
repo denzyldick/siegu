@@ -317,6 +317,9 @@ function initConsent() {
    ~20% off), so the Pro button hands off to whichever period is selected. */
 const STRIPE_PRO_PAYMENT_LINK_MONTHLY = '';
 const STRIPE_PRO_PAYMENT_LINK_YEARLY = '';
+// Launch-only lifetime offer. Hidden until a real Stripe link is baked in.
+const FOUNDING_PRO_PAYMENT_LINK = '';
+const FOUNDING_ENABLED = /^https:\/\/(?:buy|checkout)\.stripe\.com\//i.test(FOUNDING_PRO_PAYMENT_LINK);
 // The currently-selected period is read from state.billing by proPaymentLink().
 function proPaymentLink() {
   return state.billing === 'yearly'
@@ -474,6 +477,14 @@ function buildProDialog() {
   if (price) price.innerHTML = `$${proPriceFor()}<small> ${state.billing === 'yearly' ? '/year' : '/month'}</small>`;
   const pay = document.getElementById('proPayBtn');
   if (pay) pay.setAttribute('href', STRIPE_PAYMENT_RE.test(proPaymentLink()) ? proPaymentLink() : '#');
+  const founding = document.getElementById('proFounding');
+  const foundingBtn = document.getElementById('proFoundingBtn');
+  if (FOUNDING_ENABLED) {
+    if (founding) founding.hidden = false;
+    if (foundingBtn) foundingBtn.setAttribute('href', FOUNDING_PRO_PAYMENT_LINK);
+  } else if (founding) {
+    founding.hidden = true;
+  }
 }
 
 
@@ -546,6 +557,43 @@ function initTracking() {
 
     pushEvent('cta', { cta_name: trackName, locale: state.locale });
   });
+}
+
+/* GitHub stars — public repo API, no cookies, not a tracker. Silent on failure. */
+async function loadGitHubStars() {
+  const el = document.getElementById('ghStars');
+  if (!el) return;
+  try {
+    const res = await fetch('https://api.github.com/repos/denzyldick/siegu');
+    if (!res.ok) return;
+    const repo = await res.json();
+    const n = repo.stargazers_count;
+    if (typeof n === 'number') {
+      el.textContent = `\u2605 ${n} stars on GitHub`;
+      el.setAttribute('aria-hidden', 'false');
+    }
+  } catch (e) { /* offline or rate-limited: keep stars row hidden */ }
+}
+
+/* Money pages: sticky "Go Pro" bar appears after the pricing grid scrolls by. */
+function setupStickyPro() {
+  const bar = document.getElementById('stickyPro');
+  const grid = document.getElementById('pricingGrid');
+  if (!bar || !grid) return;
+  const onScroll = () => {
+    const r = grid.getBoundingClientRect();
+    const below = r.top < window.innerHeight * 0.4 && r.bottom < window.innerHeight * 0.3;
+    bar.hidden = !below;
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+}
+
+/* Launch offer: show the Lifetime-Pro notes only when a real link is baked in. */
+function setupFoundingOffer() {
+  if (FOUNDING_ENABLED) {
+    document.querySelectorAll('[data-founding]').forEach((el) => { el.hidden = false; });
+  }
 }
 
 /* ---------- Hero slide show ---------- */
@@ -1005,6 +1053,10 @@ async function boot() {
   // Trackers only load after explicit consent (accept banner); declined or
   // unanswered = nothing ever loads.
   initConsent();
+
+  loadGitHubStars();
+  setupStickyPro();
+  setupFoundingOffer();
 
   initReveal();
 }

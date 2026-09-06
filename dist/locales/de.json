@@ -228,5 +228,10 @@
   "connect": {
     "title": "Siegu Connect",
     "subtitle": "Private sync and sharing for you and your family"
-  }
+  },
+  "pricing.guarantee": "14-day money-back guarantee on every paid plan — no questions asked.",
+  "pricing.anchor_title": "Google Photos charges by the gigabyte, and it sees whatever you upload.",
+  "pricing.anchor_body": "Siegu is a flat fee for a private, infinite library that lives on your device. Pay once — upgrades included. Your memories aren't training data.",
+  "pricing.anchor_cta": "See the comparison",
+  "pricing.sticky": "Save 20% with the annual plan — cancel anytime."
 }

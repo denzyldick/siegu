@@ -766,3 +766,38 @@ img { max-width: 100%; display: block; }
 .consent-actions .btn-ghost { background: transparent; }
 .footer-legal a { color: var(--text-muted, #a1a1aa); }
 .footer-legal a + a { margin-left: 14px; }
+
+/* GitHub stars badge (filled by JS from public repo API) */
+.gh-stars { display: none; white-space: nowrap; color: var(--text-2); font-size: 13px; }
+.gh-stars[aria-hidden="false"] { display: inline; }
+
+/* Money-back guarantee note */
+.guarantee { margin-top: 8px; font-weight: 600; color: var(--text-2); }
+
+/* Google Photos anchor band */
+.price-anchor {
+  display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  margin: 32px auto 0; padding: 20px 24px; border-radius: var(--radius);
+  border: 1px solid var(--line); background: var(--card);
+}
+.price-anchor .sub { margin: 0; color: var(--text-2); }
+.price-anchor .btn { flex: 0 0 auto; }
+
+/* Sticky Pro CTA (appears after pricing grid scrolls off screen) */
+.sticky-pro {
+  position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%);
+  z-index: 999; display: flex; gap: 14px; align-items: center;
+  padding: 10px 20px; border-radius: 999px;
+  background: var(--card); border: 1px solid var(--line);
+  box-shadow: 0 8px 30px rgba(0,0,0,.25);
+  color: var(--text-1); font-size: 14px; white-space: nowrap;
+  animation: fadeIn .3s ease;
+}
+.sticky-pro[hidden] { display: none; }
+
+/* Founding / lifetime launch note */
+.founding-note { margin: 20px auto 0; font-size: 14px; color: var(--text-2); }
+.founding-note[hidden] { display: none; }
+.pro-founding { margin: 8px 0 0; font-size: 14px; color: var(--text-2); }
+.pro-founding[hidden] { display: none; }
+.pro-founding a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }

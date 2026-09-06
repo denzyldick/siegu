@@ -138,7 +138,11 @@ async function main() {
         if (!/js\/main\.js/.test(html)) { fail(`${page}: missing js/main.js`); pageOk = false; }
         if (!/data-i18n=/.test(html)) { fail(`${page}: no data-i18n hooks`); pageOk = false; }
       }
-      const footer = html.slice(html.indexOf('<footer')).slice(0, 20000);
+      const footerStart = html.indexOf('<footer');
+      const footerEnd = html.indexOf('</footer>', footerStart);
+      const footer = footerStart >= 0 && footerEnd > footerStart
+        ? html.slice(footerStart, footerEnd + 9)
+        : html.slice(footerStart, footerStart + 20000);
       /* href="#" is only valid on the JS-driven cookie-preferences link. */
       const deadFooter = [...footer.matchAll(/<a[^>]*href="#"([^>]*)>/gi)];
       const badFooter = deadFooter.filter((m) => !m[0].includes('data-cookie-prefs'));

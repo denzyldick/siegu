@@ -43,6 +43,7 @@ function bail(message) {
 
 const monthly = process.env.STRIPE_PRO_PAYMENT_LINK_MONTHLY || '';
 const yearly = process.env.STRIPE_PRO_PAYMENT_LINK_YEARLY || '';
+const founding = process.env.FOUNDING_PRO_PAYMENT_LINK || '';
 
 if (STRICT) {
   if (!STRIPE_URL_RE.test(monthly)) bail('STRIPE_PRO_PAYMENT_LINK_MONTHLY is missing or not a buy.stripe.com URL.');
@@ -59,6 +60,7 @@ const placeholders = {
   __CLARITY_PROJECT_ID__: process.env.CLARITY_PROJECT_ID || '',
   __STRIPE_PRO_PAYMENT_LINK_MONTHLY__: monthly,
   __STRIPE_PRO_PAYMENT_LINK_YEARLY__: yearly,
+  __FOUNDING_PRO_PAYMENT_LINK__: founding,
 };
 
 async function main() {

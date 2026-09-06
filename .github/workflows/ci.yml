@@ -50,6 +50,7 @@ jobs:
           STRIPE_PRO_PAYMENT_LINK_YEARLY: ${{ secrets.STRIPE_PRO_PAYMENT_LINK_YEARLY }}
           GA_MEASUREMENT_ID: ${{ secrets.GA_MEASUREMENT_ID }}
           CLARITY_PROJECT_ID: ${{ secrets.CLARITY_PROJECT_ID }}
+          FOUNDING_PRO_PAYMENT_LINK: ${{ secrets.FOUNDING_PRO_PAYMENT_LINK }}
         run: npm run build:strict
 
       - name: Payment regression guard — fail if Pay button would be inert

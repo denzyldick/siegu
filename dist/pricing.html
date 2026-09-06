@@ -142,6 +142,7 @@
           <span data-i18n="trust.open_source">Open source</span><span class="tdot">·</span>
           <span data-i18n="trust.no_uploads">No uploads</span><span class="tdot">·</span>
           <span data-i18n="trust.local">Your photos never leave your device</span>
+          <span class="tdot">·</span><span class="gh-stars" id="ghStars" aria-hidden="true"></span>
         </div>
         <div class="toggle-row" id="billingToggle">
           <button type="button" data-period="monthly" data-i18n="pricing.toggle.monthly">Monthly</button>
@@ -154,8 +155,27 @@
           <!-- Plan cards injected by js/main.js -->
         </div>
         <p class="pricing-note center" data-i18n="pricing.note">Prices in USD. Cancel anytime. No extra fees for more photos.</p>
+        <p class="pricing-note center guarantee" data-i18n="pricing.guarantee">14-day money-back guarantee on every paid plan — no questions asked.</p>
       </div>
     </section>
+
+    <section class="section page-body">
+      <div class="container">
+        <div class="price-anchor">
+          <div>
+            <h2 data-i18n="pricing.anchor_title">Google Photos charges by the gigabyte, and it sees whatever you upload.</h2>
+            <p class="sub" data-i18n="pricing.anchor_body">Siegu is a flat fee for a private, infinite library that lives on your device. Pay once — upgrades included. Your memories aren&rsquo;t training data.</p>
+          </div>
+          <a class="btn btn-ghost btn-lg" href="compare.html" data-i18n="pricing.anchor_cta">See the comparison</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="sticky-pro" id="stickyPro" hidden>
+      <span data-i18n="pricing.sticky">Save 20% with the annual plan — cancel anytime.</span>
+      <a class="btn btn-ink btn-sm" data-action="open-pro" data-track="cta_upgrade" role="button" data-i18n="cta.upgrade">Upgrade to Pro</a>
+    </div>
+    <p class="founding-note center" id="foundingNote" hidden data-founding>Launch offer: <strong>Lifetime Pro for $99</strong> — one-time, yours forever. <a data-action="open-pro" role="button">Claim it</a></p>
   </main>
 
   <footer class="site-footer">
@@ -219,6 +239,9 @@
         <span class="pro-price" id="proPrice">$9.99<span data-i18n="pro.per_month"> /month</span></span>
         <a class="btn btn-ink btn-lg" id="proPayBtn" data-track="upgrade_clicked" target="_blank" rel="noopener" data-i18n="pro.pay">Pay with card</a>
       </div>
+      <p class="pro-founding" id="proFounding" hidden data-founding>
+        <a id="proFoundingBtn" target="_blank" rel="noopener">Or get <strong>Lifetime Pro</strong> for $99 &mdash; one-time payment, yours forever.</a>
+      </p>
       <p class="dl-note" data-i18n="pro.note">Secure checkout by Stripe. Cancel anytime.</p>
     </div>
   </div>
