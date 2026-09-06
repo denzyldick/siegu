@@ -23,8 +23,10 @@ jobs:
 
       - name: Regenerated subpages must match what was committed
         run: |
-          npm run build:pages
-          git diff --exit-code -- public/about.html public/blog.html public/changelog.html public/compare.html public/docs.html public/download.html public/faq.html public/pricing.html public/privacy.html public/roadmap.html
+          # docs.html is excluded: it's built from the external siegu app-repo docs
+          # (../siegu/docs), which doesn't exist in CI, so it can't be reproduced there.
+          SIEGU_APP_DOCS=/nonexistent npm run build:pages
+          git diff --exit-code -- public/about.html public/blog.html public/changelog.html public/compare.html public/download.html public/faq.html public/pricing.html public/privacy.html public/roadmap.html
 
       - name: Static build must succeed (dev mode, no secrets)
         run: npm run build
