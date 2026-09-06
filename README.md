@@ -2,6 +2,12 @@
 
 > **Your photo library, finally all in one place — and it stays on your device.**
 
+[![Website](https://img.shields.io/badge/website-siegu.io-0b0b0b?style=flat-square&logo=readme&logoColor=white)](https://denzyldick.github.io/siegu/)
+[![GitHub Stars](https://img.shields.io/github/stars/denzyldick/siegu?style=flat-square&logo=github)](https://github.com/denzyldick/siegu/stargazers)
+[![License](https://img.shields.io/github/license/denzyldick/siegu?style=flat-square)](LICENSE)
+
+**Learn more, browse screenshots, and support the project (Pro / Family plans) at [siegu.io](https://denzyldick.github.io/siegu/).**
+
 ![Siegu gallery](docs/img/gallery.png)
 
 Siegu (say it *see-goo*) is a **private, local-first photo and video manager**
