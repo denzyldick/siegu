@@ -101,7 +101,8 @@
         "Fotos locales ilimitadas",
         "Búsqueda IA en el dispositivo",
         "Organización automática",
-        "Uso compartido local en tu red"
+        "Uso compartido local en tu red",
+        "Acceso remoto autoalojado (DIY)"
       ],
       "cta": "Empezar"
     },
@@ -109,12 +110,12 @@
       "name": "Pro",
       "price": "$5",
       "period": "por mes",
-      "tagline": "Todo, en todas partes.",
+      "tagline": "En todas partes, en cualquier red.",
       "highlight": "Más popular",
       "features": [
         "Todo en Gratis",
-        "Enlaces de uso compartido instantáneos hacia colecciones con otros",
-        "Enlaces para cualquiera, en cualquier lugar",
+        "Sincroniza y comparte por internet — incluso con datos móviles",
+        "Relay alojado, sin tocar el router ni el NAT",
         "Acceso temprano a nuevas funciones"
       ],
       "cta": "Ir a Pro",
@@ -149,6 +150,14 @@
       {
         "q": "¿Cómo funciona compartir?",
         "a": "Puedes compartir una colección mediante un enlace cifrado de extremo a extremo y en vivo. Los invitados solo ven lo que eliges compartir, y nada se guarda en nuestro lado."
+      },
+      {
+        "q": "¿Puedo acceder a mis fotos con datos móviles o de viaje?",
+        "a": "Sí. Los usuarios gratis pueden apuntar su app a un relay autoalojado en una máquina propia (abriendo un puerto UDP). El relay alojado de Pro hace lo mismo sin configuración — funciona incluso en redes móviles que bloquean conexiones directas."
+      },
+      {
+        "q": "¿Por qué necesito un relay?",
+        "a": "Para conectarse por internet, dos dispositivos tienen que encontrarse. La mayoría de las redes domésticas funcionan a la primera, pero algunas (sobre todo los datos móviles) están detrás de NAT a los que una conexión directa no llega. Un relay — TURN — reenvía el flujo cifrado entre tus dispositivos cuando eso ocurre. Nunca guarda ni lee tu contenido."
       },
       {
         "q": "¿Qué plataformas son compatibles?",

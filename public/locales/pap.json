@@ -101,7 +101,8 @@
         "Fotonan lokal sin límite",
         "Búskeda IA riba e aparato",
         "Organisashon automátiko",
-        "Kompartí lokal riba bo red"
+        "Kompartí lokal riba bo red",
+        "Akseso remoto di bo mes (DIY)"
       ],
       "cta": "Kuminsá"
     },
@@ -109,12 +110,12 @@
       "name": "Pro",
       "price": "$5",
       "period": "pa luna",
-      "tagline": "Tur kos, na tur kaminda.",
+      "tagline": "Na tur kaminda, riba kualkier red.",
       "highlight": "Mas popular",
       "features": [
         "Tur kos na Gratis",
-        "Link di kompartí den momentu pa kolekshon ku otro",
-        "Link pa ken ku sea, na unda ku sea",
+        "Sinkronisá i kompartí via internet — asta na data mobiel",
+        "Relay manehá, sin mester di toka router of NAT",
         "Akceso avaná na funshon nobo"
       ],
       "cta": "Bai Pro",
@@ -149,6 +150,14 @@
       {
         "q": "Kon e kompartí ta traha?",
         "a": "Bo por kompartí un kolekshon via un link kriptá di ekstremo na ekstremo i na bibo. Huespednan ta mira solamente loke bo skohe pa kompartí, i nada no ta wòrdu warda na nos lado."
+      },
+      {
+        "q": "Por mi mira mi fotonan na data mobiel of biahe?",
+        "a": "Sí. Usuario gratis por apuntá nan app na un relay di nan mes riba un mákina ku nan (un port UDP pa drechá). Relay manehá di Pro ta hasi meskos sin konfigurashon — e ta traha asta riba rednan mobiel ku ta blôk konekshonnan direktó."
+      },
+      {
+        "q": "Pakiko mester di un relay?",
+        "a": "Pa konektá via internet, dos aparato mester haña otro. Mayoria red di kas ta traha direktó, pero algun (prinsipalmente data mobiel) ta tras di NAT ku un konekshon direktó no por yega. Un relay — TURN — ta pasa e stream kriptá entre bo aparatonan ora esei sosodé. E nunka ta warda ni lesa bo media."
       },
       {
         "q": "Kua plataforma ta soportá?",
