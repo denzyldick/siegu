@@ -7,7 +7,7 @@
  * Built on {@link PeerTransport} so the correlation + media logic is testable
  * with a fake transport.
  */
-import { FileAssembler } from './protocol';
+import { FileAssembler, b64ToBytes } from './protocol';
 import type { GuestInbound, GuestOutbound } from './protocol';
 import type { MediaItem, ListFilesOptions } from '@/types/media';
 import type { SearchFacetsData } from '@/types/search';
@@ -209,9 +209,7 @@ export class GuestClient {
       case 'ViewMedia': {
         // Mirror webclient/main.ts: base64 image delivered inline (thumbnails).
         const id = msg.id;
-        const raw = atob(msg.data);
-        const bytes = new Uint8Array(raw.length);
-        for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+        const bytes = b64ToBytes(msg.data);
         const url = URL.createObjectURL(new Blob([bytes], { type: msg.mime }));
         const key = `thumb:${id}`;
         this.assemblers.delete(key);

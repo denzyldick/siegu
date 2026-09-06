@@ -226,6 +226,67 @@
               </v-btn>
             </template>
           </v-alert>
+
+          <v-divider class="my-4"></v-divider>
+
+          <div class="d-flex align-center mb-1">
+            <v-icon size="16" class="mr-2" color="on-surface">mdi-swap-horizontal-bold</v-icon>
+            <span class="text-subtitle-2 font-weight-bold text-high-emphasis">{{
+              $t('settings.turn')
+            }}</span>
+          </div>
+          <p class="text-caption text-medium-emphasis mb-3" style="line-height: 1.5">
+            {{ $t('settings.turn_desc') }}
+          </p>
+
+          <v-switch
+            v-model="turnEnabled"
+            color="primary"
+            hide-details
+            class="mb-3"
+            :label="$t('settings.turn_enabled')"
+            :loading="turnSaving"
+          ></v-switch>
+
+          <div v-if="turnEnabled">
+            <v-text-field
+              v-model="turnPort"
+              :label="$t('settings.turn_port')"
+              placeholder="0"
+              variant="outlined"
+              density="comfortable"
+              hide-details
+              class="mb-3"
+              :prepend-inner-icon="'mdi-counter'"
+            ></v-text-field>
+
+            <v-text-field
+              v-model="turnPublicHost"
+              :label="$t('settings.turn_public_host')"
+              :placeholder="$t('settings.turn_public_host_placeholder')"
+              variant="outlined"
+              density="comfortable"
+              hide-details
+              class="mb-3"
+              :prepend-inner-icon="'mdi-earth'"
+            ></v-text-field>
+
+            <p class="text-caption text-medium-emphasis mb-3" style="line-height: 1.5">
+              {{ $t('settings.turn_hint') }}
+            </p>
+
+            <v-btn
+              size="small"
+              variant="flat"
+              color="primary"
+              class="px-4 mb-4"
+              :loading="turnSaving"
+              @click="$emit('save-turn')"
+            >
+              <v-icon start size="16">mdi-content-save-outline</v-icon>
+              <span class="font-weight-bold">{{ $t('settings.turn_save') }}</span>
+            </v-btn>
+          </div>
         </div>
       </v-expand-transition>
 
@@ -329,6 +390,10 @@ const props = defineProps<{
   signallingTesting: boolean;
   signallingSaving: boolean;
   signalPingResult: PingResult | null;
+  turnEnabled: boolean;
+  turnPort: string;
+  turnPublicHost: string;
+  turnSaving: boolean;
   connectUrl?: string;
   verifyDialog: boolean;
   verifyDialogSending: boolean;
@@ -340,11 +405,15 @@ const emit = defineEmits<{
   'update:licenseUrl': [value: string];
   'update:signallingUrl': [value: string];
   'update:signallingToken': [value: string];
+  'update:turnEnabled': [value: boolean];
+  'update:turnPort': [value: string];
+  'update:turnPublicHost': [value: string];
   verify: [];
   'close-verify-dialog': [];
   'save-config': [];
   'test-signalling': [];
   'save-signalling': [];
+  'save-turn': [];
 }>();
 
 const email = ref(props.email);
@@ -353,6 +422,9 @@ const advanced = ref(false);
 const result = ref(props.result);
 const signallingUrl = ref(props.signallingUrl);
 const signallingToken = ref(props.signallingToken);
+const turnEnabled = ref(props.turnEnabled);
+const turnPort = ref(props.turnPort);
+const turnPublicHost = ref(props.turnPublicHost);
 
 const defaultSignallingUrl = computed(() => DEFAULT_SIGNALING_URL);
 const connectUrl = computed(() => props.connectUrl || APP_CONNECT_URL);
@@ -397,6 +469,9 @@ watch(email, (v) => emit('update:email', v));
 watch(licenseUrl, (v) => emit('update:licenseUrl', v));
 watch(signallingUrl, (v) => emit('update:signallingUrl', v));
 watch(signallingToken, (v) => emit('update:signallingToken', v));
+watch(turnEnabled, (v) => emit('update:turnEnabled', v));
+watch(turnPort, (v) => emit('update:turnPort', v));
+watch(turnPublicHost, (v) => emit('update:turnPublicHost', v));
 
 const resultText = computed(() => {
   const r = result.value;

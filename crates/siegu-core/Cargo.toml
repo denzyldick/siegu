@@ -44,6 +44,8 @@ num_cpus = "1.16.0"
 warp = { workspace = true }
 socket2 = "0.5"
 webrtc = { rev = "1da3fe8ee84db8d266322cbcfcb357c745959a8e", git = "https://github.com/webrtc-rs/webrtc" }
+turn = { rev = "1da3fe8ee84db8d266322cbcfcb357c745959a8e", git = "https://github.com/webrtc-rs/webrtc" }
+util = { package = "webrtc-util", rev = "1da3fe8ee84db8d266322cbcfcb357c745959a8e", git = "https://github.com/webrtc-rs/webrtc", default-features = false, features = ["conn", "vnet"] }
 bytes = "1.11.1"
 aes-gcm = { workspace = true }
 

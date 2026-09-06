@@ -40,6 +40,18 @@ The easiest option: [siegu.io/connect](https://siegu.io/connect)
 
 Run your own signalling server. See [SIGNALLING.md](SIGNALLING.md) for setup instructions.
 
+### Over the internet / mobile data
+
+Sharing across networks (including guests on **cellular data**) depends on the
+two devices finding a path to each other. When the networks block a direct
+connection (symmetric NAT, carrier-grade NAT on mobile data), a TURN relay
+carries the encrypted stream. You have two ways to provide one:
+
+- **Free, built-in**: enable the relay in Siegu's Settings — the host runs TURN
+  itself, no separate server — see [NAT Traversal & TURN](turn.md).
+- **Pro**: the hosted `siegu.io` relay includes TURN, so sharing works from any
+  network with zero router configuration.
+
 ## Desktop App (local, for now)
 
 The desktop app's **Share Collection** action (`… → Share Collection`) starts a
@@ -47,8 +59,9 @@ local signalling + web server and generates a browser share link
 (`http://127.0.0.1:PORT/#CODE.TOKEN.ALBUM`). Opening it loads the view-only web
 client and shows only that collection; granting/copying/stopping happens right
 in the dialog. For now the link works on the same computer — cross-network
-sharing via the hosted `siegu.io` relay is the upcoming default (see
-`src/services/appConfig.ts` for the single base-domain switch).
+sharing goes through a signalling server (see
+[Remote & hosted](sharing.md#sharing-requirements) and the single base-domain
+switch in `src/services/appConfig.ts`).
 
 ## What the Viewer Can See
 
@@ -68,8 +81,9 @@ sharing via the hosted `siegu.io` relay is the upcoming default (see
 ### Data Flow
 
 1. Photos stream directly from your device to the viewer via WebRTC
-2. No photos pass through any server
+2. No photos are stored anywhere in between
 3. The signalling server only coordinates the connection (relays encrypted SDP/ICE data)
+4. If no direct path exists, a TURN relay forwards the encrypted stream between the devices — it never stores or reads the content
 
 ### Session Security
 
@@ -105,6 +119,7 @@ When viewing shared photos on mobile:
 - Ensure both devices can reach the signalling server
 - Check firewall settings for WebRTC (STUN/TURN ports)
 - Try a different network if on restrictive WiFi
+- On mobile data, a TURN relay is usually required — see [NAT Traversal & TURN](turn.md)
 
 ### Viewer sees "Access denied"
 

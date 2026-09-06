@@ -143,6 +143,10 @@ export const useSettingsStore = defineStore('settings', () => {
   const signalingTesting = ref(false);
   const signalingPingResult = ref<PingResult | null>(null);
 
+  const turnEnabled = ref(false);
+  const turnPort = ref('');
+  const turnPublicHost = ref('');
+
   const proEmail = ref('');
   const proSending = ref(false);
   const proVerifying = ref(false);
@@ -297,6 +301,7 @@ export const useSettingsStore = defineStore('settings', () => {
     await loadModelsLoaded();
     await loadSignallingConfig();
     await loadProConfig();
+    await loadTurnConfig();
     await fetchLogs();
     await listDirectories();
   }
@@ -727,6 +732,33 @@ export const useSettingsStore = defineStore('settings', () => {
       };
     } finally {
       signalingTesting.value = false;
+    }
+  }
+
+  async function loadTurnConfig(): Promise<void> {
+    try {
+      const config = JSON.parse(await invoke<string>('get_config')) as Record<string, string>;
+      turnEnabled.value = config.turn_enabled === 'true';
+      turnPort.value = config.turn_port || '';
+      turnPublicHost.value = config.turn_public_host || '';
+    } catch {
+      turnEnabled.value = false;
+      turnPort.value = '';
+      turnPublicHost.value = '';
+    }
+  }
+
+  async function saveTurnConfig(): Promise<void> {
+    try {
+      await invoke('save_config', {
+        key: 'turn_enabled',
+        value: turnEnabled.value ? 'true' : 'false',
+      });
+      await invoke('save_config', { key: 'turn_port', value: turnPort.value.trim() });
+      await invoke('save_config', { key: 'turn_public_host', value: turnPublicHost.value.trim() });
+      showSnackbar(t('settings.turn_saved'));
+    } catch (e) {
+      showSnackbar(t('settings.turn_save_failed', { error: e }), true);
     }
   }
 
@@ -1325,6 +1357,9 @@ export const useSettingsStore = defineStore('settings', () => {
     signalingToken,
     signalingTesting,
     signalingPingResult,
+    turnEnabled,
+    turnPort,
+    turnPublicHost,
     proEmail,
     proSending,
     proVerifying,
@@ -1378,6 +1413,8 @@ export const useSettingsStore = defineStore('settings', () => {
     saveSignallingConfig,
     testSignalling,
     effectiveSignalingUrl,
+    loadTurnConfig,
+    saveTurnConfig,
     loadProConfig,
     saveLicenseConfig,
     sendProVerification,

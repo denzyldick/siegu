@@ -1031,6 +1031,14 @@ async fn cmd_mesh_host(
     let _ = std::fs::create_dir_all(config_dir);
     let db = Database::new(&config_path);
 
+    let _embedded_turn = match siegu_core::turn_embedded::ensure_started(&config_path).await {
+        Ok(turn) => turn,
+        Err(e) => {
+            cli_warn!("embedded TURN relay failed to start: {e}");
+            None
+        }
+    };
+
     let room_id = room
         .map(|r| r.to_string())
         .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());

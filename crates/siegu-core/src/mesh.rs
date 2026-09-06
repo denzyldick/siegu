@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -18,11 +19,11 @@ fn view_state() -> &'static crate::view_only::ViewOnlyState {
 pub const PROTOCOL_VERSION: u8 = 2;
 pub const MAX_MESH_DEVICES: usize = 5;
 
-/// Max raw file bytes carried in a single `FileChunk` payload. The `Vec<u8>` is
-/// serialized as a JSON array of numbers (~4 chars/byte), so the whole message
-/// must stay well under the SCTP max message size (65536). A chunk payload this
-/// size serializes to ~56 KB.
-pub const FILE_CHUNK_PAYLOAD: usize = 14000;
+/// Max raw file bytes carried in a single `FileChunk` payload. Base64 inflates
+/// 4/3, so a chunk this size serializes to ~43.8 KB — safely under the SCTP max
+/// message size. (When chunks were a JSON number array they inflated ~4 chars/
+/// byte, which forced 14 KB; doubling the payload now cuts message count ~2.3x.)
+pub const FILE_CHUNK_PAYLOAD: usize = 32768;
 
 /// Serialized-byte budget for a single sync message. The WebRTC data channel
 /// rejects messages larger than the negotiated SCTP max message size (65536 by
@@ -107,6 +108,10 @@ pub enum SyncMessage {
     FileChunk {
         id: String,
         index: u32,
+        /// Base64 on the wire, exactly like `ViewMedia.data`: the Vec<u8> as a
+        /// serde_json number array would inflate ~3.9x and, for the bulk of
+        /// every library transfer, cost the peer ~4x the real file bytes.
+        #[serde(with = "base64_bytes")]
         data: Vec<u8>,
     },
     FileEnd {
@@ -817,6 +822,8 @@ impl MeshManager {
         pending_view_manifest: &Arc<tokio::sync::Mutex<Vec<PhotoSyncInfo>>>,
         share_mode: Option<crate::rpc::ShareMode>,
         session_scope: &Arc<tokio::sync::Mutex<Option<crate::view_only::AlbumScope>>>,
+        items_failed: &Arc<std::sync::atomic::AtomicUsize>,
+        retries: &Arc<tokio::sync::Mutex<HashMap<String, u32>>>,
     ) {
         match msg {
             // Liveness probes never enter the sync pipeline: a Ping is
@@ -892,9 +899,13 @@ impl MeshManager {
                 ));
                 let db = Database::new(config_path);
                 let my_manifest = db.get_photo_sync_info();
+                // Membership-check against a HashSet instead of an O(n) scan per
+                // peer photo: a large library would otherwise do n*m id
+                // comparisons on every sync/reconnect.
+                let local_ids: HashSet<&str> = my_manifest.iter().map(|p| p.id.as_str()).collect();
                 let mut to_request = Vec::new();
                 for peer_photo in &photos {
-                    if !my_manifest.iter().any(|p| p.id == peer_photo.id) {
+                    if !local_ids.contains(peer_photo.id.as_str()) {
                         to_request.push(peer_photo.id.clone());
                     }
                 }
@@ -1289,6 +1300,41 @@ impl MeshManager {
                             file_state.filename, checksum, received_checksum
                         ));
                         let _ = tokio::fs::remove_file(&temp_path).await;
+
+                        // Retry the whole transfer a bounded number of times
+                        // (the sender re-serves on a fresh FileRequest). A
+                        // dropped byte on a flaky link shouldn't silently drop
+                        // a photo; if retries run out the file is counted as
+                        // failed so the sync ends honestly and a re-sync
+                        // catches it via the manifest compare.
+                        let attempts = {
+                            let mut retries = retries.lock().await;
+                            let entry = retries.entry(file_state.id.clone()).or_insert(0);
+                            *entry += 1;
+                            *entry
+                        };
+                        drop(incoming);
+                        if attempts <= MAX_RETRY_ATTEMPTS {
+                            event.on_log(&format!(
+                                "Retrying {} (checksum mismatch, attempt {attempts}/{MAX_RETRY_ATTEMPTS})",
+                                file_state.filename
+                            ));
+                            tokio::time::sleep(std::time::Duration::from_millis(
+                                RETRY_BACKOFF_MS * attempts as u64,
+                            ))
+                            .await;
+                            let _ = Self::send_sync_message(
+                                dc,
+                                &SyncMessage::FileRequest { id: file_state.id },
+                            )
+                            .await;
+                        } else {
+                            items_failed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                            event.on_sync_error(format!(
+                                "Giving up on {} after {MAX_RETRY_ATTEMPTS} checksum failures",
+                                file_state.filename
+                            ));
+                        }
                         return;
                     }
 
@@ -1430,10 +1476,20 @@ impl MeshManager {
                             thumbnail: None,
                         });
 
-                        if display_total > 0 && display_completed >= display_total {
+                        if display_total > 0
+                            && (display_completed
+                                + items_failed.load(std::sync::atomic::Ordering::SeqCst))
+                                >= display_total
+                        {
+                            let failed = items_failed.load(std::sync::atomic::Ordering::SeqCst);
+                            let status = if failed > 0 {
+                                format!("Synced {display_completed} files, {failed} failed (retry on next sync)")
+                            } else {
+                                "All files synced".to_string()
+                            };
                             event.on_sync_progress(SyncProgress {
                                 device_id: "peer".to_string(),
-                                status: "All files synced".to_string(),
+                                status,
                                 phase: SyncPhase::Completed,
                                 progress: 100.0,
                                 bytes_per_second: 0,
@@ -2460,6 +2516,10 @@ mod tests {
                 assert_eq!(id, "photo_0");
                 assert_eq!(index, 42);
                 assert_eq!(data.len(), FILE_CHUNK_PAYLOAD);
+                assert!(
+                    data.iter().all(|b| *b == 255),
+                    "base64 round-trip must preserve the chunk bytes"
+                );
                 assert_eq!(data[0], 255);
             }
             other => panic!("unexpected message variant: {:?}", other),

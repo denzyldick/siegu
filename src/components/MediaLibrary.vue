@@ -335,13 +335,18 @@ let unlistenRefreshed: UnlistenFn | null = null;
 let reloadTimer: ReturnType<typeof setTimeout> | null = null;
 let photoReceivedTimer: ReturnType<typeof setTimeout> | null = null;
 let reloadScrollRestore: { scrollY: number; pages: number } | null = null;
+let memInterval: ReturnType<typeof setInterval> | undefined;
 let analysisTimer: ReturnType<typeof setTimeout> | null = null;
 let analysisPendingIds = new Set<string | number>();
 
 const isScanning = computed(() => scanStore.isActive);
 
 const useVirtualScroller = computed(() => {
-  return typeof IntersectionObserver !== 'undefined' && virtualItems.value.length > 12;
+  // `IntersectionObserver` is a browser baseline; gating virtualisation on it
+  // risks silently falling into the plain `v-for` branch below, which renders
+  // the ENTIRE list (every row, every thumbnail) at once — a multi-GB DOM that
+  // freezes large libraries. Always virtualize above a dozen rows.
+  return virtualItems.value.length > 12;
 });
 
 const virtualItems = computed(() => {
@@ -695,6 +700,21 @@ watch(
   { deep: true },
 );
 
+// Photo-streams during indexing only update the list incrementally (see the
+// `photo-received` handler); when indexing finishes, do one full refresh so
+// grouping, order and counts settle.
+let wasIndexing = scanStore.status === 'indexing' || scanStore.indexingCount > 0;
+watch(
+  () => [scanStore.status, scanStore.indexingCount] as const,
+  ([status, count]) => {
+    const indexingNow = status === 'indexing' || count > 0;
+    if (wasIndexing && !indexingNow) {
+      scheduleReload({ preserveScroll: true });
+    }
+    wasIndexing = indexingNow;
+  },
+);
+
 onMounted(async () => {
   loadFiles();
 
@@ -719,6 +739,12 @@ onMounted(async () => {
       if (event.payload?.id) {
         updateGroups([event.payload]);
       }
+      // During a bulk index the backend streams one `photo-received` per
+      // photo. Keep the incremental insert above (live updates) but do NOT
+      // also tear down and rebuild the whole list once per photo — that churn
+      // freezes a large library mid-scroll. A single full refresh is fired by
+      // `watchIndexingDone` once the index finishes.
+      if (scanStore.status === 'indexing' || scanStore.indexingCount > 0) return;
       if (photoReceivedTimer) clearTimeout(photoReceivedTimer);
       photoReceivedTimer = setTimeout(() => scheduleReload({ preserveScroll: true }), 500);
     });
@@ -733,6 +759,20 @@ onMounted(async () => {
   updateColumns();
   window.addEventListener('resize', updateColumns);
   setupInfiniteScroll();
+
+  // TEMP [MEMDBG] — scroll for ~20s, then report the logged numbers.
+  memInterval = window.setInterval(() => {
+    console.log(
+      '[MEMDBG] imgs=',
+      document.getElementsByTagName('img').length,
+      'cards=',
+      document.querySelectorAll('.media-card-container').length,
+      'videos=',
+      document.querySelectorAll('.media-card-container video').length,
+      'rows=',
+      virtualItems.value.length,
+    );
+  }, 1000);
 });
 
 onUnmounted(() => {
@@ -744,6 +784,7 @@ onUnmounted(() => {
   if (reloadTimer) clearTimeout(reloadTimer);
   if (photoReceivedTimer) clearTimeout(photoReceivedTimer);
   if (analysisTimer) clearTimeout(analysisTimer);
+  if (memInterval !== undefined) clearInterval(memInterval);
 });
 </script>
 

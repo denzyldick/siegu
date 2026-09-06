@@ -30,7 +30,7 @@ export function useSwipeCarousel(options: SwipeCarouselOptions) {
   let animationFrame: number | null = null;
 
   const trackTransform = computed(() => {
-    return `translateX(${-viewportWidth + offset.value}px)`;
+    return `translateX(${-getViewportWidth() + offset.value}px)`;
   });
 
   function getViewportWidth(): number {

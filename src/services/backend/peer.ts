@@ -32,6 +32,31 @@ function wsUrl(base: string): string {
   return `${proto}://${base}`;
 }
 
+/** Optional ICE wiring for guests. Defaults to a public STUN server. */
+export interface TURNConfig {
+  /** `turn:` / `turns:` URLs, e.g. "turn:turn.siegu.io:3478". */
+  urls: string[];
+  username?: string;
+  credential?: string;
+}
+
+/**
+ * Build the ICE server list for a peer connection. Kept as a pure helper so
+ * the browser default (Google STUN alone) stays intact when no TURN is
+ * configured — mirroring the host's `rtc_configuration_from_turn`.
+ */
+export function buildIceServers(turn?: TURNConfig): RTCIceServer[] {
+  const servers: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
+  if (turn && turn.urls.length > 0) {
+    servers.push({
+      urls: turn.urls,
+      username: turn.username ?? '',
+      credential: turn.credential ?? '',
+    });
+  }
+  return servers;
+}
+
 /**
  * Build a real {@link PeerTransport} over a signalling WebSocket + WebRTC
  * peer connection. `wsBase` is the `host[:port]` of the CLI static server
@@ -40,6 +65,7 @@ function wsUrl(base: string): string {
 export function createPeerTransport(
   wsBase: string,
   session: GuestSession,
+  options?: { turn?: TURNConfig },
   onUpsertPassword?: () => void,
 ): PeerTransport {
   const socket = new WebSocket(wsUrl(wsBase) + '/ws');
@@ -171,7 +197,7 @@ export function createPeerTransport(
 
   async function answerOffer(sdpJson: string): Promise<void> {
     try {
-      pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+      pc = new RTCPeerConnection({ iceServers: buildIceServers(options?.turn) });
 
       pc.onicecandidate = (ev) => {
         if (!ev.candidate) return;

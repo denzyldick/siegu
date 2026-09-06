@@ -286,7 +286,7 @@ pub fn watch_hosts(
     Ok(rx)
 }
 
-fn local_ip() -> Result<IpAddr, Box<dyn std::error::Error>> {
+pub fn local_ip() -> Result<IpAddr, Box<dyn std::error::Error>> {
     let s = UdpSocket::bind("0.0.0.0:0")?;
     s.connect("8.8.8.8:53")?;
     Ok(s.local_addr()?.ip())

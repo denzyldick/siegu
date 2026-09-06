@@ -62,8 +62,15 @@ pub const ALLOWED_CONFIG_KEYS: &[&str] = &[
     "paid_email",
     "pro_license_url",
     "pro_license_token",
+    "turn_enabled",
+    "turn_port",
+    "turn_username",
+    "turn_password",
+    "turn_public_host",
     "analysis_skip_existing",
     "analysis_cutoff_rowid",
+    "map_tile_url",
+    "map_tile_key",
 ];
 
 pub fn is_valid_config_key(key: &str) -> bool {
@@ -189,6 +196,40 @@ pub fn validate_config_value(key: &str, value: &str) -> Result<(), ConfigError> 
             }
         }
         "signaling_token" => {}
+        "turn_enabled" => {
+            if !["true", "false"].contains(&value) {
+                return Err(ConfigError::InvalidType {
+                    key: key.to_string(),
+                    expected: "true|false".to_string(),
+                    got: value.to_string(),
+                });
+            }
+        }
+        "turn_port" => {
+            let n: u64 = value.parse().map_err(|_| ConfigError::InvalidType {
+                key: key.to_string(),
+                expected: "u16".to_string(),
+                got: value.to_string(),
+            })?;
+            if n > 65_535 {
+                return Err(ConfigError::OutOfRange {
+                    key: key.to_string(),
+                    min: 0,
+                    max: 65_535,
+                });
+            }
+        }
+        "turn_public_host" => {
+            let trimmed = value.trim();
+            if !trimmed.is_empty() && trimmed.parse::<std::net::IpAddr>().is_err() {
+                return Err(ConfigError::InvalidType {
+                    key: key.to_string(),
+                    expected: "ipv4|ipv6|(empty)".to_string(),
+                    got: value.to_string(),
+                });
+            }
+        }
+        "turn_username" | "turn_password" => {}
         _ => {}
     }
     Ok(())
@@ -252,6 +293,12 @@ mod tests {
         assert!(validate_config_value("indexing_mode", "idle").is_ok());
         assert!(validate_config_value("indexing_mode", "manual").is_ok());
         assert!(validate_config_value("model_enabled_clip", "true").is_ok());
+        assert!(validate_config_value(
+            "map_tile_url",
+            "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+        )
+        .is_ok());
+        assert!(validate_config_value("map_tile_key", "abc123").is_ok());
     }
 
     #[test]
@@ -336,6 +383,36 @@ mod tests {
     fn test_validate_config_signaling_token() {
         assert!(validate_config_value("signaling_token", "s3cret").is_ok());
         assert!(validate_config_value("signaling_token", "").is_ok());
+    }
+
+    #[test]
+    fn test_validate_config_turn_keys() {
+        assert!(is_valid_config_key("turn_enabled"));
+        assert!(validate_config_value("turn_enabled", "true").is_ok());
+        assert!(validate_config_value("turn_enabled", "false").is_ok());
+        assert!(matches!(
+            validate_config_value("turn_enabled", "yes"),
+            Err(ConfigError::InvalidType { .. })
+        ));
+        assert!(validate_config_value("turn_port", "0").is_ok());
+        assert!(validate_config_value("turn_port", "3478").is_ok());
+        assert!(validate_config_value("turn_port", "65535").is_ok());
+        assert!(matches!(
+            validate_config_value("turn_port", "70000"),
+            Err(ConfigError::OutOfRange { .. })
+        ));
+        assert!(matches!(
+            validate_config_value("turn_port", "many"),
+            Err(ConfigError::InvalidType { .. })
+        ));
+        assert!(validate_config_value("turn_public_host", "").is_ok());
+        assert!(validate_config_value("turn_public_host", "203.0.113.9").is_ok());
+        assert!(matches!(
+            validate_config_value("turn_public_host", "home.example.com"),
+            Err(ConfigError::InvalidType { .. })
+        ));
+        assert!(validate_config_value("turn_username", "alice").is_ok());
+        assert!(validate_config_value("turn_password", "s3cret").is_ok());
     }
 
     #[test]

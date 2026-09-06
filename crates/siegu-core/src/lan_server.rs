@@ -175,7 +175,8 @@ pub async fn start_with_config(config: ServerConfig) -> LanServer {
                                 .filter(|h| !h.trim().is_empty())
                                 .map(|h| format!("http://{}", h.trim()))
                                 .unwrap_or_default();
-                            let out = inject_meta(&html, &shared_og_meta(&origin));
+                            let mut out = inject_meta(&html, &shared_og_meta(&origin));
+                            out = inject_turn_config(&out);
                             Ok::<_, warp::reject::Rejection>(
                                 warp::http::Response::builder()
                                     .header("content-type", "text/html; charset=utf-8")
@@ -344,6 +345,53 @@ fn inject_meta(html: &str, metas: &str) -> String {
         return format!("{}{}\n{}", &html[..gt], metas, &html[gt..]);
     }
     format!("{metas}\n{html}")
+}
+
+/// Stamp `window.sieguTurnConfig` into the served SPA when the host runs the
+/// embedded TURN relay, so browser guests add it to their ICE configuration.
+/// Returns `html` unchanged when no relay is configured.
+fn inject_turn_config(html: &str) -> String {
+    inject_turn_config_with(
+        std::env::var("SIEGU_TURN_URLS").ok().as_deref(),
+        std::env::var("SIEGU_TURN_USERNAME").ok().as_deref(),
+        std::env::var("SIEGU_TURN_CREDENTIAL").ok().as_deref(),
+        html,
+    )
+}
+
+/// Pure half of [`inject_turn_config`], split out so it is testable without
+/// mutating process globals (which races under parallel test execution).
+fn inject_turn_config_with(
+    urls: Option<&str>,
+    username: Option<&str>,
+    password: Option<&str>,
+    html: &str,
+) -> String {
+    let (Some(urls), Some(username), Some(password)) = (urls, username, password) else {
+        return html.to_string();
+    };
+    if urls.trim().is_empty() || username.trim().is_empty() || password.is_empty() {
+        return html.to_string();
+    }
+    let script = format!(
+        "<script>window.sieguTurnConfig={}</script>",
+        serde_json::json!({
+            "url": urls.split(',').map(str::trim).collect::<Vec<_>>(),
+            "username": username,
+            "credential": password,
+        })
+    );
+    if let Some(end) = html.find("</head>") {
+        return format!("{}{}\n{}", &html[..end], script, &html[end..]);
+    }
+    if let Some(start) = html.find("<body") {
+        let gt = html[start..]
+            .find('>')
+            .map(|i| start + i + 1)
+            .unwrap_or(start);
+        return format!("{}{}\n{}", &html[..gt], script, &html[gt..]);
+    }
+    format!("{html}\n{script}")
 }
 
 fn admission_reject(ctx: &Arc<ServerContext>, remote: Option<SocketAddr>) -> Option<String> {
@@ -1620,5 +1668,45 @@ mod tests {
         assert!(body.contains("console.log('siegu')"), "wrong asset body");
 
         server.stop();
+    }
+
+    #[test]
+    fn inject_turn_config_unconfigured_is_noop() {
+        let html = "<!doctype html><head></head><body>hi</body>";
+        assert_eq!(
+            inject_turn_config_with(None, None, None, html),
+            html,
+            "no relay => page untouched"
+        );
+        assert_eq!(
+            inject_turn_config_with(Some("turn:1.2.3.4:3478"), Some(""), Some("pw"), html),
+            html,
+            "empty username => no injection"
+        );
+    }
+
+    #[test]
+    fn inject_turn_config_stamps_window_global() {
+        let html = "<!doctype html><head><title>siegu</title></head><body>hi</body>";
+        let out = inject_turn_config_with(
+            Some("turn:192.168.1.5:51820, turn:127.0.0.1:51820"),
+            Some("alice"),
+            Some("secret"),
+            html,
+        );
+        assert!(
+            out.contains("window.sieguTurnConfig"),
+            "page must expose the relay to browser guests: {out}"
+        );
+        assert!(out.contains(r#""username":"alice""#), "username stamped");
+        assert!(
+            out.contains(r#""credential":"secret""#),
+            "credential stamped"
+        );
+        assert!(
+            out.contains(r#""url":["turn:192.168.1.5:51820","turn:127.0.0.1:51820"]"#),
+            "url list stamped"
+        );
+        assert!(out.starts_with("<!doctype html>"), "head preserved");
     }
 }

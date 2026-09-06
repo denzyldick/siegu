@@ -48,9 +48,9 @@
       class="light-map"
     >
       <l-tile-layer
-        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+        :url="tileUrl"
         layer-type="base"
-        name="CartoDB Basemap"
+        name="Base Map"
         :options="{
           updateWhenZooming: false,
           updateWhenIdle: true,
@@ -77,7 +77,8 @@ if (typeof window !== 'undefined') {
   window.L = L;
 }
 import 'leaflet.markercluster';
-import { ref, computed, nextTick, watch, onUnmounted } from 'vue';
+import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { invoke } from '@/services/invoke';
 import type { Map as LeafletMap } from 'leaflet';
 import MediaViewer from './MediaViewer.vue';
@@ -101,11 +102,38 @@ const viewerOpen = ref(false);
 const viewerPhotos = ref<MediaItem[]>([]);
 const currentPhotoIndex = ref(0);
 
+const CARTO_TILE_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+const DEFAULT_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const THUMB_ZOOM = 14;
+
+const tileUrl = ref(DEFAULT_TILE_URL);
+
+function buildTileUrl(config: Record<string, string>): string {
+  const custom = (config['map_tile_url'] ?? '').trim();
+  const key = (config['map_tile_key'] ?? '').trim();
+  let url = custom || (key ? CARTO_TILE_URL : DEFAULT_TILE_URL);
+  if (key && !url.includes('key=')) {
+    url += `${url.includes('?') ? '&' : '?'}key=${encodeURIComponent(key)}`;
+  }
+  return url;
+}
+
+async function loadTileConfig(): Promise<void> {
+  try {
+    const raw = await invoke<string>('get_config');
+    tileUrl.value = buildTileUrl(JSON.parse(raw) as Record<string, string>);
+  } catch (e) {
+    console.error('[MapView] Failed to load tile config', e);
+  }
+}
+
 const { mediaSrc } = useMediaUrl();
 const mapFilterStore = useMapFilterStore();
+const { t: $t } = useI18n();
 
 let leafletMap: LeafletMap | null = null;
 let clusterGroup: L.MarkerClusterGroup | null = null;
+let mapClickHandler: ((e: L.LeafletMouseEvent) => void) | null = null;
 
 function resolveThemeColor(varName: string): string {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
@@ -122,6 +150,67 @@ function themeTextColor(): string {
   if (!m || m.length < 3) return '#fff';
   const lum = (0.299 * +m[0] + 0.587 * +m[1] + 0.114 * +m[2]) / 255;
   return lum > 0.6 ? '#1a1a2e' : '#ffffff';
+}
+
+function makeDotIcon(): L.DivIcon {
+  return L.divIcon({
+    className: 'photo-marker',
+    html: '<div class="pm-dot"></div>',
+    iconSize: L.point(14, 14),
+    iconAnchor: L.point(7, 7),
+  });
+}
+
+function makeLoadingIcon(): L.DivIcon {
+  return L.divIcon({
+    className: 'photo-marker',
+    html: '<div class="pm-loading"></div>',
+    iconSize: L.point(40, 40),
+    iconAnchor: L.point(20, 20),
+  });
+}
+
+function makeThumbIcon(url: string): L.DivIcon {
+  return L.divIcon({
+    className: 'photo-marker',
+    html: `<img src="${url}" class="pm-img" decoding="async" loading="lazy">`,
+    iconSize: L.point(44, 44),
+    iconAnchor: L.point(22, 22),
+  });
+}
+
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+function refreshVisibleMarkers(): void {
+  if (!leafletMap || refreshTimer) return;
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null;
+    if (!leafletMap || !clusterGroup) return;
+    const useThumbs = leafletMap.getZoom() >= THUMB_ZOOM;
+    const bounds = leafletMap.getBounds().pad(0.25);
+    clusterGroup.eachLayer((layer) => {
+      if (!(layer instanceof L.Marker)) return;
+      const m = layer as L.Marker & { _p?: MapPoint; _thumbLoaded?: boolean };
+      if (!m._p) return;
+      if (!useThumbs) {
+        if (m._thumbLoaded) {
+          m._thumbLoaded = false;
+          m.setIcon(makeDotIcon());
+        }
+        return;
+      }
+      if (m._thumbLoaded) return;
+      if (!bounds.contains(m.getLatLng())) return;
+      m._thumbLoaded = true;
+      m.setIcon(makeLoadingIcon());
+      void mediaSrc(
+        { id: m._p.id, location: m._p.location, encoded: null } as unknown as MediaItem,
+        'thumb',
+      ).then((url) => {
+        if (url && m._thumbLoaded) m.setIcon(makeThumbIcon(url));
+      });
+    });
+  }, 150);
 }
 
 const GRID_CELL_DEG = 1;
@@ -182,6 +271,13 @@ async function openCarouselForIds(ids: number[]) {
   }
 }
 
+function onMapClick(e: L.LeafletMouseEvent): void {
+  const nearest = nearestPoints(e.latlng.lat, e.latlng.lng, 50);
+  if (nearest.length === 0) return;
+  const ids = nearest.map((p) => p.id);
+  openCarouselForIds(ids);
+}
+
 async function openCarouselForPoint(point: MapPoint) {
   const nearest = nearestPoints(point.latitude, point.longitude, 50);
   const ids = nearest.map((p) => p.id);
@@ -230,36 +326,34 @@ async function loadMapData() {
     });
 
     const bounds: [number, number][] = [];
-    const markerFill = resolveThemeColor('--v-theme-info');
     for (const p of mapPoints.value) {
-      const marker = L.circleMarker([p.latitude, p.longitude], {
-        radius: 5,
-        fillColor: markerFill,
-        color: '#ffffff',
-        weight: 1.5,
-        opacity: 0.9,
-        fillOpacity: 0.5,
+      const marker: L.Marker & { _p?: MapPoint; _thumbLoaded?: boolean } = L.marker(
+        [p.latitude, p.longitude],
+        { icon: makeDotIcon() },
+      );
+      marker._p = p;
+      marker.on('click', (e: L.LeafletMouseEvent) => {
+        L.DomEvent.stop(e);
+        openCarouselForPoint(p);
       });
-      marker.on('click', () => openCarouselForPoint(p));
       marker.on('mouseover', () => {
-        const thumbnailDiv = L.DomUtil.create('div', 'map-thumb-popup');
-        thumbnailDiv.innerHTML = '<div class="thumb-loading"></div>';
-        void mediaSrc(
-          { id: p.id, location: p.location, encoded: null } as unknown as MediaItem,
-          'thumb',
-        ).then((thumb) => {
-          if (thumb && thumbnailDiv.isConnected) {
-            thumbnailDiv.innerHTML = `<img src="${thumb}" class="thumb-img" decoding="async" loading="lazy">`;
-            marker.setRadius(7);
-            marker.setStyle({ fillOpacity: 0.8 });
-          }
-        });
-        marker
-          .bindPopup(thumbnailDiv, {
+        if (!marker.getPopup()) {
+          const thumbnailDiv = L.DomUtil.create('div', 'map-thumb-popup');
+          thumbnailDiv.innerHTML = '<div class="thumb-loading"></div>';
+          marker.bindPopup(thumbnailDiv, {
             closeButton: false,
             offset: L.point(0, -10),
-          })
-          .openPopup();
+          });
+          void mediaSrc(
+            { id: p.id, location: p.location, encoded: null } as unknown as MediaItem,
+            'thumb',
+          ).then((thumb) => {
+            if (thumb && thumbnailDiv.isConnected) {
+              thumbnailDiv.innerHTML = `<img src="${thumb}" class="thumb-img" decoding="async" loading="lazy">`;
+            }
+          });
+        }
+        marker.openPopup();
       });
       marker.on('mouseout', () => {
         marker.closePopup();
@@ -275,13 +369,6 @@ async function loadMapData() {
     } else {
       leafletMap.setView(bounds[0], 4);
     }
-
-    leafletMap.on('click', (e: L.LeafletMouseEvent) => {
-      const nearest = nearestPoints(e.latlng.lat, e.latlng.lng, 50);
-      if (nearest.length === 0) return;
-      const ids = nearest.map((p) => p.id);
-      openCarouselForIds(ids);
-    });
   } catch (e) {
     console.error('Failed to load map data', e);
   } finally {
@@ -303,8 +390,8 @@ const filterLabel = computed(() => {
   if (mapFilterStore.dateFrom && mapFilterStore.dateTo) {
     return `${fmt(mapFilterStore.dateFrom)} – ${fmt(mapFilterStore.dateTo)}`;
   }
-  if (mapFilterStore.dateFrom) return `From ${fmt(mapFilterStore.dateFrom)}`;
-  return `Until ${fmt(mapFilterStore.dateTo!)}`;
+  if (mapFilterStore.dateFrom) return $t('map.filter_from', { date: fmt(mapFilterStore.dateFrom) });
+  return $t('map.filter_until', { date: fmt(mapFilterStore.dateTo!) });
 });
 
 function filterByDateRange(points: MapPoint[]): MapPoint[] {
@@ -339,27 +426,46 @@ function clearFilter(): void {
 
 async function onMapReady(map: LeafletMap) {
   leafletMap = map;
+  if (!mapClickHandler) {
+    mapClickHandler = onMapClick;
+    leafletMap.on('click', mapClickHandler);
+  }
+  leafletMap.on('zoomend moveend', refreshVisibleMarkers);
   await nextTick();
   setTimeout(async () => {
     if (leafletMap) {
       leafletMap.invalidateSize();
       await loadMapData();
+      refreshVisibleMarkers();
     }
   }, 100);
 }
 
+onMounted(() => {
+  void loadTileConfig();
+});
+
 onUnmounted(() => {
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
   if (clusterGroup) {
     leafletMap?.removeLayer(clusterGroup);
     clusterGroup = null;
   }
   if (leafletMap) {
-    leafletMap.off('click');
+    if (mapClickHandler) {
+      leafletMap.off('click', mapClickHandler);
+      mapClickHandler = null;
+    }
+    leafletMap.off('zoomend moveend', refreshVisibleMarkers);
     leafletMap.remove();
     leafletMap = null;
   }
   pointGrid.clear();
   mapPoints.value = [];
+  mapFilterStore.clearDateRange();
 });
 
 watch(currentPhotoIndex, (idx) => {
@@ -413,6 +519,38 @@ watch(currentPhotoIndex, (idx) => {
 :deep(.custom-cluster) {
   background: none !important;
   border: none !important;
+}
+
+:deep(.photo-marker) {
+  background: none !important;
+  border: none !important;
+}
+
+:deep(.pm-dot) {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgb(var(--v-theme-info));
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+:deep(.pm-loading) {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: rgb(var(--v-theme-surface-light));
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+:deep(.pm-img) {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
 :deep(.cluster-icon) {

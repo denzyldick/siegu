@@ -8,6 +8,40 @@ import type { MediaKind } from '@/services/backend/interface';
 const sharedPort = ref<number | null>(null);
 let portPromise: Promise<number | null> | null = null;
 
+const mediaCache = new Map<string, string>();
+const MEDIA_CACHE_MAX = 2000;
+
+function cacheKey(item: MediaItem, kind: MediaKind): string {
+  return `${kind}:${item.id}`;
+}
+
+function cacheGet(item: MediaItem, kind: MediaKind): string | null {
+  return mediaCache.get(cacheKey(item, kind)) ?? null;
+}
+
+function cacheSet(item: MediaItem, kind: MediaKind, url: string): void {
+  if (mediaCache.size >= MEDIA_CACHE_MAX) {
+    mediaCache.delete(mediaCache.keys().next().value as string);
+  }
+  mediaCache.set(cacheKey(item, kind), url);
+}
+
+/**
+ * Drop a single media item's cached URL(s) so a later resolution re-resolves
+ * instead of returning a stale/revoked URL. Used by the viewer's bounded
+ * preload window when the far neighbour is evicted (guest mode revokes the
+ * blob, so the cached string must go with it).
+ */
+export function invalidateMediaUrl(itemId: string | number, kind?: MediaKind): void {
+  const id = String(itemId);
+  if (kind) {
+    mediaCache.delete(`${kind}:${id}`);
+    return;
+  }
+  mediaCache.delete(`thumb:${id}`);
+  mediaCache.delete(`original:${id}`);
+}
+
 async function ensurePort(): Promise<number | null> {
   if (sharedPort.value !== null) return sharedPort.value;
   if (portPromise !== null) return portPromise;
@@ -80,12 +114,19 @@ export function useMediaUrl() {
   async function mediaSrc(item: MediaItem, kind: MediaKind): Promise<string | null> {
     if (!item) return null;
     if (item.encoded) return item.encoded;
+    const cached = cacheGet(item, kind);
+    if (cached) return cached;
     const backendUrl = await resolveBackendMedia(item, kind);
-    if (backendUrl) return backendUrl;
+    if (backendUrl) {
+      cacheSet(item, kind, backendUrl);
+      return backendUrl;
+    }
     await ensurePort();
     const location = item.location;
     if (!location) return null;
-    return (kind === 'thumb' ? thumbUrl(location) : imageUrl(location)) ?? null;
+    const url = (kind === 'thumb' ? thumbUrl(location) : imageUrl(location)) ?? null;
+    if (url) cacheSet(item, kind, url);
+    return url;
   }
 
   function thumbSrc(item: MediaItem | null | undefined): Promise<string | null> {

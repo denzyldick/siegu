@@ -27,6 +27,7 @@ pub mod signal;
 pub mod signalling;
 pub mod sync_transport;
 pub mod thumbnail;
+pub mod turn_embedded;
 pub mod view_only;
 
 pub use database::{

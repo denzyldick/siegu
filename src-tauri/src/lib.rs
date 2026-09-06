@@ -220,6 +220,18 @@ pub fn run() {
 
             let config_path = get_config_path(app.handle());
 
+            // Start the built-in TURN relay when enabled (settings). It
+            // publishes SIEGU_TURN_* so the host advertises the relay to
+            // guests and the served guest page picks it up.
+            {
+                let config_path = config_path.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = siegu_core::turn_embedded::ensure_started(&config_path).await {
+                        crate::common::debug_log(format!("embedded TURN relay start failed: {e}"));
+                    }
+                });
+            }
+
             let sync_tx = Arc::new(tokio::sync::Mutex::new(None));
             let ml_context = ml::start_background_worker(
                 app.handle(),

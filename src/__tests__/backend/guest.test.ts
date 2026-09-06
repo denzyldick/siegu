@@ -108,8 +108,8 @@ describe('GuestClient', () => {
     });
 
     transport.push({ type: 'FileHeader', id: 'p1', filename: 'pic.jpg', size: 2 });
-    transport.push({ type: 'FileChunk', id: 'p1', index: 0, data: [0xaa] });
-    transport.push({ type: 'FileChunk', id: 'p1', index: 1, data: [0xbb] });
+    transport.push({ type: 'FileChunk', id: 'p1', index: 0, data: 'qg==' }); // [0xaa]
+    transport.push({ type: 'FileChunk', id: 'p1', index: 1, data: 'uw==' }); // [0xbb]
     transport.push({ type: 'FileEnd', id: 'p1' });
 
     expect(onMedia).toHaveBeenCalledTimes(1);
@@ -150,8 +150,8 @@ describe('GuestClient', () => {
 
     // Original streams via FileHeader/Chunk/End.
     transport.push({ type: 'FileHeader', id: 'p1', filename: 'full.jpg', size: 2 });
-    transport.push({ type: 'FileChunk', id: 'p1', index: 0, data: [0x01] });
-    transport.push({ type: 'FileChunk', id: 'p1', index: 1, data: [0x02] });
+    transport.push({ type: 'FileChunk', id: 'p1', index: 0, data: 'AQ==' }); // [0x01]
+    transport.push({ type: 'FileChunk', id: 'p1', index: 1, data: 'Ag==' }); // [0x02]
     transport.push({ type: 'FileEnd', id: 'p1' });
 
     await expect(orig).resolves.toBeTruthy();

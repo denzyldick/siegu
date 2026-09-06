@@ -7000,10 +7000,12 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tungstenite 0.28.0",
+ "turn",
  "url",
  "uuid",
  "warp",
  "webrtc",
+ "webrtc-util",
  "zeroize",
 ]
 

@@ -365,6 +365,11 @@ impl MeshTransport {
         let items_total = Arc::new(AtomicUsize::new(0));
         let mirror_completed = Arc::new(AtomicUsize::new(0));
         let mirror_total = Arc::new(AtomicUsize::new(0));
+        // Files that failed every retry (checksum mismatch); surfaced in the
+        // final status so a drop never masquerades as a completed sync.
+        let items_failed = Arc::new(AtomicUsize::new(0));
+        // Per-file in-session retry attempts, bounded by MAX_RETRY_ATTEMPTS.
+        let retries = Arc::new(Mutex::new(HashMap::<String, u32>::new()));
 
         // Heartbeat liveness (#heartbeat): millis of last inbound frame.
         let last_seen: Arc<std::sync::atomic::AtomicU64> =
@@ -466,6 +471,8 @@ impl MeshTransport {
             let total = Arc::clone(&items_total);
             let mirror_completed = Arc::clone(&mirror_completed);
             let mirror_total = Arc::clone(&mirror_total);
+            let failed_msg = Arc::clone(&items_failed);
+            let retries_msg = Arc::clone(&retries);
             let last_seen_msg = Arc::clone(&last_seen_dc);
             let session_scope = std::sync::Arc::clone(&session_scope);
             Box::pin(async move {
@@ -487,6 +494,8 @@ impl MeshTransport {
                         &pending_view,
                         share_mode_msg,
                         &session_scope,
+                        &failed_msg,
+                        &retries_msg,
                     )
                     .await;
                 }
@@ -1002,6 +1011,11 @@ impl MeshTransport {
         let items_total = Arc::new(AtomicUsize::new(0));
         let mirror_completed = Arc::new(AtomicUsize::new(0));
         let mirror_total = Arc::new(AtomicUsize::new(0));
+        // Files that failed every retry (checksum mismatch); surfaced in the
+        // final status so a drop never masquerades as a completed sync.
+        let items_failed = Arc::new(AtomicUsize::new(0));
+        // Per-file in-session retry attempts, bounded by MAX_RETRY_ATTEMPTS.
+        let retries = Arc::new(Mutex::new(HashMap::<String, u32>::new()));
         // Heartbeat liveness (#heartbeat): millis of last inbound frame.
         let last_seen: Arc<std::sync::atomic::AtomicU64> =
             Arc::new(std::sync::atomic::AtomicU64::new(now_millis()));
@@ -1111,6 +1125,8 @@ impl MeshTransport {
         let total_rcv = Arc::clone(&items_total);
         let mirror_completed_rcv = Arc::clone(&mirror_completed);
         let mirror_total_rcv = Arc::clone(&mirror_total);
+        let failed_rcv = Arc::clone(&items_failed);
+        let retries_rcv = Arc::clone(&retries);
         let sync_rx_rcv = Arc::clone(&sync_rx);
         let device_id_rcv = self.device_id.clone();
         let device_name_rcv = self.device_name.clone();
@@ -1135,6 +1151,10 @@ impl MeshTransport {
             let total_msg = Arc::clone(&total_rcv);
             let mirror_completed_msg = Arc::clone(&mirror_completed_rcv);
             let mirror_total_msg = Arc::clone(&mirror_total_rcv);
+            let failed_msg = Arc::clone(&failed_rcv);
+            let retries_msg = Arc::clone(&retries_rcv);
+            let failed_rcv_inner = Arc::clone(&failed_msg);
+            let retries_rcv_inner = Arc::clone(&retries_msg);
 
             let session_scope: std::sync::Arc<
                 tokio::sync::Mutex<Option<crate::view_only::AlbumScope>>,
@@ -1152,6 +1172,8 @@ impl MeshTransport {
                 let total = Arc::clone(&total_msg);
                 let mirror_completed = Arc::clone(&mirror_completed_msg);
                 let mirror_total = Arc::clone(&mirror_total_msg);
+                let failed_msg = Arc::clone(&failed_rcv_inner);
+                let retries_msg = Arc::clone(&retries_rcv_inner);
                 let session_scope = std::sync::Arc::clone(&session_scope);
                 let last_seen_msg = Arc::clone(&last_seen_on_msg);
                 Box::pin(async move {
@@ -1173,6 +1195,8 @@ impl MeshTransport {
                             &pending_view,
                             share_mode_msg,
                             &session_scope,
+                            &failed_msg,
+                            &retries_msg,
                         )
                         .await;
                     }

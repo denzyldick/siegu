@@ -58,3 +58,37 @@ siegu-cli config keys
 ```
 
 Config key validation: keys are whitelisted, values have type/range checking. Invalid values are rejected with a descriptive error.
+
+## Network / TURN
+
+Siegu ships with a built-in TURN relay that runs on the host when enabled. It
+hands guests ICE credentials automatically; guests behind restrictive networks
+(mobile data, carrier-grade NAT) can still connect through it. See
+[NAT Traversal & TURN](turn.md) for the full setup.
+
+### Config keys
+
+Saved via `save_config` (the app's Settings or the config file):
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `turn_enabled` | `false` | `true`/`false` — start the built-in relay at launch |
+| `turn_port` | `0` | Relay UDP port; `0` picks a free port automatically |
+| `turn_public_host` | empty | Public IP of this device; empty = auto-detect the LAN IP |
+| `turn_username` | auto | Credentials the app generated (left alone once set) |
+| `turn_password` | auto | Credentials the app generated (left alone once set) |
+
+`turn_public_host` must be an IP address (or empty — auto-detected). Port must
+be a `u16` (0–65535).
+
+### Host environment variables (external relay override)
+
+The host reads these from its environment when creating WebRTC connections. The
+built-in relay sets them itself; setting `SIEGU_TURN_URLS` before launch **skips
+the built-in relay** and uses your own instead.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SIEGU_TURN_URLS` | set by app | Comma-separated TURN URLs, e.g. `turn:home.example.com:3478` |
+| `SIEGU_TURN_USERNAME` | set by app | TURN username (only needed if the relay has auth) |
+| `SIEGU_TURN_CREDENTIAL` | set by app | TURN password/credential |

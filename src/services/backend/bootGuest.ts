@@ -15,6 +15,7 @@
 import { GuestClient } from './guest';
 import { createPeerTransport } from './peer';
 import type { PeerTransport } from './peer';
+import type { TURNConfig } from './peer';
 import type { GuestSession } from './protocol';
 import { resolveSignalingBase } from '@/services/signalling';
 export interface GuestBootEvents {
@@ -41,9 +42,17 @@ export function bootGuest(
   events: GuestBootEvents = {},
   transportOverride?: PeerTransport,
   signalingBase?: string,
+  turn?: TURNConfig,
 ): GuestBoot {
   const base = signalingBase ?? resolveSignalingBase();
-  const transport = transportOverride ?? createPeerTransport(base, session);
+
+  // The served SPA carries the host's built-in relay as `window.sieguTurnConfig`
+  // when it is enabled; prefer the explicit argument, then fall back to it.
+  const effectiveTurn: TURNConfig | undefined = turn ?? readPageTurnConfig();
+
+  const transport =
+    transportOverride ??
+    createPeerTransport(base, session, effectiveTurn ? { turn: effectiveTurn } : undefined);
 
   const client = new GuestClient(transport, {
     onOpen: () => events.onOpen?.(),
@@ -53,4 +62,19 @@ export function bootGuest(
   });
 
   return { client, transport };
+}
+
+interface PageTurnConfig {
+  url?: string | string[];
+  username?: string;
+  credential?: string;
+}
+
+function readPageTurnConfig(): TURNConfig | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const cfg = (window as unknown as { sieguTurnConfig?: PageTurnConfig }).sieguTurnConfig;
+  if (!cfg) return undefined;
+  const urls = Array.isArray(cfg.url) ? cfg.url : cfg.url?.split(',').map((s) => s.trim());
+  if (!urls || urls.length === 0 || !cfg.username || !cfg.credential) return undefined;
+  return { urls, username: cfg.username, credential: cfg.credential };
 }

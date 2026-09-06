@@ -193,6 +193,7 @@ const emit = defineEmits<{
   play: [];
   pause: [];
   ended: [];
+  ready: [];
   error: [e: Event];
 }>();
 
@@ -250,6 +251,7 @@ function onMetadataLoaded(): void {
   const video = videoEl.value;
   if (!video) return;
   duration.value = video.duration;
+  emit('ready');
   if (props.autoPlay) {
     nextTick(() => {
       video.play().catch(() => {});

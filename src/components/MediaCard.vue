@@ -28,6 +28,7 @@
           v-else-if="imageSrc"
           :src="imageSrc"
           loading="lazy"
+          decoding="async"
           :alt="$t('media_card.alt_photo')"
           class="media-card-img"
           @load="onMainLoad"
@@ -198,6 +199,13 @@ function stopPreview(): void {
     previewTimerId = undefined;
   }
   hovering.value = false;
+  // Unmounting alone may leave the decoder holding video buffers (WebKitGTK);
+  // dropping the src + load() lets the codec release its frames immediately.
+  const video = containerRef.value?.querySelector('video');
+  if (video) {
+    video.removeAttribute('src');
+    video.load();
+  }
 }
 
 onUnmounted(() => stopPreview());

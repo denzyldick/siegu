@@ -26,7 +26,7 @@ export type GuestInbound =
       size: number;
       checksum?: string;
     }
-  | { type: 'FileChunk'; id: number | string; index: number; data: number[] }
+  | { type: 'FileChunk'; id: number | string; index: number; data: string }
   | { type: 'FileEnd'; id: number | string; checksum?: string };
 // Unknown inbound frames fall through to the `default` case at runtime; there
 // is intentionally no catch-all union member so TypeScript can narrow the
@@ -90,10 +90,22 @@ export function inferMime(filename: string): string {
 }
 
 /**
+ * Decode a base64 string into bytes. Chunks travel base64 on the wire (a JSON
+ * number array would inflate each chunk ~3.9x); this mirrors the host's
+ * `base64_bytes` serde adapter.
+ */
+export function b64ToBytes(b64: string): Uint8Array {
+  const raw = atob(b64);
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return bytes;
+}
+
+/**
  * Reassemble a set of file chunks into a single byte array.
  * Returns null when no chunks have been received.
  */
-export function assembleChunks(chunks: Map<number, number[]>): Uint8Array | null {
+export function assembleChunks(chunks: Map<number, Uint8Array>): Uint8Array | null {
   if (chunks.size === 0) return null;
   const indexes = [...chunks.keys()].sort((a, b) => a - b);
   let len = 0;
@@ -113,7 +125,7 @@ export function assembleChunks(chunks: Map<number, number[]>): Uint8Array | null
  */
 export class FileAssembler {
   private filename: string | undefined;
-  private chunks = new Map<number, number[]>();
+  private chunks = new Map<number, Uint8Array>();
 
   constructor(
     public readonly id: number | string,
@@ -124,8 +136,8 @@ export class FileAssembler {
     this.filename = filename;
   }
 
-  chunk(index: number, data: number[]): void {
-    this.chunks.set(index, data);
+  chunk(index: number, b64: string): void {
+    this.chunks.set(index, b64ToBytes(b64));
   }
 
   end(): void {

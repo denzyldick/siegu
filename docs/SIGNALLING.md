@@ -2,11 +2,14 @@
 
 Siegu uses a WebSocket signalling server to coordinate WebRTC connections between devices. The default server is `wss://siegu.io/ws`, but you can self-host your own.
 
+For connectivity when the devices can't reach each other directly (symmetric NAT, cellular/carrier-grade NAT), Siegu also supports its built-in TURN relay — see [NAT Traversal & TURN](turn.md).
+
 ## How It Works
 
 1. Both devices connect to the signalling server via WebSocket
 2. The server relays WebRTC offer/answer/ICE candidates between peers
 3. Once the peer-to-peer connection is established, the signalling server is no longer needed for data transfer
+4. If no direct peer-to-peer path exists (e.g. a guest on mobile data behind carrier NAT), the media is relayed through Siegu's built-in TURN relay — encrypted in transit, never stored
 
 ```
 Device A ──WebSocket──┐
@@ -127,6 +130,7 @@ The viewer will connect via the signalling server and stream the collection.
 
 - **"Test connection" fails**: Check that the URL is reachable and the server is running
 - **Devices can't connect**: Ensure both devices can reach the signalling server URL
+- **Sync works on Wi-Fi but not on mobile data**: The guest is likely behind carrier-grade NAT and needs a TURN relay — see [NAT Traversal & TURN](turn.md)
 - **Connection drops**: Check server logs for disconnection reasons; verify TLS certificates are valid
 - **Web client shows "Missing session link"**: The URL hash must contain CODE.TOKEN — make sure you're using the full share URL
 - **Web client shows "Session ended" immediately**: The signalling server may not be running or the room expired
@@ -155,6 +159,7 @@ You (Tauri) ──WebSocket── Signalling ──WebSocket── Friend (Brows
 
 ## Related Documentation
 
+- [NAT Traversal & TURN](turn.md) — keeping connections working over cellular / restrictive networks
 - [Web Client](webclient.md) — View-only browser viewer
 - [Collection Sharing](sharing.md) — How sharing works
 - [Security](security.md) — Privacy and encryption details

@@ -2271,7 +2271,7 @@ impl Database {
     pub fn get_heatmap_points(&self) -> Vec<MapPoint> {
         let mut points = Vec::new();
         let sql = "SELECT id, latitude, longitude, location, created FROM photo \
-            WHERE (latitude != 0.0 OR longitude != 0.0)";
+            WHERE (latitude != 0.0 OR longitude != 0.0) AND deleted_at IS NULL";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([], |row| {
                 Ok(MapPoint {
@@ -5712,6 +5712,14 @@ mod tests {
         let _ = db.store_photo_batch(&[photo]);
         let points = db.get_heatmap_points();
         assert!(points.iter().any(|p| p.id == "test_heat_1"));
+        db.connection
+            .execute(
+                "UPDATE photo SET deleted_at = '2024-02-01' WHERE id = 'test_heat_1'",
+                [],
+            )
+            .unwrap();
+        let points = db.get_heatmap_points();
+        assert!(!points.iter().any(|p| p.id == "test_heat_1"));
     }
 
     #[test]

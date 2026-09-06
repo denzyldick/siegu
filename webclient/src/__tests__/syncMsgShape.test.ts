@@ -51,15 +51,15 @@ describe('SyncMsg type shape', () => {
     expect(msg.filename).toBe('photo.jpg');
   });
 
-  it('FileChunk has index and data array', () => {
+  it('FileChunk has index and base64 data string', () => {
     const msg: SyncMsg = {
       type: 'FileChunk',
       id: 'p1',
       index: 0,
-      data: [1, 2, 3],
+      data: 'AQID',
     };
     expect(msg.type).toBe('FileChunk');
-    expect(msg.data).toEqual([1, 2, 3]);
+    expect(msg.data).toBe('AQID');
   });
 
   it('FileEnd has id and checksum', () => {

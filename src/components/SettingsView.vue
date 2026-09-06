@@ -55,6 +55,7 @@
         <MaintenanceSection v-if="!embedded" />
 
         <StorageSection v-if="!embedded" />
+        <MapSection v-if="!embedded" />
 
         <ProSection
           v-if="!embedded"
@@ -70,11 +71,18 @@
           :signalling-testing="signalingTesting"
           :signalling-saving="signallingSaving"
           :signal-ping-result="signalingPingResult"
+          :turn-enabled="turnEnabled"
+          :turn-port="turnPort"
+          :turn-public-host="turnPublicHost"
+          :turn-saving="turnSaving"
           :connect-url="APP_CONNECT_URL"
           @update:email="onProEmail"
           @update:license-url="onProLicenseUrl"
           @update:signalling-url="onSignallingUrl"
           @update:signalling-token="onSignallingToken"
+          @update:turn-enabled="onTurnEnabled"
+          @update:turn-port="onTurnPort"
+          @update:turn-public-host="onTurnPublicHost"
           @verify="startProVerification"
           @close-verify-dialog="closeProDialog"
           :verify-dialog="proDialogOpen"
@@ -83,6 +91,7 @@
           @save-config="saveLicense"
           @test-signalling="testSignalling"
           @save-signalling="saveSignalling"
+          @save-turn="saveTurn"
         />
 
         <UpdateSection
@@ -239,6 +248,7 @@ import LanguageSection from './settings/LanguageSection.vue';
 import AppearanceSection from './settings/AppearanceSection.vue';
 import MaintenanceSection from './settings/MaintenanceSection.vue';
 import StorageSection from './settings/StorageSection.vue';
+import MapSection from './settings/MapSection.vue';
 import ProSection from './settings/ProSection.vue';
 import UpdateSection from './settings/UpdateSection.vue';
 import AboutSection from './settings/AboutSection.vue';
@@ -271,6 +281,10 @@ const {
   signalingToken,
   signalingTesting,
   signalingPingResult,
+  turnEnabled,
+  turnPort,
+  turnPublicHost,
+  saveTurnConfig,
   init,
   stopClock,
   selectDirectory,
@@ -307,6 +321,7 @@ const isStoreManaged = computed(
 
 const signallingSaving = ref(false);
 const proSaving = ref(false);
+const turnSaving = ref(false);
 const cleanupConfirming = ref(false);
 const wipeConfirming = ref(false);
 
@@ -347,6 +362,25 @@ function onProEmail(v: string): void {
 }
 function onProLicenseUrl(v: string): void {
   proLicenseUrl.value = v;
+}
+
+function onTurnEnabled(v: boolean): void {
+  turnEnabled.value = v;
+}
+function onTurnPort(v: string): void {
+  turnPort.value = v;
+}
+function onTurnPublicHost(v: string): void {
+  turnPublicHost.value = v;
+}
+
+async function saveTurn(): Promise<void> {
+  turnSaving.value = true;
+  try {
+    await saveTurnConfig();
+  } finally {
+    turnSaving.value = false;
+  }
 }
 
 async function saveLicense(): Promise<void> {

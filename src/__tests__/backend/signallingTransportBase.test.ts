@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { bootGuest } from '@/services/backend/bootGuest';
-import { createPeerTransport } from '@/services/backend/peer';
+import { buildIceServers, createPeerTransport } from '@/services/backend/peer';
 import type { GuestSession } from '@/services/backend/protocol';
 
 /**
@@ -51,5 +51,31 @@ describe('bootGuest signalling base wiring', () => {
     expect(client).toBeDefined();
     // Override short-circuits the real builder.
     expect(vi.mocked(createPeerTransport)).not.toHaveBeenCalled();
+  });
+});
+
+describe('buildIceServers', () => {
+  it('defaults to the public STUN server alone', () => {
+    const servers = buildIceServers();
+    expect(servers).toHaveLength(1);
+    expect(servers[0].urls).toContain('stun:stun.l.google.com:19302');
+  });
+
+  it('appends a TURN server when configured, preserving the STUN default', () => {
+    const servers = buildIceServers({
+      urls: ['turn:turn.siegu.io:3478'],
+      username: 'ghost',
+      credential: 'hunter2',
+    });
+    expect(servers).toHaveLength(2);
+    expect(servers[0].urls).toContain('stun:stun.l.google.com:19302');
+    expect(servers[1].urls).toEqual(['turn:turn.siegu.io:3478']);
+    expect(servers[1].username).toBe('ghost');
+    expect(servers[1].credential).toBe('hunter2');
+  });
+
+  it('ignores an empty TURN URL list', () => {
+    const servers = buildIceServers({ urls: [] });
+    expect(servers).toHaveLength(1);
   });
 });

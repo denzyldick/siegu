@@ -18,7 +18,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' tauri: localhost; style-src 'self' 'unsafe-inline'; img-src 'self' data: tauri: asset: http://asset.localhost http://127.0.0.1:* https://*.basemaps.cartocdn.com; media-src 'self' tauri: asset: http://asset.localhost http://127.0.0.1:*; frame-src 'self' tauri: localhost; connect-src 'self' tauri: localhost http://127.0.0.1:* https://github.com;",
+      "csp": "default-src 'self' tauri: localhost; style-src 'self' 'unsafe-inline'; img-src 'self' data: tauri: asset: http://asset.localhost http://127.0.0.1:* https:; media-src 'self' tauri: asset: http://asset.localhost http://127.0.0.1:*; frame-src 'self' tauri: localhost; connect-src 'self' tauri: localhost http://127.0.0.1:* https://github.com;",
       "assetProtocol": {
         "enable": true,
         "scope": [

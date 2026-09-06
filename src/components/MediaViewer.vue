@@ -75,49 +75,96 @@
             >
               <div
                 class="carousel-track"
-                :style="{
-                  transform: trackTransform,
-                  transition: isCarouselAnimating
-                    ? 'transform 300ms cubic-bezier(0.16, 1, 0.3, 1)'
-                    : 'none',
-                }"
+                :style="{ transform: trackTransform, transition: 'none' }"
               >
                 <!-- Previous slide -->
                 <div class="carousel-slide">
-                  <template v-if="prevItem && !isItemVideo(prevItem)">
-                    <img :src="prevFull" class="viewer-image" decoding="async" />
-                  </template>
-                  <template v-else-if="prevItem && isItemVideo(prevItem)">
-                    <img :src="prevThumb" class="viewer-image" decoding="async" />
-                  </template>
+                  <img
+                    v-if="prevItem"
+                    :key="'prev-' + prevItem.id"
+                    :src="prevThumb"
+                    class="viewer-thumb-slide"
+                    decoding="async"
+                    draggable="false"
+                  />
+                  <img
+                    v-if="prevItem && !isItemVideo(prevItem)"
+                    :key="'prev-full-' + prevItem.id"
+                    :src="prevFull"
+                    class="preload-full"
+                    loading="eager"
+                    decoding="async"
+                    draggable="false"
+                    aria-hidden="true"
+                    @load="onNeighborFullLoad('prev', $event)"
+                  />
                 </div>
 
                 <!-- Current slide -->
                 <div class="carousel-slide">
-                  <template v-if="currentPhoto && !isVideo">
-                    <img :src="currentPhotoSrc" class="viewer-image" decoding="async" />
-                  </template>
-                  <template v-else-if="currentPhoto && isVideo && computedVideoUrl">
-                    <VideoPlayer
-                      ref="videoPlayerRef"
-                      :src="computedVideoUrl"
-                      :type="videoType"
-                      :auto-play="true"
-                      :transcript="photoTranscript"
-                      :title="currentPhotoName"
-                      @error="onVideoError($event)"
-                    />
-                  </template>
+                  <div v-if="currentPhoto" :key="currentPhoto.id" class="media-frame">
+                    <template v-if="!isVideo">
+                      <img
+                        :src="currentThumb"
+                        class="media-thumb"
+                        :class="{ 'is-hidden': fullPhotoLoaded }"
+                        decoding="async"
+                        draggable="false"
+                      />
+                      <img
+                        :src="currentPhotoSrc"
+                        class="media-fill"
+                        :class="{ 'is-ready': fullPhotoLoaded }"
+                        decoding="async"
+                        draggable="false"
+                        @load="fullPhotoLoaded = true"
+                      />
+                    </template>
+                    <template v-else>
+                      <img
+                        :src="currentThumb"
+                        class="media-thumb"
+                        :class="{ 'is-hidden': videoReady }"
+                        decoding="async"
+                        draggable="false"
+                      />
+                      <div v-if="computedVideoUrl" class="video-reveal" :class="{ 'is-ready': videoReady }">
+                        <VideoPlayer
+                          ref="videoPlayerRef"
+                          :src="computedVideoUrl"
+                          :type="videoType"
+                          :auto-play="true"
+                          :transcript="photoTranscript"
+                          :title="currentPhotoName"
+                          @error="onVideoError($event)"
+                          @ready="videoReady = true"
+                        />
+                      </div>
+                    </template>
+                  </div>
                 </div>
 
                 <!-- Next slide -->
                 <div class="carousel-slide">
-                  <template v-if="nextItem && !isItemVideo(nextItem)">
-                    <img :src="nextFull" class="viewer-image" decoding="async" />
-                  </template>
-                  <template v-else-if="nextItem && isItemVideo(nextItem)">
-                    <img :src="nextThumb" class="viewer-image" decoding="async" />
-                  </template>
+                  <img
+                    v-if="nextItem"
+                    :key="'next-' + nextItem.id"
+                    :src="nextThumb"
+                    class="viewer-thumb-slide"
+                    decoding="async"
+                    draggable="false"
+                  />
+                  <img
+                    v-if="nextItem && !isItemVideo(nextItem)"
+                    :key="'next-full-' + nextItem.id"
+                    :src="nextFull"
+                    class="preload-full"
+                    loading="eager"
+                    decoding="async"
+                    draggable="false"
+                    aria-hidden="true"
+                    @load="onNeighborFullLoad('next', $event)"
+                  />
                 </div>
               </div>
             </div>
@@ -567,6 +614,7 @@ import { useMediaUrl } from '@/composables/useMediaUrl';
 import { useDoubleTap } from '@/composables/useDoubleTap';
 import { useTimePeriods } from '@/composables/useTimePeriods';
 import { useSwipeCarousel } from '@/composables/useSwipeCarousel';
+import { invalidateMediaUrl } from '@/composables/useMediaUrl';
 import { useI18n } from 'vue-i18n';
 import type { MediaItem } from '@/types/media';
 
@@ -653,7 +701,6 @@ const {
 
 const {
   phase: carouselPhase,
-  isAnimating: isCarouselAnimating,
   trackTransform,
   getPrevIndex,
   getNextIndex,
@@ -799,6 +846,17 @@ const currentPhoto = computed(() => {
 const currentPhotoRef = computed(() => currentPhoto.value);
 const currentThumb = mediaSrcRef(currentPhotoRef, 'thumb');
 const currentOriginal = mediaSrcRef(currentPhotoRef, 'original');
+
+const fullPhotoLoaded = ref(false);
+const videoReady = ref(false);
+
+watch(
+  () => currentPhoto.value?.id ?? '',
+  () => {
+    fullPhotoLoaded.value = false;
+    videoReady.value = false;
+  },
+);
 
 const currentPhotoName = computed(() => {
   const loc = currentPhoto.value?.location;
@@ -1303,14 +1361,53 @@ const nextItem = computed((): MediaItem | null => {
   return props.photos[getNextIndex()];
 });
 
+const prevThumb = mediaSrcRef(prevItem, 'thumb');
+const nextThumb = mediaSrcRef(nextItem, 'thumb');
+
 function isItemVideo(item: MediaItem): boolean {
   return checkIsVideo(item.location ?? '');
 }
 
-const prevFull = mediaSrcRef(prevItem, 'original');
-const prevThumb = mediaSrcRef(prevItem, 'thumb');
-const nextFull = mediaSrcRef(nextItem, 'original');
-const nextThumb = mediaSrcRef(nextItem, 'thumb');
+// Full-resolution preloads for the neighbour slides. Video neighbours are
+// deliberately excluded (resolving their 'original' would preload raw video
+// bytes for zero benefit). Passing a computed that yields null lets the shared
+// mediaSrcRef skip the fetch entirely instead of pulling the video URL.
+const prevPhotoRef = computed(() => (prevItem.value ? (!isItemVideo(prevItem.value) ? prevItem.value : null) : null));
+const nextPhotoRef = computed(() => (nextItem.value ? (!isItemVideo(nextItem.value) ? nextItem.value : null) : null));
+const prevFull = mediaSrcRef(prevPhotoRef, 'original');
+const nextFull = mediaSrcRef(nextPhotoRef, 'original');
+
+// ── Bounded 3-image window ─────────────────────────────────────────────────
+// The center keeps its full image mounted; neighbours eager-load theirs in a
+// hidden node. When navigation moves one of them out of the window, the keyed
+// <img> unmounts (frees the decoded pixels). In guest mode the source is a
+// blob: URL, so we also revoke it (and drop the cached URL string) to release
+// the raw bytes — otherwise the browser would keep the whole library's blobs.
+const windowFullBlobs = new Map<string, string>();
+
+function onNeighborFullLoad(_side: 'prev' | 'next', e: Event): void {
+  const target = e.target as HTMLImageElement | null;
+  const src = target?.currentSrc || target?.src;
+  if (!src || !src.startsWith('blob:')) return;
+  const slide = _side === 'prev' ? prevItem.value : nextItem.value;
+  if (slide) windowFullBlobs.set(String(slide.id), src);
+}
+
+function releaseEvictedNeighbors(): void {
+  const ids = new Set<string>();
+  const current = currentPhoto.value;
+  if (current) ids.add(String(current.id));
+  if (prevItem.value) ids.add(String(prevItem.value.id));
+  if (nextItem.value) ids.add(String(nextItem.value.id));
+  for (const [id, url] of [...windowFullBlobs]) {
+    if (ids.has(id)) continue;
+    windowFullBlobs.delete(id);
+    if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+    invalidateMediaUrl(id);
+  }
+}
+
+watch([() => props.index, () => props.photos], releaseEvictedNeighbors);
 
 function handleKeydown(e: KeyboardEvent): void {
   if (!visible.value) return;
@@ -1367,11 +1464,24 @@ watch(
 
 watch(
   () => props.photos,
-  (newPhotos) => {
+  (newPhotos, oldPhotos) => {
     if (!Array.isArray(newPhotos) || newPhotos.length === 0) {
       if (visible.value) visible.value = false;
       detectedFaces.value = [];
       return;
+    }
+    // The library rebuilds its photos array in place when new items arrive
+    // mid-browse (photo-received events). Keep showing the photo the user is
+    // actually viewing by re-anchoring on its id instead of leaving the old
+    // numeric index pointing at a different, newly-inserted item.
+    const oldIndex = props.index;
+    const oldId = oldPhotos?.[oldIndex]?.id;
+    if (oldId != null) {
+      const reanchored = newPhotos.findIndex((p) => p.id === oldId);
+      if (reanchored !== -1 && reanchored !== oldIndex) {
+        emit('update:index', reanchored);
+        return;
+      }
     }
     if (props.index >= newPhotos.length) emit('update:index', newPhotos.length - 1);
     if (props.index < 0) emit('update:index', 0);
@@ -1477,6 +1587,13 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
+/* Hidden neighbour preloader: renders the full-res image to warm the HTTP /
+   decoded cache without taking layout space. Unmounting the keyed node on
+   navigation frees the decoded pixels. */
+.preload-full {
+  display: none;
+}
+
 .viewer-image {
   max-width: 100%;
   max-height: 100%;
@@ -1484,6 +1601,71 @@ onUnmounted(() => {
   user-select: none;
   -webkit-user-drag: none;
   pointer-events: none;
+}
+
+.viewer-thumb-slide {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+.media-frame {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.media-thumb {
+  position: absolute;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.25s ease;
+}
+
+.media-thumb.is-hidden {
+  opacity: 0;
+}
+
+.media-fill {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.media-fill.is-ready {
+  opacity: 1;
+}
+
+.video-reveal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+
+.video-reveal.is-ready {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .viewer-nav-btn {

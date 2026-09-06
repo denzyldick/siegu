@@ -3,6 +3,7 @@ import {
   parseHash,
   inferMime,
   assembleChunks,
+  b64ToBytes,
   FileAssembler,
   takeNextOutbound,
 } from '@/services/backend';
@@ -83,13 +84,20 @@ describe('assembleChunks', () => {
   });
 
   it('concatenates out-of-order chunks in index order', () => {
-    const chunks = new Map<number, number[]>([
-      [1, [2, 2]],
-      [0, [1, 1, 1]],
+    const chunks = new Map<number, Uint8Array>([
+      [1, new Uint8Array([2, 2])],
+      [0, new Uint8Array([1, 1, 1])],
     ]);
     const bytes = assembleChunks(chunks);
     expect(bytes).not.toBeNull();
     expect([...bytes!]).toEqual([1, 1, 1, 2, 2]);
+  });
+});
+
+describe('b64ToBytes', () => {
+  it('decodes base64 payloads back to the original bytes', () => {
+    expect([...b64ToBytes('AQI=')]).toEqual([1, 2]);
+    expect([...b64ToBytes('AAA/AA==')]).toEqual([0, 0, 63, 0]);
   });
 });
 
@@ -103,8 +111,8 @@ describe('FileAssembler', () => {
       done();
     });
     asm.header('pic.jpg');
-    asm.chunk(0, [1, 2]);
-    asm.chunk(1, [3]);
+    asm.chunk(0, 'AQI='); // [1, 2] base64
+    asm.chunk(1, 'Aw=='); // [3] base64
     asm.end();
     expect(done).toHaveBeenCalledTimes(1);
   });

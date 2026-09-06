@@ -8,7 +8,7 @@
  * gallery and pulls media on demand. Nothing is persisted anywhere.
  */
 
-import { parseHash, inferMime, assembleChunks } from './lib';
+import { parseHash, inferMime, assembleChunks, b64ToBytes, turnIceServers } from './lib';
 import type { ViewPhoto, SyncMsg } from './lib';
 
 type SignalMsg = Record<string, unknown> & { type: string };
@@ -39,7 +39,7 @@ const inflightThumbs = new Set<string>();
 let pendingOriginal: {
   id: string;
   filename: string;
-  chunks: Map<number, number[]>;
+  chunks: Map<number, Uint8Array>;
 } | null = null;
 
 /** Revoke a single blob URL and remove it from the cache. */
@@ -153,7 +153,7 @@ function handleSync(msg: SyncMsg): void {
     case 'FileChunk': {
       const m = msg as Extract<SyncMsg, { type: 'FileChunk' }>;
       if (pendingOriginal && pendingOriginal.id === m.id) {
-        pendingOriginal.chunks.set(m.index, m.data);
+        pendingOriginal.chunks.set(m.index, b64ToBytes(m.data));
       }
       break;
     }
@@ -549,7 +549,7 @@ async function answerOffer(ws: WebSocket, sdpJson: string): Promise<void> {
   try {
     setStatus('Connecting media channel…');
     pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      iceServers: turnIceServers(),
     });
 
     pc.onicecandidate = (ev) => {
