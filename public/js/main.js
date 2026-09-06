@@ -1002,8 +1002,9 @@ async function boot() {
     initCarousel();
   }
 
-  // Fire trackers after a short delay (or after consent). For now, auto-enable.
-  setTimeout(trackersOn, 800);
+  // Trackers only load after explicit consent (accept banner); declined or
+  // unanswered = nothing ever loads.
+  initConsent();
 
   initReveal();
 }
