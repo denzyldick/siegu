@@ -101,7 +101,8 @@
         "Onbeperkt lokale foto's",
         "AI-zoekopdracht op je apparaat",
         "Automatische organisatie",
-        "Lokaal delen op je netwerk"
+        "Lokaal delen op je netwerk",
+        "Zelf-gehoste toegang op afstand (DIY)"
       ],
       "cta": "Aan de slag"
     },
@@ -109,12 +110,12 @@
       "name": "Pro",
       "price": "$5",
       "period": "per maand",
-      "tagline": "Alles, overal.",
+      "tagline": "Overal, op elk netwerk.",
       "highlight": "Meest populair",
       "features": [
         "Alles in Gratis",
-        "Directe deellinks naar collecties met anderen",
-        "Links voor iedereen, overal",
+        "Sync & delen over internet — zelfs op mobiele data",
+        "Gehoste relay, dus je raakt router- of NAT-instellingen niet aan",
         "Vroege toegang tot nieuwe functies"
       ],
       "cta": "Ga Pro",
@@ -149,6 +150,14 @@
       {
         "q": "Hoe werkt delen?",
         "a": "Je kunt een collectie delen via een live, end-to-end-versleutelde link. Gasten zien alleen wat jij kiest om te delen, en er wordt niets aan onze kant opgeslagen."
+      },
+      {
+        "q": "Kan ik mijn foto's via mobiele data of op reis bekijken?",
+        "a": "Ja. Free-gebruikers kunnen hun app richten op een zelf-gehoste relay op een eigen machine (één UDP-poort doorsturen). Pro's gehoste relay doet hetzelfde zonder configuratie — het werkt zelfs op mobiele netwerken die directe verbindingen blokkeren."
+      },
+      {
+        "q": "Waarom heb ik eigenlijk een relay nodig?",
+        "a": "Om via internet te verbinden moeten twee apparaten elkaar kunnen vinden. De meeste thuisnetwerken werken direct, maar sommige netwerken (vooral mobiele data) zitten achter NAT's die een directe verbinding onmogelijk maken. Een relay — TURN — stuurt de gecodeerde stream tussen je apparaten door wanneer dat nodig is. Hij slaat je media nooit op of leest die nooit."
       },
       {
         "q": "Welke platformen worden ondersteund?",
