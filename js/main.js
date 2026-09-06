@@ -205,7 +205,7 @@ function cycleTheme() {
    GA4: the Docker build injects the real Measurement ID into GA_MEASUREMENT_ID
    (see deploy/Caddyfile + README). When the ID is still the public placeholder
    or absent, GA stays off — including under plain `npm run dev`. */
-const GA_MEASUREMENT_ID = '';
+const GA_MEASUREMENT_ID = 'G-Z1QJYVPR46';
 const GA_ENABLED = /^G-[A-Z0-9]+$/.test(GA_MEASUREMENT_ID);
 
 function trackersOn() {
