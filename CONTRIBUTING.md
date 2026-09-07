@@ -40,11 +40,11 @@ talks to **one** clean facade: `crates/siegu-core/src/rpc.rs::dispatch`.
 
 Every command belongs to one of three tiers (see `Tier` in `rpc_catalog.rs`):
 
-| Tier | Catalog guard | Who may call |
-|------|---------------|--------------|
-| `read` | `Tier::ReadOnly` | everyone (read-only and up) |
-| `write` | `Tier::ReadWrite` | `rw` principals and above |
-| `owner` | `Tier::Owner` | the **owner** only — bearer of the configured `web_token` at its own host `/rpc`, or the desktop user |
+| Tier    | Catalog guard     | Who may call                                                                                          |
+| ------- | ----------------- | ----------------------------------------------------------------------------------------------------- |
+| `read`  | `Tier::ReadOnly`  | everyone (read-only and up)                                                                           |
+| `write` | `Tier::ReadWrite` | `rw` principals and above                                                                             |
+| `owner` | `Tier::Owner`     | the **owner** only — bearer of the configured `web_token` at its own host `/rpc`, or the desktop user |
 
 **Owner** is the trust boundary. Only owner-tier commands run ML analysis,
 indexing, and device sync. A WebRTC guest (code + token on `siegu.io` or a
@@ -140,16 +140,16 @@ host (`--owner-mode` for ML parity), and the WebRTC guest round-trip.
 
 ## Where things live
 
-| Concern | Location |
-|---------|----------|
-| Command catalog (source of truth) | `crates/siegu-core/src/rpc_catalog.rs` |
-| RPC facade (`dispatch`) | `crates/siegu-core/src/rpc.rs` |
-| Generated TS contract (committed) | `shared/generated/rpc-commands.ts` |
-| Shared RPC/desktop business logic | `crates/siegu-core/src/library.rs`, `ml_commands.rs` |
-| Capability + auth | `ShareMode` / `Tier`; `siegu-cli web --share-mode`, `--owner-mode` |
-| Frontend  Backend seam | `src/services/backend/{interface,tauriBackend,webHostBackend,guest}.ts` |
-| Tauri command wrappers | `src-tauri/src/commands/*.rs` |
-| Web host server | `crates/siegu-cli/src/web.rs` |
+| Concern                           | Location                                                                |
+| --------------------------------- | ----------------------------------------------------------------------- |
+| Command catalog (source of truth) | `crates/siegu-core/src/rpc_catalog.rs`                                  |
+| RPC facade (`dispatch`)           | `crates/siegu-core/src/rpc.rs`                                          |
+| Generated TS contract (committed) | `shared/generated/rpc-commands.ts`                                      |
+| Shared RPC/desktop business logic | `crates/siegu-core/src/library.rs`, `ml_commands.rs`                    |
+| Capability + auth                 | `ShareMode` / `Tier`; `siegu-cli web --share-mode`, `--owner-mode`      |
+| Frontend Backend seam             | `src/services/backend/{interface,tauriBackend,webHostBackend,guest}.ts` |
+| Tauri command wrappers            | `src-tauri/src/commands/*.rs`                                           |
+| Web host server                   | `crates/siegu-cli/src/web.rs`                                           |
 
 See [docs/architecture.md](docs/architecture.md) for the full map.
 

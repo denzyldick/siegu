@@ -27,12 +27,14 @@ npm run tauri ios build
 ```
 
 Produces:
+
 - `.xcarchive` (in `src-tauri/gen/apple/build/`)
 - Signed `.ipa` (requires Apple Developer account + code signing configured in Xcode)
 
 ## CI
 
 The `test-ios` job in CI runs:
+
 - `cargo fmt --check`
 - `cargo check --target aarch64-apple-ios`
 

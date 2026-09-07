@@ -21,8 +21,8 @@ export interface PhotoSyncInfo {
   created: string;
   latitude: number | null;
   longitude: number | null;
-  objects: string;   // JSON array of SyncObject
-  faces: string;     // JSON array of SyncFace
+  objects: string; // JSON array of SyncObject
+  faces: string; // JSON array of SyncFace
   caption: string | null;
   aesthetics_score: number | null;
 }

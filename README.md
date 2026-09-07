@@ -10,7 +10,7 @@
 
 ![Siegu gallery](docs/img/gallery.png)
 
-Siegu (say it *see-goo*) is a **private, local-first photo and video manager**
+Siegu (say it _see-goo_) is a **private, local-first photo and video manager**
 that runs entirely on your own computer. You point it at your pictures, and it
 organizes them, lets you search them in plain words, finds the people in them,
 and keeps them in sync across your own devices — all **without ever uploading
@@ -24,8 +24,8 @@ No accounts. No cloud. No ads. Your photos never leave your machine.
 
 Siegu is built to feel obvious. Here's what you can do with it:
 
-- **Find any photo by describing it** — type *"sunset at the beach"* or *"my
-  dog on the couch"* and it finds the matching pictures, without you having to
+- **Find any photo by describing it** — type _"sunset at the beach"_ or _"my
+  dog on the couch"_ and it finds the matching pictures, without you having to
   tag them all by hand.
 - **See where things were taken** — the app reads the location stored in your
   photos and labels them with real city names.
@@ -47,9 +47,9 @@ nothing is sent to a server to be processed.
 
 Here's the app in action.
 
-| Your library, organized and searchable | Collections and albums |
-|---|---|
-| ![Library](docs/img/gallery.png) | ![Collections](docs/img/collections.png) |
+| Your library, organized and searchable | Collections and albums                   |
+| -------------------------------------- | ---------------------------------------- |
+| ![Library](docs/img/gallery.png)       | ![Collections](docs/img/collections.png) |
 
 When you open any photo, you can see everything the app knows about it — its
 AI-written caption, the objects it found, any text it recognized, and how it
@@ -111,12 +111,12 @@ folders and downloading the AI models.
 The docs live in the `docs/` folder and cover everything from the first steps to
 deep technical detail:
 
-| For you | Docs |
-|---------|------|
-| **Contributors** | [CONTRIBUTING.md](CONTRIBUTING.md), [Developing](docs/developing.md), [End-to-End testing](docs/e2e.md) |
-| **New users** | [Getting Started](docs/getting-started.md), [Configuration](docs/configuration.md), [Sharing with friends](docs/sharing.md), [Web client](docs/webclient.md), [NAT Traversal & TURN](docs/turn.md) |
-| **Builders / developers** | [Build](docs/build.md), [Architecture](docs/architecture.md), [ML engine](docs/ml-engine.md), [Frontend](docs/frontend.md), [Backend](docs/backend.md), [Database](docs/database.md) |
-| **Advanced** | [CLI](docs/cli.md), [Sync](docs/sync.md), [Mesh networking](docs/mesh-protocol.md), [Security](docs/security.md), [Android](docs/android.md), [iOS](docs/ios.md) |
+| For you                   | Docs                                                                                                                                                                                               |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Contributors**          | [CONTRIBUTING.md](CONTRIBUTING.md), [Developing](docs/developing.md), [End-to-End testing](docs/e2e.md)                                                                                            |
+| **New users**             | [Getting Started](docs/getting-started.md), [Configuration](docs/configuration.md), [Sharing with friends](docs/sharing.md), [Web client](docs/webclient.md), [NAT Traversal & TURN](docs/turn.md) |
+| **Builders / developers** | [Build](docs/build.md), [Architecture](docs/architecture.md), [ML engine](docs/ml-engine.md), [Frontend](docs/frontend.md), [Backend](docs/backend.md), [Database](docs/database.md)               |
+| **Advanced**              | [CLI](docs/cli.md), [Sync](docs/sync.md), [Mesh networking](docs/mesh-protocol.md), [Security](docs/security.md), [Android](docs/android.md), [iOS](docs/ios.md)                                   |
 
 ---
 

@@ -37,7 +37,11 @@ describe('turnIceServers', () => {
   });
 
   it('appends the relay with credentials when configured', () => {
-    const turn: SieguTurnConfig = { url: 'turn:relay.siegu.io:3478', username: 'u', credential: 'p' };
+    const turn: SieguTurnConfig = {
+      url: 'turn:relay.siegu.io:3478',
+      username: 'u',
+      credential: 'p',
+    };
     const servers = turnIceServers(turn);
     expect(servers).toHaveLength(2);
     expect(servers[1]).toEqual({

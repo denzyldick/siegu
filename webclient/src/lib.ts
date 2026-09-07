@@ -32,9 +32,14 @@ export function parseHash(
   const parts = raw.split('.');
   if (parts.length < 2) return null;
   const [code, token, albumId, flag] = parts;
-  if (!code || !token || code.includes('/') || token.includes('/'))
-    return null;
-  const result: { code: string; token: string; albumId?: string; minutes?: number; oneTime?: boolean } = {
+  if (!code || !token || code.includes('/') || token.includes('/')) return null;
+  const result: {
+    code: string;
+    token: string;
+    albumId?: string;
+    minutes?: number;
+    oneTime?: boolean;
+  } = {
     code,
     token,
     albumId: albumId || undefined,
@@ -68,9 +73,7 @@ export function b64ToBytes(b64: string): Uint8Array {
  * Reassemble chunked file data into a single byte array.
  * Returns the assembled bytes, or null if no chunks exist.
  */
-export function assembleChunks(
-  chunks: Map<number, Uint8Array>,
-): Uint8Array | null {
+export function assembleChunks(chunks: Map<number, Uint8Array>): Uint8Array | null {
   if (chunks.size === 0) return null;
   const indexes = [...chunks.keys()].sort((a, b) => a - b);
   let len = 0;
@@ -94,11 +97,10 @@ export interface SieguTurnConfig {
 }
 
 /** Read the relay config the host injected into this page, if any. */
-export function readSieguTurnConfig(
-  win?: { sieguTurnConfig?: SieguTurnConfig },
-): SieguTurnConfig | undefined {
-  const root =
-    win ?? (globalThis as unknown as { sieguTurnConfig?: SieguTurnConfig });
+export function readSieguTurnConfig(win?: {
+  sieguTurnConfig?: SieguTurnConfig;
+}): SieguTurnConfig | undefined {
+  const root = win ?? (globalThis as unknown as { sieguTurnConfig?: SieguTurnConfig });
   const cfg = root.sieguTurnConfig;
   if (!cfg || !cfg.username || !cfg.credential) return undefined;
   const urls = Array.isArray(cfg.url)

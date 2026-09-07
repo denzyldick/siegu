@@ -175,7 +175,11 @@ function navigate(
                 <div class="siegu-dock-icon-wrap">
                   <v-icon size="24">{{ item.icon }}</v-icon>
                   <template v-if="item.page === 'duplicates'">
-                    <span v-if="dupeStore.scanning" class="duplicates-dot" aria-label="scanning"></span>
+                    <span
+                      v-if="dupeStore.scanning"
+                      class="duplicates-dot"
+                      aria-label="scanning"
+                    ></span>
                     <span v-if="dupeStore.ready && dupeCount > 0" class="duplicates-pill">{{
                       dupeCount.toLocaleString()
                     }}</span>

@@ -128,7 +128,10 @@
             <v-chip size="small" label color="primary" variant="tonal">
               {{ $t('duplicates.kind_' + group.kind) }}
             </v-chip>
-            <span v-if="group.unknown_best" class="text-caption text-warning align-self-center ml-1">
+            <span
+              v-if="group.unknown_best"
+              class="text-caption text-warning align-self-center ml-1"
+            >
               {{ $t('duplicates.unknown_best') }}
             </span>
           </div>
@@ -220,11 +223,7 @@ function groupKey(group: DuplicateGroupView): string {
 }
 
 function effectiveKeep(group: DuplicateGroupView): string {
-  return (
-    keepSelections.value[groupKey(group)] ??
-    group.best_id ??
-    group.members[0]?.id
-  );
+  return keepSelections.value[groupKey(group)] ?? group.best_id ?? group.members[0]?.id;
 }
 
 function isKeep(group: DuplicateGroupView, id: string): boolean {

@@ -226,7 +226,12 @@ async function readRawBody(request: Request): Promise<ArrayBuffer> {
 }
 
 // ---- Purchase fulfillment email (download + setup instructions) ----
-async function sendPurchaseEmail(env: Env, to: string, amount: number | null, currency: string | null): Promise<void> {
+async function sendPurchaseEmail(
+  env: Env,
+  to: string,
+  amount: number | null,
+  currency: string | null,
+): Promise<void> {
   const price = amount != null ? (amount / 100).toFixed(2) : null;
   const priceLine =
     price != null
@@ -373,9 +378,14 @@ export default {
         const email = normalizeEmail(url.searchParams.get('email') ?? '');
         const token = request.headers.get('x-siegu-token') ?? '';
 
-        if (!email) return withCors(json({ ok: false, paid: false, verified: false, error: 'email required' }, 400));
+        if (!email)
+          return withCors(
+            json({ ok: false, paid: false, verified: false, error: 'email required' }, 400),
+          );
         if (!token || token !== env.SIEGU_VERIFY_TOKEN) {
-          return withCors(json({ ok: false, paid: false, verified: false, error: 'unauthorized' }, 401));
+          return withCors(
+            json({ ok: false, paid: false, verified: false, error: 'unauthorized' }, 401),
+          );
         }
 
         const [paid, verified] = await Promise.all([
@@ -447,10 +457,7 @@ export default {
               // error can't cause the handler to throw (Stripe would then
               // retry, which re-records + re-sends — the marker above prevents
               // duplicate sends on those retries once one succeeds).
-              console.error(
-                'purchase email failed',
-                err instanceof Error ? err.message : err,
-              );
+              console.error('purchase email failed', err instanceof Error ? err.message : err);
             }
           }
         }
@@ -468,5 +475,8 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 function esc(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+  return s.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
 }

@@ -28,18 +28,18 @@ the contract; TypeScript is generated from it.
 
 ## Technology Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Vue 3, Vuetify 3, Vite, TypeScript |
-| Desktop Shell | Tauri v2 (Rust) |
-| Mobile Shell | Tauri Android (Kotlin + WebView) |
-| Core Library | Rust (siegu-core) |
-| Database | SQLite via rusqlite |
-| ML Runtime | ONNX Runtime via ort crate |
-| Tokenization | HuggingFace tokenizers |
-| P2P Networking | WebRTC via webrtc-rs |
-| Signaling | WebSockets via tokio-tungstenite |
-| LAN Discovery | mDNS via mdns-sd |
+| Layer            | Technology                                   |
+| ---------------- | -------------------------------------------- |
+| Frontend         | Vue 3, Vuetify 3, Vite, TypeScript           |
+| Desktop Shell    | Tauri v2 (Rust)                              |
+| Mobile Shell     | Tauri Android (Kotlin + WebView)             |
+| Core Library     | Rust (siegu-core)                            |
+| Database         | SQLite via rusqlite                          |
+| ML Runtime       | ONNX Runtime via ort crate                   |
+| Tokenization     | HuggingFace tokenizers                       |
+| P2P Networking   | WebRTC via webrtc-rs                         |
+| Signaling        | WebSockets via tokio-tungstenite             |
+| LAN Discovery    | mDNS via mdns-sd                             |
 | Video Processing | ffmpeg-next (optional, video-thumbs feature) |
 
 ## Crate Dependency Graph
@@ -83,12 +83,12 @@ command names/casing. Regenerate with `cargo build -p siegu-core`.
 
 ### Capability model
 
-| Principal | Capability | ML |
-|-----------|-----------|-----|
-| Desktop user | everything | yes |
-| **Owner** — bearer of the configured `web_token` at its own host `/rpc` | everything | yes (opt-in) |
-| `rw` guest (WebRTC/mesh, or web without `--owner-mode`) | read + write | no |
-| `ro` guest | read only | no |
+| Principal                                                               | Capability   | ML           |
+| ----------------------------------------------------------------------- | ------------ | ------------ |
+| Desktop user                                                            | everything   | yes          |
+| **Owner** — bearer of the configured `web_token` at its own host `/rpc` | everything   | yes (opt-in) |
+| `rw` guest (WebRTC/mesh, or web without `--owner-mode`)                 | read + write | no           |
+| `ro` guest                                                              | read only    | no           |
 
 - `siegu-cli web --share-mode ro|rw` caps web/WebRTC/mesh guests. Default `ro`.
 - `siegu-cli web --owner-mode` promotes the bearer of the printed `web_token` to
@@ -168,21 +168,21 @@ siegu/
 
 One Vue bundle serves three modes, chosen at runtime (`src/services/runtime.ts`):
 
-| Mode | Trigger | Backend |
-|------|---------|---------|
-| `desktop` | Tauri (`isTauri`) | `tauriBackend` (invoke) |
+| Mode      | Trigger                                   | Backend                         |
+| --------- | ----------------------------------------- | ------------------------------- |
+| `desktop` | Tauri (`isTauri`)                         | `tauriBackend` (invoke)         |
 | `webHost` | not Tauri + `GET /session` returns a code | `webHostBackend` (fetch `/rpc`) |
-| `guest` | not Tauri + `#code.token` in the hash | `guest` (WebRTC RPC) |
+| `guest`   | not Tauri + `#code.token` in the hash     | `guest` (WebRTC RPC)            |
 
 All three implement the same `Backend` interface, so stores/views never branch on
 share mode — authorization is entirely server-side in `dispatch`.
 
 ## Feature Flags (siegu-core)
 
-| Feature | Deps | Purpose |
-|---------|------|---------|
-| `ml` (default) | `ort`, `tokenizers` | AI model inference |
-| `video-thumbs` | `ffmpeg-next` | Video keyframe extraction |
+| Feature        | Deps                | Purpose                   |
+| -------------- | ------------------- | ------------------------- |
+| `ml` (default) | `ort`, `tokenizers` | AI model inference        |
+| `video-thumbs` | `ffmpeg-next`       | Video keyframe extraction |
 
 `ml` gates the owner-tier ML commands and the live worker; without it the facade
 still answers (ML arms return "needs a live ML worker" for an owner without a

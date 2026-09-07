@@ -28,6 +28,7 @@ docker compose up
 ```
 
 This gives you everything on **one port** (`http://localhost:8080`):
+
 - Web client (static files)
 - WebSocket signalling (proxied to the internal signalling server)
 
@@ -44,9 +45,9 @@ Browser → http://localhost:8080
 
 ### Services
 
-| Service | Port | Description |
-|---------|------|-------------|
-| `webclient` | 8080 | nginx serves webclient + proxies WebSocket |
+| Service      | Port     | Description                                        |
+| ------------ | -------- | -------------------------------------------------- |
+| `webclient`  | 8080     | nginx serves webclient + proxies WebSocket         |
 | `signalling` | internal | WebSocket signalling server (not exposed directly) |
 
 ## Self-Hosted Setup
@@ -75,12 +76,12 @@ RUST_LOG=info cargo run --release
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `8080` | Listening port |
-| `RUST_LOG` | `warn` | Log level (`info`, `debug`, `trace`) |
-| `SIEGU_SIGNAL_TOKEN` | None | Token required for all connections (authentication) |
-| `SIEGU_WEB_DIST_DIR` | None | Path to webclient dist for serving the viewer SPA |
+| Variable             | Default | Description                                         |
+| -------------------- | ------- | --------------------------------------------------- |
+| `PORT`               | `8080`  | Listening port                                      |
+| `RUST_LOG`           | `warn`  | Log level (`info`, `debug`, `trace`)                |
+| `SIEGU_SIGNAL_TOKEN` | None    | Token required for all connections (authentication) |
+| `SIEGU_WEB_DIST_DIR` | None    | Path to webclient dist for serving the viewer SPA   |
 
 ### Configuration in Siegu
 

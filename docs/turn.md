@@ -11,7 +11,7 @@ Over the internet, a device normally first asks a STUN server what its public
 IP looks like and tries to punch a hole through its router ("hole punching").
 That works for most home networks, but fails on:
 
-- **Symmetric NAT** — some routers assign a *different* public port per
+- **Symmetric NAT** — some routers assign a _different_ public port per
   destination, which hole punching can't predict.
 - **Carrier-grade NAT (CGNAT)** — many mobile data networks put every phone
   behind a shared public IP, so the phone has no public address at all.
@@ -41,11 +41,11 @@ The host reads its ICE configuration from three environment variables when it
 creates WebRTC connections (`mesh_transport.rs`). With the built-in relay these
 are **set automatically** by the app:
 
-| Variable | Description |
-|----------|-------------|
-| `SIEGU_TURN_URLS` | Comma-separated TURN URLs, e.g. `turn:home.example.com:3478` |
-| `SIEGU_TURN_USERNAME` | TURN username (required when the relay has auth) |
-| `SIEGU_TURN_CREDENTIAL` | TURN password/credential |
+| Variable                | Description                                                  |
+| ----------------------- | ------------------------------------------------------------ |
+| `SIEGU_TURN_URLS`       | Comma-separated TURN URLs, e.g. `turn:home.example.com:3478` |
+| `SIEGU_TURN_USERNAME`   | TURN username (required when the relay has auth)             |
+| `SIEGU_TURN_CREDENTIAL` | TURN password/credential                                     |
 
 You can still override these variables yourself to point at a relay you manage
 separately — set `SIEGU_TURN_URLS` before starting Siegu and the built-in relay
@@ -58,14 +58,14 @@ server rental, no credit card — just the app you already run.
 
 ### Enable it
 
-Desktop app: **Settings → Pro → Advanced → Built-in relay**, toggle *Run a
-relay on this device* and Save. Or set the config keys directly (see
+Desktop app: **Settings → Pro → Advanced → Built-in relay**, toggle _Run a
+relay on this device_ and Save. Or set the config keys directly (see
 [Configuration](configuration.md)):
 
-| Key | Meaning |
-|-----|---------|
-| `turn_enabled` | `true` / `false` — start the built-in relay at launch |
-| `turn_port` | Relay UDP port; `0` (default) picks a free port automatically |
+| Key                | Meaning                                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `turn_enabled`     | `true` / `false` — start the built-in relay at launch                                                              |
+| `turn_port`        | Relay UDP port; `0` (default) picks a free port automatically                                                      |
 | `turn_public_host` | Public IP of this device; empty = auto-detected LAN IP (browser guests still need your public address — see below) |
 
 The app generates a username/password pair the first time the relay is enabled
@@ -116,11 +116,11 @@ story: you never think about NAT again.
 
 ## Summary
 
-| Setup | Cost | Works on | Router config | Best for |
-|-------|------|----------|---------------|----------|
-| LAN only | Free | Same network | No | Default |
-| Built-in relay | Free | Internet (if home NAT allows) | UDP forward once | DIY, mobile data at home |
-| Hosted relay (Pro) | Pro plan | Anything, incl. CGNAT | None | Everyone else |
+| Setup              | Cost     | Works on                      | Router config    | Best for                 |
+| ------------------ | -------- | ----------------------------- | ---------------- | ------------------------ |
+| LAN only           | Free     | Same network                  | No               | Default                  |
+| Built-in relay     | Free     | Internet (if home NAT allows) | UDP forward once | DIY, mobile data at home |
+| Hosted relay (Pro) | Pro plan | Anything, incl. CGNAT         | None             | Everyone else            |
 
 ## Related
 

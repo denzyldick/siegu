@@ -92,7 +92,9 @@
         <div class="controls-bar">
           <button class="icon-btn" :title="t('video_player.unmute')" @click.stop="toggleMute">
             <v-icon size="20" color="white">
-              {{ isMuted ? 'mdi-volume-off' : isVolumeLow ? 'mdi-volume-medium' : 'mdi-volume-high' }}
+              {{
+                isMuted ? 'mdi-volume-off' : isVolumeLow ? 'mdi-volume-medium' : 'mdi-volume-high'
+              }}
             </v-icon>
           </button>
           <input
@@ -117,9 +119,7 @@
             <div class="progress-fill" :style="{ width: progressPercent + '%' }" />
             <div class="progress-handle" :style="{ left: progressPercent + '%' }" />
           </div>
-          <span class="time-label">
-            -{{ remainingTime }} / {{ formatTime(duration) }}
-          </span>
+          <span class="time-label"> -{{ remainingTime }} / {{ formatTime(duration) }} </span>
           <button
             v-if="transcript"
             class="icon-btn"
@@ -235,9 +235,7 @@ const bufferedPercent = computed(() => {
   return Math.max(0, Math.min(100, (bufferedEnd.value / duration.value) * 100));
 });
 
-const remainingTime = computed(() =>
-  Math.max(0, duration.value - currentTime.value).toFixed(0),
-);
+const remainingTime = computed(() => Math.max(0, duration.value - currentTime.value).toFixed(0));
 
 const playbackRateLabel = computed(() => rateLabel(playbackRate.value));
 

@@ -30,7 +30,7 @@ services:
     # --share-mode ro`; do NOT set command: here (it would be appended and
     # collide with the entrypoint).
     expose:
-      - "8787"
+      - '8787'
     # Optional direct LAN port (bypasses Caddy). Uncomment to also publish:
     # ports:
     #   - "8787:8787"
@@ -44,8 +44,8 @@ services:
     depends_on:
       - siegu-host
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     environment:
       # Empty (default) -> plain HTTP on :80 (localhost / LAN).
       # Set a real domain on a VPS -> automatic HTTPS via Caddy's Let's Encrypt.

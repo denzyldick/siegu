@@ -128,7 +128,11 @@
                         decoding="async"
                         draggable="false"
                       />
-                      <div v-if="computedVideoUrl" class="video-reveal" :class="{ 'is-ready': videoReady }">
+                      <div
+                        v-if="computedVideoUrl"
+                        class="video-reveal"
+                        :class="{ 'is-ready': videoReady }"
+                      >
                         <VideoPlayer
                           ref="videoPlayerRef"
                           :src="computedVideoUrl"
@@ -430,14 +434,21 @@
               <div class="text-caption text-disabled mb-2 text-uppercase tracking-widest">
                 {{ $t('media_viewer.model_performance') }}
               </div>
-              <div v-for="[model, ms] in sortedModelTimings" :key="model" class="d-flex align-center mb-1">
+              <div
+                v-for="[model, ms] in sortedModelTimings"
+                :key="model"
+                class="d-flex align-center mb-1"
+              >
                 <span class="text-body-2 text-medium-emphasis" style="width: 90px">
                   {{ model }}
                 </span>
                 <div class="model-timing-track">
                   <div class="model-timing-fill" :style="{ width: timingBarWidth(ms) }" />
                 </div>
-                <span class="text-body-2 text-medium-emphasis ml-2" style="width: 52px; text-align: right">
+                <span
+                  class="text-body-2 text-medium-emphasis ml-2"
+                  style="width: 52px; text-align: right"
+                >
                   {{ ms.toFixed(0) }}ms
                 </span>
               </div>
@@ -1067,7 +1078,9 @@ async function loadTranscript(): Promise<void> {
   }
   transcriptLoading.value = true;
   try {
-    photoTranscript.value = await invoke<string>('get_photo_transcript', { id: currentPhoto.value.id });
+    photoTranscript.value = await invoke<string>('get_photo_transcript', {
+      id: currentPhoto.value.id,
+    });
   } catch (e) {
     console.error('Failed to fetch transcript', e);
     photoTranscript.value = '';
@@ -1372,8 +1385,12 @@ function isItemVideo(item: MediaItem): boolean {
 // deliberately excluded (resolving their 'original' would preload raw video
 // bytes for zero benefit). Passing a computed that yields null lets the shared
 // mediaSrcRef skip the fetch entirely instead of pulling the video URL.
-const prevPhotoRef = computed(() => (prevItem.value ? (!isItemVideo(prevItem.value) ? prevItem.value : null) : null));
-const nextPhotoRef = computed(() => (nextItem.value ? (!isItemVideo(nextItem.value) ? nextItem.value : null) : null));
+const prevPhotoRef = computed(() =>
+  prevItem.value ? (!isItemVideo(prevItem.value) ? prevItem.value : null) : null,
+);
+const nextPhotoRef = computed(() =>
+  nextItem.value ? (!isItemVideo(nextItem.value) ? nextItem.value : null) : null,
+);
 const prevFull = mediaSrcRef(prevPhotoRef, 'original');
 const nextFull = mediaSrcRef(nextPhotoRef, 'original');
 

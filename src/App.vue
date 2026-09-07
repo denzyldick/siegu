@@ -246,9 +246,7 @@ function removeFilterChip(index: number): void {
           <CollectionsView v-if="currentPage === 'collections' && !runtimeStore.isGuest" />
           <MapView v-if="currentPage === 'location' && !runtimeStore.isGuest" />
           <DeviceList v-if="currentPage === 'devices' && !runtimeStore.isGuest" />
-          <DuplicateManager
-            v-if="currentPage === 'duplicates' && !runtimeStore.isGuest"
-          />
+          <DuplicateManager v-if="currentPage === 'duplicates' && !runtimeStore.isGuest" />
           <GuestUpsellView v-if="runtimeStore.isGuest && currentPage === 'settings'" />
           <SettingsView
             v-else-if="currentPage === 'settings' && !runtimeStore.isGuest"

@@ -2,7 +2,7 @@
 
 ## About Siegu
 
-**Siegu** (pronounced *see-goo*) is a privacy-first, local-only media manager for your photo and video library. It scans the folders you choose, builds a searchable library entirely on your machine, and never uploads your media anywhere. Every AI feature runs on-device via ONNX Runtime — no cloud, no accounts, no telemetry.
+**Siegu** (pronounced _see-goo_) is a privacy-first, local-only media manager for your photo and video library. It scans the folders you choose, builds a searchable library entirely on your machine, and never uploads your media anywhere. Every AI feature runs on-device via ONNX Runtime — no cloud, no accounts, no telemetry.
 
 ### What Siegu can do
 
@@ -24,15 +24,15 @@ Everything happens on your computer. There are no accounts, no analytics, no clo
 Siegu is verified against the platforms below. Which device you use also decides
 how the on-device AI models are accelerated (via ONNX Runtime):
 
-| Platform | Devices | AI acceleration |
-|----------|---------|-----------------|
-| **Windows** | Any x64 Windows 10/11 PC or laptop | DirectML (NVIDIA/AMD/Intel GPU) |
-| **Windows on ARM** | Snapdragon X / Arm64 laptops | CPU |
-| **macOS** | Apple Silicon Macs (M1–M4: MacBook Air/Pro, iMac, Mac mini, Mac Studio, Mac Pro) | CoreML (GPU + Neural Engine) |
-| **Linux** | x86_64 desktops/laptops (Ubuntu, Debian, Fedora, Arch, …) | CPU |
-| **Linux ARM64** | Raspberry Pi 4/5, ARM single-board computers | CPU |
-| **Android** | arm64 (arm64-v8a) phones and tablets, ~2017 and newer | CPU |
-| **iOS / iPadOS** | iPhone and iPad (arm64, iOS 12+) | CPU (CoreML is used on macOS) |
+| Platform           | Devices                                                                          | AI acceleration                 |
+| ------------------ | -------------------------------------------------------------------------------- | ------------------------------- |
+| **Windows**        | Any x64 Windows 10/11 PC or laptop                                               | DirectML (NVIDIA/AMD/Intel GPU) |
+| **Windows on ARM** | Snapdragon X / Arm64 laptops                                                     | CPU                             |
+| **macOS**          | Apple Silicon Macs (M1–M4: MacBook Air/Pro, iMac, Mac mini, Mac Studio, Mac Pro) | CoreML (GPU + Neural Engine)    |
+| **Linux**          | x86_64 desktops/laptops (Ubuntu, Debian, Fedora, Arch, …)                        | CPU                             |
+| **Linux ARM64**    | Raspberry Pi 4/5, ARM single-board computers                                     | CPU                             |
+| **Android**        | arm64 (arm64-v8a) phones and tablets, ~2017 and newer                            | CPU                             |
+| **iOS / iPadOS**   | iPhone and iPad (arm64, iOS 12+)                                                 | CPU (CoreML is used on macOS)   |
 
 **Not supported**: Intel Macs, 32-bit platforms, and Alpine Linux (musl).
 Android x86_64 (arm64 emulator images also work) and the iOS Simulator are
@@ -125,7 +125,7 @@ Click the search bar to open "Your library at a glance":
 - **People** — named people and unnamed face groups to browse
 - **Locations / Tags / Papers / Cameras / Months** — browse the library by these facets
 
-Filters stack: you can combine e.g. *Faces* + a specific *month* to narrow down results.
+Filters stack: you can combine e.g. _Faces_ + a specific _month_ to narrow down results.
 
 ### People
 
@@ -157,11 +157,11 @@ Everything above is also available headless via the `siegu-cli` binary — scann
 
 ## Basic Usage
 
-| Task | GUI | CLI |
-|------|-----|-----|
-| Scan folders | Settings → Directories → Add | `siegu-cli scan /path/to/photos` |
-| Download models | Settings → Models → Download | `siegu-cli models download` |
-| Analyze photos | Auto after scan (if indexing_mode != manual) | `siegu-cli analyze all` |
-| Search | Search bar (text or semantic) | — |
-| Mesh sync | Connect panel → Host or Join | `siegu-cli mesh host` / `siegu-cli mesh join <room>` |
-| Change config | Settings → Preferences | `siegu-cli config set <key> <val>` |
+| Task            | GUI                                          | CLI                                                  |
+| --------------- | -------------------------------------------- | ---------------------------------------------------- |
+| Scan folders    | Settings → Directories → Add                 | `siegu-cli scan /path/to/photos`                     |
+| Download models | Settings → Models → Download                 | `siegu-cli models download`                          |
+| Analyze photos  | Auto after scan (if indexing_mode != manual) | `siegu-cli analyze all`                              |
+| Search          | Search bar (text or semantic)                | —                                                    |
+| Mesh sync       | Connect panel → Host or Join                 | `siegu-cli mesh host` / `siegu-cli mesh join <room>` |
+| Change config   | Settings → Preferences                       | `siegu-cli config set <key> <val>`                   |

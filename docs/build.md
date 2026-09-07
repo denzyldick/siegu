@@ -15,17 +15,18 @@ npm run tauri build
 ```
 
 This produces:
+
 - **Linux**: `.AppImage` + `.deb`
 - **macOS**: `.dmg`
 - **Windows**: `.msi` installer
 
 ### Build flags
 
-| Flag | Effect |
-|------|--------|
-| `--bundles appimage` | Linux AppImage only |
-| `--bundles deb` | Debian package only |
-| `--no-bundle` | Build binary without packaging |
+| Flag                 | Effect                         |
+| -------------------- | ------------------------------ |
+| `--bundles appimage` | Linux AppImage only            |
+| `--bundles deb`      | Debian package only            |
+| `--no-bundle`        | Build binary without packaging |
 
 ---
 
@@ -45,6 +46,7 @@ bash scripts/run-android.sh
 ```
 
 The script:
+
 1. Builds the frontend (`bun run build`)
 2. Cross-compiles Rust for `aarch64-linux-android` via `cargo-ndk`
 3. Copies `libsiegu_lib.so` into `jniLibs/arm64-v8a`
@@ -112,19 +114,19 @@ npm run tauri ios dev
 The project uses GitHub Actions (`.github/workflows/`) with one workflow per
 platform (details in `docs/ci.md`):
 
-| Workflow | Platform | Key jobs |
-|----------|----------|-----------|
-| `ubuntu.yml` | Ubuntu | tests, lint, mesh + view-only E2E, face-grouping E2E, full AI inference |
-| `macos.yml` | macOS | tests, Tauri build, mesh + view-only E2E |
-| `windows.yml` | Windows | tests, Tauri build, mesh + view-only E2E |
-| `android.yml` | Ubuntu (Android target) | cross-compile check + core tests on an x86_64 emulator |
-| `ios.yml` | macOS (iOS target) | cross-compile check + core tests on a simulator |
+| Workflow      | Platform                | Key jobs                                                                |
+| ------------- | ----------------------- | ----------------------------------------------------------------------- |
+| `ubuntu.yml`  | Ubuntu                  | tests, lint, mesh + view-only E2E, face-grouping E2E, full AI inference |
+| `macos.yml`   | macOS                   | tests, Tauri build, mesh + view-only E2E                                |
+| `windows.yml` | Windows                 | tests, Tauri build, mesh + view-only E2E                                |
+| `android.yml` | Ubuntu (Android target) | cross-compile check + core tests on an x86_64 emulator                  |
+| `ios.yml`     | macOS (iOS target)      | cross-compile check + core tests on a simulator                         |
 
 Release jobs (`release.yml`: desktop installers, Android APK, iOS build gate)
 attach binaries to the GitHub release whose `v*` tag triggered the run.
 
 ### CI environment variables
 
-| Variable | Purpose |
-|----------|---------|
+| Variable                | Purpose                                                            |
+| ----------------------- | ------------------------------------------------------------------ |
 | `ORT_STRATEGY=download` | Downloads pre-built ONNX Runtime binaries instead of building them |

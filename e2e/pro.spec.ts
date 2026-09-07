@@ -31,9 +31,7 @@ test.describe('Settings → Pro activation', () => {
 
     await expect(proSection.getByLabel('Email used at checkout')).toBeVisible();
 
-    await expect(
-      proSection.getByRole('button', { name: 'Send verification email' }),
-    ).toBeVisible();
+    await expect(proSection.getByRole('button', { name: 'Send verification email' })).toBeVisible();
     await expect(proSection.getByRole('button', { name: 'Check status' })).toBeVisible();
 
     // Upsell block links to the pricing page.

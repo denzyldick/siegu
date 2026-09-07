@@ -37,9 +37,7 @@ test.describe('Collections — Albums & People', () => {
     expect((body.result ?? []).length).toBe(6);
   });
 
-  test('drilling into a collection album lists its photos (not empty)', async ({
-    page,
-  }) => {
+  test('drilling into a collection album lists its photos (not empty)', async ({ page }) => {
     await page.locator('button[data-tour="dock-collections"]').first().click();
     await page.waitForTimeout(1500);
     await expect(page.locator('.collection-tile').first()).toBeVisible({ timeout: 10_000 });
@@ -59,9 +57,7 @@ test.describe('Collections — Albums & People', () => {
     expect(bodyText).not.toContain('This collection is empty');
   });
 
-  test('people-manage fallback proves the detected face surfaces in the UI', async ({
-    page,
-  }) => {
+  test('people-manage fallback proves the detected face surfaces in the UI', async ({ page }) => {
     // data-plane proof: exactly one unnamed-face group was clustered by YuNet
     const token = (await (await page.request.get('/session')).json()).webToken;
     const faces = await page.request.post('/rpc', {

@@ -37,6 +37,7 @@ Pre-commit hooks in `.githooks/pre-commit`:
 3. **Translation check**: Runs `node scripts/check-translations.js` to verify all locale files have matching keys (English is canonical)
 
 Enable hooks manually:
+
 ```bash
 git config core.hooksPath .githooks
 ```
@@ -45,23 +46,25 @@ git config core.hooksPath .githooks
 
 GitHub Actions workflows in `.github/workflows/` (details in `docs/ci.md`):
 
-| Workflow | What it checks |
-|----------|----------------|
-| `ubuntu.yml` | Unit/integration tests, lint, mesh + view-only E2E, face-grouping E2E, full AI inference (only platform that runs ML tests) |
-| `macos.yml` / `windows.yml` | Unit tests, Tauri desktop build, mesh + view-only E2E |
-| `android.yml` | Cross-compile check (aarch64 + x86_64) + core tests on an x86_64 emulator |
-| `ios.yml` | Cross-compile check (aarch64) + core tests on an iOS simulator |
-| `release.yml` | Builds desktop installers + Android APK and gates on iOS build; triggered by a GitHub release or a `v*` tag push — artifacts auto-attach to the release |
-| `signal-docker.yml` | Docker publish (PRs only validate the build); mesh-sync E2E against the just-pushed image |
+| Workflow                    | What it checks                                                                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ubuntu.yml`                | Unit/integration tests, lint, mesh + view-only E2E, face-grouping E2E, full AI inference (only platform that runs ML tests)                             |
+| `macos.yml` / `windows.yml` | Unit tests, Tauri desktop build, mesh + view-only E2E                                                                                                   |
+| `android.yml`               | Cross-compile check (aarch64 + x86_64) + core tests on an x86_64 emulator                                                                               |
+| `ios.yml`                   | Cross-compile check (aarch64) + core tests on an iOS simulator                                                                                          |
+| `release.yml`               | Builds desktop installers + Android APK and gates on iOS build; triggered by a GitHub release or a `v*` tag push — artifacts auto-attach to the release |
+| `signal-docker.yml`         | Docker publish (PRs only validate the build); mesh-sync E2E against the just-pushed image                                                               |
 
 ### Formatting
 
 CI enforces:
+
 - **Rust**: `cargo fmt --check` (Ubuntu only)
 - **JS/Vue**: `bun x prettier --check` (Ubuntu only)
 - **Translations**: `bun run check:translations` (Ubuntu only)
 
 Run locally:
+
 ```bash
 npm run format            # Fix formatting (Rust + frontend)
 npm run format:check      # Check only
@@ -69,17 +72,17 @@ npm run format:check      # Check only
 
 ## Project Scripts
 
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start Vite dev server |
-| `npm run build` | Build frontend for production |
-| `npm run tauri dev` | Start Tauri development mode |
-| `npm run tauri build` | Build desktop app bundle |
-| `npm run test` | Run vitest unit tests |
-| `npm run format` | Format Rust + frontend code |
-| `npm run format:check` | Check formatting without modifying |
-| `npm run typecheck` | Run vue-tsc type checking |
-| `npm run check:translations` | Verify locale completeness |
+| Script                       | Description                        |
+| ---------------------------- | ---------------------------------- |
+| `npm run dev`                | Start Vite dev server              |
+| `npm run build`              | Build frontend for production      |
+| `npm run tauri dev`          | Start Tauri development mode       |
+| `npm run tauri build`        | Build desktop app bundle           |
+| `npm run test`               | Run vitest unit tests              |
+| `npm run format`             | Format Rust + frontend code        |
+| `npm run format:check`       | Check formatting without modifying |
+| `npm run typecheck`          | Run vue-tsc type checking          |
+| `npm run check:translations` | Verify locale completeness         |
 
 ## Rust Test Commands
 

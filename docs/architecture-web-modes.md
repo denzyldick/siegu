@@ -50,12 +50,12 @@ needs a browser-native pairing mechanism, which this plan provides.
 
 ## Mode detection (`src/services/runtime.ts`)
 
-| Mode | Trigger (in order) |
-|------|--------------------|
-| `desktop` | `isTauri === true` |
-| `webHost` | not Tauri **and** `fetch('/session')` returns `{code}` (`web.rs:153-155`) |
-| `guest` | not Tauri, no `/session`, **and** `parseHash(location.hash)` finds `#code.token` (`protocol.ts:41`) |
-| `onboarding` | none of the above (fresh / landing) |
+| Mode         | Trigger (in order)                                                                                  |
+| ------------ | --------------------------------------------------------------------------------------------------- |
+| `desktop`    | `isTauri === true`                                                                                  |
+| `webHost`    | not Tauri **and** `fetch('/session')` returns `{code}` (`web.rs:153-155`)                           |
+| `guest`      | not Tauri, no `/session`, **and** `parseHash(location.hash)` finds `#code.token` (`protocol.ts:41`) |
+| `onboarding` | none of the above (fresh / landing)                                                                 |
 
 `createBackend.ts` extends `BackendMode` to `'tauri' | 'webHost' | 'guest'`.
 
@@ -92,6 +92,7 @@ working today.
 ## Phased implementation
 
 ### Phase 1 — Foundation: runtime mode + shared Backend wiring
+
 - `src/services/runtime.ts`: `detectMode(): Promise<'tauri'|'webHost'|'guest'|'onboarding'>`
   using the table above.
 - `createBackend.ts`: extend picker to `'tauri' | 'webHost' | 'guest'`.
@@ -104,8 +105,9 @@ working today.
 - Commit the Mode A Option-1 decision so stores compile against all three backends.
 
 ### Phase 2 — Mode B: guest boot in the served `src/` bundle
+
 - `main.ts`: when mode is guest, build `GuestClient` + `createPeerTransport('/ws', session
-  from #code.token)` → `guestBackend()` (reuse `webclient/src/main.ts` +
+from #code.token)` → `guestBackend()` (reuse `webclient/src/main.ts` +
   `peer.ts:39` / `guest.ts`).
 - `App.vue`: run Tauri-only `onMounted` boot only in desktop mode; guest boots from the
   peer manifest.
@@ -115,12 +117,14 @@ working today.
   or a Share link).
 
 ### Phase 3 — Mode A: WebHost backend (Rust + TS)
+
 - Rust (`web.rs`): `POST /rpc` bridging to `rpc::dispatch` under a session token; `GET
-  /media/*` and `/thumb/*` auth'd routes; honor `--share-mode ro/rw`.
+/media/*` and `/thumb/*` auth'd routes; honor `--share-mode ro/rw`.
 - `src/services/backend/webHostBackend.ts`: `fetch`-based `Backend`.
 - Session auth + `/session` self-probe as webHost detection + auth handshake.
 
 ### Phase 4 — Mode B multi-tenant signalling
+
 - `siegu-cli web --server <wss://signal>` + desktop "Share" → hosted signaler;
   browser `getConfiguredSignalingUrl()`.
 - Shared / album-scoped sharing so a guest only streams what's shared
@@ -128,6 +132,7 @@ working today.
 - Infra (hosted signaler, runbook, auth/token + rate limits) is a **separate task**.
 
 ### Phase 5 — Hardening across modes
+
 - Auth for webHost; token rotation for guest rooms; scope-check every
   `FetchMediaRequest`/`CommandRequest`; per-mode onboarding/landing; e2e: desktop
   Tauri, webHost self-serve, guest pair-and-stream.
@@ -135,6 +140,7 @@ working today.
 ---
 
 ## Phase tracking (GitHub issues)
+
 - #24 PHASE-1 — runtime mode detection + shared Backend wiring
 - #25 PHASE-2 — Mode B guest boot in served `src` bundle
 - #26 PHASE-3 — Mode A WebHost backend (Rust HTTP-RPC + TS)
@@ -142,6 +148,7 @@ working today.
 - #28 PHASE-5 — hardening across modes
 
 ## Related issues
+
 - #19 Full-parity web client over WebRTC RPC (replaces `webclient/`)
 - #14 Stripe + license-key entitlements + hosted signalling layer
 - #16 Shareable albums — live link + ephemeral web view

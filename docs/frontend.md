@@ -14,11 +14,11 @@ Vue 3 + TypeScript + Vuetify 3 + Vite + Pinia.
 `src/services/runtime.ts` picks the mode; `src/services/backend/createBackend.ts`
 builds the matching `Backend` once in `main.ts`:
 
-| Mode | Detection | `Backend` impl |
-|------|-----------|----------------|
-| `desktop` | `isTauri` | `tauriBackend.ts` (Tauri `invoke` via `src/services/invoke.ts`) |
-| `webHost` | not Tauri + `GET /session` returns a code | `webHostBackend.ts` (`fetch` against `/rpc` + media routes) |
-| `guest` | not Tauri + `#code.token` in the hash | `guest.ts` + `peer.ts`/`protocol.ts` (WebRTC RPC) |
+| Mode      | Detection                                 | `Backend` impl                                                  |
+| --------- | ----------------------------------------- | --------------------------------------------------------------- |
+| `desktop` | `isTauri`                                 | `tauriBackend.ts` (Tauri `invoke` via `src/services/invoke.ts`) |
+| `webHost` | not Tauri + `GET /session` returns a code | `webHostBackend.ts` (`fetch` against `/rpc` + media routes)     |
+| `guest`   | not Tauri + `#code.token` in the hash     | `guest.ts` + `peer.ts`/`protocol.ts` (WebRTC RPC)               |
 
 Authorization is **server-side**: `dispatch` decides based on `--share-mode` /
 `--owner-mode`. The frontend has no ro/rw/owner branching.
@@ -63,16 +63,16 @@ src/
 
 ## State management (Pinia stores)
 
-| Store | Purpose |
-|-------|---------|
-| `app` | initialization state, onboarding completion |
-| `ui` | theme, sidebar, current view |
-| `runtime` | runtime mode + active backend |
-| `search` | query, results, filters, pagination |
-| `sync` | sync progress, peers, status |
-| `scan` | scan progress, file counts |
-| `models` | model download/load status |
-| `albums`, `settings`, `mapFilter` | albums, config, map filter |
+| Store                             | Purpose                                     |
+| --------------------------------- | ------------------------------------------- |
+| `app`                             | initialization state, onboarding completion |
+| `ui`                              | theme, sidebar, current view                |
+| `runtime`                         | runtime mode + active backend               |
+| `search`                          | query, results, filters, pagination         |
+| `sync`                            | sync progress, peers, status                |
+| `scan`                            | scan progress, file counts                  |
+| `models`                          | model download/load status                  |
+| `albums`, `settings`, `mapFilter` | albums, config, map filter                  |
 
 ## Composables
 

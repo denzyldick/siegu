@@ -23,31 +23,31 @@ Direct IP + port entry for LAN hosts.
 
 17 message types over WebSocket JSON in `crates/siegu-core/src/signal.rs`:
 
-| Message | Direction | Purpose |
-|---------|-----------|---------|
-| `Join` | Client → Server | Join a room with device_id + metadata |
-| `Joined` | Server → Client | Confirmation + peer_count |
-| `PeerJoined` | Server → Client | Another device joined |
-| `PeerDisconnected` | Server → Client | Peer left the room |
-| `Offer` | Peer → Peer | WebRTC SDP offer |
-| `Answer` | Peer → Peer | WebRTC SDP answer |
-| `IceCandidate` | Peer → Peer | ICE candidate |
-| `Relay` | Peer → Peer | Relay message through intermediate peer |
-| `RoomClosed` | Server → Client | Room was destroyed |
-| `DeviceInfo` | Bidirectional | Device metadata exchange |
-| `Ping` | Bidirectional | Keepalive |
-| `Pong` | Bidirectional | Keepalive response |
-| `Error` | Server → Client | Error with description |
-| `JoinError` | Server → Client | Join rejected |
-| `Kick` | Server → Client | Force disconnect |
-| `RoomList` | Server → Client | Available rooms |
-| `DirectMessage` | Peer → Peer | Arbitrary direct message |
+| Message            | Direction       | Purpose                                 |
+| ------------------ | --------------- | --------------------------------------- |
+| `Join`             | Client → Server | Join a room with device_id + metadata   |
+| `Joined`           | Server → Client | Confirmation + peer_count               |
+| `PeerJoined`       | Server → Client | Another device joined                   |
+| `PeerDisconnected` | Server → Client | Peer left the room                      |
+| `Offer`            | Peer → Peer     | WebRTC SDP offer                        |
+| `Answer`           | Peer → Peer     | WebRTC SDP answer                       |
+| `IceCandidate`     | Peer → Peer     | ICE candidate                           |
+| `Relay`            | Peer → Peer     | Relay message through intermediate peer |
+| `RoomClosed`       | Server → Client | Room was destroyed                      |
+| `DeviceInfo`       | Bidirectional   | Device metadata exchange                |
+| `Ping`             | Bidirectional   | Keepalive                               |
+| `Pong`             | Bidirectional   | Keepalive response                      |
+| `Error`            | Server → Client | Error with description                  |
+| `JoinError`        | Server → Client | Join rejected                           |
+| `Kick`             | Server → Client | Force disconnect                        |
+| `RoomList`         | Server → Client | Available rooms                         |
+| `DirectMessage`    | Peer → Peer     | Arbitrary direct message                |
 
 ### LAN Signaling
 
 Built-in warp WebSocket server (`lan_server.rs`):
 
-- Manages rooms as `HashMap<String, Room>` 
+- Manages rooms as `HashMap<String, Room>`
 - Max 5 clients per room (`MAX_MESH_DEVICES`)
 - Relays Offer/Answer/ICE between peers
 - No external server needed
@@ -79,17 +79,17 @@ File: `crates/siegu-core/src/mesh.rs`
 
 Once a WebRTC data channel is established, `SyncMessage` enum drives the protocol:
 
-| Message | Purpose |
-|---------|---------|
-| `ManifestRequest` / `ManifestResponse` | Exchange photo inventory (IDs + sync_needed flags) |
-| `FileRequest` | Request specific photo by ID |
-| `FileHeader` | Metadata before transfer (size, name, mime) |
-| `FileChunk` | 64KB chunk of file data |
-| `FileEnd` | Signal transfer complete (with SHA-256 hash) |
-| `StartSync` | Trigger sync session |
-| `MetadataUpdate` | Propagate AI results (caption, score, indexed state) |
-| `VersionNegotiate` / `VersionReject` | Protocol version handshake |
-| `CatchUp` / `CatchUpDone` | Incremental sync after reconnection |
+| Message                                | Purpose                                              |
+| -------------------------------------- | ---------------------------------------------------- |
+| `ManifestRequest` / `ManifestResponse` | Exchange photo inventory (IDs + sync_needed flags)   |
+| `FileRequest`                          | Request specific photo by ID                         |
+| `FileHeader`                           | Metadata before transfer (size, name, mime)          |
+| `FileChunk`                            | 64KB chunk of file data                              |
+| `FileEnd`                              | Signal transfer complete (with SHA-256 hash)         |
+| `StartSync`                            | Trigger sync session                                 |
+| `MetadataUpdate`                       | Propagate AI results (caption, score, indexed state) |
+| `VersionNegotiate` / `VersionReject`   | Protocol version handshake                           |
+| `CatchUp` / `CatchUpDone`              | Incremental sync after reconnection                  |
 
 ### File Transfer
 

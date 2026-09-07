@@ -1,9 +1,9 @@
-import { execSync } from 'child_process'
-import { resolve } from 'path'
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
+import { execSync } from 'child_process';
+import { resolve } from 'path';
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
 
-const host = process.env.TAURI_DEV_HOST
+const host = process.env.TAURI_DEV_HOST;
 
 function resolveCommitSha(): string {
   if (process.env.APP_COMMIT_SHA) return process.env.APP_COMMIT_SHA;
@@ -55,4 +55,4 @@ export default defineConfig(async () => ({
         }
       : undefined,
   },
-}))
+}));

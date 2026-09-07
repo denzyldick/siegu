@@ -18,11 +18,11 @@ app can unlock Pro.
 
 ## Endpoints
 
-| Method | Path        | Purpose                                             |
-| ------ | ----------- | --------------------------------------------------- |
-| POST   | `/webhook`  | Stripe webhook (verifies signature, records email)  |
-| GET    | `/verify`   | Checks `?email=` against KV; needs `x-siegu-token`  |
-| GET    | `/`         | Health                                            |
+| Method | Path       | Purpose                                            |
+| ------ | ---------- | -------------------------------------------------- |
+| POST   | `/webhook` | Stripe webhook (verifies signature, records email) |
+| GET    | `/verify`  | Checks `?email=` against KV; needs `x-siegu-token` |
+| GET    | `/`        | Health                                             |
 
 `/verify` requires the `x-siegu-token` header equal to the `SIEGU_VERIFY_TOKEN`
 secret. `/webhook` requires a valid `stripe-signature` header.

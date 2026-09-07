@@ -15,11 +15,7 @@ class FakeKV {
     if (exp !== undefined && exp < Date.now()) return null;
     return this.store.get(key) ?? null;
   }
-  async put(
-    key: string,
-    value: string,
-    opts: { expirationTtl?: number } = {},
-  ): Promise<void> {
+  async put(key: string, value: string, opts: { expirationTtl?: number } = {}): Promise<void> {
     this.store.set(key, value);
     if (opts.expirationTtl) this.expiries.set(key, Date.now() + opts.expirationTtl * 1000);
   }
@@ -40,7 +36,11 @@ function makeEnv(): Env {
 }
 
 /** Build a valid `stripe-signature` header using Stripe's HMAC scheme. */
-function stripeHeader(body: string, secret = STRIPE_SECRET, timestamp = Math.floor(Date.now() / 1000)): string {
+function stripeHeader(
+  body: string,
+  secret = STRIPE_SECRET,
+  timestamp = Math.floor(Date.now() / 1000),
+): string {
   const signed = `${timestamp}.${body}`;
   const mac = createHmac('sha256', secret).update(signed).digest('hex');
   return `t=${timestamp},v1=${mac}`;
@@ -70,7 +70,10 @@ describe('pro-license worker — Stripe webhook idempotency', () => {
     vi.restoreAllMocks();
     env = makeEnv();
     resend = vi.fn(async () => new Response('', { status: 200 }));
-    vi.stubGlobal('fetch', async (...args: Parameters<typeof fetch>) => resend(...args) as Promise<Response>);
+    vi.stubGlobal(
+      'fetch',
+      async (...args: Parameters<typeof fetch>) => resend(...args) as Promise<Response>,
+    );
   });
 
   it('records payment and sends one purchase email on the first delivery', async () => {

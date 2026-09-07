@@ -53,10 +53,10 @@ docker compose up -d
 
 The server runs on port `8080` with these env vars:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `8080` | Listen address |
-| `SIEGU_SIGNAL_TOKEN` | *(unset)* | If set, every join/room request must include this token |
+| Variable             | Default   | Description                                             |
+| -------------------- | --------- | ------------------------------------------------------- |
+| `PORT`               | `8080`    | Listen address                                          |
+| `SIEGU_SIGNAL_TOKEN` | _(unset)_ | If set, every join/room request must include this token |
 
 ### Pre-built image
 

@@ -13,14 +13,13 @@ test.describe('Runtime boundary — plain-browser webHost mode', () => {
     page,
   }) => {
     await page.goto('/');
-    const hasTauri = await page.evaluate(
-      () =>
-        Boolean(
-          // @ts-expect-error Tauri injects internals on window
-          (window as Record<string, unknown>)['__TAURI_INTERNALS__'] ||
-            // @ts-expect-error older IPC
-            (window as Record<string, unknown>)['__TAURI__'],
-        ),
+    const hasTauri = await page.evaluate(() =>
+      Boolean(
+        // @ts-expect-error Tauri injects internals on window
+        (window as Record<string, unknown>)['__TAURI_INTERNALS__'] ||
+        // @ts-expect-error older IPC
+        (window as Record<string, unknown>)['__TAURI__'],
+      ),
     );
     expect(hasTauri).toBe(false);
   });

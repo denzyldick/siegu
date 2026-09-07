@@ -13,7 +13,14 @@ export { bootGuest } from './bootGuest';
 export type { GuestBoot, GuestBootEvents } from './bootGuest';
 export { createPeerTransport, buildIceServers } from './peer';
 export type { PeerTransport } from './peer';
-export { parseHash, inferMime, assembleChunks, b64ToBytes, FileAssembler, takeNextOutbound } from './protocol';
+export {
+  parseHash,
+  inferMime,
+  assembleChunks,
+  b64ToBytes,
+  FileAssembler,
+  takeNextOutbound,
+} from './protocol';
 export type { GuestSession, GuestInbound, GuestOutbound } from './protocol';
 export { tauriBackend } from './tauriBackend';
 export { guestBackend } from './guestBackend';

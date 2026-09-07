@@ -23,23 +23,23 @@ src-tauri/gen/android/
 
 From `AndroidManifest.xml`:
 
-| Permission | Purpose |
-|------------|---------|
-| `INTERNET` | Networking |
-| `ACCESS_NETWORK_STATE` | Connectivity checks |
-| `ACCESS_WIFI_STATE` | WiFi status |
-| `CAMERA` | QR scanning (optional, not required) |
-| `READ_EXTERNAL_STORAGE` | Legacy storage access |
-| `WRITE_EXTERNAL_STORAGE` | Legacy storage write |
-| `READ_MEDIA_IMAGES` | Scoped storage (API 33+) |
-| `READ_MEDIA_VIDEO` | Scoped storage (API 33+) |
-| `READ_MEDIA_AUDIO` | Scoped storage (API 33+) |
-| `MANAGE_EXTERNAL_STORAGE` | Full file access |
-| `ACCESS_FINE_LOCATION` | GPS for photo geotagging |
-| `ACCESS_COARSE_LOCATION` | Approximate location |
-| `ACCESS_MEDIA_LOCATION` | EXIF GPS reading |
-| `NEARBY_WIFI_DEVICES` | mDNS LAN discovery |
-| `SET_WALLPAPER` | Set photo as wallpaper |
+| Permission                | Purpose                              |
+| ------------------------- | ------------------------------------ |
+| `INTERNET`                | Networking                           |
+| `ACCESS_NETWORK_STATE`    | Connectivity checks                  |
+| `ACCESS_WIFI_STATE`       | WiFi status                          |
+| `CAMERA`                  | QR scanning (optional, not required) |
+| `READ_EXTERNAL_STORAGE`   | Legacy storage access                |
+| `WRITE_EXTERNAL_STORAGE`  | Legacy storage write                 |
+| `READ_MEDIA_IMAGES`       | Scoped storage (API 33+)             |
+| `READ_MEDIA_VIDEO`        | Scoped storage (API 33+)             |
+| `READ_MEDIA_AUDIO`        | Scoped storage (API 33+)             |
+| `MANAGE_EXTERNAL_STORAGE` | Full file access                     |
+| `ACCESS_FINE_LOCATION`    | GPS for photo geotagging             |
+| `ACCESS_COARSE_LOCATION`  | Approximate location                 |
+| `ACCESS_MEDIA_LOCATION`   | EXIF GPS reading                     |
+| `NEARBY_WIFI_DEVICES`     | mDNS LAN discovery                   |
+| `SET_WALLPAPER`           | Set photo as wallpaper               |
 
 ## Build Pipeline
 

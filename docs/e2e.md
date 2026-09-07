@@ -21,10 +21,11 @@ cargo test -p siegu-core --lib
 ```
 
 Key things these pin:
+
 - **Contract drift**: the committed `shared/generated/rpc-commands.ts` matches
   `rpc_catalog.rs`. If you changed a command, regenerate with
   `cargo build -p siegu-core` and re-run.
-- **Capability ladder**: a guest (read-only / `rw`, no worker) is *rejected* from
+- **Capability ladder**: a guest (read-only / `rw`, no worker) is _rejected_ from
   every owner-tier ML command; the owner (with a live worker) is allowed.
 - **Facade behavior**: `dispatch` returns real data over the RPC surface — e.g.
   `get_unindexed_count` reports the uncapped library count (>50), and
@@ -58,6 +59,7 @@ These drive two real siegu processes over the actual WebRTC/mesh and signaling
 stack.
 
 ### Rust integration tests (single crate, deterministic)
+
 ```bash
 cargo test -p siegu-core --test sync_e2e     # delta sync, mDNS, sync over transport
 cargo test -p siegu-core --test mesh_e2e     # join --initiator + session
@@ -65,6 +67,7 @@ cargo test -p siegu-core --test signal_routing
 ```
 
 ### Shell drivers (full CLI + WebRTC)
+
 - **`scripts/e2e-sync.sh`** — builds and runs two real processes; verifies
   initiator/joiner mesh sync end to end.
 - **`scripts/e2e-view-only.sh`** — the richest contract exercise. It hosts a
@@ -111,6 +114,7 @@ bun install && bun run build
 ```
 
 ### What to verify manually
+
 - **Ro vs rw**: with `--share-mode ro`, write commands from the web bearer are
   rejected; with `rw` they apply. Same mapping the E2E driver asserts over
   WebRTC.

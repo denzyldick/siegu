@@ -8,10 +8,13 @@ const props = defineProps<{
   location: string;
 }>();
 
-const item = computed<MediaItem | null>(() => ({
-  id: props.id,
-  location: props.location,
-} as unknown as MediaItem));
+const item = computed<MediaItem | null>(
+  () =>
+    ({
+      id: props.id,
+      location: props.location,
+    }) as unknown as MediaItem,
+);
 
 const { mediaSrcRef } = useMediaUrl();
 const src = mediaSrcRef(item, 'thumb');

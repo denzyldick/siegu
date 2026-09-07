@@ -95,10 +95,7 @@ export const useDuplicatesStore = defineStore('duplicates', () => {
           groups: found,
           stats: {
             group_count: found.length,
-            duplicate_count: found.reduce(
-              (sum, g) => sum + Math.max(0, g.members.length - 1),
-              0,
-            ),
+            duplicate_count: found.reduce((sum, g) => sum + Math.max(0, g.members.length - 1), 0),
             reclaimable_bytes: found.reduce((sum, g) => sum + g.reclaimable_bytes, 0),
           },
           library_bytes: 0,

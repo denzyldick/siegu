@@ -71,11 +71,7 @@
       ></v-switch>
     </v-sheet>
 
-    <v-sheet
-      v-if="timingAverages.length > 0"
-      class="mb-4 px-4 py-3 rounded-lg"
-      border
-    >
+    <v-sheet v-if="timingAverages.length > 0" class="mb-4 px-4 py-3 rounded-lg" border>
       <div class="text-caption font-weight-bold text-disabled tracking-widest uppercase mb-2">
         {{ $t('settings.model_performance') }}
       </div>
@@ -86,10 +82,7 @@
       >
         <span class="text-body-2 text-medium-emphasis" style="width: 90px">{{ model }}</span>
         <div class="model-timing-track">
-          <div
-            class="model-timing-fill"
-            :style="{ width: (avg / maxTimingMs()) * 100 + '%' }"
-          />
+          <div class="model-timing-fill" :style="{ width: (avg / maxTimingMs()) * 100 + '%' }" />
         </div>
         <span class="text-body-2 text-medium-emphasis ml-2" style="width: 96px; text-align: right">
           {{ avg.toFixed(0) }}ms · {{ count }} runs

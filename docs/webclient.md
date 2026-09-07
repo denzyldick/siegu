@@ -128,13 +128,13 @@ None — the web client is intentionally minimal.
 
 ## Architecture
 
-| File | Purpose |
-|------|---------|
-| `index.html` | Entry point, minimal HTML shell |
-| `src/main.ts` | All logic: signalling, WebRTC, gallery rendering, preview |
-| `src/lib.ts` | Pure utilities: `parseHash`, `inferMime`, `assembleChunks` |
-| `src/style.css` | Dark theme, grid layout, responsive design |
-| `public/robots.txt` | Blocks search engine crawlers |
+| File                | Purpose                                                    |
+| ------------------- | ---------------------------------------------------------- |
+| `index.html`        | Entry point, minimal HTML shell                            |
+| `src/main.ts`       | All logic: signalling, WebRTC, gallery rendering, preview  |
+| `src/lib.ts`        | Pure utilities: `parseHash`, `inferMime`, `assembleChunks` |
+| `src/style.css`     | Dark theme, grid layout, responsive design                 |
+| `public/robots.txt` | Blocks search engine crawlers                              |
 
 ## Dependencies
 

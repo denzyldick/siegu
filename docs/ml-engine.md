@@ -17,19 +17,19 @@ crates/siegu-core/src/ml_engine/
 
 ## Model Registry
 
-18 files across 9 model groups, defined in `model_manager.rs`. The "expected size" in the registry is a *minimum-valid-size* guard, not the real file size; the sizes below are the actual download sizes:
+18 files across 9 model groups, defined in `model_manager.rs`. The "expected size" in the registry is a _minimum-valid-size_ guard, not the real file size; the sizes below are the actual download sizes:
 
-| Model | Files | Approx Size | Purpose |
-|-------|-------|-------------|---------|
-| **clip** | visual (~335MB), text (~242MB), tokenizer.json (~2MB) | ~580MB | Semantic search embeddings |
-| **face** | face_detection_yunet_2023mar.onnx (~0.2MB), arcface.onnx (~166MB) | ~167MB | Face detection + landmark alignment + recognition/grouping (512-dim) |
-| **ocr** | det (~2MB), rec (~9MB), en_dict.txt (~1KB) | ~11MB | PP-OCRv3 text recognition |
-| **nsfw** | nsfw.onnx (~327MB) | ~327MB | Sensitive content detection |
-| **aesthetics** | aesthetics.onnx (~1.6GB) | ~1.6GB | Photo quality scoring (1-10) |
-| **yolo** | yolov8n.onnx (~12MB) | ~12MB | 80-class object detection |
-| **blip** | encoder (~329MB), decoder (~170MB), blip_tokenizer.json (~0.5MB) | ~500MB | Image captioning |
-| **midas** | midas.onnx (~120MB) | ~120MB | Depth estimation |
-| **whisper** | encoder (~31MB), decoder (~113MB), tokenizer.json (~3.7MB) | ~148MB | Audio transcription |
+| Model          | Files                                                             | Approx Size | Purpose                                                              |
+| -------------- | ----------------------------------------------------------------- | ----------- | -------------------------------------------------------------------- |
+| **clip**       | visual (~335MB), text (~242MB), tokenizer.json (~2MB)             | ~580MB      | Semantic search embeddings                                           |
+| **face**       | face_detection_yunet_2023mar.onnx (~0.2MB), arcface.onnx (~166MB) | ~167MB      | Face detection + landmark alignment + recognition/grouping (512-dim) |
+| **ocr**        | det (~2MB), rec (~9MB), en_dict.txt (~1KB)                        | ~11MB       | PP-OCRv3 text recognition                                            |
+| **nsfw**       | nsfw.onnx (~327MB)                                                | ~327MB      | Sensitive content detection                                          |
+| **aesthetics** | aesthetics.onnx (~1.6GB)                                          | ~1.6GB      | Photo quality scoring (1-10)                                         |
+| **yolo**       | yolov8n.onnx (~12MB)                                              | ~12MB       | 80-class object detection                                            |
+| **blip**       | encoder (~329MB), decoder (~170MB), blip_tokenizer.json (~0.5MB)  | ~500MB      | Image captioning                                                     |
+| **midas**      | midas.onnx (~120MB)                                               | ~120MB      | Depth estimation                                                     |
+| **whisper**    | encoder (~31MB), decoder (~113MB), tokenizer.json (~3.7MB)        | ~148MB      | Audio transcription                                                  |
 
 **Total**: ~3.4GB on disk (varies slightly per platform/version)
 
@@ -41,17 +41,17 @@ Model files are verified against expected SHA-256 hashes after download. Files w
 
 Each model has model-specific input dimensions and normalization:
 
-| Model | Input Size | Normalization |
-|-------|-----------|---------------|
-| CLIP | 224×224 | ImageNet mean/std |
-| Aesthetics | 384×384 | [-1, 1] |
-| NSFW | 224×224 | ImageNet mean/std |
-| OCR | 320×48 (det) / varies (rec) | [0, 1] |
-| YOLO | 640×640 | [0, 1] |
-| BLIP | 384×384 | ImageNet mean/std |
-| MiDaS | 256×256 | [0, 1] |
-| ArcFace | 112×112 | [-1, 1] |
-| UltraFace | 320×240 | [-1, 1] |
+| Model      | Input Size                  | Normalization     |
+| ---------- | --------------------------- | ----------------- |
+| CLIP       | 224×224                     | ImageNet mean/std |
+| Aesthetics | 384×384                     | [-1, 1]           |
+| NSFW       | 224×224                     | ImageNet mean/std |
+| OCR        | 320×48 (det) / varies (rec) | [0, 1]            |
+| YOLO       | 640×640                     | [0, 1]            |
+| BLIP       | 384×384                     | ImageNet mean/std |
+| MiDaS      | 256×256                     | [0, 1]            |
+| ArcFace    | 112×112                     | [-1, 1]           |
+| UltraFace  | 320×240                     | [-1, 1]           |
 
 ## Analysis Pipeline
 
@@ -81,12 +81,12 @@ Whisper tiny processes audio from video files:
 
 ## Execution Providers
 
-| Provider | Platform | Enabled when |
-|----------|----------|-------------|
-| CUDA | NVIDIA GPU | `OrtStrategy::Cuda` |
-| DirectML | Windows GPU | `OrtStrategy::DirectML` |
-| CoreML | Apple Silicon | feature flag |
-| CPU | All | Always (fallback) |
+| Provider | Platform      | Enabled when            |
+| -------- | ------------- | ----------------------- |
+| CUDA     | NVIDIA GPU    | `OrtStrategy::Cuda`     |
+| DirectML | Windows GPU   | `OrtStrategy::DirectML` |
+| CoreML   | Apple Silicon | feature flag            |
+| CPU      | All           | Always (fallback)       |
 
 Default is CPU. GPU providers are configured via `ep.rs` based on `ORT_STRATEGY` env var.
 

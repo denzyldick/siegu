@@ -362,11 +362,19 @@ function destroySession(): void {
 
   // Close WebRTC
   if (dc) {
-    try { dc.close(); } catch { /* ignore */ }
+    try {
+      dc.close();
+    } catch {
+      /* ignore */
+    }
     dc = null;
   }
   if (pc) {
-    try { pc.close(); } catch { /* ignore */ }
+    try {
+      pc.close();
+    } catch {
+      /* ignore */
+    }
     pc = null;
   }
 

@@ -19,25 +19,28 @@ produced `siegu.db` with `rusqlite` and asserts the extracted state matches the
 bundled `demos/` source assets.
 
 ### Group A — deterministic, offline (always run)
-| Test | Proves |
-|---|---|
-| `seed_demo_produces_source_matching_library` | one album per category; `photo` row count == source image count; album membership (`album_item`) == source count; no dangling `album_item -> photo` refs |
-| `seed_demo_generates_thumbnails_for_every_photo` | every photo gets a `encoded` thumbnail; thumbs are base64 JPEG (`data:image/jpeg...`) |
-| `seed_demo_is_idempotent` | re-seed adds 0 photos, reuses albums, never duplicates them |
-| `unrecognized_category_is_reported_not_fatal` | unknown slug warns and seeds nothing, exit 0 |
-| `seeded_albums_are_queryable_by_the_album_join_features_use` | the `album_item JOIN photo` path features use to power the album view returns results |
-| `seed_demo_combined_album_contains_every_photo` | the combined "My Photos" album contains all 46 items (self-heals older seeds) |
-| `seed_demo_videos_gain_poster_thumbnails_and_never_seed_posts` | video clips get a poster `encoded` thumb and the `*_poster.jpg` files are never seeded as photos |
+
+| Test                                                           | Proves                                                                                                                                                   |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `seed_demo_produces_source_matching_library`                   | one album per category; `photo` row count == source image count; album membership (`album_item`) == source count; no dangling `album_item -> photo` refs |
+| `seed_demo_generates_thumbnails_for_every_photo`               | every photo gets a `encoded` thumbnail; thumbs are base64 JPEG (`data:image/jpeg...`)                                                                    |
+| `seed_demo_is_idempotent`                                      | re-seed adds 0 photos, reuses albums, never duplicates them                                                                                              |
+| `unrecognized_category_is_reported_not_fatal`                  | unknown slug warns and seeds nothing, exit 0                                                                                                             |
+| `seeded_albums_are_queryable_by_the_album_join_features_use`   | the `album_item JOIN photo` path features use to power the album view returns results                                                                    |
+| `seed_demo_combined_album_contains_every_photo`                | the combined "My Photos" album contains all 46 items (self-heals older seeds)                                                                            |
+| `seed_demo_videos_gain_poster_thumbnails_and_never_seed_posts` | video clips get a poster `encoded` thumb and the `*_poster.jpg` files are never seeded as photos                                                         |
 
 ### Group B — ML extraction (`#[ignore]`, needs ONNX models; self-skips otherwise)
-| Test | Proves |
-|---|---|
-| `analyze_persists_objects_and_marks_indexed` | `analyze all --headless` produces `object` (tags) rows and marks photos `indexed=2` |
-| `analyze_persists_people_from_faces` | `faces` + `people` rows recorded for the people demo |
-| `analyze_persists_aesthetics_and_face_count_properties` | `aesthetics_score` and the `face_count` property persisted |
-| `extracted_tags_are_searchable_by_the_query_features_use` | extracted tags attach to real photos so search/facets can find them |
+
+| Test                                                      | Proves                                                                              |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `analyze_persists_objects_and_marks_indexed`              | `analyze all --headless` produces `object` (tags) rows and marks photos `indexed=2` |
+| `analyze_persists_people_from_faces`                      | `faces` + `people` rows recorded for the people demo                                |
+| `analyze_persists_aesthetics_and_face_count_properties`   | `aesthetics_score` and the `face_count` property persisted                          |
+| `extracted_tags_are_searchable_by_the_query_features_use` | extracted tags attach to real photos so search/facets can find them                 |
 
 ### Group C — how it runs
+
 - ML group skips when ONNX models are absent, mirroring
   `siegu_core::ml_engine::models::test_models_dir` and `src-tauri/src/ml.rs`.
   CI runs them with `--ignored` once models are downloaded (`docs/ci.md`).
@@ -50,7 +53,9 @@ ignored** until models are present. With ONNX models present, **all 4 Group B
 ML tests pass** too against the 46-item demo.
 
 ### Group B validation results (run once against the real models)
+
 All four ML tests were executed for real (ONNX models present) and pass:
+
 - `analyze_persists_objects_and_marks_indexed` → object/tag rows written,
   photos marked `indexed=2`.
 - `analyze_persists_people_from_faces` → `faces` and `people` rows for the people demo.
@@ -60,6 +65,7 @@ All four ML tests were executed for real (ONNX models present) and pass:
   real photos and are reachable via search/facets.
 
 **Model-dependent tests beyond the demo (also run, all green):**
+
 - `ml_engine::models::tests::session_pool_allows_concurrent_locks` (YuNet) —
   proves two concurrent locks get distinct pooled sessions (real model).
 - `ml_engine::whisper::tests::test_decoder_model_metadata` +
@@ -73,19 +79,21 @@ All four ML tests were executed for real (ONNX models present) and pass:
 ## 2. Bugs / risks found while writing the tests
 
 ### BUG-1 — Seeder is silent for already-indexed categories (re-seed UX)
-**Finding:** On a re-run, categories whose image set is unchanged print *no*
+
+**Finding:** On a re-run, categories whose image set is unchanged print _no_
 `SEEDED <cat> ...` line at all — they fall into the `then continue` branch
 (`main.rs:1548-1551`, `cli_warn!("no images seeded for demo category")`) and the
 only feedback is a single generic `DEMO SEED DONE ... photos_added=0`
 (`main.rs:1575`). The original test asserted the re-seed re-printed albums, which
 failed — that's how the gap surfaced.
-**Impact:** Operator can't tell *which* category was cached vs. actually
+**Impact:** Operator can't tell _which_ category was cached vs. actually
 (re)seeded. Low severity, but confusing in CI/logs.
 **#impact-platforms:** `cli` (seed runs only on a CLI). No web/desktop/ios path.
 **Fix to plan:** emit a per-category status line (`CACHED <cat> photos=0`) or a
 `SEEDED ... photos=0` line instead of only the aggregate.
 
 ### BUG-2 — Default demo-root is a build-time path (packaged installs fail)
+
 **Finding:** `resolve_demo_root` (`main.rs:1429-1444`) falls back to
 `env!("CARGO_MANIFEST_DIR")/../../demos` — that path is baked in at **compile
 time**. For a dev build it resolves fine, but for a packaged artifact
@@ -93,7 +101,7 @@ time**. For a dev build it resolves fine, but for a packaged artifact
 `demos/` tree will not exist at that path at runtime.
 **Impact:** On packaged installs `seed-demo` with no `--demos-root` /
 `SIEGU_DEMO_ROOT` finds nothing and silently seeds 0 photos across every
-category (each just `continue`s). Data would be *missing*, not wrong.
+category (each just `continue`s). Data would be _missing_, not wrong.
 **#impact-platforms:** `cli` primary. **Also `web` / `desktop` / `ios`** — any
 platform that ships a binary without the repo-relative source tree. If demo
 assets are later served from a bundle, this must be reworked to a
@@ -103,6 +111,7 @@ via `include_bytes!` / a platform resource bundle) instead of
 `CARGO_MANIFEST_DIR`.
 
 ### BUG-3 — No allowlist of demo category slugs
+
 **Finding:** `--demos` accepts any directory name under `demos/` (`main.rs:1460`)
 with no validation against known slugs; unknown ones just warn and are skipped.
 `pretty_category` passes unknown slugs through unchanged as the album name.
@@ -114,9 +123,10 @@ picker is later exposed in web/desktop/ios UI, the slug list must be shared.
 print valid choices on mismatch.
 
 ### BUG-4 — Album dedup is by name, so slug→pretty collisions merge albums
+
 **Finding:** idempotency reuses albums by `album.name` (`main.rs:1483-1487`).
 The bundled 4 slugs map to 4 distinct pretty names, so it's correct today. But
-nothing prevents two *different* slugs from mapping to one name (e.g. a future
+nothing prevents two _different_ slugs from mapping to one name (e.g. a future
 `city` slug would collide with `cities` → "Cities & Travel") and silently share
 an album.
 **Impact:** latent; no live repro with current data. Would cause wrong album
@@ -128,6 +138,7 @@ unique-per-slug and unit-test the mapping (partially covered by
 `pretty_category_maps_recognised_slugs`).
 
 ### BUG-5 — Thumbnails generated synchronously during seed (latency on big sets)
+
 **Finding:** `seed-demo` calls `generate_thumbnail` inline per photo
 (`main.rs:1538-1542`). Fine at 24 assets (~ms each), but the code path is
 O(N·decode+encode) and blocks the whole command.
@@ -139,6 +150,7 @@ ever invoked from the app's main thread instead of a worker.
 if reused from app code.
 
 ### BUG-6 — `add_directory` re-registered on every seed (no-op but noisy)
+
 **Finding:** `cmd_seed_demo` calls `db.add_directory(&demo_root)` on every run
 (`main.rs:1475`) so the demo root is (re)watched. It is idempotent in practice,
 but it means a seeder introduces a persistent watched-directory side effect.
@@ -168,12 +180,13 @@ platforms), confirm against the matching surface before closing:
       break; confirm demo assets are shipped in the bundle and resolved relative
       to a writable sandbox dir. Watch for BUG-6’s watcher on sandboxed roots.
 
-No bug currently affects data *in-flight* correctness of a single seed; BUG-2
+No bug currently affects data _in-flight_ correctness of a single seed; BUG-2
 and BUG-4 are the two most likely to bite outside the CLI.
 
 ---
 
 ## 4. Proven-dead issues (do not re-investigate)
+
 - **Random photo ids vs idempotency** — handled by guarding on `location` via
   `load_existing_paths`, exactly as `cmd_scan` does; verified by
   `seed_demo_is_idempotent`.
@@ -214,6 +227,7 @@ Verified end-to-end on the seeded demo (Playwright/Chromium, 0 console errors):
   `Backend`, and no-op / return shape-correct defaults for the rest.
 
 ### Host RPC inventory (`crates/siegu-core/src/rpc.rs` `dispatch`)
+
 The host `/rpc` surface now mirrors the full Tauri command set so the browser
 client can **manage** a `siegu-cli web` instance, not just read it. Read-only
 commands run in any share mode; mutations require the host to be started with
@@ -248,12 +262,14 @@ a generic `Backend.request(name, payload)` on all three adapters (tauri / webHos
 results the Tauri commands return as strings.
 
 ### Deliberately desktop-only on the host (not in `/rpc`)
+
 Sync/mesh (`initialize_sync_folder`, `request_start_sync`, `enter_view_only`,
 `list_devices`, pairing-code commands, `fetch_original`), wallpaper
 (`set_wallpaper`), and live file-read/IO commands stay Tauri-only; the browser
 data plane returns shape-correct no-ops/fallbacks for these.
 
 ### Verified gaps (feed the cross-platform pass)
+
 - **`list_files` returns `encoded: ""`** — thumbnails are never inline over
   webHost; the browser must fetch `/thumb`. Frontend handles it (mode-aware
   `mediaSrc`), but confirm desktop/ios don’t regress to relying on `encoded`

@@ -10,8 +10,8 @@ cargo install --path crates/siegu-cli
 
 ## Global Flags
 
-| Flag | Description |
-|------|-------------|
+| Flag                  | Description                                              |
+| --------------------- | -------------------------------------------------------- |
 | `--config-dir <path>` | Override config directory (default: OS-appropriate path) |
 
 ---
@@ -127,6 +127,7 @@ siegu-cli mesh seed-album --name "Shared" --take-first 5
 ```
 
 Availability and defaults:
+
 - `host` — `--server` connects to an existing signaling server instead of
   starting a local one; `--room` names the room (required with `--server`).
   `--share-mode <ro|rw>` sets the permission level for connected peers

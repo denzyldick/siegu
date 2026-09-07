@@ -37,7 +37,9 @@ test.describe('Gallery (model-enriched demo)', () => {
   test('video hover preview actually plays', async ({ page }) => {
     const vIndicator = page.locator('.media-card-container .video-indicator').first();
     await expect(vIndicator).toBeVisible({ timeout: 15_000 });
-    const wrapper = vIndicator.locator('xpath=ancestor::div[contains(@class,"media-card-container")]');
+    const wrapper = vIndicator.locator(
+      'xpath=ancestor::div[contains(@class,"media-card-container")]',
+    );
     await wrapper.hover();
     await page.waitForTimeout(1200);
     const video = wrapper.locator('video').first();

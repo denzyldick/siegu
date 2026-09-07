@@ -12,15 +12,15 @@ E2E, and the real-ML inference test on desktop). Open the workflow for a
 platform in the Actions tab to see its full check list, then switch to another
 platform's list.
 
-| Workflow | Trigger | Purpose |
-|----------|---------|---------|
-| `ubuntu.yml` | push to `main`, PRs | Unit/integration tests, lint, mesh E2E, face-grouping E2E, full ONNX inference (the only platform that runs AI tests) |
-| `macos.yml` | push to `main`, PRs | macOS: unit tests, Tauri desktop build, mesh + view-only E2E |
-| `windows.yml` | push to `main`, PRs | Windows: unit tests, Tauri desktop build, mesh + view-only E2E |
-| `android.yml` | push to `main`, PRs | Android: cross-compile check + core tests on an x86_64 emulator |
-| `ios.yml` | push to `main`, PRs | iOS: cross-compile check + core tests on a simulator |
-| `release.yml` | GitHub release `created`, push of `v*` tags | Build desktop installers + Android APK, gate on iOS build, attach artifacts to the triggering release |
-| `signal-docker.yml` | push to `main`, PRs, tags | Build/push the signaling-server Docker image; PRs only validate the build |
+| Workflow            | Trigger                                     | Purpose                                                                                                               |
+| ------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `ubuntu.yml`        | push to `main`, PRs                         | Unit/integration tests, lint, mesh E2E, face-grouping E2E, full ONNX inference (the only platform that runs AI tests) |
+| `macos.yml`         | push to `main`, PRs                         | macOS: unit tests, Tauri desktop build, mesh + view-only E2E                                                          |
+| `windows.yml`       | push to `main`, PRs                         | Windows: unit tests, Tauri desktop build, mesh + view-only E2E                                                        |
+| `android.yml`       | push to `main`, PRs                         | Android: cross-compile check + core tests on an x86_64 emulator                                                       |
+| `ios.yml`           | push to `main`, PRs                         | iOS: cross-compile check + core tests on a simulator                                                                  |
+| `release.yml`       | GitHub release `created`, push of `v*` tags | Build desktop installers + Android APK, gate on iOS build, attach artifacts to the triggering release                 |
+| `signal-docker.yml` | push to `main`, PRs, tags                   | Build/push the signaling-server Docker image; PRs only validate the build                                             |
 
 ### Desktop workflows (`ubuntu.yml`, `macos.yml`, `windows.yml`)
 
@@ -37,7 +37,7 @@ them to avoid triple-running on every PR (the main driver of long CI time).
   `ai-test-models-v3-${{ runner.os }}`). This is the only platform where
   `--ignored` ML integration tests run.
 - **`macos.yml`** / **`windows.yml`** — `cargo test` (src-tauri), `cargo check
-  --all-targets`, Tauri desktop build (`--no-bundle`), CLI release build,
+--all-targets`, Tauri desktop build (`--no-bundle`), CLI release build,
   mesh-sync E2E, and view-only/RPC E2E. The `tests`, `lint`, and `ai-inference`
   jobs described above are Ubuntu-only; these platforms only verify compilation
   and the shared runtime on their OS.
@@ -68,20 +68,20 @@ them to avoid triple-running on every PR (the main driver of long CI time).
 
 What is actually verified per platform, and on which devices the app can run.
 
-| Coverage | macOS | Ubuntu | Windows | Android | iOS |
-|----------|-------|--------|---------|---------|-----|
-| Unit/integration tests + lint | ✅ | ✅ | ✅ | — | — |
-| Real AI inference (full model suite) | — | ✅ | — | — | — |
-| Mesh sync E2E (CLI, in-process signaling) | ✅ | ✅ | ✅ | — | — |
-| ML face-grouping E2E | — | ✅ | — | — | — |
-| Container mesh E2E | — | ✅ | — | — | — |
-| Cross-compile check | — | — | — | ✅ | ✅ |
-| On-device unit tests + mesh sync (`sync_e2e`) | — | — | — | ✅ emulator | ✅ simulator |
-| Release desktop installers | ✅ | ✅ | ✅ | — | — |
-| Release Android APK | — | — | — | ✅ | — |
-| Release iOS build (real gate, no artifact) | — | — | — | — | ✅ |
+| Coverage                                      | macOS | Ubuntu | Windows | Android     | iOS          |
+| --------------------------------------------- | ----- | ------ | ------- | ----------- | ------------ |
+| Unit/integration tests + lint                 | ✅    | ✅     | ✅      | —           | —            |
+| Real AI inference (full model suite)          | —     | ✅     | —       | —           | —            |
+| Mesh sync E2E (CLI, in-process signaling)     | ✅    | ✅     | ✅      | —           | —            |
+| ML face-grouping E2E                          | —     | ✅     | —       | —           | —            |
+| Container mesh E2E                            | —     | ✅     | —       | —           | —            |
+| Cross-compile check                           | —     | —      | —       | ✅          | ✅           |
+| On-device unit tests + mesh sync (`sync_e2e`) | —     | —      | —       | ✅ emulator | ✅ simulator |
+| Release desktop installers                    | ✅    | ✅     | ✅      | —           | —            |
+| Release Android APK                           | —     | —      | —       | ✅          | —            |
+| Release iOS build (real gate, no artifact)    | —     | —      | —       | —           | ✅           |
 
-**Policy**: real AI *inference* is verified on Ubuntu only (the only platform
+**Policy**: real AI _inference_ is verified on Ubuntu only (the only platform
 that downloads and exercises the full ~5 GB ONNX model suite); other platforms
 only verify that the ML code compiles. The iOS app must build for the simulator
 as a release gate, but no signed artifact is produced in CI (App Store
@@ -104,10 +104,10 @@ must be arm64), Linux musl/Alpine.
 
 ## E2E scripts
 
-| Script | What it does |
-|--------|--------------|
-| `scripts/e2e-sync.sh` | Builds the CLI, starts a mesh host, joins from a second process, transfers `einstein_1.jpg`, asserts the transferred file matches the source SHA-256. Falls back to the external signaling server when `SIEGU_SIGNAL_URL` is set. |
-| `scripts/e2e-face-grouping.sh` | Runs the full AI pipeline against a small album and asserts same-person faces land in one group. Needs the model suite in `SIEGU_MODELS_DIR` (default: downloads to the script's own cache). |
+| Script                         | What it does                                                                                                                                                                                                                      |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/e2e-sync.sh`          | Builds the CLI, starts a mesh host, joins from a second process, transfers `einstein_1.jpg`, asserts the transferred file matches the source SHA-256. Falls back to the external signaling server when `SIEGU_SIGNAL_URL` is set. |
+| `scripts/e2e-face-grouping.sh` | Runs the full AI pipeline against a small album and asserts same-person faces land in one group. Needs the model suite in `SIEGU_MODELS_DIR` (default: downloads to the script's own cache).                                      |
 
 ### Running the sync E2E locally
 
@@ -155,18 +155,18 @@ scoring and MiDaS depth, then asserts a coherent caption and ≥1 detected face.
 
 All files land in `src-tauri/test_models/`:
 
-| File | Source |
-|------|--------|
-| `clip-vit-base-patch32-visual.onnx` / `-text.onnx`, `tokenizer.json` | `Xenova/clip-vit-base-patch32` |
-| `face_detection_yunet_2023mar.onnx` | opencv_zoo |
-| `ocr_det.onnx`, `ocr_rec.onnx`, `en_dict.txt` | SWHL RapidOCR / PaddleOCR |
-| `nsfw.onnx` | onnx-community nsfw_image_detection |
-| `aesthetics.onnx` | aesthetic-predictor-v2-5 |
-| `yolov8.onnx` | webml/yolov8n |
+| File                                                                        | Source                                |
+| --------------------------------------------------------------------------- | ------------------------------------- |
+| `clip-vit-base-patch32-visual.onnx` / `-text.onnx`, `tokenizer.json`        | `Xenova/clip-vit-base-patch32`        |
+| `face_detection_yunet_2023mar.onnx`                                         | opencv_zoo                            |
+| `ocr_det.onnx`, `ocr_rec.onnx`, `en_dict.txt`                               | SWHL RapidOCR / PaddleOCR             |
+| `nsfw.onnx`                                                                 | onnx-community nsfw_image_detection   |
+| `aesthetics.onnx`                                                           | aesthetic-predictor-v2-5              |
+| `yolov8.onnx`                                                               | webml/yolov8n                         |
 | `blip.onnx` (split_0), `blip_decoder.onnx` (split_1), `blip_tokenizer.json` | Salesforce BLIP image-captioning-base |
-| `arcface.onnx` | arcface_w600k_r50 |
-| `midas.onnx` | Xenova dpt-hybrid-midas |
-| `whisper.onnx` (encoder), `whisper-decoder.onnx`, `whisper-tokenizer.json` | onnx-community whisper-tiny |
+| `arcface.onnx`                                                              | arcface_w600k_r50                     |
+| `midas.onnx`                                                                | Xenova dpt-hybrid-midas               |
+| `whisper.onnx` (encoder), `whisper-decoder.onnx`, `whisper-tokenizer.json`  | onnx-community whisper-tiny           |
 
 Cache key is `ai-test-models-v3` — bump it whenever a model URL or file
 changes so CI re-downloads instead of reusing stale files.

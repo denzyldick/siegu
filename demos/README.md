@@ -8,13 +8,13 @@ library reads like one person's camera roll.
 
 ## Categories
 
-| Directory    | Album name       | Contents                  |
-| ------------ | ---------------- | ------------------------- |
-| `landscapes/`| Landscapes       | 10 photos                 |
-| `people/`    | People & Faces   | 10 photos                 |
-| `cities/`    | Cities & Travel  | 10 photos                 |
-| `food/`      | Food & Still Life| 10 photos                 |
-| `videos/`    | Videos           | 6 short clips + posters   |
+| Directory     | Album name        | Contents                |
+| ------------- | ----------------- | ----------------------- |
+| `landscapes/` | Landscapes        | 10 photos               |
+| `people/`     | People & Faces    | 10 photos               |
+| `cities/`     | Cities & Travel   | 10 photos               |
+| `food/`       | Food & Still Life | 10 photos               |
+| `videos/`     | Videos            | 6 short clips + posters |
 
 ## Seeding
 

@@ -16,9 +16,7 @@ test.describe('Search — model data is searchable & facet-able', () => {
     await page.waitForTimeout(2000);
   });
 
-  test('searching an object tag (e.g. "landscape") filters the gallery', async ({
-    page,
-  }) => {
+  test('searching an object tag (e.g. "landscape") filters the gallery', async ({ page }) => {
     const unsearched = await page.locator('.media-card-container').count();
     expect(unsearched).toBeGreaterThan(0);
 

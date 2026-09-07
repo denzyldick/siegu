@@ -162,8 +162,13 @@ dialog#preview::backdrop {
 }
 
 @keyframes pulse-warn {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* Download Siegu upsell */
