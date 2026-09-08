@@ -7,7 +7,7 @@
   <meta name="description" content="Siegu is a private, local-first photo library with on-device AI. Browse, search, share and relive your memories without handing them to the cloud." />
   <script>
     // Apply the saved theme before first paint to avoid a flash of the wrong
-    // palette. Mirrors applyTheme() in js/main.js?v=mtpz8ic0 (light | dark | system).
+    // palette. Mirrors applyTheme() in js/main.js?v=mtsph0n1 (light | dark | system).
     (function () {
       try {
         var v = localStorage.getItem('siegu_theme');
@@ -97,14 +97,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="css/styles.css?v=mtpz8ic0" />
+  <link rel="stylesheet" href="css/styles.css?v=mtsph0n1" />
 
   <!--
     MARKETING / TRACKER HOOK
     Drop vendor scripts (Plausible, Fathom, GA, Meta Pixel, Hotjar, …) here.
     Each snippet can live in its own file under /trackers/*.js and be included
     with a <script src> tag, or added inline below. They load only after the
-    cookie-consent banner has been accepted (see js/main.js?v=mtpz8ic0 `trackersOn`).
+    cookie-consent banner has been accepted (see js/main.js?v=mtsph0n1 `trackersOn`).
   -->
 </head>
 <body>
@@ -163,7 +163,6 @@
       <video class="hero-video" autoplay muted loop playsinline preload="metadata" poster="video/video-cover.jpg" aria-hidden="true">
         <source src="video/siegu-intro.mp4" type="video/mp4" />
       </video>
-      <div class="hero-scrim" aria-hidden="true"></div>
       <div class="container hero-content">
         <span class="hero-badge"><span class="dot"></span><span data-i18n="hero.badge">Private by design · Local-first</span></span>
         <h1>
@@ -172,7 +171,7 @@
         </h1>
         <p class="sub" data-i18n="hero.subtitle">Siegu keeps every photo and video on your device. Powerful search, on-device AI, and seamless sharing — no cloud, no uploads, no compromises.</p>
         <div class="hero-cta">
-          <a class="btn btn-ink" href="#" data-track="cta_get_started" data-i18n="hero.cta_primary">Get siegu free</a>
+          <a class="btn btn-ink btn-hero-pulse" href="#" data-track="cta_get_started" data-i18n="hero.cta_primary">Get siegu free</a>
           <a class="btn btn-ghost" href="https://siegu.onrender.com" target="_blank" rel="noopener" data-track="demo_clicked" data-i18n="hero.cta_demo">Try the live demo</a>
         </div>
         <p class="hero-trust" data-i18n="hero.trust">Free forever · No account. <a href="pricing.html" data-i18n="hero.see_pro">See Pro →</a></p>
@@ -180,13 +179,28 @@
     </section>
 
     <!-- Platform strip -->
-    <section class="logo-strip section" style="padding-top:34px;padding-bottom:20px">
+    <section class="logo-strip section">
       <div class="platform-row">
-        <span class="platform-item" data-i18n="logos.win">Windows</span>
-        <span class="platform-item" data-i18n="logos.mac">macOS</span>
-        <span class="platform-item" data-i18n="logos.linux">Linux</span>
-        <span class="platform-item" data-i18n="logos.android">Android</span>
-        <span class="platform-item" data-i18n="logos.web">Web</span>
+        <button type="button" class="platform-item" data-action="open-download" data-dl-key="windows" data-track="platform_windows">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+          <span data-i18n="logos.win">Windows</span>
+        </button>
+        <button type="button" class="platform-item" data-action="open-download" data-dl-key="macos" data-track="platform_macos">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M12 5c-1.5-1.7-3.4-2-5-1.8a6.5 6.5 0 0 0 1.4 12.9c.7 0 1.6-.5 2.8-.5s2 .6 2.8.6c1.8 0 4-2.5 4-5 .9-1.8-.3-3.6-2-4-.3-1.1-1.8-2.6-4-2.2z"/><path d="M9.5 3.2c-.2-1.3.9-2.6 2.3-2.9"/></svg>
+          <span data-i18n="logos.mac">macOS</span>
+        </button>
+        <button type="button" class="platform-item" data-action="open-download" data-dl-key="linux" data-track="platform_linux">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M12 3c-3 0-5 2.4-5 5.5 0 2 .6 3.6 1.3 5.4.5 1.2 1 2.3 1.2 3.6.2 1.7.9 3.5 2.5 3.5s2.3-1.8 2.5-3.5c.2-1.3.7-2.4 1.2-3.6.7-1.8 1.3-3.4 1.3-5.4C17 5.4 15 3 12 3z"/><path d="M12 3c-1 1.3-1 3.7 0 6.6.7 2 2 4 2.5 5.4.3.9.5 1.8.5 2.5" opacity=".5"/></svg>
+          <span data-i18n="logos.linux">Linux</span>
+        </button>
+        <button type="button" class="platform-item" data-action="open-download" data-dl-key="android" data-track="platform_android">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M5 9v6M19 9v6"/><rect x="5" y="9" width="14" height="10" rx="2"/><path d="M8 9l-2-3M16 9l2-3M8 19v2M16 19v2"/></svg>
+          <span data-i18n="logos.android">Android</span>
+        </button>
+        <button type="button" class="platform-item" data-action="open-download" data-dl-key="web" data-track="platform_web">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>
+          <span data-i18n="logos.web">Web</span>
+        </button>
       </div>
     </section>
 
@@ -310,7 +324,7 @@
       </div>
       <div class="container">
         <div class="pricing-grid" id="pricingGrid">
-          <!-- Plan cards injected by js/main.js?v=mtpz8ic0 -->
+          <!-- Plan cards injected by js/main.js?v=mtsph0n1 -->
         </div>
         <p class="pricing-note center" data-i18n="pricing.note">Prices in USD. No extra fees for more photos.</p>
       </div>
@@ -442,6 +456,6 @@
     </div>
   </div>
 
-  <script src="js/main.js?v=mtpz8ic0"></script>
+  <script src="js/main.js?v=mtsph0n1"></script>
 </body>
 </html>
