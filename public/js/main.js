@@ -453,6 +453,20 @@ function buildDownloadDialog() {
   grids.forEach((grid) => { grid.innerHTML = content; });
 }
 
+// When the download dialog is opened from a platform pill (Windows, macOS, …),
+// draw attention to the matching download option inside the dialog.
+function highlightDl(modal, key) {
+  if (!modal || !key) return;
+  const opts = modal.querySelectorAll(`.dl-opt[data-platform="${key}"], .dl-opt[data-waitlist-source="${key}"]`);
+  if (!opts.length) return;
+  opts.forEach((o) => {
+    o.classList.remove('dl-hl');
+    void o.offsetWidth; // restart the pulse animation
+    o.classList.add('dl-hl');
+  });
+  if (opts[0].scrollIntoView) opts[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
 /* ---------- Pro dialog (explain + Stripe pay) ---------- */
 const PRO_BENEFITS = [
   'Unlimited photos and albums',
@@ -946,7 +960,7 @@ async function boot() {
   }
   document.addEventListener('click', (e) => {
     const dlTrig = e.target.closest('[data-action="open-download"]');
-    if (dlTrig) { e.preventDefault(); openDl(dlModal); pushEvent('download_dialog_opened', { locale: state.locale }); return; }
+    if (dlTrig) { e.preventDefault(); openDl(dlModal); pushEvent('download_dialog_opened', { locale: state.locale }); highlightDl(dlModal, dlTrig.getAttribute('data-dl-key')); return; }
     const proTrig = e.target.closest('[data-action="open-pro"]');
     if (proTrig) { e.preventDefault(); buildProDialog(); openDl(proModal); pushEvent('pro_dialog_opened', { locale: state.locale }); return; }
     if (e.target.closest('[data-dl-close]') || e.target === dlModal) closeDl(dlModal);
