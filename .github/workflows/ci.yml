@@ -2,7 +2,7 @@ name: verify + deploy
 
 on:
   push:
-    branches: [master]
+    branches: [landing-page]
   pull_request:
 
 concurrency:
@@ -32,7 +32,7 @@ jobs:
         run: npm run build
 
   deploy:
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/landing-page'
     needs: verify
     runs-on: ubuntu-latest
     permissions:
