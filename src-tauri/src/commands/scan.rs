@@ -76,6 +76,28 @@ fn dispatch_thumbnails(
 
 #[tauri::command]
 pub fn scan_files(app: tauri::AppHandle) {
+    // Preflight: refuse to start a heavy scan when the host is already close to
+    // the OOM killer. Starting anyway just gets siegu killed mid-scan by the
+    // kernel; telling the user beats a mysterious crash.
+    if let Some(reason) = siegu_core::memory_pressure::headroom_block_reason() {
+        crate::common::debug_log(format!("Aborting scan: system memory too low ({reason})"));
+        emit_log(&app, reason.clone());
+        // Always notify (even when the window is focused the scan dialog may be
+        // hidden behind a folder view).
+        crate::notify::notify_critical(&app, reason.clone());
+        let _ = app.emit(
+            "scan-progress",
+            serde_json::json!({
+                "status": "paused",
+                "message": reason.clone(),
+            }),
+        );
+        let _ = app.emit(
+            "scan-memory-blocked",
+            serde_json::json!({ "message": reason.clone() }),
+        );
+        return;
+    }
     let session = {
         let scan_state = app.state::<crate::ScanState>();
         scan_state.guard.try_start()

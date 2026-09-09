@@ -263,6 +263,17 @@ export async function invoke<T>(command: string, args?: InvokeArgs): Promise<T> 
   }
   const handler = browserHandlers[command];
   if (handler) return handler(args) as Promise<T>;
+  // Bridge through the active backend's generic RPC (webHost → host /rpc,
+  // guest → WebRTC client) before falling back to the shape-correct default.
+  const backend = activeMediaBackend();
+  if (backend?.request) {
+    try {
+      const result = await backend.request(command, args ?? {});
+      if (result !== undefined) return result as T;
+    } catch {
+      // host rejected the command; fall through to the graceful default
+    }
+  }
   if (command in browserFallbacks) return browserFallbacks[command] as T;
   throw new Error(`invoke: command '${command}' is unavailable in browser mode`);
 }

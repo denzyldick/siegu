@@ -1,4 +1,9 @@
 import { isVideoFile, VIDEO_EXTENSIONS, IMAGE_EXTENSIONS } from '@/types/media';
+import { isTauriRuntime } from '@/services/invoke';
+// NOTE: `@tauri-apps/api/core`'s `convertFileSrc` lives behind a throwing
+// export getter in plain-browser builds, so it must only ever be *read* when
+// the Tauri shell is actually used. Importing the binding is safe; touching it
+// in webHost/guest mode would throw even in a `typeof` guard.
 import { convertFileSrc } from '@tauri-apps/api/core';
 
 export const VIDEO_EXTENSIONS_LIST = [...VIDEO_EXTENSIONS] as readonly string[];
@@ -47,10 +52,15 @@ export function normalizeIndexingCount(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function toFileSrc(path: string): string {
+  if (!path) return '';
+  if (!isTauriRuntime) return '';
+  return convertFileSrc(path);
+}
+
 export function getFaceImageSrc(cropPath: string | null, encoded: string | null): string {
   if (encoded) return encoded;
-  if (cropPath) return convertFileSrc(cropPath);
-  return '';
+  return toFileSrc(cropPath ?? '');
 }
 
 export function getMediaThumbnailSrc(
@@ -59,7 +69,7 @@ export function getMediaThumbnailSrc(
   useFileSrc: boolean = false,
 ): string {
   if (encoded) return encoded;
-  if (useFileSrc) return convertFileSrc(location);
+  if (useFileSrc) return toFileSrc(location);
   return '';
 }
 

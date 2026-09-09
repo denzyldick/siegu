@@ -77,6 +77,23 @@ pub struct DayCount {
     pub videos: i64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct RegisteredPeer {
+    pub device_id: String,
+    pub name: String,
+    pub ip: String,
+    pub port: i64,
+    pub device_type: String,
+    pub os: String,
+    pub photo_count: i64,
+    pub video_count: i64,
+    pub remote_photo_count: i64,
+    pub remote_video_count: i64,
+    pub storage_used: i64,
+    pub storage_capacity: i64,
+    pub last_seen: String,
+}
+
 /// CLIP zero-shot classes that correspond to documents, receipts and
 /// screenshots, powering the "Papers & screenshots" section and filter.
 pub const PAPER_CLASSES: &[&str] = &[
@@ -993,12 +1010,24 @@ impl Database {
         let _ = conn.execute("ALTER TABLE photo ADD COLUMN dup_hash TEXT;", ());
         let _ = conn.execute("ALTER TABLE photo ADD COLUMN file_sha256 TEXT;", ());
         let _ = conn.execute("ALTER TABLE photo ADD COLUMN clip_embedding BLOB;", ());
+        // Duplicate-detection CLIP state, kept separate from ai_status.clip
+        // (which only records that CLIP *classification* ran during indexing).
+        // 0 = no Space-Saver embedding yet, 1 = still embedding stored,
+        // 2 = video embedding stored.
+        let _ = conn.execute(
+            "ALTER TABLE photo ADD COLUMN dup_clip_state INTEGER DEFAULT 0;",
+            (),
+        );
         let _ = conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_photo_file_sha256 ON photo(file_sha256) WHERE file_sha256 IS NOT NULL;",
             (),
         );
         let _ = conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_photo_dup_hash ON photo(dup_hash) WHERE dup_hash IS NOT NULL;",
+            (),
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_photo_dup_clip ON photo(dup_clip_state, clip_embedding) WHERE dup_clip_state > 0;",
             (),
         );
 
@@ -3384,6 +3413,21 @@ impl Database {
             .unwrap_or_default()
     }
 
+    /// Locations (not IDs) of every photo missing a thumbnail, split by
+    /// thumbnail decode kind. Drives the machine-calibrated ETA so the UI knows
+    /// how many stills/HEIC/videos still need a preview without loading every
+    /// row's base64 blob twice.
+    pub fn missing_thumbnail_locations(&self) -> Vec<String> {
+        self.connection
+            .prepare("SELECT location FROM photo WHERE encoded IS NULL OR encoded = ''")
+            .map(|mut stmt| {
+                stmt.query_map([], |row| row.get::<_, String>(0))
+                    .map(|rows| rows.flatten().collect())
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default()
+    }
+
     /// Store a generated thumbnail for a photo. Only writes when the photo has no
     /// thumbnail yet. Returns true if the thumbnail was actually stored.
     pub fn update_photo_thumbnail(&self, id: &str, encoded: &str) -> bool {
@@ -3489,25 +3533,88 @@ impl Database {
     }
 
     /// Persist a photo's CLIP embedding (raw f32 LE bytes), or clear it when
-    /// `bytes` is None.
-    pub fn set_clip_embedding(&self, id: &str, bytes: Option<&[u8]>) {
+    /// `bytes` is None. `state` records which media type produced it (still vs
+    /// video — see `DupClipState` in `duplicates`), which is tracked separately
+    /// from `ai_status.clip` (that only means CLIP *classification* ran).
+    pub fn set_clip_embedding(&self, id: &str, state: i32, bytes: Option<&[u8]>) {
         let _ = self.connection.execute(
-            "UPDATE photo SET clip_embedding = ?1 WHERE id = ?2",
-            rusqlite::params![bytes, id],
+            "UPDATE photo SET clip_embedding = ?1, dup_clip_state = ?2 WHERE id = ?3",
+            rusqlite::params![bytes, state, id],
         );
     }
 
-    /// Load (id, embedding) for every non-deleted photo that has a stored CLIP
-    /// embedding. Embeddings are L2-normalized 512-dim f32 vectors.
-    pub fn list_clip_embeddings(&self) -> Vec<(String, Vec<f32>)> {
+    /// Legacy single-state setter used by callers that don't distinguish media
+    /// type (kept for compatibility); marks the embedding as a still.
+    pub fn set_clip_embedding_legacy(&self, id: &str, bytes: Option<&[u8]>) {
+        self.set_clip_embedding(id, 1, bytes);
+    }
+
+    /// Photos that still need a Space-Saver CLIP embedding, restricted to a
+    /// media type. `is_video` selects videos (1) vs stills (0). A photo is
+    /// returned only while it has no embedding yet — once `clip_embedding` is
+    /// set (any `dup_clip_state`), it counts as covered. `dup_clip_state` just
+    /// records which media type last ran its backfill. Limited to `limit`.
+    pub fn photos_missing_clip_embedding(
+        &self,
+        is_video: bool,
+        limit: i64,
+    ) -> Vec<(String, String)> {
         self.connection
             .prepare(
-                "SELECT id, clip_embedding FROM photo WHERE deleted_at IS NULL AND clip_embedding IS NOT NULL",
+                "SELECT id, location FROM photo \
+                 WHERE deleted_at IS NULL AND location IS NOT NULL AND location <> '' \
+                 AND (dup_clip_state = 0 OR (dup_clip_state <> ?1 AND clip_embedding IS NULL)) \
+                 AND is_video = ?2 LIMIT ?3",
             )
+            .map(|mut stmt| {
+                stmt.query_map(
+                    rusqlite::params![if is_video { 2 } else { 1 }, is_video, limit],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+                )
+                .map(|rows| rows.flatten().collect())
+                .unwrap_or_default()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Number of photos still needing a Space-Saver CLIP embedding for the
+    /// given media type (see `photos_missing_clip_embedding`).
+    pub fn count_photos_missing_clip_embedding(&self, is_video: bool) -> i64 {
+        self.connection
+            .query_row(
+                "SELECT COUNT(*) FROM photo \
+                 WHERE deleted_at IS NULL AND location IS NOT NULL AND location <> '' \
+                 AND (dup_clip_state = 0 OR (dup_clip_state <> ?1 AND clip_embedding IS NULL)) \
+                 AND is_video = ?2",
+                rusqlite::params![if is_video { 2 } else { 1 }, is_video],
+                |row| row.get(0),
+            )
+            .unwrap_or(0)
+    }
+
+    /// Load (id, embedding, state) for every non-deleted photo that has a
+    /// stored CLIP embedding. Embeddings are L2-normalized 512-dim f32 vectors.
+    /// `is_video: Option<bool>` restricts to stills/videos; `None` loads all.
+    pub fn list_clip_embeddings_filtered(
+        &self,
+        is_video: Option<bool>,
+    ) -> Vec<(String, Vec<f32>, i32)> {
+        let sql = match is_video {
+            Some(v) => format!(
+                "SELECT id, clip_embedding, dup_clip_state FROM photo WHERE deleted_at IS NULL AND clip_embedding IS NOT NULL AND is_video = {}",
+                if v { 1 } else { 0 }
+            ),
+            None => {
+                "SELECT id, clip_embedding, dup_clip_state FROM photo WHERE deleted_at IS NULL AND clip_embedding IS NOT NULL".to_string()
+            }
+        };
+        self.connection
+            .prepare(&sql)
             .map(|mut stmt| {
                 stmt.query_map([], |row| {
                     let id: String = row.get(0)?;
                     let bytes: Option<Vec<u8>> = row.get(1)?;
+                    let state: i32 = row.get(2).unwrap_or(0);
                     let emb = bytes
                         .map(|b| {
                             b.chunks_exact(4)
@@ -3515,12 +3622,21 @@ impl Database {
                                 .collect()
                         })
                         .unwrap_or_default();
-                    Ok((id, emb))
+                    Ok((id, emb, state))
                 })
                 .map(|rows| rows.flatten().collect())
                 .unwrap_or_default()
             })
             .unwrap_or_default()
+    }
+
+    /// Load (id, embedding) for every non-deleted photo that has a stored CLIP
+    /// embedding. Embeddings are L2-normalized 512-dim f32 vectors.
+    pub fn list_clip_embeddings(&self) -> Vec<(String, Vec<f32>)> {
+        self.list_clip_embeddings_filtered(None)
+            .into_iter()
+            .map(|(id, emb, _)| (id, emb))
+            .collect()
     }
 
     /// Number of non-deleted photos that have a CLIP embedding stored.
@@ -4330,6 +4446,41 @@ impl Database {
     }
 
     /// Count photos currently in trash.
+    pub fn list_devices(&self) -> Vec<RegisteredPeer> {
+        let mut results = Vec::new();
+        if let Ok(mut stm) = self.connection.prepare(
+            "SELECT device_id, name, ip, port, device_type, os, \
+                    COALESCE(photo_count,0), COALESCE(video_count,0), \
+                    COALESCE(remote_photo_count,0), COALESCE(remote_video_count,0), \
+                    COALESCE(storage_used,0), COALESCE(storage_capacity,0), \
+                    COALESCE(last_seen,'') \
+             FROM peer_device ORDER BY last_seen DESC",
+        ) {
+            if let Ok(iter) = stm.query_map((), |row| {
+                Ok(RegisteredPeer {
+                    device_id: row.get(0)?,
+                    name: row.get(1)?,
+                    ip: row.get(2)?,
+                    port: row.get(3)?,
+                    device_type: row.get(4)?,
+                    os: row.get(5)?,
+                    photo_count: row.get(6)?,
+                    video_count: row.get(7)?,
+                    remote_photo_count: row.get(8)?,
+                    remote_video_count: row.get(9)?,
+                    storage_used: row.get(10)?,
+                    storage_capacity: row.get(11)?,
+                    last_seen: row.get(12)?,
+                })
+            }) {
+                for val in iter.flatten() {
+                    results.push(val);
+                }
+            }
+        }
+        results
+    }
+
     pub fn count_trash(&self) -> i64 {
         self.connection
             .query_row(
@@ -7116,5 +7267,129 @@ mod tests {
             out.push('\n');
         }
         out
+    }
+
+    fn emb_bytes(deg: f32) -> Vec<u8> {
+        // L2-normalized 512-dim f32 vector in the first two coordinates.
+        unit_embed(deg)
+            .iter()
+            .flat_map(|v| v.to_le_bytes())
+            .collect()
+    }
+
+    #[test]
+    fn test_clip_embedding_state_separates_stills_and_videos() {
+        let mut db = test_db();
+        let _ = db.store_photo_batch(&[
+            make_photo("still_1", "/tmp/still.jpg"),
+            make_photo("still_2", "/tmp/other.jpg"),
+            make_photo("video_1", "/tmp/clip.mp4"),
+        ]);
+
+        // Still embedding (state 1) and video embedding (state 2).
+        db.set_clip_embedding("still_1", 1, Some(&emb_bytes(0.0)));
+        db.set_clip_embedding("still_2", 1, Some(&emb_bytes(30.0)));
+        db.set_clip_embedding("video_1", 2, Some(&emb_bytes(60.0)));
+
+        // list_clip_embeddings_filtered respects the media type.
+        let stills = db.list_clip_embeddings_filtered(Some(false));
+        assert_eq!(stills.len(), 2);
+        assert!(stills.iter().all(|(_, _, s)| *s == 1));
+
+        let videos = db.list_clip_embeddings_filtered(Some(true));
+        assert_eq!(videos.len(), 1);
+        assert_eq!(videos[0].0, "video_1");
+        assert_eq!(videos[0].2, 2);
+
+        // Unfiltered returns everything with its state intact.
+        let all = db.list_clip_embeddings_filtered(None);
+        assert_eq!(all.len(), 3);
+        assert_eq!(all.iter().find(|(id, ..)| id == "video_1").unwrap().2, 2);
+
+        // The legacy shim keeps the original single-item shape.
+        assert_eq!(db.list_clip_embeddings().len(), 3);
+        assert_eq!(db.list_clip_embeddings()[0].1.len(), 512);
+    }
+
+    #[test]
+    fn test_set_clip_embedding_legacy_marks_still() {
+        let mut db = test_db();
+        let _ = db.store_photo_batch(&[make_photo("solo", "/tmp/legacy.jpg")]);
+        db.set_clip_embedding_legacy("solo", Some(&emb_bytes(10.0)));
+
+        let all = db.list_clip_embeddings_filtered(None);
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].2, 1);
+    }
+
+    #[test]
+    fn test_photos_missing_clip_embedding_respects_media_and_state() {
+        let mut db = test_db();
+        let _ = db.store_photo_batch(&[
+            make_photo("s1", "/tmp/a.jpg"),
+            make_photo("s2", "/tmp/b.jpg"),
+            make_photo("v1", "/tmp/c.mp4"),
+            make_photo("v2", "/tmp/d.mp4"),
+        ]);
+
+        // s1 and v1 already have embeddings of the right type.
+        db.set_clip_embedding("s1", 1, Some(&emb_bytes(0.0)));
+        db.set_clip_embedding("v1", 2, Some(&emb_bytes(0.0)));
+
+        let missing_stills = db.photos_missing_clip_embedding(false, 100);
+        assert_eq!(
+            missing_stills
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect::<Vec<_>>(),
+            vec!["s2".to_string()]
+        );
+
+        let missing_videos = db.photos_missing_clip_embedding(true, 100);
+        assert_eq!(
+            missing_videos
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect::<Vec<_>>(),
+            vec!["v2".to_string()]
+        );
+
+        // A still embedding does NOT satisfy the video backlog and vice versa:
+        // a photo with the wrong state still counts as missing.
+        db.set_clip_embedding("s2", 1, Some(&emb_bytes(20.0)));
+        db.set_clip_embedding("v2", 2, Some(&emb_bytes(20.0)));
+        assert!(db.photos_missing_clip_embedding(false, 100).is_empty());
+        assert!(db.photos_missing_clip_embedding(true, 100).is_empty());
+
+        // Any stored embedding — even under the "wrong" state — counts as
+        // covered, since the same CLIP vector feeds grouping regardless of
+        // which media type's backfill wrote it.
+        let _ = db.store_photo_batch(&[make_photo("mix", "/tmp/mixed.jpg")]);
+        db.set_clip_embedding("mix", 2, Some(&emb_bytes(40.0)));
+        assert!(db.photos_missing_clip_embedding(false, 100).is_empty());
+        assert!(db.photos_missing_clip_embedding(true, 100).is_empty());
+
+        // But a state-marked photo with no saved embedding is still missing:
+        // the state records which backfill ran, not that one succeeded.
+        let _ = db.store_photo_batch(&[make_photo("stale", "/tmp/stale.jpg")]);
+        db.set_clip_embedding("stale", 2, None);
+        let missing = db.photos_missing_clip_embedding(false, 100);
+        assert_eq!(missing.len(), 1);
+        assert_eq!(missing[0].0, "stale");
+    }
+
+    #[test]
+    fn test_count_photos_missing_clip_embedding_matches_rows() {
+        let mut db = test_db();
+        let _ = db.store_photo_batch(&[
+            make_photo("x1", "/tmp/1.jpg"),
+            make_photo("x2", "/tmp/2.mp4"),
+        ]);
+        assert_eq!(db.count_photos_missing_clip_embedding(false), 1);
+        assert_eq!(db.count_photos_missing_clip_embedding(true), 1);
+
+        db.set_clip_embedding("x1", 1, Some(&emb_bytes(0.0)));
+        assert_eq!(db.count_photos_missing_clip_embedding(false), 0);
+        assert_eq!(db.count_photos_missing_clip_embedding(true), 1);
     }
 }

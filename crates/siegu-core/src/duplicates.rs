@@ -15,6 +15,7 @@
 use std::collections::HashMap;
 
 use crate::database::Database;
+use crate::ml_engine::models::ModelEngine;
 
 /// Perceptual dHash hamming-distance threshold: photos at or below this many
 /// differing bits are considered perceptual duplicates.
@@ -239,7 +240,14 @@ fn group_non_ai(db: &Database) -> Vec<DuplicateGroup> {
 /// responsible for guiding the user to download the model and re-run the
 /// pipeline so embeddings are persisted.
 pub fn detect_clip(db: &Database) -> Vec<DuplicateGroup> {
-    let embs = db.list_clip_embeddings();
+    detect_clip_filtered(db, None)
+}
+
+/// `detect_clip` restricted to a media type: `Some(true)` compares only video
+/// embeddings, `Some(false)` only stills, `None` all. This lets Space Saver
+/// run in stills-only vs videos modes.
+pub fn detect_clip_filtered(db: &Database, is_video: Option<bool>) -> Vec<DuplicateGroup> {
+    let embs = db.list_clip_embeddings_filtered(is_video);
     let n = embs.len();
     let labels: Vec<String> = embs.iter().map(|e| e.0.clone()).collect();
     let mut uf = UnionFind::new(n);
@@ -273,6 +281,80 @@ pub fn detect_all(db: &Database, include_clip: bool) -> Vec<DuplicateGroup> {
         groups.extend(detect_clip(db));
     }
     groups
+}
+
+/// Decode a representative RGB image for a photo/video to embed with CLIP.
+/// Stills come from their stored thumbnail; videos from the first extracted
+/// frame. Returns `None` when nothing usable is available.
+fn representative_rgb(db: &Database, location: &str, is_video: bool) -> Option<image::RgbImage> {
+    if is_video {
+        let frames = crate::ml_engine::whisper::extract_frames(location);
+        return frames.into_iter().next();
+    }
+    // Still: reuse the stored thumbnail the same way the dHash stage does.
+    let thumb = image_from_thumb(db, location)?;
+    Some(thumb.to_rgb8())
+}
+
+/// Lazily compute and persist the Space-Saver CLIP embedding for photos
+/// missing one, restricted to a media type (`is_video`). Uses the provided,
+/// already-loaded CLIP visual model. Returns how many embeddings were computed.
+/// Progress `(done, total)` is fired after each photo.
+///
+/// This is what makes the CLIP stage do real work on a first scan (the current
+/// "too fast" symptom): every embedding computed here is stored to
+/// `photo.clip_embedding` so re-scans hit the fast comparison-only path.
+pub fn backfill_clip_embeddings(
+    db: &Database,
+    model: &ModelEngine,
+    is_video: bool,
+    progress: &mut dyn FnMut(usize, usize),
+) -> usize {
+    const LIMIT: i64 = 10_000;
+    let missing = db.photos_missing_clip_embedding(is_video, LIMIT);
+    let total = missing.len();
+    let mut computed = 0usize;
+    for (done, (id, location)) in missing.into_iter().enumerate() {
+        if let Some(rgb) = representative_rgb(db, &location, is_video) {
+            if let Some(emb) = crate::ml_engine::pipeline::compute_clip_embedding(model, &rgb) {
+                let mut bytes: Vec<u8> = Vec::with_capacity(emb.len() * 4);
+                for v in &emb {
+                    bytes.extend_from_slice(&v.to_le_bytes());
+                }
+                db.set_clip_embedding(&id, if is_video { 2 } else { 1 }, Some(&bytes));
+                computed += 1;
+            }
+        }
+        progress(done + 1, total);
+    }
+    computed
+}
+
+/// Run the full CLIP stage for Space Saver: lazily embed missing stills (and,
+/// when `include_videos`, videos), then return the enriched CLIP duplicate
+/// groups for the selected media types. Returns the groups and how many
+/// embeddings were newly computed. The provided model must already be loaded.
+pub fn detect_clip_with_backfill(
+    db: &Database,
+    model: &ModelEngine,
+    include_videos: bool,
+    progress: &mut dyn FnMut(&str, usize, usize),
+) -> (Vec<DuplicateGroupView>, usize) {
+    let mut computed = 0usize;
+    let mut views = Vec::new();
+    progress("clip-stills", 0, 0);
+    computed += backfill_clip_embeddings(db, model, false, &mut |d, t| {
+        progress("clip-stills", d, t);
+    });
+    views.extend(clip_groups_for_media(db, Some(false)));
+    if include_videos {
+        progress("clip-videos", 0, 0);
+        computed += backfill_clip_embeddings(db, model, true, &mut |d, t| {
+            progress("clip-videos", d, t);
+        });
+        views.extend(clip_groups_for_media(db, Some(true)));
+    }
+    (views, computed)
 }
 
 // ── User-facing view ────────────────────────────────────────────────────
@@ -369,8 +451,23 @@ fn enrich(db: &Database, group: &DuplicateGroup, kind: &str) -> DuplicateGroupVi
 
 /// Combined non-AI groups with kind labels. Exact groups (all members share the
 /// same file SHA-256) are labeled "exact", everything else "perceptual".
-pub fn detect_all_view(db: &Database, include_clip: bool) -> Vec<DuplicateGroupView> {
-    detect_all_view_progress(db, include_clip, &mut |_, _| {})
+/// `include_videos` only affects the CLIP stage (videos are always covered by
+/// the cheap exact + perceptual stages).
+pub fn detect_all_view(
+    db: &Database,
+    include_clip: bool,
+    include_videos: bool,
+) -> Vec<DuplicateGroupView> {
+    detect_all_view_progress(db, include_clip, include_videos, &mut |_, _| {})
+}
+
+/// `detect_all_view` grouping for persisted CLIP embeddings, restricted to a
+/// media type. Used by the caller to combine stills + (optionally) videos.
+fn clip_groups_for_media(db: &Database, is_video: Option<bool>) -> Vec<DuplicateGroupView> {
+    detect_clip_filtered(db, is_video)
+        .into_iter()
+        .map(|g| enrich(db, &g, "clip"))
+        .collect()
 }
 
 /// `detect_all_view` with a progress callback `(done, total)` forwarded from
@@ -378,6 +475,7 @@ pub fn detect_all_view(db: &Database, include_clip: bool) -> Vec<DuplicateGroupV
 pub fn detect_all_view_progress(
     db: &Database,
     include_clip: bool,
+    include_videos: bool,
     progress: &mut dyn FnMut(usize, usize),
 ) -> Vec<DuplicateGroupView> {
     let (mut groups, _) = detect_non_ai_progress(db, progress);
@@ -388,7 +486,7 @@ pub fn detect_all_view_progress(
         .map(|(id, sha, dh, _, _)| (id, (sha, dh)))
         .collect();
 
-    let views: Vec<DuplicateGroupView> = groups
+    let mut views: Vec<DuplicateGroupView> = groups
         .drain(..)
         .map(|g| {
             let shas: Vec<&str> = g
@@ -405,14 +503,14 @@ pub fn detect_all_view_progress(
         .collect();
 
     if include_clip {
-        let clip = detect_clip(db);
-        views
-            .into_iter()
-            .chain(clip.into_iter().map(|g| enrich(db, &g, "clip")))
-            .collect()
-    } else {
-        views
+        // Stills always included when CLIP is on; videos only when toggled.
+        views.extend(clip_groups_for_media(db, Some(false)));
+        if include_videos {
+            views.extend(clip_groups_for_media(db, Some(true)));
+        }
     }
+
+    views
 }
 
 /// Aggregate stats over duplicate groups for a status banner.
@@ -423,8 +521,8 @@ pub struct DuplicateStats {
     pub reclaimable_bytes: u64,
 }
 
-pub fn duplicate_stats(db: &Database, include_clip: bool) -> DuplicateStats {
-    duplicate_stats_from_views(&detect_all_view(db, include_clip))
+pub fn duplicate_stats(db: &Database, include_clip: bool, include_videos: bool) -> DuplicateStats {
+    duplicate_stats_from_views(&detect_all_view(db, include_clip, include_videos))
 }
 
 /// Aggregate stats directly from already-detected views (no re-scan).
@@ -559,12 +657,100 @@ mod tests {
         db.upsert_dup_hashes("b", "same", "0000000000000000");
         db.upsert_dup_hashes("c", "other", "ffffffffffffffff");
 
-        let views = detect_all_view(&db, false);
+        let views = detect_all_view(&db, false, false);
         assert_eq!(views.len(), 1);
         let view = &views[0];
         assert_eq!(view.members.len(), 2);
         let trashed = trash_group_non_best(&db, view);
         assert!(trashed >= 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn unit_embed_512(deg: f32) -> Vec<f32> {
+        let rad = deg.to_radians();
+        let mut v = vec![0.0f32; 512];
+        v[0] = rad.cos();
+        v[1] = rad.sin();
+        v
+    }
+
+    fn emb_bytes(v: &[f32]) -> Vec<u8> {
+        v.iter().flat_map(|x| x.to_le_bytes()).collect()
+    }
+
+    fn seed_photo(
+        db: &mut crate::database::Database,
+        id: &str,
+        location: &str,
+        deg: f32,
+        clip: bool,
+    ) {
+        let photo = crate::database::Photo {
+            id: id.to_string(),
+            location: location.to_string(),
+            encoded: String::new(),
+            created: "2024-01-01".to_string(),
+            objects: Default::default(),
+            properties: Default::default(),
+            latitude: 0.0,
+            longitude: 0.0,
+            favorite: false,
+            indexed: 1,
+            caption: None,
+            aesthetics_score: None,
+            ai_status: Default::default(),
+            sync_needed: false,
+            received: false,
+            view_only: false,
+            last_opened: 0,
+        };
+        db.store_photo_batch(&[photo]).unwrap();
+        if clip {
+            let state = if location.to_lowercase().contains(".mp4") {
+                2
+            } else {
+                1
+            };
+            db.set_clip_embedding(id, state, Some(&emb_bytes(&unit_embed_512(deg))));
+        }
+    }
+
+    #[test]
+    fn test_detect_clip_filtered_separates_stills_and_videos() {
+        let dir = std::env::temp_dir().join(format!("siegu-dup-clip-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut db = crate::database::Database::new(&dir.display().to_string());
+
+        // Two stills 10° apart (cos ≈ 0.98 > 0.90) group; a third at 80° does not.
+        seed_photo(&mut db, "s1", "/a.jpg", 0.0, true);
+        seed_photo(&mut db, "s2", "/b.jpg", 10.0, true);
+        seed_photo(&mut db, "s3", "/c.jpg", 80.0, true);
+        // Two videos 10° apart group with each other but never with the stills.
+        seed_photo(&mut db, "v1", "/d.mp4", 5.0, true);
+        seed_photo(&mut db, "v2", "/e.mp4", 15.0, true);
+        // A still with no embedding is simply not part of the CLIP stage.
+        seed_photo(&mut db, "noemb", "/f.jpg", 0.0, false);
+
+        let stills = detect_clip_filtered(&db, Some(false));
+        assert_eq!(stills.len(), 1);
+        let mut members = stills[0].members.clone();
+        members.sort();
+        assert_eq!(members, vec!["s1", "s2"]);
+
+        let videos = detect_clip_filtered(&db, Some(true));
+        assert_eq!(videos.len(), 1);
+        let mut members = videos[0].members.clone();
+        members.sort();
+        assert_eq!(members, vec!["v1", "v2"]);
+
+        // The unfiltered call merges across media only when similarity holds;
+        // here the still/video pair at ~5° apart is above threshold, so expect
+        // all four to fall into one cluster.
+        let all = detect_clip(&db);
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].members.len(), 4);
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

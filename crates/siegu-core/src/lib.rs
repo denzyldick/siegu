@@ -9,6 +9,7 @@ pub mod lan_server;
 pub mod library;
 pub mod logfmt;
 pub mod mdns;
+pub mod memory_pressure;
 pub mod mesh;
 pub mod mesh_transport;
 #[cfg(feature = "ml")]

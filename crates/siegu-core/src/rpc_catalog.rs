@@ -123,6 +123,7 @@ pub const CATALOG: &[CommandSpec] = &[
     spec("get_max_photo_rowid", Tier::ReadOnly, false, &[]),
     spec("get_indexing_status", Tier::ReadOnly, false, &[]),
     spec("storage_usage", Tier::ReadOnly, false, &[]),
+    spec("list_devices", Tier::ReadOnly, false, &[]),
     spec("check_models", Tier::ReadOnly, true, &[]),
     spec("get_model_capabilities", Tier::ReadOnly, true, &[]),
     // ── trash (read-only) ─────────────────────────────────────────────────

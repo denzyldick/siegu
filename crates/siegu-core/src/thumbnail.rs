@@ -58,6 +58,40 @@ pub fn needs_thumbnail(encoded: &str) -> bool {
     encoded.is_empty()
 }
 
+/// Broad class of a media file for thumbnail-cost estimation. Each kind is
+/// calibrated separately so the ETA reflects this machine's real decode speed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ThumbKind {
+    /// JPEG, PNG, and other still formats decoded by the `image` crate.
+    Still,
+    /// HEIC/HEIF, decoded via the native `heic` crate (slower, vendor-exclusive).
+    Heic,
+    /// Video, decoded by ffmpeg at a seeks marker.
+    Video,
+}
+
+impl ThumbKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ThumbKind::Still => "still",
+            ThumbKind::Heic => "heic",
+            ThumbKind::Video => "video",
+        }
+    }
+
+    pub const ALL: [ThumbKind; 3] = [ThumbKind::Still, ThumbKind::Heic, ThumbKind::Video];
+}
+
+pub fn classify(path: &str) -> ThumbKind {
+    if is_heic_file(path) {
+        ThumbKind::Heic
+    } else if is_video_ext(path) {
+        ThumbKind::Video
+    } else {
+        ThumbKind::Still
+    }
+}
+
 pub fn is_video_ext(path: &str) -> bool {
     let lower = path.to_lowercase();
     lower.ends_with(".mp4")

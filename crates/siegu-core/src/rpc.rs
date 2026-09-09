@@ -329,11 +329,21 @@ pub fn dispatch(ctx: &RpcContext, name: &str, payload: &Value) -> Result<Value, 
         "get_model_timing_averages" => Ok(json!(db.get_model_timing_averages())),
         "find_duplicates" => {
             let include_clip = payload.bool_or("include_clip", false)?;
-            Ok(json!(crate::duplicates::detect_all_view(&db, include_clip)))
+            let include_videos = payload.bool_or("include_videos", false)?;
+            Ok(json!(crate::duplicates::detect_all_view(
+                &db,
+                include_clip,
+                include_videos
+            )))
         }
         "duplicate_stats" => {
             let include_clip = payload.bool_or("include_clip", false)?;
-            Ok(json!(crate::duplicates::duplicate_stats(&db, include_clip)))
+            let include_videos = payload.bool_or("include_videos", false)?;
+            Ok(json!(crate::duplicates::duplicate_stats(
+                &db,
+                include_clip,
+                include_videos
+            )))
         }
         "trash_duplicate_members" => {
             let ids = payload.string_vec("ids")?;
@@ -387,6 +397,7 @@ pub fn dispatch(ctx: &RpcContext, name: &str, payload: &Value) -> Result<Value, 
             let used = crate::mesh::MeshManager::get_storage_used(ctx.config_path);
             Ok(json!({ "used": used, "quota": quota }))
         }
+        "list_devices" => Ok(json!(db.list_devices())),
         "check_models" => {
             let models_dir = Path::new(ctx.config_path).join("models");
             Ok(to_json(

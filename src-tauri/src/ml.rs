@@ -229,6 +229,13 @@ impl AnalysisCallbacks for TauriCallbacks {
                 "total": total,
             }),
         );
+        let remaining = total.saturating_sub(completed);
+        if remaining > 0 {
+            let _ = self.app.emit(
+                "indexing-eta",
+                serde_json::json!({ "eta": self.eta_ms(remaining) }),
+            );
+        }
     }
 
     fn on_model_status(&self, model: &str, status: &str, pending: usize, total: usize) {

@@ -319,6 +319,31 @@ export async function autoReconnect(discoveredUrl?: string | null): Promise<bool
   return call<boolean>('auto_reconnect', { discoveredUrl: discoveredUrl ?? null });
 }
 
+interface DeviceRawRow {
+  device_id: string;
+  name: string;
+  ip: string;
+  port: number;
+  device_type: string;
+  os: string;
+  photo_count: number;
+  video_count: number;
+  remote_photo_count: number;
+  remote_video_count: number;
+  storage_used: number;
+  storage_capacity: number;
+}
+
+function deviceIconForType(deviceType: string): string {
+  const t = deviceType.toLowerCase();
+  if (t.includes('android')) return 'mdi-cellphone-android';
+  if (t.includes('ios') || t.includes('iphone')) return 'mdi-cellphone-iphone';
+  if (t.includes('mac')) return 'mdi-laptop';
+  if (t.includes('server')) return 'mdi-server';
+  if (t.includes('windows')) return 'mdi-microsoft-windows';
+  return 'mdi-devices';
+}
+
 export async function listDevices(): Promise<
   Array<{
     id: string;
@@ -335,8 +360,23 @@ export async function listDevices(): Promise<
     storage_capacity: number;
   }>
 > {
-  const raw = await call<string>('list_devices');
-  return parseJsonArray(raw);
+  const raw = await call<unknown>('list_devices');
+  const rows: DeviceRawRow[] =
+    typeof raw === 'string' ? parseJsonArray<DeviceRawRow>(raw) : ((raw as DeviceRawRow[]) ?? []);
+  return rows.map((d) => ({
+    id: d.device_id,
+    title: d.name,
+    icon: deviceIconForType(d.device_type),
+    os: d.os || 'unknown',
+    photo_count: d.photo_count ?? 0,
+    video_count: d.video_count ?? 0,
+    remote_photo_count: d.remote_photo_count ?? 0,
+    remote_video_count: d.remote_video_count ?? 0,
+    host: '',
+    subtitle: '',
+    storage_used: d.storage_used ?? 0,
+    storage_capacity: d.storage_capacity ?? 0,
+  }));
 }
 
 export async function removeDevice(id: string): Promise<void> {

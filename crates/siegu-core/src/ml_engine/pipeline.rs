@@ -106,6 +106,11 @@ pub struct PhotoResult {
     pub caption: Option<String>,
     pub face_count: usize,
     pub faces: Vec<FaceInfo>,
+    /// L2-normalized CLIP visual embedding (512-dim) for the Space Saver CLIP
+    /// duplicate stage. Computed alongside CLIP classification; persisted to
+    /// `photo.clip_embedding` by the flush. Kept separate from `ai_status.clip`,
+    /// which only records that classification ran.
+    pub clip_embedding: Option<Vec<f32>>,
     pub completed_models: Vec<&'static str>,
     pub model_timings: HashMap<String, f64>,
 }
@@ -193,6 +198,11 @@ pub fn analyze_image(
                     for v in visual_embedding.iter_mut() {
                         *v /= norm;
                     }
+                }
+                // Persist the normalized embedding for the Space Saver CLIP
+                // duplicate stage (separate from ai_status.clip classification).
+                if !visual_embedding.is_empty() {
+                    result.clip_embedding = Some(visual_embedding.clone());
                 }
                 let mut similarities: Vec<(String, f32)> = models
                     .text_embeddings
@@ -769,6 +779,11 @@ fn aggregate_frame_results(frame_results: &[PhotoResult], _frame_count: usize) -
             }
         }
         all_faces.extend(fr.faces.iter().cloned());
+        // Keep the first frame that produced a CLIP visual embedding as the
+        // video's representative embedding for the Space Saver CLIP stage.
+        if merged.clip_embedding.is_none() {
+            merged.clip_embedding = fr.clip_embedding.clone();
+        }
     }
 
     for (cls, conf) in best_objects {
@@ -839,6 +854,22 @@ fn aggregate_frame_results(frame_results: &[PhotoResult], _frame_count: usize) -
     }
 
     merged
+}
+
+/// Compute the L2-normalized CLIP visual embedding (512-dim) of an image for
+/// the Space Saver CLIP duplicate stage. Returns `None` if inference fails.
+pub fn compute_clip_embedding(model: &ModelEngine, img: &image::RgbImage) -> Option<Vec<f32>> {
+    let input = preprocessing::clip_preprocess(img);
+    let data = run_model(model, input, "pixel_values").ok()?;
+    let mut emb = data;
+    let norm: f32 = emb.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm <= 0.0 {
+        return None;
+    }
+    for v in emb.iter_mut() {
+        *v /= norm;
+    }
+    Some(emb)
 }
 
 fn run_model(
@@ -963,6 +994,21 @@ fn flush_results_statements(
             "UPDATE photo SET caption = ?1 WHERE id = ?2",
             (caption, photo_id),
         );
+    }
+    // Persist the CLIP visual embedding for the Space Saver CLIP duplicate
+    // stage. State distinguishes still (1) vs video (2) and is tracked
+    // separately from ai_status.clip (classification-only). Encoding: raw
+    // little-endian f32, 512 dims.
+    if let Some(embedding) = &result.clip_embedding {
+        let mut bytes: Vec<u8> = Vec::with_capacity(embedding.len() * 4);
+        for v in embedding {
+            bytes.extend_from_slice(&v.to_le_bytes());
+        }
+        let is_video = db
+            .get_photo_location(photo_id)
+            .map(|p| is_video_file(&p))
+            .unwrap_or(false);
+        db.set_clip_embedding(photo_id, if is_video { 2 } else { 1 }, Some(&bytes));
     }
     let _ = db.connection.execute(
         "INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES(?1, 'face_count', ?2)",

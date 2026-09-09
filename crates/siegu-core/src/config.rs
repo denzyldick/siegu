@@ -71,6 +71,7 @@ pub const ALLOWED_CONFIG_KEYS: &[&str] = &[
     "analysis_cutoff_rowid",
     "map_tile_url",
     "map_tile_key",
+    "dup_scan_videos",
 ];
 
 pub fn is_valid_config_key(key: &str) -> bool {
@@ -196,6 +197,15 @@ pub fn validate_config_value(key: &str, value: &str) -> Result<(), ConfigError> 
             }
         }
         "signaling_token" => {}
+        "dup_scan_videos" => {
+            if !["true", "false"].contains(&value) {
+                return Err(ConfigError::InvalidType {
+                    key: key.to_string(),
+                    expected: "true|false".to_string(),
+                    got: value.to_string(),
+                });
+            }
+        }
         "turn_enabled" => {
             if !["true", "false"].contains(&value) {
                 return Err(ConfigError::InvalidType {

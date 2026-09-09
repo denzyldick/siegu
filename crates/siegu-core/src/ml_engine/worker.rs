@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::database::Database;
+use crate::memory_pressure::Governor;
 use crate::ml_worker::{self, decrement_pending_count, increment_pending_count, Job, MlContext};
 
 use super::models::LoadedModels;
@@ -25,6 +26,15 @@ const FACE_SIM_MERGE_THRESHOLD: f32 = 0.5;
 /// post-analysis merge pass; recombination is O(P²), so huge fresh imports
 /// simply skip it rather than stall the worker.
 const MAX_MERGE_CANDIDATES: usize = 4096;
+
+/// Serializes video frame extraction to one video at a time.
+///
+/// Video analysis spawns an ffmpeg child process per video; a handful of
+/// concurrent decoders can push a machine over its physical RAM (the process
+/// that gets OOM-killed is usually the app, whose ONNX arenas are huge). One
+/// video in flight at a time bounds peak decode memory regardless of
+/// `scan_threads` or the pressure governor.
+static VIDEO_DECODE_GATE: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// Pacing delay (in milliseconds) applied between batches of a bulk analysis
 /// job. Parsed from the `batch_delay_ms` config value; clamped to 0..=2000.
@@ -264,6 +274,10 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
         let total_processed = Arc::new(AtomicUsize::new(0));
         let mut last_auto_job: Option<Instant> = None;
         let models = models_thread;
+        // Adaptive memory-pressure backpressure: paces and (under critical
+        // pressure) serializes bulk analysis so it can't drive the host into
+        // OOM territory. Always present; only acts when the system is tight.
+        let memory_governor = Arc::new(Governor::new());
 
         while let Some(job) = recv_next_job(&mut rx, &models, &pending_count_clone, unload_idle) {
             let is_reload = matches!(job, Job::ReloadModels);
@@ -431,6 +445,7 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
             let callbacks_ref = Arc::clone(&callbacks);
             let total_processed_ref = Arc::clone(&total_processed);
             let avg_photo_time_us_ref = Arc::clone(&avg_photo_time_us);
+            let memory_governor_ref = Arc::clone(&memory_governor);
 
             let scan_threads: usize = config
                 .get("scan_threads")
@@ -518,6 +533,16 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                             break;
                         }
 
+                        // Backpressure before touching the photo. Under system
+                        // memory pressure this paces (Elevated) or serializes
+                        // one photo at a time (Critical), holding the gate for
+                        // the whole run below so peak RSS stays bounded.
+                        let _mem_guard = if is_bulk {
+                            memory_governor_ref.acquire(&|msg| callbacks.on_log(msg))
+                        } else {
+                            crate::memory_pressure::PhotoGuard::idle()
+                        };
+
                         let photo_entry = {
                             let lock = db_ref.lock().unwrap_or_else(|e| e.into_inner());
                             lock.get_photo_for_indexing(photo_id)
@@ -551,6 +576,15 @@ pub fn start_worker<C: AnalysisCallbacks + 'static>(
                             };
 
                             let photo_start = Instant::now();
+                            // Videos decode in an ffmpeg child process, so a
+                            // burst of concurrent decoders can climb the host's
+                            // RSS graph fast. Serialize decode+analysis to one
+                            // video at a time.
+                            let _video_gate = if is_video {
+                                Some(VIDEO_DECODE_GATE.lock().unwrap_or_else(|e| e.into_inner()))
+                            } else {
+                                None
+                            };
                             let mut result = if is_video {
                                 pipeline::analyze_video(
                                     &photo_entry.id,

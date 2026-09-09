@@ -303,18 +303,61 @@ fn dropped_over_cap_bytes(
     dropped
 }
 
+/// Default resident model budget as a fraction of *total physical RAM*, used
+/// only when the user hasn't pinned a budget (env or config). Momentary free
+/// RAM is a poor signal here: a machine can look "fine" at load time and then
+/// tip into OOM once analysis and video decode start, so we size against what
+/// the machine *has* for the whole session rather than what's free this second.
+///
+/// 12% of physical RAM keeps a 16 GiB laptop to ~1.9 GiB of models (roughly
+/// the edge where the app used to get OOM-killed at 4.5 GiB resident), while
+/// still allowing a generous set on larger machines. CI overrides this with
+/// `SIEGU_ML_MEMORY_BUDGET_MB` so its AI integration tests always load the
+/// heavy models they assert on.
+const DEFAULT_MODEL_BUDGET_FRACTION: f64 = 0.12;
+
+/// Never drop to a budget below the cheapest useful baseline, even on
+/// machines with only a few GiB of RAM.
+const DEFAULT_MODEL_BUDGET_FLOOR_MB: u64 = 512;
+
+/// Default budget when neither the env override nor `ml_memory_budget_mb` is
+/// set. `None` only when physical RAM can't be read at all (then we fall back
+/// to the historical "load everything enabled" behavior).
+fn default_load_budget() -> Option<u64> {
+    let physical = crate::model_manager::physical_memory_bytes()?;
+    Some(default_budget_from_physical(physical))
+}
+
+/// Pure derivation from total physical RAM, injectable for tests.
+fn default_budget_from_physical(physical_bytes: u64) -> u64 {
+    let by_fraction = (physical_bytes as f64 * DEFAULT_MODEL_BUDGET_FRACTION) as u64;
+    by_fraction.max(DEFAULT_MODEL_BUDGET_FLOOR_MB * 1024 * 1024)
+}
+
 /// Applies the `ml_memory_budget_mb` cap: returns the names of enabled models
 /// dropped (heaviest first) so the total estimated size fits the budget.
-/// Returns an empty list when the budget is unset.
+///
+/// Precedence for the budget:
+/// 1. `SIEGU_ML_MEMORY_BUDGET_MB` env override (lets CI and power users pin an
+///    exact budget regardless of the machine's shape);
+/// 2. the `ml_memory_budget_mb` config key;
+/// 3. a deterministic default derived from total physical RAM
+///    (`default_load_budget`) so small/oversubscribed machines never load a
+///    resident model set that can push them into OOM.
 fn dropped_over_budget(config: &HashMap<String, String>, log: &dyn Fn(&str)) -> Vec<&'static str> {
-    let budget_mb = config
-        .get("ml_memory_budget_mb")
-        .and_then(|s| s.parse::<u64>().ok());
-    dropped_over_cap_bytes(
-        config,
-        budget_mb.and_then(|mb| (mb > 0).then_some(mb.saturating_mul(1024 * 1024))),
-        log,
-    )
+    let budget_mb = std::env::var("SIEGU_ML_MEMORY_BUDGET_MB")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .or_else(|| {
+            config
+                .get("ml_memory_budget_mb")
+                .and_then(|s| s.parse::<u64>().ok())
+        });
+    let cap = match budget_mb {
+        Some(mb) if mb > 0 => Some(mb.saturating_mul(1024 * 1024)),
+        _ => default_load_budget(),
+    };
+    dropped_over_cap_bytes(config, cap, log)
 }
 
 /// Machine-readable reasons a model can't run on this device. These codes are
@@ -714,6 +757,25 @@ fn load_model_with_min_size(
     Some(Arc::new(SessionPool::new(sessions)))
 }
 
+/// Loads only the CLIP visual engine (not every enabled model), used by the
+/// Space Saver CLIP duplicate stage to embed photos/videos on demand without
+/// paying the cost of loading face, yolo, aesthetics, etc. Returns `None` when
+/// CLIP is disabled in config, the model file is missing, or loading fails.
+pub fn load_clip_visual_only(
+    config_path: &str,
+    config: &HashMap<String, String>,
+) -> Option<ModelEngine> {
+    if !model_enabled(config, "clip") {
+        return None;
+    }
+    let models_dir = Path::new(config_path).join("models");
+    let ml_threads: Option<usize> = config
+        .get("ml_threads")
+        .and_then(|s| s.parse::<usize>().ok())
+        .filter(|&n| (1..=32).contains(&n));
+    load_model(&models_dir, "clip-vit-base-patch32-visual.onnx", ml_threads)
+}
+
 /// Pre-computes CLIP text embeddings for a fixed vocabulary of common
 /// photo categories (people, pets, vehicles, landscapes, etc.).
 ///
@@ -904,15 +966,21 @@ mod tests {
     fn noop_log(_msg: &str) {}
 
     #[test]
-    fn budget_unset_returns_nothing() {
+    fn budget_unset_no_cap_returns_nothing() {
+        // A resolved `None` cap (no budget could be derived) never drops.
         let config = HashMap::new();
-        assert!(dropped_over_budget(&config, &noop_log).is_empty());
+        assert!(dropped_over_cap_bytes(&config, None, &noop_log).is_empty());
     }
 
     #[test]
-    fn budget_zero_means_unset() {
-        let config = config_with("0", &["aesthetics", "blip", "clip"]);
-        assert!(dropped_over_budget(&config, &noop_log).is_empty());
+    fn budget_zero_means_default_not_unlimited() {
+        // "0" (or unset) no longer means "load everything": the default derives
+        // a cap from physical RAM. On a small host the heavy pooled model ships.
+        let config = config_with("0", &["clip", "yolo"]);
+        let cap = default_budget_from_physical(8 * 1024 * 1024 * 1024);
+        let dropped = dropped_over_cap_bytes(&config, Some(cap), &noop_log);
+        assert!(dropped.contains(&"clip"));
+        assert!(!dropped.contains(&"yolo"));
     }
 
     #[test]
@@ -953,6 +1021,50 @@ mod tests {
         let dropped = dropped_over_budget(&config, &noop_log);
         assert!(!should_load(&config, &dropped, "aesthetics"));
         assert!(should_load(&config, &dropped, "yolo"));
+    }
+
+    #[test]
+    fn default_budget_scales_with_physical_ram() {
+        let gi = 1024 * 1024 * 1024;
+        // 16 GiB laptop → ~1.9 GiB cap (the size that used to OOM at 4.5 GiB).
+        let cap_16 = default_budget_from_physical(16 * gi);
+        assert_eq!(
+            cap_16,
+            (16_f64 * DEFAULT_MODEL_BUDGET_FRACTION * gi as f64) as u64
+        );
+        assert!((cap_16 as f64) < 3.0 * gi as f64);
+        // Scales up with RAM: a 64 GiB workstation keeps most of the set.
+        let cap_64 = default_budget_from_physical(64 * gi);
+        assert!(cap_64 > 5 * gi);
+        // Never below the floor on small machines.
+        assert_eq!(
+            default_budget_from_physical(4 * gi),
+            DEFAULT_MODEL_BUDGET_FLOOR_MB * 1024 * 1024
+        );
+    }
+
+    #[test]
+    fn default_budget_ships_heaviest_model_when_ram_is_short() {
+        // Simulate a 16 GiB host: with no explicit budget, the default cap must
+        // drop the heaviest enabled model (CLIP's 4-session pool ~2.4 GiB) so
+        // the resident set survives on an oversubscribed machine.
+        let cap = default_budget_from_physical(16 * 1024 * 1024 * 1024);
+        let config = config_with("0", &["clip", "yolo"]);
+        let dropped = dropped_over_cap_bytes(&config, Some(cap), &noop_log);
+        assert!(dropped.contains(&"clip"));
+        assert!(!dropped.contains(&"yolo"));
+    }
+
+    #[test]
+    fn env_budget_override_wins_over_default() {
+        // SIEGU_ML_MEMORY_BUDGET_MB lets CI / power users pin the exact budget,
+        // so heavy models always load there regardless of physical RAM.
+        const KEY: &str = "SIEGU_ML_MEMORY_BUDGET_MB";
+        unsafe { std::env::set_var(KEY, "32768") };
+        let config = config_with("0", &["aesthetics", "yolo"]);
+        let dropped = dropped_over_budget(&config, &noop_log);
+        assert!(dropped.is_empty(), "env override must keep models loaded");
+        unsafe { std::env::remove_var(KEY) };
     }
 
     #[test]
