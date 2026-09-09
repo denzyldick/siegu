@@ -176,6 +176,7 @@ const TAIL = `  </main>
           <a href="https://github.com/denzyldick/siegu/tree/main/docs" target="_blank" rel="noopener" data-i18n="footer.resources_links.docs">Documentation</a>
           <a href="download.html" data-track="cta_get_started" data-i18n="footer.resources_links.download">Download</a>
           <a href="compare.html" data-i18n="footer.resources_links.compare">vs Google Photos</a>
+          <a href="guide-google-photos.html">Import from Google Photos</a>
           <a href="https://siegu.onrender.com" target="_blank" rel="noopener" data-track="demo_clicked" data-i18n="footer.resources_links.demo">Live demo</a>
           <a href="video.html" data-track="video_viewed" data-i18n="footer.resources_links.video">Watch the trailer</a>
         </div>
@@ -183,6 +184,8 @@ const TAIL = `  </main>
           <h5 data-i18n="footer.company">Company</h5>
           <a href="about.html" data-i18n="footer.company_links.about">About</a>
           <a href="https://github.com/denzyldick/siegu" target="_blank" rel="noopener" data-i18n="footer.company_links.github">GitHub</a>
+          <a href="https://github.com/denzyldick/siegu/discussions" target="_blank" rel="noopener">Discussions</a>
+          <a href="https://github.com/sponsors/denzyldick" target="_blank" rel="noopener">Sponsor</a>
           <a href="blog.html" data-i18n="footer.company_links.blog">Blog</a>
         </div>
       </div>
@@ -330,6 +333,7 @@ ${GRID_OPEN}
 ${STATIC_PLAN_CARDS}
         </div>
         <p class="pricing-note center" data-i18n="pricing.note">Prices in USD. No extra fees for more photos.</p>
+        <p class="pricing-demo center"><a href="https://siegu.onrender.com" target="_blank" rel="noopener" data-track="demo_clicked">Not sure yet? Try the live demo first — no install, no account.</a></p>
       </div>
     </section>
 
@@ -479,6 +483,49 @@ const COMPARE_MAIN = `
           </ul>
 
           <p>Curious? <a href="pricing.html">See the plans</a> or <a href="download.html">download Siegu for free</a>.</p>
+        </div>
+      </div>
+    </section>`;
+
+const GUIDE_GOOGLE_PHOTOS_MAIN = `
+    <section class="page-hero">
+      <div class="container">
+        <p class="eyebrow">Guide</p>
+        <h1>Import from Google Photos into Siegu</h1>
+        <p class="sub">A private, offline way to leave Google Photos. Export with Google Takeout, import into Siegu, and let on-device AI organize and index everything on your own machine. Nothing is uploaded.</p>
+      </div>
+    </section>
+
+    <section class="section page-body">
+      <div class="container">
+        <div class="narrow">
+          <ol class="guide-steps">
+            <li>
+              <h3>1. Export your library</h3>
+              <p>Go to <a href="https://takeout.google.com" target="_blank" rel="noopener">takeout.google.com</a>, deselect all products, then re-select <strong>Google Photos</strong>. Choose an archive size that fits your connection and export.</p>
+            </li>
+            <li>
+              <h3>2. Download and extract</h3>
+              <p>Google emails you one or more archives (ZIP or TGZ). Download them all and extract them into a folder on the machine where Siegu lives.</p>
+            </li>
+            <li>
+              <h3>3. Install Siegu</h3>
+              <p>Grab the free Siegu app for Windows, macOS or Linux. It works offline and never uploads your photos.</p>
+              <p><a class="btn btn-ink" href="download.html" data-track="cta_get_started">Download Siegu</a> <a class="btn btn-ghost" href="https://siegu.onrender.com" target="_blank" rel="noopener" data-track="demo_clicked">Try the live demo</a></p>
+            </li>
+            <li>
+              <h3>4. Import the extracted folder</h3>
+              <p>In Siegu, import an existing library and point it at the extracted Takeout folder. Takeout keeps your media in folders such as <code>Photos from 2020</code> plus an <code>Albums</code> folder &mdash; you can import the whole extract or individual folders.</p>
+            </li>
+            <li>
+              <h3>5. Let on-device AI do the rest</h3>
+              <p>Siegu deduplicates, organizes and indexes your photos for AI search &mdash; all on your device, even offline. Once it's in and double-checked, you can delete the cloud originals from Google Photos.</p>
+            </li>
+          </ol>
+          <div class="guide-note">
+            <p><strong>Imported from iCloud?</strong> The same import flow works: download your iCloud library, then import the folder into Siegu. The processing still happens locally and privately.</p>
+          </div>
+          <p class="sub" style="margin-top:24px">Keep your memories &mdash; ditch the cloud. See how Siegu's <a href="docs.html#security-privacy">security model</a> keeps everything on your machine, or read the <a href="compare.html">full comparison with Google Photos</a>.</p>
         </div>
       </div>
     </section>`;
@@ -904,6 +951,42 @@ const PAGES = [
       },
       ${SITE_SCHEMA_ORG}`,
     main: COMPARE_MAIN,
+  },
+  {
+    file: 'guide-google-photos.html',
+    active: 'guide-google-photos.html',
+    title: 'Import from Google Photos into Siegu — private, offline, on-device',
+    description: 'Step-by-step guide to move your photos from Google Photos to Siegu with Google Takeout. Your library and the AI that organizes it stay on your device.',
+    keywords: 'google photos alternative, move photos from google photos, google takeout import, import google photos, private photo library, local-first photo app',
+    url: `${BASE}/guide-google-photos.html`,
+    schema: `{
+        "@type": "WebPage",
+        "@id": "${BASE}/guide-google-photos.html",
+        "url": "${BASE}/guide-google-photos.html",
+        "name": "Import from Google Photos into Siegu",
+        "description": "Export your library with Google Takeout, import it into Siegu, and let on-device AI organize everything locally.",
+        "isPartOf": { "@id": "${BASE}/#website" },
+        "inLanguage": "en",
+        "publisher": { "@id": "${BASE}/#organization" }
+      },
+      {
+        "@type": "HowTo",
+        "@id": "${BASE}/guide-google-photos.html#howto",
+        "name": "How to move your photos from Google Photos to Siegu",
+        "description": "A private, offline way to leave Google Photos: export with Takeout, import into Siegu, and process everything on your own device.",
+        "totalTime": "PT1H",
+        "estimatedCost": { "@type": "MonetaryAmount", "currency": "USD", "value": "0" },
+        "tool": [ { "@type": "HowToTool", "name": "Siegu (free, offline)" } ],
+        "step": [
+          { "@type": "HowToStep", "position": 1, "name": "Export from Google Photos", "text": "Go to takeout.google.com, deselect all products, then choose Google Photos and export your library." },
+          { "@type": "HowToStep", "position": 2, "name": "Download and extract your archives", "text": "Google emails you ZIP or TGZ archives. Download them and extract into a local folder." },
+          { "@type": "HowToStep", "position": 3, "name": "Install Siegu", "text": "Download Siegu for Windows, macOS or Linux. It is free and works entirely offline." },
+          { "@type": "HowToStep", "position": 4, "name": "Import the extracted folder", "text": "In Siegu, import an existing library and select the extracted Google Takeout folder (or individual folders)." },
+          { "@type": "HowToStep", "position": 5, "name": "Let on-device AI do the rest", "text": "Siegu deduplicates, organizes and indexes your photos for AI search — all on your machine, nothing uploaded." }
+        ]
+      },
+      ${SITE_SCHEMA_ORG}`,
+    main: GUIDE_GOOGLE_PHOTOS_MAIN,
   },
   {
     file: 'about.html',

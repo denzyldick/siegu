@@ -602,11 +602,11 @@ function setupStickyPro() {
   onScroll();
 }
 
-/* Launch offer: show the Lifetime-Pro notes only when a real link is baked in. */
+/* Launch offer: Lifetime-Pro notes are always visible. When a real Stripe
+   link is baked in, the Pro dialog's founding block wire-directs to it;
+   otherwise the "Claim it" anchor falls back to the Pro dialog. */
 function setupFoundingOffer() {
-  if (FOUNDING_ENABLED) {
-    document.querySelectorAll('[data-founding]').forEach((el) => { el.hidden = false; });
-  }
+  document.querySelectorAll('[data-founding]').forEach((el) => { el.hidden = false; });
 }
 
 /* ---------- Hero slide show ---------- */

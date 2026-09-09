@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Siegu — Your photo library, privately yours</title>
-  <meta name="description" content="Siegu is a private, local-first photo library with on-device AI. Browse, search, share and relive your memories without handing them to the cloud." />
+  <title>Siegu — Your photos, on your machine. AI that never phones home.</title>
+  <meta name="description" content="Your photos, on your machine, with AI that never phones home. Siegu is a private, local-first photo library with on-device search, syncing and sharing. Nothing is uploaded." />
   <script>
     // Apply the saved theme before first paint to avoid a flash of the wrong
-    // palette. Mirrors applyTheme() in js/main.js?v=mtu8vtj0 (light | dark | system).
+    // palette. Mirrors applyTheme() in js/main.js?v=mtuae8jy (light | dark | system).
     (function () {
       try {
         var v = localStorage.getItem('siegu_theme');
@@ -21,15 +21,15 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Siegu" />
-  <meta property="og:title" content="Siegu — Your photo library, privately yours" />
-  <meta property="og:description" content="Private, local-first photo library with on-device AI. No cloud, no uploads." />
+  <meta property="og:title" content="Siegu — Your photos, on your machine. AI that never phones home." />
+  <meta property="og:description" content="Your photos, on your machine, with AI that never phones home. Private, local-first photo library. No cloud, no uploads." />
   <meta property="og:url" content="https://denzyldick.github.io/siegu/" />
   <meta property="og:image" content="https://denzyldick.github.io/siegu/social-card.jpg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Siegu — Your photo library, privately yours" />
-  <meta name="twitter:description" content="Private, local-first photo library with on-device AI. No cloud, no uploads." />
+  <meta name="twitter:title" content="Siegu — Your photos, on your machine. AI that never phones home." />
+  <meta name="twitter:description" content="Your photos, on your machine, with AI that never phones home. Private, local-first photo library. No cloud, no uploads." />
   <meta name="twitter:image" content="https://denzyldick.github.io/siegu/social-card.jpg" />
   <link rel="preload" as="image" href="shots/library.webp" fetchpriority="high" />
 
@@ -51,7 +51,7 @@
         "@id": "https://denzyldick.github.io/siegu/#website",
         "url": "https://denzyldick.github.io/siegu/",
         "name": "Siegu",
-        "description": "Siegu is a private, local-first photo library with on-device AI. Browse, search, share and relive your memories without handing them to the cloud.",
+        "description": "Your photos, on your machine, with AI that never phones home. A private, local-first photo library with on-device search, syncing and sharing — nothing is uploaded.",
         "publisher": { "@id": "https://denzyldick.github.io/siegu/#organization" },
         "inLanguage": "en"
       },
@@ -66,7 +66,7 @@
           "price": "0",
           "priceCurrency": "USD"
         },
-        "description": "Siegu is a private, local-first photo library with on-device AI. Browse, search, share and relive your memories without handing them to the cloud.",
+        "description": "Your photos, on your machine, with AI that never phones home. A private, local-first photo library with on-device search, syncing and sharing — nothing is uploaded.",
         "url": "https://denzyldick.github.io/siegu/",
         "image": "https://denzyldick.github.io/siegu/social-card.jpg",
         "isPartOf": { "@id": "https://denzyldick.github.io/siegu/#website" }
@@ -95,7 +95,7 @@
         "name": "Siegu",
         "url": "https://denzyldick.github.io/siegu/",
         "image": "https://denzyldick.github.io/siegu/social-card.jpg",
-        "description": "Private, local-first photo library with on-device AI search, automatic organization and secure sharing. Runs on Windows, macOS and Linux.",
+        "description": "Private, local-first photo library. Your photos never leave your device; on-device AI does the searching. Runs on Windows, macOS and Linux.",
         "brand": {
           "@type": "Brand",
           "name": "Siegu"
@@ -290,14 +290,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="css/styles.css?v=mtu8vtj0" />
+  <link rel="stylesheet" href="css/styles.css?v=mtuae8jy" />
 
   <!--
     MARKETING / TRACKER HOOK
     Drop vendor scripts (Plausible, Fathom, GA, Meta Pixel, Hotjar, …) here.
     Each snippet can live in its own file under /trackers/*.js and be included
     with a <script src> tag, or added inline below. They load only after the
-    cookie-consent banner has been accepted (see js/main.js?v=mtu8vtj0 `trackersOn`).
+    cookie-consent banner has been accepted (see js/main.js?v=mtuae8jy `trackersOn`).
   -->
 </head>
 <body>
@@ -351,7 +351,7 @@
   </div>
 
   <main id="main">
-    <h1 class="sr-only">Siegu — Your photo library, privately yours. Private, local-first photo management with on-device AI search.</h1>
+    <h1 class="sr-only">Siegu — your photos, on your machine, with AI that never phones home. A private, local-first photo library with on-device search.</h1>
     <!-- Hero -->
     <section class="hero" id="top">
       <video class="hero-video" autoplay muted loop playsinline preload="metadata" poster="video/video-cover.jpg" aria-hidden="true">
@@ -379,7 +379,7 @@
       </div>
       <div class="container">
         <div class="pricing-grid" id="pricingGrid">
-          <!-- Plan cards injected by js/main.js?v=mtu8vtj0 -->
+          <!-- Plan cards injected by js/main.js?v=mtuae8jy -->
         <div class="plan ">
           
           <p class="plan-name">Free</p>
@@ -414,6 +414,30 @@
         </div>
         </div>
         <p class="pricing-note center" data-i18n="pricing.note">Prices in USD. No extra fees for more photos.</p>
+        <p class="pricing-demo center"><a href="https://siegu.onrender.com" target="_blank" rel="noopener" data-track="demo_clicked">Not sure yet? Try the live demo first — no install, no account.</a></p>
+        <p class="founding-note center" id="foundingNote" hidden data-founding>Launch offer: <strong>Lifetime Pro for $99</strong> — one-time, yours forever. <a data-action="open-pro" role="button">Claim it</a></p>
+      </div>
+    </section>
+
+    <!-- Proof / security band -->
+    <section class="section" aria-label="Trust and security">
+      <div class="container">
+        <div class="trust-band">
+          <div class="trust-band-row">
+            <span class="trust-band-item">
+              <svg class="trust-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5l8-3z"/><path d="M9 12l2 2 4-4"/></svg>
+              <span><strong>Open source</strong> — MIT-licensed. Read every line of code on <a href="https://github.com/denzyldick/siegu" target="_blank" rel="noopener">GitHub</a>.</span>
+            </span>
+            <span class="trust-band-item">
+              <svg class="trust-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12c2-5.2 5.2-8 9-8s7 2.8 9 8c-2 5.2-5.2 8-9 8s-7-2.8-9-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span><strong>No uploads</strong> — AI search and organization run on your device, never in a cloud.</span>
+            </span>
+            <span class="trust-band-item">
+              <svg class="trust-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>
+              <span><strong>Auditable</strong> — the <a href="docs.html#security-privacy">security model</a> explained in plain language.</span>
+            </span>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -710,12 +734,15 @@
           <a href="https://github.com/denzyldick/siegu/tree/main/docs" target="_blank" rel="noopener" data-i18n="footer.resources_links.docs">Documentation</a>
           <a href="download.html" data-track="cta_get_started" data-i18n="footer.resources_links.download">Download</a>
           <a href="compare.html" data-i18n="footer.resources_links.compare">vs Google Photos</a>
+          <a href="guide-google-photos.html">Import from Google Photos</a>
           <a href="https://siegu.onrender.com" target="_blank" rel="noopener" data-track="demo_clicked" data-i18n="footer.resources_links.demo">Live demo</a>
         </div>
         <div class="footer-col">
           <h5 data-i18n="footer.company">Company</h5>
           <a href="about.html" data-i18n="footer.company_links.about">About</a>
           <a href="https://github.com/denzyldick/siegu" target="_blank" rel="noopener" data-i18n="footer.company_links.github">GitHub</a>
+          <a href="https://github.com/denzyldick/siegu/discussions" target="_blank" rel="noopener">Discussions</a>
+          <a href="https://github.com/sponsors/denzyldick" target="_blank" rel="noopener">Sponsor</a>
           <a href="blog.html" data-i18n="footer.company_links.blog">Blog</a>
         </div>
       </div>
@@ -788,6 +815,6 @@
     </div>
   </div>
 
-  <script src="js/main.js?v=mtu8vtj0"></script>
+  <script src="js/main.js?v=mtuae8jy"></script>
 </body>
 </html>
