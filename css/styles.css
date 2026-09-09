@@ -416,6 +416,10 @@ img { max-width: 100%; display: block; }
 }
 .feature:hover .ico .ic .fill { animation: popIn .35s ease forwards; }
 
+/* Pro callout on the homepage */
+.pro-cta { margin-top: 44px; }
+.pro-note { color: var(--text-3); font-size: 14px; margin-top: 18px; }
+
 @keyframes icoFloat {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
@@ -781,7 +785,6 @@ img { max-width: 100%; display: block; }
   .pricing-head { margin-bottom: 28px; }
   .price-anchor { flex-direction: column; gap: 16px; text-align: center; padding: 24px 20px; }
   .price-anchor .btn { width: 100%; }
-  .guarantee { font-size: 12px; }
   .sticky-pro { bottom: 76px; font-size: 13px; padding: 8px 16px; gap: 10px; }
   .sticky-pro .btn { padding: 10px 16px; font-size: 13px; min-height: 40px; }
 }
@@ -835,19 +838,12 @@ img { max-width: 100%; display: block; }
 .footer-legal a + a { margin-left: 14px; }
 
 /* Video page */
-.video-stage { max-width: 960px; margin: 0 auto; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: #000; box-shadow: 0 30px 80px rgba(0,0,0,.25); }
-.video-stage video { display: block; width: 100%; aspect-ratio: 16/9; background: #000; }
-.video-frames { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-width: 960px; margin: 28px auto 0; }
-.video-frames img { width: 100%; border-radius: 12px; border: 1px solid var(--border); }
-.page-body .video-stage a, .page-body .video-stage a:visited { color: #a1a1aa; text-decoration: underline; }
 @media (max-width: 640px) { .video-frames { grid-template-columns: 1fr; } }
 
 /* GitHub stars badge (filled by JS from public repo API) */
 .gh-stars { display: none; white-space: nowrap; color: var(--text-2); font-size: 13px; }
 .gh-stars[aria-hidden="false"] { display: inline; }
 
-/* Money-back guarantee note */
-.guarantee { margin-top: 8px; font-weight: 600; color: var(--text-2); }
 
 /* Google Photos anchor band */
 .price-anchor {
@@ -876,3 +872,55 @@ img { max-width: 100%; display: block; }
 .pro-founding { margin: 8px 0 0; font-size: 14px; color: var(--text-2); }
 .pro-founding[hidden] { display: none; }
 .pro-founding a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+
+/* ---------- Pro section: conversion animation ---------- */
+.pro .feature.is-visible .ico {
+  animation: proIcoIn .7s cubic-bezier(.22,1,.36,1) both, icoFloat 5.5s ease-in-out 1s infinite;
+  box-shadow: inset 0 0 0 1px var(--border), 0 10px 26px rgba(139,92,246,.18);
+}
+@keyframes proIcoIn { 0% { transform: scale(.4) translateY(18px); opacity: 0; } 60% { transform: scale(1.12) translateY(-2px); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes icoFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+
+.pro-cta .btn-ink {
+  position: relative;
+  overflow: hidden;
+  animation: ctaGlow 2.8s ease-in-out infinite;
+}
+.pro-cta .btn-ink::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: -130%;
+  width: 55%;
+  background: linear-gradient(105deg, transparent, rgba(255,255,255,.5), transparent);
+  transform: skewX(-20deg);
+  animation: ctaSheen 3.4s ease-in-out infinite;
+}
+@keyframes ctaSheen { 0%, 52% { left: -130%; } 78%, 100% { left: 140%; } }
+@keyframes ctaGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(139,92,246,.25); } 50% { box-shadow: 0 0 28px 3px rgba(139,92,246,.5); } }
+
+.plan.featured {
+  position: relative;
+  overflow: hidden;
+  animation: planGlow 3.2s ease-in-out infinite;
+}
+.plan.featured::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: -150%;
+  width: 45%;
+  background: linear-gradient(100deg, transparent, rgba(139,92,246,.28), rgba(255,255,255,.10), transparent);
+  transform: skewX(-18deg);
+  animation: cardSheen 3.6s ease-in-out 1s infinite;
+  pointer-events: none;
+}
+@keyframes cardSheen { 0%, 45% { left: -150%; } 78%, 100% { left: 165%; } }
+@keyframes planGlow {
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(139,92,246,.35), 0 18px 44px rgba(139,92,246,.16); }
+  50% { box-shadow: inset 0 0 0 2px rgba(139,92,246,.85), 0 18px 60px rgba(139,92,246,.36); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pro .feature.is-visible .ico { animation: proIcoIn .5s both; }
+  .pro-cta .btn-ink, .plan.featured { animation: none; }
+  .pro-cta .btn-ink::after, .plan.featured::before { animation: none; }
+}

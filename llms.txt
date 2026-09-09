@@ -1,0 +1,27 @@
+# Siegu
+
+> Siegu is an open-source, private, local-first photo library for Windows, macOS and Linux. It keeps your photos and metadata on your device and uses on-device AI for search, organization and deduplication — nothing is uploaded for processing. Sharing works over live, end-to-end-encrypted links; remote access uses a self-hosted relay or Siegu's hosted relay (Pro). Free for personal use, no cloud account, works offline.
+
+## Core product
+
+- [Home](https://denzyldick.github.io/siegu/): overview, live demo and download
+- [Features](https://denzyldick.github.io/siegu/#features): what Siegu does
+- [Download](https://denzyldick.github.io/siegu/download.html): installers for Windows, macOS and Linux
+- [Pricing](https://denzyldick.github.io/siegu/pricing.html): Free ($0), Pro ($7.99/month billed yearly), Family ($23.99/month billed yearly)
+- [Compare](https://denzyldick.github.io/siegu/compare.html): Siegu vs. cloud photo services
+- [Connect](https://denzyldick.github.io/siegu/connect.html): connecting your devices over any network
+- [FAQ](https://denzyldick.github.io/siegu/faq.html): common questions
+- [What "private, on-device, relay, TURN" mean](https://denzyldick.github.io/siegu/faq.html) — data never leaves your device for processing; a relay only forwards the encrypted stream between your own devices and never stores or reads media.
+
+## Evidence
+
+- [Blog](https://denzyldick.github.io/siegu/blog.html): notes from building a private photo library
+- [Changelog](https://denzyldick.github.io/siegu/changelog.html): release history
+- [Roadmap](https://denzyldick.github.io/siegu/roadmap.html): what's planned
+- [About](https://denzyldick.github.io/siegu/about.html): the project and its author
+- [Source code](https://github.com/denzyldick/siegu): open-source repository
+- [Privacy policy](https://denzyldick.github.io/siegu/privacy.html)
+
+## Optional
+
+- [Live in-browser demo](https://denzyldick.github.io/siegu/): explore a real Siegu library without installing anything. Visit the site and open the demo.
