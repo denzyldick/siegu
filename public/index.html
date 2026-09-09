@@ -85,6 +85,199 @@
   }
   </script>
 
+  <script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Product",
+        "@id": "https://denzyldick.github.io/siegu/#product",
+        "name": "Siegu",
+        "url": "https://denzyldick.github.io/siegu/",
+        "image": "https://denzyldick.github.io/siegu/social-card.jpg",
+        "description": "Private, local-first photo library with on-device AI search, automatic organization and secure sharing. Runs on Windows, macOS and Linux.",
+        "brand": {
+          "@type": "Brand",
+          "name": "Siegu"
+        },
+        "category": "Photography Software",
+        "offers": {
+          "@type": "AggregateOffer",
+          "lowPrice": "0",
+          "highPrice": "29.99",
+          "priceCurrency": "USD",
+          "offerCount": "6",
+          "offers": [
+            {
+              "@type": "Offer",
+              "name": "Siegu Free (yearly billing)",
+              "description": "Everything on-device, no monthly fee. Includes self-hosted remote access (DIY).",
+              "price": "0.00",
+              "priceCurrency": "USD",
+              "priceSpecification": {
+                "@type": "UnitPriceSpecification",
+                "price": "0.00",
+                "priceCurrency": "USD",
+                "billingDuration": {
+                  "@type": "QuantitativeValue",
+                  "value": 12,
+                  "unitCode": "MON"
+                },
+                "referenceQuantity": {
+                  "@type": "QuantitativeValue",
+                  "value": 1,
+                  "unitCode": "MON"
+                }
+              },
+              "availability": "https://schema.org/InStock"
+            },
+            {
+              "@type": "Offer",
+              "name": "Siegu Free (monthly billing)",
+              "description": "Everything on-device, no monthly fee. Includes self-hosted remote access (DIY).",
+              "price": "0",
+              "priceCurrency": "USD",
+              "availability": "https://schema.org/InStock"
+            },
+            {
+              "@type": "Offer",
+              "name": "Siegu Pro (yearly billing)",
+              "description": "Sponsored hosted relay for anywhere access plus all free features. Billed yearly at 7.99/month (Save 20%).",
+              "price": "7.99",
+              "priceCurrency": "USD",
+              "priceSpecification": {
+                "@type": "UnitPriceSpecification",
+                "price": "7.99",
+                "priceCurrency": "USD",
+                "billingDuration": {
+                  "@type": "QuantitativeValue",
+                  "value": 12,
+                  "unitCode": "MON"
+                },
+                "referenceQuantity": {
+                  "@type": "QuantitativeValue",
+                  "value": 1,
+                  "unitCode": "MON"
+                }
+              },
+              "availability": "https://schema.org/InStock"
+            },
+            {
+              "@type": "Offer",
+              "name": "Siegu Pro (monthly billing)",
+              "description": "Sponsored hosted relay for anywhere access plus all free features. Billed yearly at 7.99/month (Save 20%).",
+              "price": "9.99",
+              "priceCurrency": "USD",
+              "availability": "https://schema.org/InStock"
+            },
+            {
+              "@type": "Offer",
+              "name": "Siegu Family (yearly billing)",
+              "description": "Pro plus a curated family feed across multiple accounts. Billed yearly at 23.99/month (Save 20%).",
+              "price": "23.99",
+              "priceCurrency": "USD",
+              "priceSpecification": {
+                "@type": "UnitPriceSpecification",
+                "price": "23.99",
+                "priceCurrency": "USD",
+                "billingDuration": {
+                  "@type": "QuantitativeValue",
+                  "value": 12,
+                  "unitCode": "MON"
+                },
+                "referenceQuantity": {
+                  "@type": "QuantitativeValue",
+                  "value": 1,
+                  "unitCode": "MON"
+                }
+              },
+              "availability": "https://schema.org/InStock"
+            },
+            {
+              "@type": "Offer",
+              "name": "Siegu Family (monthly billing)",
+              "description": "Pro plus a curated family feed across multiple accounts. Billed yearly at 23.99/month (Save 20%).",
+              "price": "29.99",
+              "priceCurrency": "USD",
+              "availability": "https://schema.org/InStock"
+            }
+          ]
+        }
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://denzyldick.github.io/siegu/#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Is my data really private?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Your photos and metadata stay on your device. Siegu uses on-device AI, so nothing is uploaded for processing."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does Siegu work offline?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Absolutely. Your library is stored locally, so you can browse and search your photos anywhere — even without a connection."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How does sharing work?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "You can share a collection over a live, end-to-end-encrypted link. Guests only see what you choose to share, and nothing is stored on our side."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I access my photos over mobile data or while traveling?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Free users can point their app at a self-hosted relay on a machine they own (port-forwarding one UDP port). Pro's hosted relay does the same with zero setup — it works even on cellular networks that block direct connections."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Why do I need a relay at all?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "To connect over the internet, two devices have to find each other. Most home networks work out of the box, but some networks (especially mobile data) sit behind NATs a direct connection can't reach. A relay — TURN — forwards the encrypted stream between your devices when that happens. It never stores or reads your media."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What platforms are supported?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Siegu runs on Windows, macOS and Linux, with a full web experience for guests."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I import from Google Photos or iCloud?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes — Siegu imports your existing library, then processes it all locally and privately."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is there a demo I can try?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes! Open the live demo to see Siegu in action right in your browser — no install or account needed."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+
   <!-- iOS / favicon (adaptive: dark-supporting browsers get the white glyph) -->
   <link rel="icon" href="favicon.png" />
   <link rel="icon" href="favicon-white.png" media="(prefers-color-scheme: dark)" />
@@ -158,6 +351,7 @@
   </div>
 
   <main id="main">
+    <h1 class="sr-only">Siegu — Your photo library, privately yours. Private, local-first photo management with on-device AI search.</h1>
     <!-- Hero -->
     <section class="hero" id="top">
       <video class="hero-video" autoplay muted loop playsinline preload="metadata" poster="video/video-cover.jpg" aria-hidden="true">
@@ -186,6 +380,38 @@
       <div class="container">
         <div class="pricing-grid" id="pricingGrid">
           <!-- Plan cards injected by js/main.js -->
+        <div class="plan ">
+          
+          <p class="plan-name">Free</p>
+          <div class="plan-price"><span class="cur">$</span>0</div>
+          <p class="period">forever</p>
+          
+          <p class="tagline">The full app on your device.</p>
+          <ul><li><span class="check">&#10003;</span><span>Unlimited local photos</span></li><li><span class="check">&#10003;</span><span>On-device AI search</span></li><li><span class="check">&#10003;</span><span>Automatic organization</span></li><li><span class="check">&#10003;</span><span>Local sharing on your network</span></li><li><span class="check">&#10003;</span><span>Self-hosted remote access (DIY)</span></li><li><span class="check">&#10003;</span><span>Runs 100% on-device</span></li><li><span class="check">&#10003;</span><span>No uploads</span></li></ul>
+          <a class="btn btn-ink" href="#" data-action="open-download" target="_blank" rel="noopener"  data-track="pricing_free">Get started</a>
+        </div>
+
+        <div class="plan ">
+          
+          <p class="plan-name">Family</p>
+          <div class="plan-price"><span class="cur">$</span>23.99</div>
+          <p class="period">per month</p>
+          
+          <p class="tagline">Share one library together.</p>
+          <ul><li><span class="check">&#10003;</span><span>Everything in Pro</span></li><li><span class="check">&#10003;</span><span>Up to 6 members</span></li><li><span class="check">&#10003;</span><span>Invitational management</span></li><li><span class="check">&#10003;</span><span>Share securely, anywhere</span></li><li><span class="check">&#10003;</span><span>Always in sync</span></li></ul>
+          <a class="btn btn-ghost" href="#" data-action="open-waitlist" target="_blank" rel="noopener" data-waitlist-source="family" data-track="pricing_waitlist">Choose Family</a>
+        </div>
+
+        <div class="plan featured">
+          <span class="plan-badge">Most popular</span>
+          <p class="plan-name">Pro</p>
+          <div class="plan-price"><span class="cur">$</span>7.99</div>
+          <p class="period">per month</p>
+          <p class="yearly-badge">billed yearly</p>
+          <p class="tagline">Everywhere, on any network.</p>
+          <ul><li><span class="check">&#10003;</span><span>Everything in Free</span></li><li><span class="check">&#10003;</span><span>Sync &amp; share over the internet — even on mobile data</span></li><li><span class="check">&#10003;</span><span>Hosted relay, so you never touch router or NAT settings</span></li><li><span class="check">&#10003;</span><span>Early access to new features</span></li><li><span class="check">&#10003;</span><span>Priority support</span></li></ul>
+          <a class="btn btn-ink" href="#" data-action="open-pro" target="_blank" rel="noopener"  data-track="pricing_pro">Go Pro</a>
+        </div>
         </div>
         <p class="pricing-note center" data-i18n="pricing.note">Prices in USD. No extra fees for more photos.</p>
       </div>
@@ -395,7 +621,56 @@
         <h2 class="section-title" data-i18n="faq.title">Questions, answered</h2>
       </div>
       <div class="container">
-        <div class="faq-list" id="faqList"><!-- injected --></div>
+        <div class="faq-list" id="faqList">
+        <div class="faq-item" id="faq-0">
+          <button type="button" class="faq-q" data-faq="0">
+            <span>Is my data really private?</span><span class="chev">&#9662;</span>
+          </button>
+          <div class="faq-a"><p>Yes. Your photos and metadata stay on your device. Siegu uses on-device AI, so nothing is uploaded for processing.</p></div>
+        </div>
+        <div class="faq-item" id="faq-1">
+          <button type="button" class="faq-q" data-faq="1">
+            <span>Does Siegu work offline?</span><span class="chev">&#9662;</span>
+          </button>
+          <div class="faq-a"><p>Absolutely. Your library is stored locally, so you can browse and search your photos anywhere — even without a connection.</p></div>
+        </div>
+        <div class="faq-item" id="faq-2">
+          <button type="button" class="faq-q" data-faq="2">
+            <span>How does sharing work?</span><span class="chev">&#9662;</span>
+          </button>
+          <div class="faq-a"><p>You can share a collection over a live, end-to-end-encrypted link. Guests only see what you choose to share, and nothing is stored on our side.</p></div>
+        </div>
+        <div class="faq-item" id="faq-3">
+          <button type="button" class="faq-q" data-faq="3">
+            <span>Can I access my photos over mobile data or while traveling?</span><span class="chev">&#9662;</span>
+          </button>
+          <div class="faq-a"><p>Yes. Free users can point their app at a self-hosted relay on a machine they own (port-forwarding one UDP port). Pro's hosted relay does the same with zero setup — it works even on cellular networks that block direct connections.</p></div>
+        </div>
+        <div class="faq-item" id="faq-4">
+          <button type="button" class="faq-q" data-faq="4">
+            <span>Why do I need a relay at all?</span><span class="chev">&#9662;</span>
+          </button>
+          <div class="faq-a"><p>To connect over the internet, two devices have to find each other. Most home networks work out of the box, but some networks (especially mobile data) sit behind NATs a direct connection can't reach. A relay — TURN — forwards the encrypted stream between your devices when that happens. It never stores or reads your media.</p></div>
+        </div>
+        <div class="faq-item" id="faq-5">
+          <button type="button" class="faq-q" data-faq="5">
+            <span>What platforms are supported?</span><span class="chev">&#9662;</span>
+          </button>
+          <div class="faq-a"><p>Siegu runs on Windows, macOS and Linux, with a full web experience for guests.</p></div>
+        </div>
+        <div class="faq-item" id="faq-6">
+          <button type="button" class="faq-q" data-faq="6">
+            <span>Can I import from Google Photos or iCloud?</span><span class="chev">&#9662;</span>
+          </button>
+          <div class="faq-a"><p>Yes — Siegu imports your existing library, then processes it all locally and privately.</p></div>
+        </div>
+        <div class="faq-item" id="faq-7">
+          <button type="button" class="faq-q" data-faq="7">
+            <span>Is there a demo I can try?</span><span class="chev">&#9662;</span>
+          </button>
+          <div class="faq-a"><p>Yes! Open the live demo to see Siegu in action right in your browser — no install or account needed.</p></div>
+        </div>
+        </div>
       </div>
     </section>
 
