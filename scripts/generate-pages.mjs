@@ -9,6 +9,7 @@
  *   node scripts/generate-pages.mjs
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDocsMain } from './docs-from-md.mjs';
@@ -262,6 +263,44 @@ const TAIL = `  </main>
 </html>`;
 
 /* ---------- Subpage content ---------- */
+const EN = JSON.parse(readFileSync(join(SRC, 'locales', 'en.json'), 'utf8'));
+const escStatic = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+function staticPlanCard(key) {
+  const p = EN.pricing[key] ?? {};
+  const featured = key === 'pro';
+  const waitlist = key === 'team';
+  const action = waitlist ? 'open-waitlist' : (key === 'free' ? 'open-download' : 'open-pro');
+  const track = waitlist ? 'pricing_waitlist' : `pricing_${key}`;
+  const monthly = { free: 0, pro: 9.99, team: 29.99 }[key];
+  const disp = key === 'free' ? '0' : (monthly * 0.8).toFixed(2);
+  const badge = featured && p.highlight ? `<span class="plan-badge">${escStatic(p.highlight)}</span>` : '';
+  const yearly = key !== 'free' && (featured || !waitlist) && p.yearly_badge ? `<p class="yearly-badge">${escStatic(p.yearly_badge)}</p>` : '';
+  const feats = (p.features ?? []).map((f) => `<li><span class="check">&#10003;</span><span>${escStatic(f)}</span></li>`).join('');
+  return `        <div class="plan ${featured ? 'featured' : ''}">
+          ${badge}
+          <p class="plan-name">${escStatic(p.name)}</p>
+          <div class="plan-price"><span class="cur">$</span>${escStatic(disp)}</div>
+          <p class="period">${escStatic(p.period ?? '')}</p>
+          ${yearly}
+          <p class="tagline">${escStatic(p.tagline ?? '')}</p>
+          <ul>${feats}</ul>
+          <a class="btn ${waitlist ? 'btn-ghost' : 'btn-ink'}" href="#" data-action="${action}" target="_blank" rel="noopener" data-track="${track}">${escStatic(p.cta ?? '')}</a>
+        </div>`;
+}
+
+const STATIC_PLAN_CARDS = ['free', 'team', 'pro'].map(staticPlanCard).join('\n\n');
+
+const STATIC_FAQ = EN.faq.items.map((it, i) => `        <div class="faq-item" id="faq-${i}">
+          <button type="button" class="faq-q" data-faq="${i}">
+            <span>${escStatic(it.q)}</span><span class="chev">&#9662;</span>
+          </button>
+          <div class="faq-a"><p>${escStatic(it.a)}</p></div>
+        </div>`).join('\n');
+
+const GRID_OPEN = `        <div class="pricing-grid" id="pricingGrid">
+          <!-- Plan cards injected by js/main.js -->`;
+
 
 const PRICING_MAIN = `
     <section class="page-hero">
@@ -287,11 +326,10 @@ const PRICING_MAIN = `
         </div>
       </div>
       <div class="container">
-        <div class="pricing-grid" id="pricingGrid">
-          <!-- Plan cards injected by js/main.js -->
+${GRID_OPEN}
+${STATIC_PLAN_CARDS}
         </div>
         <p class="pricing-note center" data-i18n="pricing.note">Prices in USD. No extra fees for more photos.</p>
-        <p class="pricing-note center guarantee" data-i18n="pricing.guarantee">14-day money-back guarantee on every paid plan — no questions asked.</p>
       </div>
     </section>
 
@@ -324,7 +362,9 @@ const FAQ_MAIN = `
 
     <section class="section">
       <div class="container">
-        <div class="faq-list faq-page-list" id="faqList"><!-- injected --></div>
+        <div class="faq-list faq-page-list" id="faqList">
+${STATIC_FAQ}
+        </div>
       </div>
     </section>`;
 
@@ -368,11 +408,10 @@ const CONNECT_MAIN = `
         </div>
       </div>
       <div class="container">
-        <div class="pricing-grid" id="pricingGrid">
-          <!-- Plan cards injected by js/main.js -->
+${GRID_OPEN}
+${STATIC_PLAN_CARDS}
         </div>
         <p class="pricing-note center" data-i18n="pricing.note">Prices in USD. No extra fees for more photos.</p>
-        <p class="pricing-note center guarantee" data-i18n="pricing.guarantee">14-day money-back guarantee on every paid plan — no questions asked.</p>
       </div>
     </section>
 
