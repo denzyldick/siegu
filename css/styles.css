@@ -924,3 +924,25 @@ img { max-width: 100%; display: block; }
   .pro-cta .btn-ink, .plan.featured { animation: none; }
   .pro-cta .btn-ink::after, .plan.featured::before { animation: none; }
 }
+
+/* ---------- Trust band ---------- */
+.trust-band { border: 1px solid var(--border, #2a2a2a); border-radius: 14px; padding: 22px 26px; background: color-mix(in srgb, var(--surface, #171717) 60%, transparent); }
+.trust-band-row { display: flex; flex-wrap: wrap; gap: 22px 30px; justify-content: center; align-items: center; }
+.trust-band-item { display: inline-flex; align-items: center; gap: 10px; color: var(--muted, #a0a0a0); font-size: 14px; line-height: 1.45; }
+.trust-band-item a { color: var(--link, #7aa2ff); text-decoration: none; }
+.trust-band-item a:hover { text-decoration: underline; }
+.trust-band-item strong { color: var(--text, #e8e8e8); font-weight: 600; }
+.trust-inline { flex: none; width: 20px; height: 20px; color: var(--accent, #7aa2ff); }
+@media (max-width: 640px) { .trust-band-row { flex-direction: column; align-items: flex-start; gap: 14px; } }
+
+/* ---------- Pricing demo hint ---------- */
+.pricing-demo { margin: 14px 0 0; }
+.pricing-demo a { color: var(--link, #7aa2ff); text-decoration: none; font-size: 14px; }
+.pricing-demo a:hover { text-decoration: underline; }
+
+/* ---------- Guide page ---------- */
+.guide-steps { list-style: none; margin: 0; padding: 0; counter-reset: guide; }
+.guide-steps li { padding: 18px 0 6px; border-top: 1px solid var(--border, #2a2a2a); }
+.guide-steps li:first-child { border-top: 0; }
+.guide-steps h3 { margin: 0 0 6px; font-size: 19px; }
+.guide-note { margin-top: 22px; padding: 14px 18px; border-left: 3px solid var(--accent, #7aa2ff); background: color-mix(in srgb, var(--surface, #171717) 60%, transparent); border-radius: 0 10px 10px 0; }

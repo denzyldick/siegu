@@ -9,6 +9,7 @@
 - [Download](https://denzyldick.github.io/siegu/download.html): installers for Windows, macOS and Linux
 - [Pricing](https://denzyldick.github.io/siegu/pricing.html): Free ($0), Pro ($7.99/month billed yearly), Family ($23.99/month billed yearly)
 - [Compare](https://denzyldick.github.io/siegu/compare.html): Siegu vs. cloud photo services
+- [Import from Google Photos](https://denzyldick.github.io/siegu/guide-google-photos.html): step-by-step guide using Google Takeout (runs locally, nothing uploaded)
 - [Connect](https://denzyldick.github.io/siegu/connect.html): connecting your devices over any network
 - [FAQ](https://denzyldick.github.io/siegu/faq.html): common questions
 - [What "private, on-device, relay, TURN" mean](https://denzyldick.github.io/siegu/faq.html) — data never leaves your device for processing; a relay only forwards the encrypted stream between your own devices and never stores or reads media.
@@ -20,6 +21,8 @@
 - [Roadmap](https://denzyldick.github.io/siegu/roadmap.html): what's planned
 - [About](https://denzyldick.github.io/siegu/about.html): the project and its author
 - [Source code](https://github.com/denzyldick/siegu): open-source repository
+- [Discussions](https://github.com/denzyldick/siegu/discussions): community
+- [Sponsor](https://github.com/sponsors/denzyldick): support development
 - [Privacy policy](https://denzyldick.github.io/siegu/privacy.html)
 
 ## Optional
