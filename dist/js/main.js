@@ -316,9 +316,6 @@ function initConsent() {
    ~20% off), so the Pro button hands off to whichever period is selected. */
 const STRIPE_PRO_PAYMENT_LINK_MONTHLY = 'https://buy.stripe.com/test_cNiaEX8HIdZc1e7fLL9MY00';
 const STRIPE_PRO_PAYMENT_LINK_YEARLY = 'https://buy.stripe.com/test_cNieVd3nocV8cWP2YZ9MY01';
-// Launch-only lifetime offer. Hidden until a real Stripe link is baked in.
-const FOUNDING_PRO_PAYMENT_LINK = '';
-const FOUNDING_ENABLED = /^https:\/\/(?:buy|checkout)\.stripe\.com\//i.test(FOUNDING_PRO_PAYMENT_LINK);
 // The currently-selected period is read from state.billing by proPaymentLink().
 function proPaymentLink() {
   return state.billing === 'yearly'
@@ -490,14 +487,6 @@ function buildProDialog() {
   if (price) price.innerHTML = `$${proPriceFor()}<small> ${state.billing === 'yearly' ? '/year' : '/month'}</small>`;
   const pay = document.getElementById('proPayBtn');
   if (pay) pay.setAttribute('href', STRIPE_PAYMENT_RE.test(proPaymentLink()) ? proPaymentLink() : '#');
-  const founding = document.getElementById('proFounding');
-  const foundingBtn = document.getElementById('proFoundingBtn');
-  if (FOUNDING_ENABLED) {
-    if (founding) founding.hidden = false;
-    if (foundingBtn) foundingBtn.setAttribute('href', FOUNDING_PRO_PAYMENT_LINK);
-  } else if (founding) {
-    founding.hidden = true;
-  }
 }
 
 
@@ -600,13 +589,6 @@ function setupStickyPro() {
   };
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
-}
-
-/* Launch offer: Lifetime-Pro notes are always visible. When a real Stripe
-   link is baked in, the Pro dialog's founding block wire-directs to it;
-   otherwise the "Claim it" anchor falls back to the Pro dialog. */
-function setupFoundingOffer() {
-  document.querySelectorAll('[data-founding]').forEach((el) => { el.hidden = false; });
 }
 
 /* ---------- Hero slide show ---------- */
@@ -1070,7 +1052,6 @@ async function boot() {
 
   loadGitHubStars();
   setupStickyPro();
-  setupFoundingOffer();
 
   initReveal();
 }
@@ -1108,7 +1089,7 @@ function initReveal() {
 
   // Section ripple: tag heading blocks + containers, cascade via CSS nth-child
   document.querySelectorAll('.section, .cta-band, .page-hero').forEach((sec) => {
-    const blocks = sec.querySelectorAll('.section-eyebrow, .section-title, .section-sub, .narrow, .pricing-head, .price-anchor, .pricing-note, .founding-note, .point');
+    const blocks = sec.querySelectorAll('.section-eyebrow, .section-title, .section-sub, .narrow, .pricing-head, .price-anchor, .pricing-note, .point');
     blocks.forEach((el, i) => {
       el.classList.add('sr-elem');
       el.style.setProperty('--d', `${i * 110}ms`);

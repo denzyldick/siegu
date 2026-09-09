@@ -221,9 +221,6 @@ const TAIL = `  </main>
         <span class="pro-price" id="proPrice">$9.99<span data-i18n="pro.per_month"> /month</span></span>
         <a class="btn btn-ink btn-lg" id="proPayBtn" data-track="upgrade_clicked" target="_blank" rel="noopener" data-i18n="pro.pay">Pay with card</a>
       </div>
-      <p class="pro-founding" id="proFounding" hidden data-founding>
-        <a id="proFoundingBtn" target="_blank" rel="noopener">Or get <strong>Lifetime Pro</strong> for $99 &mdash; one-time payment, yours forever.</a>
-      </p>
       <p class="dl-note" data-i18n="pro.note">Secure checkout by Stripe.</p>
     </div>
   </div>
@@ -353,7 +350,9 @@ ${STATIC_PLAN_CARDS}
       <span data-i18n="pricing.sticky">Save 20% with the annual plan — cancel anytime.</span>
       <a class="btn btn-ink btn-sm" data-action="open-pro" data-track="cta_upgrade" role="button" data-i18n="cta.upgrade">Upgrade to Pro</a>
     </div>
-    <p class="founding-note center" id="foundingNote" hidden data-founding>Launch offer: <strong>Lifetime Pro for $99</strong> — one-time, yours forever. <a data-action="open-pro" role="button">Claim it</a></p>`;
+`;
+
+/* ---------- Subpage templates ---------- */
 
 const FAQ_MAIN = `
     <section class="page-hero">
@@ -423,7 +422,6 @@ ${STATIC_PLAN_CARDS}
       <span data-i18n="pricing.sticky">Save 20% with the annual plan — cancel anytime.</span>
       <a class="btn btn-ink btn-sm" data-action="open-pro" data-track="cta_upgrade" role="button" data-i18n="cta.upgrade">Upgrade to Pro</a>
     </div>
-    <p class="founding-note center" id="foundingNote" hidden data-founding>Launch offer: <strong>Lifetime Pro for $99</strong> — one-time, yours forever. <a data-action="open-pro" role="button">Claim it</a></p>
 
     <section class="section page-body">
       <div class="container">

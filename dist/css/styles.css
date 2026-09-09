@@ -866,13 +866,6 @@ img { max-width: 100%; display: block; }
 }
 .sticky-pro[hidden] { display: none; }
 
-/* Founding / lifetime launch note */
-.founding-note { margin: 20px auto 0; font-size: 14px; color: var(--text-2); }
-.founding-note[hidden] { display: none; }
-.pro-founding { margin: 8px 0 0; font-size: 14px; color: var(--text-2); }
-.pro-founding[hidden] { display: none; }
-.pro-founding a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
-
 /* ---------- Pro section: conversion animation ---------- */
 .pro .feature.is-visible .ico {
   animation: proIcoIn .7s cubic-bezier(.22,1,.36,1) both, icoFloat 5.5s ease-in-out 1s infinite;
