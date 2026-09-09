@@ -1,0 +1,18 @@
+{
+  "name": "siegu-trailer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remotion project for the Siegu trailer",
+  "scripts": {
+    "render": "remotion render index.ts SieguIntro ../siegu-intro.mp4 --codec h264",
+    "still": "remotion still SieguIntro",
+    "browser": "remotion browser ensure"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "@remotion/bundler": "^4.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.0"
+  }
+}

@@ -145,7 +145,6 @@ function renderPricing() {
         ${isYearly && key !== 'free' ? `<p class="yearly-badge">${p.yearly_badge || ''}</p>` : ''}
         <p class="tagline">${p.tagline || ''}</p>
         <ul>${feats.map((f) => `<li><span class="check">✓</span><span>${f}</span></li>`).join('')}</ul>
-        ${key !== 'free' ? '<p class="plan-risk">14-day money-back guarantee</p>' : ''}
         <a class="btn ${btnClass}" href="${btnHref}" data-action="${btnAction}" ${btnTarget} ${btnExtra} ${dataPlatform} ${btnTrack}>${p.cta || ''}</a>
       </div>`;
     })
@@ -315,8 +314,8 @@ function initConsent() {
    side. A build script (scripts/build-static.mjs) substitutes the real links
    into these placeholders. Monthly and Yearly are separate prices (Yearly is
    ~20% off), so the Pro button hands off to whichever period is selected. */
-const STRIPE_PRO_PAYMENT_LINK_MONTHLY = '';
-const STRIPE_PRO_PAYMENT_LINK_YEARLY = '';
+const STRIPE_PRO_PAYMENT_LINK_MONTHLY = 'https://buy.stripe.com/test_cNiaEX8HIdZc1e7fLL9MY00';
+const STRIPE_PRO_PAYMENT_LINK_YEARLY = 'https://buy.stripe.com/test_cNieVd3nocV8cWP2YZ9MY01';
 // Launch-only lifetime offer. Hidden until a real Stripe link is baked in.
 const FOUNDING_PRO_PAYMENT_LINK = '';
 const FOUNDING_ENABLED = /^https:\/\/(?:buy|checkout)\.stripe\.com\//i.test(FOUNDING_PRO_PAYMENT_LINK);
@@ -453,6 +452,20 @@ function buildDownloadDialog() {
   grids.forEach((grid) => { grid.innerHTML = content; });
 }
 
+// When the download dialog is opened from a platform pill (Windows, macOS, …),
+// draw attention to the matching download option inside the dialog.
+function highlightDl(modal, key) {
+  if (!modal || !key) return;
+  const opts = modal.querySelectorAll(`.dl-opt[data-platform="${key}"], .dl-opt[data-waitlist-source="${key}"]`);
+  if (!opts.length) return;
+  opts.forEach((o) => {
+    o.classList.remove('dl-hl');
+    void o.offsetWidth; // restart the pulse animation
+    o.classList.add('dl-hl');
+  });
+  if (opts[0].scrollIntoView) opts[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
 /* ---------- Pro dialog (explain + Stripe pay) ---------- */
 const PRO_BENEFITS = [
   'Unlimited photos and albums',
@@ -515,7 +528,7 @@ async function applyCtas() {
 
   // Re-render pricing so the Free card's button opens the download dialog and
   // the Pro card's button opens the pro dialog (rebuilt with current billing).
-  if (document.getElementById('pricingGrid')) renderPricing();
+  if (document.getElementById('pricingGrid')) { renderPricing(); observePlans(); }
   buildDownloadDialog();
   buildProDialog();
 }
@@ -925,6 +938,7 @@ async function boot() {
       state.billing = btn.getAttribute('data-period');
       document.querySelectorAll('#billingToggle button').forEach((b) => b.classList.toggle('active', b === btn));
       renderPricing();
+      observePlans();
       buildProDialog();
     });
   }
@@ -946,7 +960,7 @@ async function boot() {
   }
   document.addEventListener('click', (e) => {
     const dlTrig = e.target.closest('[data-action="open-download"]');
-    if (dlTrig) { e.preventDefault(); openDl(dlModal); pushEvent('download_dialog_opened', { locale: state.locale }); return; }
+    if (dlTrig) { e.preventDefault(); openDl(dlModal); pushEvent('download_dialog_opened', { locale: state.locale }); highlightDl(dlModal, dlTrig.getAttribute('data-dl-key')); return; }
     const proTrig = e.target.closest('[data-action="open-pro"]');
     if (proTrig) { e.preventDefault(); buildProDialog(); openDl(proModal); pushEvent('pro_dialog_opened', { locale: state.locale }); return; }
     if (e.target.closest('[data-dl-close]') || e.target === dlModal) closeDl(dlModal);
@@ -1061,6 +1075,13 @@ async function boot() {
   initReveal();
 }
 
+let revealIO = null;
+
+function observePlans() {
+  if (!revealIO) return;
+  document.querySelectorAll('.pricing-grid .plan').forEach((el) => revealIO.observe(el));
+}
+
 function initReveal() {
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!('IntersectionObserver' in window) || reduce) {
@@ -1068,13 +1089,13 @@ function initReveal() {
     return;
   }
 
-  const io = new IntersectionObserver(
+  revealIO = new IntersectionObserver(
     (entries) => entries.forEach((e) => {
-      if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); }
+      if (e.isIntersecting) { e.target.classList.add('is-visible'); revealIO.unobserve(e.target); }
     }),
     { threshold: 0.12, rootMargin: '0px 0px -50px 0px' },
   );
-  const observe = (sel) => { document.querySelectorAll(sel).forEach((el) => io.observe(el)); };
+  const observe = (sel) => { document.querySelectorAll(sel).forEach((el) => revealIO.observe(el)); };
 
   // Feature cards: alternate L/R slide
   document.querySelectorAll('.features-grid .feature').forEach((card, i) => {
@@ -1083,16 +1104,16 @@ function initReveal() {
   observe('.features-grid .feature');
 
   // Pricing cards: pop up
-  observe('.pricing-grid .plan');
+  observePlans();
 
   // Section ripple: tag heading blocks + containers, cascade via CSS nth-child
   document.querySelectorAll('.section, .cta-band, .page-hero').forEach((sec) => {
-    const blocks = sec.querySelectorAll('.section-eyebrow, .section-title, .section-sub, .narrow, .pricing-head, .price-anchor, .pricing-note, .guarantee, .founding-note, .point');
+    const blocks = sec.querySelectorAll('.section-eyebrow, .section-title, .section-sub, .narrow, .pricing-head, .price-anchor, .pricing-note, .founding-note, .point');
     blocks.forEach((el, i) => {
       el.classList.add('sr-elem');
       el.style.setProperty('--d', `${i * 110}ms`);
     });
-    blocks.forEach((el) => io.observe(el));
+    blocks.forEach((el) => revealIO.observe(el));
   });
 }
 

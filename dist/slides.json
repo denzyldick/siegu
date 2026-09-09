@@ -2,10 +2,12 @@
   "_comment": "Hero slide show. Each slide: { src, alt, label? }. Real UI captures from the Siegu app in /shots/.",
   "slides": [
     { "src": "shots/library.webp", "alt": "Siegu photo library", "label": "Your whole library, at a glance" },
-    { "src": "shots/album.webp", "alt": "Siegu album grid", "label": "Every album, beautifully organized" },
-    { "src": "shots/locations.webp", "alt": "Siegu places map", "label": "Places, clustered automatically" },
+    { "src": "shots/collections.webp", "alt": "Siegu album grid", "label": "Every album, beautifully organized" },
+    { "src": "shots/map.webp", "alt": "Siegu places map", "label": "Places, clustered automatically" },
     { "src": "shots/viewer.webp", "alt": "Siegu photo viewer", "label": "Relive your memories, full screen" },
-    { "src": "shots/share.webp", "alt": "Siegu private sharing", "label": "Privately share a whole collection" },
+    { "src": "shots/devices.webp", "alt": "Siegu device sync", "label": "In sync across every device" },
+    { "src": "shots/search.webp", "alt": "Siegu search", "label": "Type it like you\u2019d say it" },
+    { "src": "shots/spacesaver.webp", "alt": "Siegu Space Saver", "label": "Reclaim gigabytes of duplicates" },
     { "src": "shots/banner.webp", "alt": "Siegu library overview", "label": "Fast, calm and made for memories" }
   ]
 }

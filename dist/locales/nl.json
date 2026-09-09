@@ -44,6 +44,23 @@
     "android": "Android",
     "web": "Web"
   },
+  "pro_section": {
+    "eyebrow": "Siegu Pro",
+    "title": "Jouw bibliotheek, overal",
+    "subtitle": "Eén vaste prijs voor al je apparaten. Synchroniseren, delen en early access — alles blijft privé.",
+    "s1_t": "Veilig delen, overal",
+    "s1_d": "Live, versleutelde links die vrienden gewoon in de browser openen — zonder account, en er verlaat niets je apparaat.",
+    "s2_t": "Altijd gesynchroniseerd",
+    "s2_d": "Jouw bibliotheek blijft op elk apparaat synchroon, ook op mobiel internet.",
+    "s3_t": "Toegang zonder gedoe",
+    "s3_d": "De relay van Pro verbindt lastige netwerken voor je — geen poorten doorsturen, geen router instellen.",
+    "s4_t": "Vroege toegang",
+    "s4_d": "Nieuwe functies bereiken Pro als eerste en jouw feedback bepaalt wat er verder komt.",
+    "s5_t": "Prioritaire ondersteuning",
+    "s5_d": "Directe hulp van het team, met snellere reactietijden.",
+    "cta": "Bekijk Pro-plannen",
+    "note": "Het gratis abonnement blijft voor altijd gratis."
+  },
   "features": {
     "eyebrow": "Functies",
     "title": "Alles wat je foto's verdienen",
@@ -102,7 +119,9 @@
         "AI-zoekopdracht op je apparaat",
         "Automatische organisatie",
         "Lokaal delen op je netwerk",
-        "Zelf-gehoste toegang op afstand (DIY)"
+        "Zelf-gehoste toegang op afstand (DIY)",
+        "Draait 100% op je apparaat",
+        "Geen uploads"
       ],
       "cta": "Aan de slag"
     },
@@ -116,7 +135,8 @@
         "Alles in Gratis",
         "Sync & delen over internet — zelfs op mobiele data",
         "Gehoste relay, dus je raakt router- of NAT-instellingen niet aan",
-        "Vroege toegang tot nieuwe functies"
+        "Vroege toegang tot nieuwe functies",
+        "Prioritaire ondersteuning"
       ],
       "cta": "Ga Pro",
       "yearly_badge": "jaarlijks gefactureerd"
@@ -130,7 +150,9 @@
       "features": [
         "Alles in Pro",
         "Tot 6 leden",
-        "Uitnodigingsbeheer"
+        "Uitnodigingsbeheer",
+        "Veilig delen, overal",
+        "Altijd gesynchroniseerd"
       ],
       "cta": "Kies Familie"
     }
@@ -239,7 +261,6 @@
     "title": "Siegu Connect",
     "subtitle": "Private sync and sharing for you and your family"
   },
-  "pricing.guarantee": "14-day money-back guarantee on every paid plan — no questions asked.",
   "pricing.anchor_title": "Google Photos charges by the gigabyte, and it sees whatever you upload.",
   "pricing.anchor_body": "Siegu is a flat fee for a private, infinite library that lives on your device. Pay once — upgrades included. Your memories aren't training data.",
   "pricing.anchor_cta": "See the comparison",

@@ -1,46 +1,30 @@
 # Siegu Video Assets
 
-The animated trailer for Siegu, generated with Remotion.
+The animated marketing trailer for Siegu, generated with Remotion from REAL
+screenshots of the current app UI.
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `siegu-intro.mp4` | Full trailer (17s, 1920×1080, 30fps, H.264, silent) |
-| `video-cover.jpg` | Poster / hero fallback (1280×720) |
-| `frame-1.jpg` | Scene: The library |
-| `frame-2.jpg` | Scene: Auto-organized |
-| `frame-3.jpg` | Scene: Private by design |
+| `siegu-intro.mp4` | Full trailer (28.7s, 1920x1080, 30fps, H.264, silent) |
+| `video-cover.jpg` | Poster / hero fallback (1280x720) |
+| `frame-1.jpg` | Keyframe: problem hook |
+| `frame-2.jpg` | Keyframe: device-to-device sync |
+| `frame-3.jpg` | Keyframe: Space Saver / reclaim |
 | `remotion-src/` | Remotion project source |
 
 ## The trailer scenes (silent)
 
-1. **The library** — "A home for every memory" (library screenshot)
-2. **Find anything** — "sunsets at the beach" — natural-language search (album shot)
-3. **Auto-organized** — faces, places, trips & events (locations shot)
-4. **Privately share** — "Share one link. Nothing else leaves." (share shot)
-5. **Private by design** — "Your photos never leave your device" (banner shot)
-6. **End card** — "Your photo library, privately yours" + CTA row
+1. **Problem hook** — "Your photos are everywhere. Phone. Laptop. Drive. Cloud."
+2. **One home** — "Every photo, finally in one place" (library screenshot)
+3. **Device-to-device sync** — "On your phone, on your laptop" (devices screenshot)
+4. **Find anything** — "sunsets from the beach" — on-device search (search screenshot)
+5. **Reclaim gigabytes** — "That 4 GB of duplicates? Gone." (Space Saver screenshot)
+6. **Automatically organized** — people, places, albums (collections screenshot)
+7. **Private by design** — "Your photos never leave your device" (viewer screenshot)
+8. **CTA** — "One private library, on every device you own."
 
-Each scene fades/slides in on the dark `#0b0b0b` brand background with a green
-(`#22c55e`) accent. All timing lives in `remotion-src/Intro.tsx` via
-`Sequence` + `interpolate()`.
-
-## Re-render
-
-```bash
-cd remotion-src
-npm install
-npx remotion render SieguIntro ../siegu-intro.mp4 --codec h264
-```
-
-## Edit
-
-- `remotion-src/Intro.tsx` — scenes, timing, text, colors
-- `remotion-src/Root.tsx` — `durationInFrames` (currently 520 = 17.3s at 30fps)
-
-## Deploy
-
-`siegu-intro.mp4` + `video-cover.jpg` + `frame-*.jpg` are copied into
-`public/video/`, which the static build deploys to gh-pages. The homepage hero
-loops the trailer (`autoplay muted loop`); `/video.html` hosts the full player.
+Screenshots are captured against the demo web host (`siegu-shots` sandbox, HOME
+override, 52 seeded media + 3 duplicate groups incl. a ~4GB video pair) and kept
+in `public/shots/*.webp` for both the trailer and the site.

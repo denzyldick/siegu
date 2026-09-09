@@ -44,6 +44,23 @@
     "android": "Android",
     "web": "Web"
   },
+  "pro_section": {
+    "eyebrow": "Siegu Pro",
+    "title": "Bo biblioteca, na tur lugá",
+    "subtitle": "Un preis fihá pa tur bo aparato. Sinkronisá, parti i accesiko early — tur kos ta keda privá.",
+    "s1_t": "Parti seguro, na tur lugá",
+    "s1_d": "Link enkriptá i na otro dato ku amigunan ta habri den browser — sin cuenta i sin nada sali for di bo aparato.",
+    "s2_t": "Sempre sinkronisá",
+    "s2_d": "Bo biblioteca ta keda mes na tur aparato, asta riba dater móvil.",
+    "s3_t": "Accesiko sin konfigurashon",
+    "s3_d": "E relay di Pro ta drechá rednan difísil pa bo — sin port-forwarding ni kambia router.",
+    "s4_t": "Accesiko early",
+    "s4_d": "Funshonnan nobo ta yega Pro promé, i bo feedback ta duna forma na ló siguiente.",
+    "s5_t": "Soporte prioritario",
+    "s5_d": "Ayudo direktamente for di e ekipo, ku kontesta mas lihé.",
+    "cta": "Mira plan di Pro",
+    "note": "E plan gratis ta keda gratis pa semper."
+  },
   "features": {
     "eyebrow": "Funshon",
     "title": "Tur loke bo fotonan meresé",
@@ -102,7 +119,9 @@
         "Búskeda IA riba e aparato",
         "Organisashon automátiko",
         "Kompartí lokal riba bo red",
-        "Akseso remoto di bo mes (DIY)"
+        "Akseso remoto di bo mes (DIY)",
+        "Ta drai 100% riba bo ekipo",
+        "Sin upload"
       ],
       "cta": "Kuminsá"
     },
@@ -116,7 +135,8 @@
         "Tur kos na Gratis",
         "Sinkronisá i kompartí via internet — asta na data mobiel",
         "Relay manehá, sin mester di toka router of NAT",
-        "Akceso avaná na funshon nobo"
+        "Akceso avaná na funshon nobo",
+        "Soporte prioritario"
       ],
       "cta": "Bai Pro",
       "yearly_badge": "fakturá anualmente"
@@ -130,7 +150,9 @@
       "features": [
         "Tur kos na Pro",
         "Tei 6 miembro",
-        "Maneho pa invitashon"
+        "Maneho pa invitashon",
+        "Parti seguro, na tur lugá",
+        "Sempre sinkronisá"
       ],
       "cta": "Skuèchi Familia"
     }
@@ -239,7 +261,6 @@
     "title": "Siegu Connect",
     "subtitle": "Private sync and sharing for you and your family"
   },
-  "pricing.guarantee": "14-day money-back guarantee on every paid plan — no questions asked.",
   "pricing.anchor_title": "Google Photos charges by the gigabyte, and it sees whatever you upload.",
   "pricing.anchor_body": "Siegu is a flat fee for a private, infinite library that lives on your device. Pay once — upgrades included. Your memories aren't training data.",
   "pricing.anchor_cta": "See the comparison",

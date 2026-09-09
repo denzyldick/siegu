@@ -145,7 +145,6 @@ function renderPricing() {
         ${isYearly && key !== 'free' ? `<p class="yearly-badge">${p.yearly_badge || ''}</p>` : ''}
         <p class="tagline">${p.tagline || ''}</p>
         <ul>${feats.map((f) => `<li><span class="check">✓</span><span>${f}</span></li>`).join('')}</ul>
-        ${key !== 'free' ? '<p class="plan-risk">14-day money-back guarantee</p>' : ''}
         <a class="btn ${btnClass}" href="${btnHref}" data-action="${btnAction}" ${btnTarget} ${btnExtra} ${dataPlatform} ${btnTrack}>${p.cta || ''}</a>
       </div>`;
     })
@@ -529,7 +528,7 @@ async function applyCtas() {
 
   // Re-render pricing so the Free card's button opens the download dialog and
   // the Pro card's button opens the pro dialog (rebuilt with current billing).
-  if (document.getElementById('pricingGrid')) renderPricing();
+  if (document.getElementById('pricingGrid')) { renderPricing(); observePlans(); }
   buildDownloadDialog();
   buildProDialog();
 }
@@ -939,6 +938,7 @@ async function boot() {
       state.billing = btn.getAttribute('data-period');
       document.querySelectorAll('#billingToggle button').forEach((b) => b.classList.toggle('active', b === btn));
       renderPricing();
+      observePlans();
       buildProDialog();
     });
   }
@@ -1075,6 +1075,13 @@ async function boot() {
   initReveal();
 }
 
+let revealIO = null;
+
+function observePlans() {
+  if (!revealIO) return;
+  document.querySelectorAll('.pricing-grid .plan').forEach((el) => revealIO.observe(el));
+}
+
 function initReveal() {
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!('IntersectionObserver' in window) || reduce) {
@@ -1082,13 +1089,13 @@ function initReveal() {
     return;
   }
 
-  const io = new IntersectionObserver(
+  revealIO = new IntersectionObserver(
     (entries) => entries.forEach((e) => {
-      if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); }
+      if (e.isIntersecting) { e.target.classList.add('is-visible'); revealIO.unobserve(e.target); }
     }),
     { threshold: 0.12, rootMargin: '0px 0px -50px 0px' },
   );
-  const observe = (sel) => { document.querySelectorAll(sel).forEach((el) => io.observe(el)); };
+  const observe = (sel) => { document.querySelectorAll(sel).forEach((el) => revealIO.observe(el)); };
 
   // Feature cards: alternate L/R slide
   document.querySelectorAll('.features-grid .feature').forEach((card, i) => {
@@ -1097,16 +1104,16 @@ function initReveal() {
   observe('.features-grid .feature');
 
   // Pricing cards: pop up
-  observe('.pricing-grid .plan');
+  observePlans();
 
   // Section ripple: tag heading blocks + containers, cascade via CSS nth-child
   document.querySelectorAll('.section, .cta-band, .page-hero').forEach((sec) => {
-    const blocks = sec.querySelectorAll('.section-eyebrow, .section-title, .section-sub, .narrow, .pricing-head, .price-anchor, .pricing-note, .guarantee, .founding-note, .point');
+    const blocks = sec.querySelectorAll('.section-eyebrow, .section-title, .section-sub, .narrow, .pricing-head, .price-anchor, .pricing-note, .founding-note, .point');
     blocks.forEach((el, i) => {
       el.classList.add('sr-elem');
       el.style.setProperty('--d', `${i * 110}ms`);
     });
-    blocks.forEach((el) => io.observe(el));
+    blocks.forEach((el) => revealIO.observe(el));
   });
 }
 

@@ -44,6 +44,23 @@
     "android": "Android",
     "web": "Web"
   },
+  "pro_section": {
+    "eyebrow": "Siegu Pro",
+    "title": "Tu biblioteca, en todas partes",
+    "subtitle": "Un solo precio para todos tus dispositivos. Sincroniza, comparte y accede antes — todo sigue siendo privado.",
+    "s1_t": "Comparte con seguridad, en cualquier lugar",
+    "s1_d": "Enlaces cifrados y en directo que tus amigos abren en el navegador — sin cuenta y sin que nada salga de tu dispositivo.",
+    "s2_t": "Siempre sincronizada",
+    "s2_d": "Tu biblioteca se mantiene al día en todos tus dispositivos, incluso con datos móviles.",
+    "s3_t": "Acceso sin configuración",
+    "s3_d": "El relay de Pro supera las redes complicadas por ti — sin reenviar puertos ni tocar el router.",
+    "s4_t": "Acceso anticipado",
+    "s4_d": "Las funciones nuevas llegan primero a Pro y tus comentarios dan forma a lo que sigue.",
+    "s5_t": "Soporte prioritario",
+    "s5_d": "Ayuda directa del equipo con respuestas más rápidas.",
+    "cta": "Ver planes Pro",
+    "note": "El plan gratuito sigue siendo gratis para siempre."
+  },
   "features": {
     "eyebrow": "Funciones",
     "title": "Todo lo que tus fotos merecen",
@@ -102,7 +119,9 @@
         "Búsqueda IA en el dispositivo",
         "Organización automática",
         "Uso compartido local en tu red",
-        "Acceso remoto autoalojado (DIY)"
+        "Acceso remoto autoalojado (DIY)",
+        "Funciona 100% en tu dispositivo",
+        "Sin subidas"
       ],
       "cta": "Empezar"
     },
@@ -116,7 +135,8 @@
         "Todo en Gratis",
         "Sincroniza y comparte por internet — incluso con datos móviles",
         "Relay alojado, sin tocar el router ni el NAT",
-        "Acceso temprano a nuevas funciones"
+        "Acceso temprano a nuevas funciones",
+        "Soporte prioritario"
       ],
       "cta": "Ir a Pro",
       "yearly_badge": "facturado anualmente"
@@ -130,7 +150,9 @@
       "features": [
         "Todo en Pro",
         "Hasta 6 miembros",
-        "Gestión por invitación"
+        "Gestión por invitación",
+        "Comparte con seguridad, en cualquier lugar",
+        "Siempre sincronizada"
       ],
       "cta": "Elegir Familia"
     }
@@ -239,7 +261,6 @@
     "title": "Siegu Connect",
     "subtitle": "Private sync and sharing for you and your family"
   },
-  "pricing.guarantee": "14-day money-back guarantee on every paid plan — no questions asked.",
   "pricing.anchor_title": "Google Photos charges by the gigabyte, and it sees whatever you upload.",
   "pricing.anchor_body": "Siegu is a flat fee for a private, infinite library that lives on your device. Pay once — upgrades included. Your memories aren't training data.",
   "pricing.anchor_cta": "See the comparison",
