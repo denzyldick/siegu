@@ -10082,6 +10082,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "siegu-web"
+version = "0.1.0"
+dependencies = [
+ "ely-gpui-component",
+ "gpui-pre",
+ "gpui-pre-platform",
+]
+
+[[package]]
 name = "signal-hook"
 version = "0.3.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
