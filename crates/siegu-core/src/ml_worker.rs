@@ -114,7 +114,7 @@ pub const MAX_REASONABLE_PENDING: usize = 1_000_000;
 pub fn decrement_pending_count(counter: &std::sync::atomic::AtomicUsize) -> usize {
     use std::sync::atomic::Ordering;
     counter
-        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+        .try_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
             if current > MAX_REASONABLE_PENDING {
                 Some(0)
             } else {
@@ -134,7 +134,7 @@ pub fn decrement_pending_count(counter: &std::sync::atomic::AtomicUsize) -> usiz
 pub fn increment_pending_count(counter: &std::sync::atomic::AtomicUsize, amount: usize) -> usize {
     use std::sync::atomic::Ordering;
     counter
-        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+        .try_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
             let base = if current > MAX_REASONABLE_PENDING {
                 0
             } else {

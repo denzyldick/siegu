@@ -960,27 +960,40 @@ fn flush_results_statements(
 ) -> Result<(), String> {
     for (class, prob) in &result.objects {
         let _ = db.connection.execute(
-            "INSERT INTO object (photo_id, class, probability) VALUES(?1, ?2, ?3)",
-            (photo_id, class, prob),
+            "INSERT INTO tag (name) VALUES (?1) ON CONFLICT(name) DO NOTHING",
+            (class,),
+        );
+        let _ = db.connection.execute(
+            "INSERT OR REPLACE INTO photo_tag (photo_id, tag_id, probability) \
+             SELECT ?1, id, ?2 FROM tag WHERE name = ?3",
+            (photo_id, prob, class),
         );
     }
+    let existing_ocr: i64 = db
+        .connection
+        .query_row(
+            "SELECT COUNT(*) FROM ocr WHERE photo_id = ?1",
+            [photo_id],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
     if !result.ocr_texts.is_empty() {
-        for text in &result.ocr_texts {
+        for (i, text) in result.ocr_texts.iter().enumerate() {
             let _ = db.connection.execute(
-                "INSERT INTO ocr (photo_id, text) VALUES(?1, ?2)",
-                (photo_id, text),
+                "INSERT INTO ocr (photo_id, n, text) VALUES(?1, ?2, ?3)",
+                (photo_id, existing_ocr + i as i64, text),
             );
         }
     } else if let Some(ref text) = result.ocr {
         let _ = db.connection.execute(
-            "INSERT INTO ocr (photo_id, text) VALUES(?1, ?2)",
-            (photo_id, text),
+            "INSERT INTO ocr (photo_id, n, text) VALUES(?1, ?2, ?3)",
+            (photo_id, existing_ocr, text),
         );
     }
     if let Some(ref score) = result.nsfw {
         let _ = db.connection.execute(
-            "INSERT INTO properties (photo_id, key, value) VALUES(?1, 'nsfw', ?2)",
-            (photo_id, score),
+            "UPDATE photo SET nsfw_score = ?1 WHERE id = ?2",
+            (score, photo_id),
         );
     }
     if let Some(score) = result.aesthetics {
@@ -1011,7 +1024,17 @@ fn flush_results_statements(
         db.set_clip_embedding(photo_id, if is_video { 2 } else { 1 }, Some(&bytes));
     }
     let _ = db.connection.execute(
-        "INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES(?1, 'face_count', ?2)",
+        "INSERT INTO meta_key (name) VALUES ('face_count') ON CONFLICT(name) DO NOTHING",
+        (),
+    );
+    let _ = db.connection.execute(
+        "INSERT INTO meta_value (text) VALUES (?1) ON CONFLICT(text) DO NOTHING",
+        (&result.face_count.to_string(),),
+    );
+    let _ = db.connection.execute(
+        "INSERT OR REPLACE INTO photo_meta (photo_id, meta_key_id, meta_value_id) \
+         SELECT ?1, (SELECT id FROM meta_key WHERE name = 'face_count'), \
+         (SELECT id FROM meta_value WHERE text = ?2)",
         (photo_id, &result.face_count.to_string()),
     );
 
@@ -1021,9 +1044,14 @@ fn flush_results_statements(
     // photo's lat/long are read from the DB (analysis results don't carry them).
     if let Some(photo) = db.get_photo_by_id(photo_id) {
         if let Some((city, country)) = geocode::find_nearest_city(photo.latitude, photo.longitude) {
+            let loc_name = format!("{city}, {country}");
             let _ = db.connection.execute(
-                "INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES(?1, 'location_name', ?2)",
-                (photo_id, format!("{city}, {country}")),
+                "INSERT INTO place (name) VALUES (?1) ON CONFLICT(name) DO NOTHING",
+                (&loc_name,),
+            );
+            let _ = db.connection.execute(
+                "UPDATE photo SET place_id = (SELECT id FROM place WHERE name = ?2) WHERE id = ?1",
+                (photo_id, &loc_name),
             );
         }
     }
@@ -1049,7 +1077,7 @@ fn flush_results_statements(
 
     if let Some(ref transcript) = result.transcript {
         let _ = db.connection.execute(
-            "INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES(?1, 'transcript', ?2)",
+            "INSERT OR REPLACE INTO transcript (photo_id, text) VALUES(?1, ?2)",
             (photo_id, transcript),
         );
     }
@@ -1582,7 +1610,7 @@ mod tests {
         let value: Option<String> = db
             .connection
             .query_row(
-                "SELECT value FROM properties WHERE photo_id='geo-1' AND key='location_name'",
+                "SELECT pl.name FROM place pl JOIN photo p ON p.place_id = pl.id WHERE p.id='geo-1'",
                 [],
                 |row| row.get(0),
             )
@@ -1626,12 +1654,21 @@ mod tests {
         let count: i64 = db
             .connection
             .query_row(
-                "SELECT COUNT(*) FROM properties WHERE photo_id='geo-0' AND key='location_name'",
+                "SELECT COUNT(*) FROM ocr WHERE photo_id='geo-0'",
                 [],
                 |row| row.get(0),
             )
             .unwrap();
         assert_eq!(count, 0);
+        let place_count: i64 = db
+            .connection
+            .query_row(
+                "SELECT COUNT(*) FROM photo WHERE id='geo-0' AND place_id IS NULL",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(place_count, 1);
 
         let _ = std::fs::remove_dir_all(&dir);
     }

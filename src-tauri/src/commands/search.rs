@@ -54,25 +54,31 @@ mod tests {
         let (db, _dir) = test_db();
         db.connection
             .execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
-                ("p1", "cat", "0.9"),
-            )
-            .unwrap();
-        db.connection
-            .execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
-                ("p1", "dog", "0.8"),
-            )
-            .unwrap();
-        db.connection
-            .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
-                ("p1", "Paris, France"),
-            )
-            .unwrap();
-        db.connection
-            .execute(
                 "INSERT INTO photo (id, location, created, encoded) VALUES ('p1', '/x.jpg', '2026-03-01', '')",
+                (),
+            )
+            .unwrap();
+        for tag in ["cat", "dog"] {
+            db.connection
+                .execute(
+                    "INSERT INTO tag (name) VALUES (?1) ON CONFLICT(name) DO NOTHING",
+                    (tag,),
+                )
+                .unwrap();
+            db.connection
+                .execute(
+                    "INSERT INTO photo_tag (photo_id, tag_id, probability) \
+                     VALUES ('p1', (SELECT id FROM tag WHERE name = ?1), 0.9)",
+                    (tag,),
+                )
+                .unwrap();
+        }
+        db.connection
+            .execute("INSERT INTO place (name) VALUES ('Paris, France')", ())
+            .unwrap();
+        db.connection
+            .execute(
+                "UPDATE photo SET place_id = (SELECT id FROM place WHERE name = 'Paris, France') WHERE id = 'p1'",
                 (),
             )
             .unwrap();
@@ -95,14 +101,21 @@ mod tests {
             )
             .unwrap();
         db.connection
+            .execute("INSERT INTO camera_make (name) VALUES ('Sony')", ())
+            .unwrap();
+        db.connection
             .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES ('p2', 'Make', 'Sony')",
+                "UPDATE photo SET make_id = (SELECT id FROM camera_make WHERE name = 'Sony') WHERE id = 'p2'",
                 (),
             )
             .unwrap();
         db.connection
+            .execute("INSERT INTO tag (name) VALUES ('a receipt')", ())
+            .unwrap();
+        db.connection
             .execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES ('p1', 'a receipt', '0.9')",
+                "INSERT INTO photo_tag (photo_id, tag_id, probability) \
+                 VALUES ('p1', (SELECT id FROM tag WHERE name = 'a receipt'), 0.9)",
                 (),
             )
             .unwrap();

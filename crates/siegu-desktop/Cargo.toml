@@ -1,0 +1,17 @@
+[package]
+name = "siegu-desktop"
+version = "0.1.0"
+description = "Desktop GPUI + Ely spike for Siegu"
+authors = ["Denzyl Dick"]
+license-file = "../../LICENSE"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "siegu-desktop"
+path = "src/main.rs"
+
+[dependencies]
+ely-gpui-component = { workspace = true }
+gpui = { workspace = true }
+gpui_platform = { workspace = true, features = ["font-kit", "wayland", "x11"] }

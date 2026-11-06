@@ -132,7 +132,7 @@ async fn run_thumbnail_prep(app: &AppHandle) {
         }
         let mut handles = Vec::with_capacity(batch.len());
         let mut batch_kinds = [0usize; 3];
-        for (id, location) in &batch {
+        for (_, location) in &batch {
             batch_kinds[siegu_core::thumbnail::classify(location) as usize] += 1;
         }
         for (id, location) in batch {

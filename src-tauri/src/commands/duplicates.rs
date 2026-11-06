@@ -182,16 +182,16 @@ pub async fn duplicate_stats(
 }
 
 #[tauri::command]
-pub async fn trash_duplicate_members(app: tauri::AppHandle, ids: Vec<String>) -> usize {
+pub async fn trash_duplicate_members(app: tauri::AppHandle, ids: Vec<String>) -> Vec<String> {
     let path = get_config_path(&app);
     if path.is_empty() {
-        return 0;
+        return Vec::new();
     }
     let database = database::Database::new(&path);
-    let mut trashed = 0usize;
+    let mut trashed = Vec::new();
     for id in &ids {
         if database.trash_photo(id).is_ok() {
-            trashed += 1;
+            trashed.push(id.clone());
         }
     }
     trashed

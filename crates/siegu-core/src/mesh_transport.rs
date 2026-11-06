@@ -428,7 +428,7 @@ impl MeshTransport {
                             let Some(msg) = msg else { break; };
                             let _ = MeshManager::send_sync_message(&dc, &msg).await;
                             // Decrement backpressure counter after drain.
-                            outbound_queued_open.fetch_update(
+                            let _ = outbound_queued_open.try_update(
                                 std::sync::atomic::Ordering::Relaxed,
                                 std::sync::atomic::Ordering::Relaxed,
                                 |v| Some(v.saturating_sub(1)),
@@ -1257,7 +1257,7 @@ impl MeshTransport {
                                 ));
                                 let _ =
                                     MeshManager::send_sync_message(&dc, &msg).await;
-                                outbound_queued_dc.fetch_update(
+                                let _ = outbound_queued_dc.try_update(
                                     std::sync::atomic::Ordering::Relaxed,
                                     std::sync::atomic::Ordering::Relaxed,
                                     |v| Some(v.saturating_sub(1)),

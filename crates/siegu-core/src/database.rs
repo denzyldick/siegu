@@ -716,6 +716,316 @@ impl TripAcc {
     }
 }
 
+/// Current database schema version, tracked in `PRAGMA user_version`.
+///
+/// Version 1 is the fully normalized schema (dictionary tables, junction
+/// tables, foreign keys, FTS5). Existing pre-normalization databases are not
+/// migrated — `Database::new` replaces them with a clean install — but every
+/// schema change from here on is an append-only numbered migration.
+const DB_SCHEMA_VERSION: i32 = 1;
+
+/// A single schema migration: version number plus an `up` closure.
+type Migration = (i32, fn(&rusqlite::Connection) -> rusqlite::Result<()>);
+
+/// Ordered, append-only schema migrations. Each entry applies its `up` closure
+/// inside its own transaction and only bumps `user_version` on success. To
+/// change the schema in the future, append a new `(N, migration_vN)` entry —
+/// never modify an existing one.
+fn schema_migrations() -> Vec<Migration> {
+    vec![(1, migration_v1)]
+}
+
+/// True when the database still uses the pre-normalization schema (unkeyed
+/// `object`/`properties` tables). Such a database is replaced via clean install.
+fn legacy_pre_normalize_schema_present(conn: &rusqlite::Connection) -> bool {
+    conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name IN ('object','properties'))",
+        [],
+        |r| r.get::<_, i64>(0),
+    )
+    .unwrap_or(0)
+        == 1
+}
+
+/// Serializes database initialization (legacy-schema detection, clean install
+/// replacement and schema migration) across the many `Database::new` calls the
+/// app makes from different threads at startup. Without this, two connections
+/// can both observe a pre-migration `user_version` and race to create the same
+/// tables — one panics on the conflicting `CREATE` — and multiple threads can
+/// each replay the legacy-file replacement. The lock is taken once per open in
+/// `Database::new`; the app is single-instance (Tauri plugin), so an in-process
+/// latch fully covers the race.
+static MIGRATION_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Bring the database up to `DB_SCHEMA_VERSION`, applying any pending
+/// migrations in order. Runs before any query; migration failures are fatal
+/// because the app cannot operate against a half-schema database. Callers must
+/// hold `MIGRATION_LOCK` (see `Database::new`).
+#[allow(clippy::panic)]
+fn ensure_schema_version(conn: &mut rusqlite::Connection) {
+    let current: i64 = conn
+        .pragma_query_value(None, "user_version", |r| r.get(0))
+        .unwrap_or(0);
+    tracing::debug!(
+        current,
+        expected = DB_SCHEMA_VERSION,
+        "database schema version"
+    );
+    for (version, up) in schema_migrations() {
+        if (version as i64) <= current {
+            continue;
+        }
+        let tx = match conn.transaction() {
+            Ok(tx) => tx,
+            Err(e) => {
+                let msg = format!("failed to start database schema migration v{version}: {e}");
+                tracing::error!("{msg}");
+                panic!("{msg}");
+            }
+        };
+        if (up)(&tx).is_err() {
+            let msg = format!("database schema migration v{version} failed");
+            tracing::error!("{msg}");
+            panic!("{msg}");
+        }
+        if let Err(e) = tx.pragma_update(None, "user_version", version) {
+            let msg = format!("failed to record schema version {version}: {e}");
+            tracing::error!("{msg}");
+            panic!("{msg}");
+        }
+        if let Err(e) = tx.commit() {
+            let msg = format!("failed to commit database schema migration v{version}: {e}");
+            tracing::error!("{msg}");
+            panic!("{msg}");
+        }
+        tracing::info!(version, "applied database schema migration");
+    }
+}
+
+/// Migration 1: the fully normalized schema. No data is migrated into it — it
+/// is the initial schema for clean installs and future migrations build on it.
+fn migration_v1(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
+    let is_video_expr = scanner::VIDEO_EXTENSIONS
+        .iter()
+        .map(|ext| format!("location LIKE '%.{ext}'"))
+        .collect::<Vec<_>>()
+        .join(" OR ");
+    let ddl = format!(
+        r#"
+        -- ---------------------------------------------------------------------------
+        -- Vocabulary / dictionary tables: every repeated value stored once.
+        -- ---------------------------------------------------------------------------
+        CREATE TABLE tag (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE COLLATE NOCASE
+        );
+        CREATE TABLE place (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE COLLATE NOCASE
+        );
+        CREATE TABLE camera_make (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE COLLATE NOCASE
+        );
+        CREATE TABLE camera_model (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            make_id INTEGER REFERENCES camera_make(id) ON DELETE CASCADE
+        );
+        CREATE TABLE meta_key (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE
+        );
+        CREATE TABLE meta_value (
+            id INTEGER PRIMARY KEY,
+            text TEXT NOT NULL UNIQUE
+        );
+        CREATE TABLE directory (
+            name TEXT
+        );
+        CREATE TABLE config (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        );
+
+        -- ---------------------------------------------------------------------------
+        -- Photos: core row plus typed, normalized columns.
+        -- ---------------------------------------------------------------------------
+        CREATE TABLE photo(
+            id TEXT PRIMARY KEY,
+            location TEXT NOT NULL,
+            encoded TEXT,
+            created TEXT,
+            latitude REAL,
+            longitude REAL,
+            indexed INTEGER NOT NULL DEFAULT 0,
+            caption TEXT,
+            aesthetics_score REAL,
+            sync_needed INTEGER NOT NULL DEFAULT 0,
+            received INTEGER NOT NULL DEFAULT 0,
+            deleted_at TEXT,
+            view_only INTEGER NOT NULL DEFAULT 0,
+            last_opened INTEGER NOT NULL DEFAULT 0,
+            dup_hash TEXT,
+            file_sha256 TEXT,
+            clip_embedding BLOB,
+            dup_clip_state INTEGER NOT NULL DEFAULT 0,
+            favorite INTEGER NOT NULL DEFAULT 0,
+            nsfw_score REAL,
+            place_id INTEGER REFERENCES place(id),
+            make_id INTEGER REFERENCES camera_make(id),
+            model_id INTEGER REFERENCES camera_model(id),
+            is_video INTEGER GENERATED ALWAYS AS ({is_video_expr}) VIRTUAL
+        );
+        CREATE UNIQUE INDEX idx_photo_location_unique ON photo(location);
+        CREATE INDEX idx_photo_deleted_at ON photo(deleted_at) WHERE deleted_at IS NOT NULL;
+        CREATE INDEX idx_photo_file_sha256 ON photo(file_sha256) WHERE file_sha256 IS NOT NULL;
+        CREATE INDEX idx_photo_dup_hash ON photo(dup_hash) WHERE dup_hash IS NOT NULL;
+        CREATE INDEX idx_photo_dup_clip ON photo(dup_clip_state, clip_embedding) WHERE dup_clip_state > 0;
+        CREATE INDEX idx_photo_is_video ON photo(is_video);
+        CREATE INDEX idx_photo_created ON photo(created);
+        CREATE INDEX idx_photo_aesthetics ON photo(aesthetics_score);
+        CREATE INDEX idx_photo_aesthetics_desc ON photo(aesthetics_score DESC);
+        CREATE INDEX idx_photo_indexed ON photo(indexed);
+        CREATE INDEX idx_photo_coords ON photo(latitude, longitude);
+        CREATE INDEX idx_photo_favorite ON photo(favorite) WHERE favorite = 1;
+        CREATE INDEX idx_photo_nsfw ON photo(nsfw_score) WHERE nsfw_score IS NOT NULL;
+        CREATE INDEX idx_photo_place ON photo(place_id);
+
+        -- ---------------------------------------------------------------------------
+        -- AI status / faces / people / albums / sync-side tables.
+        -- ---------------------------------------------------------------------------
+        CREATE TABLE ai_status (photo_id TEXT PRIMARY KEY REFERENCES photo(id) ON DELETE CASCADE,
+            clip INTEGER DEFAULT 0, face INTEGER DEFAULT 0, ocr INTEGER DEFAULT 0,
+            nsfw INTEGER DEFAULT 0, aesthetics INTEGER DEFAULT 0, yolo INTEGER DEFAULT 0,
+            blip INTEGER DEFAULT 0, arcface INTEGER DEFAULT 0, midas INTEGER DEFAULT 0,
+            whisper INTEGER DEFAULT 0, sam INTEGER DEFAULT 0, superres INTEGER DEFAULT 0);
+        CREATE INDEX idx_ai_status_clip ON ai_status(clip) WHERE clip = 0;
+        CREATE INDEX idx_ai_status_face ON ai_status(face) WHERE face = 0;
+        CREATE INDEX idx_ai_status_ocr ON ai_status(ocr) WHERE ocr = 0;
+        CREATE INDEX idx_ai_status_nsfw ON ai_status(nsfw) WHERE nsfw = 0;
+        CREATE INDEX idx_ai_status_aesthetics ON ai_status(aesthetics) WHERE aesthetics = 0;
+        CREATE INDEX idx_ai_status_yolo ON ai_status(yolo) WHERE yolo = 0;
+        CREATE INDEX idx_ai_status_blip ON ai_status(blip) WHERE blip = 0;
+        CREATE INDEX idx_ai_status_arcface ON ai_status(arcface) WHERE arcface = 0;
+        CREATE INDEX idx_ai_status_midas ON ai_status(midas) WHERE midas = 0;
+        CREATE INDEX idx_ai_status_whisper ON ai_status(whisper) WHERE whisper = 0;
+        CREATE INDEX idx_ai_status_sam ON ai_status(sam) WHERE sam = 0;
+        CREATE INDEX idx_ai_status_superres ON ai_status(superres) WHERE superres = 0;
+        CREATE TABLE faces (photo_id TEXT, face_id TEXT PRIMARY KEY, crop_path TEXT, encoded TEXT, embedding BLOB, person_id TEXT);
+        CREATE INDEX idx_faces_person_id ON faces(person_id);
+        CREATE INDEX idx_faces_person_photo ON faces(person_id, photo_id);
+        CREATE INDEX idx_faces_photo_id ON faces(photo_id);
+        CREATE TABLE people (id TEXT PRIMARY KEY, name TEXT, embedding BLOB);
+        CREATE INDEX idx_people_name ON people(name);
+        CREATE TABLE model_timings (photo_id TEXT, model TEXT, ms REAL, PRIMARY KEY(photo_id, model));
+        CREATE TABLE album(
+            id TEXT PRIMARY KEY, name TEXT NOT NULL,
+            created_at TEXT DEFAULT (datetime('now')),
+            cover_photo_id TEXT REFERENCES photo(id) ON DELETE SET NULL,
+            sort_order INTEGER DEFAULT 0,
+            kind TEXT NOT NULL DEFAULT 'manual',
+            rule TEXT,
+            updated_at TEXT DEFAULT (datetime('now')),
+            share_count INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX idx_album_kind ON album(kind);
+        CREATE TABLE album_item(
+            album_id TEXT NOT NULL REFERENCES album(id) ON DELETE CASCADE,
+            photo_id TEXT NOT NULL REFERENCES photo(id) ON DELETE CASCADE,
+            added_at TEXT DEFAULT (datetime('now')),
+            position INTEGER DEFAULT 0,
+            PRIMARY KEY (album_id, photo_id)
+        );
+        CREATE INDEX idx_album_item_album ON album_item(album_id, position);
+        CREATE INDEX idx_album_item_photo ON album_item(photo_id);
+        CREATE TABLE peer_device(
+            device_id TEXT PRIMARY KEY, name TEXT, ip TEXT, port INTEGER DEFAULT 0,
+            device_type TEXT DEFAULT '', os TEXT DEFAULT '',
+            models_enabled TEXT DEFAULT '[]', protocol_version INTEGER DEFAULT 1,
+            storage_used INTEGER DEFAULT 0, storage_capacity INTEGER DEFAULT 0,
+            last_seen TEXT DEFAULT (datetime('now')),
+            photo_count INTEGER DEFAULT 0, video_count INTEGER DEFAULT 0,
+            remote_photo_count INTEGER DEFAULT 0, remote_video_count INTEGER DEFAULT 0
+        );
+        CREATE TABLE dismissed_trip(id TEXT PRIMARY KEY);
+
+        -- ---------------------------------------------------------------------------
+        -- Normalized facts / junctions (replaces object + properties).
+        -- ---------------------------------------------------------------------------
+        CREATE TABLE photo_tag(
+            photo_id TEXT NOT NULL REFERENCES photo(id) ON DELETE CASCADE,
+            tag_id INTEGER NOT NULL REFERENCES tag(id) ON DELETE CASCADE,
+            probability REAL NOT NULL DEFAULT 1.0,
+            PRIMARY KEY (photo_id, tag_id)
+        );
+        CREATE INDEX idx_photo_tag_tag ON photo_tag(tag_id);
+        CREATE TABLE photo_meta(
+            photo_id TEXT NOT NULL REFERENCES photo(id) ON DELETE CASCADE,
+            meta_key_id INTEGER NOT NULL REFERENCES meta_key(id),
+            meta_value_id INTEGER NOT NULL REFERENCES meta_value(id),
+            PRIMARY KEY (photo_id, meta_key_id)
+        );
+        CREATE INDEX idx_photo_meta_key ON photo_meta(meta_key_id);
+        CREATE TABLE transcript(
+            photo_id TEXT PRIMARY KEY REFERENCES photo(id) ON DELETE CASCADE,
+            text TEXT NOT NULL
+        );
+        CREATE TABLE ocr(
+            photo_id TEXT NOT NULL REFERENCES photo(id) ON DELETE CASCADE,
+            n INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            PRIMARY KEY (photo_id, n)
+        );
+        CREATE INDEX idx_ocr_photo_id ON ocr(photo_id, n);
+
+        -- ---------------------------------------------------------------------------
+        -- FTS5 external-content indexes (kept in sync by triggers below).
+        -- ---------------------------------------------------------------------------
+        CREATE VIRTUAL TABLE fts_caption USING fts5(caption, content='photo', content_rowid='rowid', tokenize='porter');
+        CREATE VIRTUAL TABLE fts_ocr USING fts5(text, content='ocr', content_rowid='rowid', tokenize='porter');
+        CREATE VIRTUAL TABLE fts_transcript USING fts5(text, content='transcript', content_rowid='rowid', tokenize='porter');
+
+        CREATE TRIGGER fts_caption_ai AFTER INSERT ON photo BEGIN
+            INSERT INTO fts_caption(rowid, caption) VALUES (new.rowid, new.caption);
+        END;
+        CREATE TRIGGER fts_caption_ad AFTER DELETE ON photo BEGIN
+            INSERT INTO fts_caption(fts_caption, rowid, caption) VALUES ('delete', old.rowid, old.caption);
+        END;
+        CREATE TRIGGER fts_caption_au AFTER UPDATE OF caption ON photo BEGIN
+            INSERT INTO fts_caption(fts_caption, rowid, caption) VALUES ('delete', old.rowid, old.caption);
+            INSERT INTO fts_caption(rowid, caption) VALUES (new.rowid, new.caption);
+        END;
+        CREATE TRIGGER fts_ocr_ai AFTER INSERT ON ocr BEGIN
+            INSERT INTO fts_ocr(rowid, text) VALUES (new.rowid, new.text);
+        END;
+        CREATE TRIGGER fts_ocr_ad AFTER DELETE ON ocr BEGIN
+            INSERT INTO fts_ocr(fts_ocr, rowid, text) VALUES ('delete', old.rowid, old.text);
+        END;
+        CREATE TRIGGER fts_ocr_au AFTER UPDATE OF photo_id, n, text ON ocr BEGIN
+            INSERT INTO fts_ocr(fts_ocr, rowid, text) VALUES ('delete', old.rowid, old.text);
+            INSERT INTO fts_ocr(rowid, text) VALUES (new.rowid, new.text);
+        END;
+        CREATE TRIGGER fts_transcript_ai AFTER INSERT ON transcript BEGIN
+            INSERT INTO fts_transcript(rowid, text) VALUES (new.rowid, new.text);
+        END;
+        CREATE TRIGGER fts_transcript_ad AFTER DELETE ON transcript BEGIN
+            INSERT INTO fts_transcript(fts_transcript, rowid, text) VALUES ('delete', old.rowid, old.text);
+        END;
+        CREATE TRIGGER fts_transcript_au AFTER UPDATE OF text ON transcript BEGIN
+            INSERT INTO fts_transcript(fts_transcript, rowid, text) VALUES ('delete', old.rowid, old.text);
+            INSERT INTO fts_transcript(rowid, text) VALUES (new.rowid, new.text);
+        END;
+        "#
+    );
+    conn.execute_batch(&ddl)?;
+    // Logs are no longer stored in SQLite (unbounded disk growth). Drop any
+    // legacy table to reclaim space.
+    let _ = conn.execute("DROP TABLE IF EXISTS logs", ());
+    let _ = conn.execute("DROP TABLE IF EXISTS device", ());
+    Ok(())
+}
+
 impl Database {
     /// Get all photos (with their detected objects and faces) for device sync.
     /// Includes every scanned photo so sync works immediately after a scan, plus
@@ -739,10 +1049,10 @@ impl Database {
 
                 // Fetch objects for this photo
                 let mut objects = Vec::new();
-                if let Ok(mut obj_stmt) = self
-                    .connection
-                    .prepare("SELECT class, probability FROM object WHERE photo_id = ?1")
-                {
+                if let Ok(mut obj_stmt) = self.connection.prepare(
+                    "SELECT t.name, CAST(pt.probability AS TEXT) FROM photo_tag pt \
+                         JOIN tag t ON t.id = pt.tag_id WHERE pt.photo_id = ?1",
+                ) {
                     if let Ok(obj_rows) = obj_stmt.query_map([&id], |r| {
                         Ok(SyncObject {
                             class: r.get(0)?,
@@ -869,10 +1179,10 @@ impl Database {
 
                 // Fetch objects for this photo
                 let mut objects = Vec::new();
-                if let Ok(mut obj_stmt) = self
-                    .connection
-                    .prepare("SELECT class, probability FROM object WHERE photo_id = ?1")
-                {
+                if let Ok(mut obj_stmt) = self.connection.prepare(
+                    "SELECT t.name, CAST(pt.probability AS TEXT) FROM photo_tag pt \
+                         JOIN tag t ON t.id = pt.tag_id WHERE pt.photo_id = ?1",
+                ) {
                     if let Ok(obj_rows) = obj_stmt.query_map([&id], |r| {
                         Ok(SyncObject {
                             class: r.get(0)?,
@@ -923,11 +1233,59 @@ impl Database {
     pub fn new(config_path: &str) -> Self {
         let path = format!("{config_path}/siegu.db");
         let _ = fs::create_dir_all(config_path);
+
+        // Serialize the whole open: the detect -> replace -> migrate sequence
+        // must be atomic so the many startup threads can't each replay it (the
+        // legacy file would be idempotently re-parked by every thread that
+        // grabbed a handle before the rename, and dropping/recreating tables on
+        // a half-open library is what we must avoid). Opening under the latch
+        // also means every caller evaluates the *current* file state, so
+        // exactly one thread performs the clean install.
+        let _guard = MIGRATION_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         // Fatal: the app cannot function without a usable database, and `new` cannot signal failure.
         #[allow(clippy::expect_used)]
         let conn = Connection::open(&path)
             .expect("failed to open the Siegu database; the app cannot function without it");
+        let conn = Self::configure_connection(conn);
+        let mut db = Self { connection: conn };
 
+        let already_current = db
+            .connection
+            .pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
+            .unwrap_or(0)
+            == DB_SCHEMA_VERSION as i64;
+
+        if !already_current && legacy_pre_normalize_schema_present(&db.connection) {
+            // Clean install (no data migration from the pre-normalization
+            // schema): park the legacy file for manual recovery and start over
+            // with a fresh, normalized database. The library must re-scan /
+            // re-sync to repopulate.
+            drop(db);
+            let backup = format!("{path}.pre-normalize");
+            let _ = fs::rename(&path, &backup);
+            for suffix in ["-wal", "-shm"] {
+                let _ = fs::remove_file(format!("{path}{suffix}"));
+            }
+            tracing::info!("replaced legacy database schema (clean install)");
+            #[allow(clippy::expect_used)]
+            let conn = Connection::open(&path)
+                .expect("failed to open the Siegu database; the app cannot function without it");
+            let conn = Self::configure_connection(conn);
+            let mut db = Self { connection: conn };
+            ensure_schema_version(&mut db.connection);
+            return db;
+        }
+
+        ensure_schema_version(&mut db.connection);
+        db
+    }
+
+    /// Shared per-connection tuning: WAL, busy timeout, write/read parameters
+    /// and foreign-key enforcement. Every connection the app opens goes through
+    /// here so normalized FKs and FTS-external-content tables behave uniformly.
+    fn configure_connection(conn: Connection) -> Connection {
         // Enable WAL mode for better concurrency and set a busy timeout
         let _ = conn.execute("PRAGMA journal_mode=WAL;", ());
         let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
@@ -939,310 +1297,11 @@ impl Database {
         let _ = conn.execute("PRAGMA synchronous=NORMAL;", ());
         let _ = conn.execute("PRAGMA cache_size=-32768;", ());
         let _ = conn.execute("PRAGMA mmap_size=67108864;", ());
-
-        let _ = conn.execute("CREATE TABLE IF NOT EXISTS photo (id STRING PRIMARY KEY, location STRING, encoded STRING, created DATE_TIME, latitude REAL, longitude REAL, indexed INTEGER DEFAULT 0, caption TEXT, aesthetics_score REAL);", ());
-        let _ = conn.execute("CREATE TABLE IF NOT EXISTS ai_status (photo_id STRING PRIMARY KEY, clip INTEGER DEFAULT 0, face INTEGER DEFAULT 0, ocr INTEGER DEFAULT 0, nsfw INTEGER DEFAULT 0, aesthetics INTEGER DEFAULT 0, yolo INTEGER DEFAULT 0, blip INTEGER DEFAULT 0, arcface INTEGER DEFAULT 0, midas INTEGER DEFAULT 0, whisper INTEGER DEFAULT 0, sam INTEGER DEFAULT 0, superres INTEGER DEFAULT 0);", ());
-        for model in [
-            "clip",
-            "face",
-            "ocr",
-            "nsfw",
-            "aesthetics",
-            "yolo",
-            "blip",
-            "arcface",
-            "midas",
-            "whisper",
-            "sam",
-            "superres",
-        ] {
-            let _ = conn.execute(
-                &format!(
-                    "CREATE INDEX IF NOT EXISTS idx_ai_status_{model} ON ai_status({model}) WHERE {model} = 0;"
-                ),
-                (),
-            );
-        }
-        let _ = conn.execute(
-            "CREATE TABLE IF NOT EXISTS ocr (photo_id STRING, text TEXT);",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_ocr_photo_id ON ocr(photo_id);",
-            (),
-        );
-
-        // Simple migration: try to add columns if they don't exist (ignore errors if they do)
-        let _ = conn.execute("ALTER TABLE photo ADD COLUMN latitude REAL;", ());
-        let _ = conn.execute("ALTER TABLE photo ADD COLUMN longitude REAL;", ());
-        let _ = conn.execute("ALTER TABLE photo ADD COLUMN created DATE_TIME;", ());
-        let _ = conn.execute("ALTER TABLE photo ADD COLUMN caption TEXT;", ());
-        let _ = conn.execute("ALTER TABLE photo ADD COLUMN aesthetics_score REAL;", ());
-        let _ = conn.execute(
-            "ALTER TABLE photo ADD COLUMN sync_needed INTEGER DEFAULT 0;",
-            (),
-        );
-        let _ = conn.execute(
-            "ALTER TABLE photo ADD COLUMN indexed INTEGER DEFAULT 0;",
-            (),
-        );
-        let _ = conn.execute(
-            "ALTER TABLE photo ADD COLUMN received INTEGER DEFAULT 0;",
-            (),
-        );
-        let _ = conn.execute(
-            "ALTER TABLE photo ADD COLUMN deleted_at TEXT DEFAULT NULL;",
-            (),
-        );
-        let _ = conn.execute(
-            "ALTER TABLE photo ADD COLUMN view_only INTEGER DEFAULT 0;",
-            (),
-        );
-        let _ = conn.execute(
-            "ALTER TABLE photo ADD COLUMN last_opened INTEGER DEFAULT 0;",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_photo_deleted_at ON photo(deleted_at) WHERE deleted_at IS NOT NULL;",
-            (),
-        );
-        // Duplicate-detection metadata (Stage 0).
-        let _ = conn.execute("ALTER TABLE photo ADD COLUMN dup_hash TEXT;", ());
-        let _ = conn.execute("ALTER TABLE photo ADD COLUMN file_sha256 TEXT;", ());
-        let _ = conn.execute("ALTER TABLE photo ADD COLUMN clip_embedding BLOB;", ());
-        // Duplicate-detection CLIP state, kept separate from ai_status.clip
-        // (which only records that CLIP *classification* ran during indexing).
-        // 0 = no Space-Saver embedding yet, 1 = still embedding stored,
-        // 2 = video embedding stored.
-        let _ = conn.execute(
-            "ALTER TABLE photo ADD COLUMN dup_clip_state INTEGER DEFAULT 0;",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_photo_file_sha256 ON photo(file_sha256) WHERE file_sha256 IS NOT NULL;",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_photo_dup_hash ON photo(dup_hash) WHERE dup_hash IS NOT NULL;",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_photo_dup_clip ON photo(dup_clip_state, clip_embedding) WHERE dup_clip_state > 0;",
-            (),
-        );
-
-        // Virtual generated column mirroring video_sql_like(): lets the
-        // videos-only filter use an index instead of a 14-way LIKE scan.
-        // VIRTUAL (not STORED) because ALTER TABLE ADD COLUMN rejects STORED.
-        let is_video_expr = scanner::VIDEO_EXTENSIONS
-            .iter()
-            .map(|ext| format!("location LIKE '%.{ext}'"))
-            .collect::<Vec<_>>()
-            .join(" OR ");
-        let _ = conn.execute(
-            &format!(
-                "ALTER TABLE photo ADD COLUMN is_video INTEGER GENERATED ALWAYS AS ({is_video_expr}) VIRTUAL"
-            ),
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_photo_is_video ON photo(is_video);",
-            (),
-        );
-
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_photo_location ON photo(location);",
-            (),
-        );
-
-        // Deduplicate existing rows by location, then enforce uniqueness
-        let _ = conn.execute(
-            "DELETE FROM photo WHERE rowid NOT IN (SELECT MIN(rowid) FROM photo GROUP BY location)",
-            (),
-        );
-        let _ = conn.execute("DROP INDEX IF EXISTS idx_photo_location;", ());
-        let _ = conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_photo_location_unique ON photo(location);",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_photo_created ON photo(created);",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_photo_aesthetics ON photo(aesthetics_score);",
-            (),
-        );
-        // Matches "best" ordering (aesthetics DESC NULLS LAST) so SQLite scans
-        // the index instead of sorting the whole table for each page.
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_photo_aesthetics_desc ON photo(aesthetics_score DESC);",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_photo_indexed ON photo(indexed);",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_photo_coords ON photo(latitude, longitude);",
-            (),
-        );
-        let _ = conn.execute("CREATE TABLE IF NOT EXISTS directory (name TEXT);", ());
-        let _ = conn.execute(
-            "CREATE TABLE IF NOT EXISTS object(photo_id TEXT, class TEXT, probability TEXT);",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE TABLE IF NOT EXISTS properties (photo_id TEXT, key TEXT, value TEXT);",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_object_photo_id ON object(photo_id);",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_object_class ON object(class);",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_properties_photo_id ON properties(photo_id);",
-            (),
-        );
-        // Backs tag/location/non-camera facet lookups (key + value equality).
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_properties_key_value ON properties(key, value);",
-            (),
-        );
-        // Backs the ocr/text portion of full-text search.
-        let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_ocr_text ON ocr(text);", ());
-        let _ = conn.execute(
-            "CREATE TABLE IF NOT EXISTS peer_device(\
-             device_id TEXT PRIMARY KEY, name TEXT, ip TEXT, port INTEGER DEFAULT 0, \
-             device_type TEXT DEFAULT '', os TEXT DEFAULT '', \
-             models_enabled TEXT DEFAULT '[]', protocol_version INTEGER DEFAULT 1, \
-             storage_used INTEGER DEFAULT 0, storage_capacity INTEGER DEFAULT 0, \
-             last_seen TEXT DEFAULT (datetime('now'))\
-             );",
-            (),
-        );
-        // Migrate legacy device table → peer_device, then drop it.
-        let _ = conn.execute(
-            "INSERT OR IGNORE INTO peer_device(device_id, name, ip, port, last_seen) \
-             SELECT lower(hex(randomblob(16))), name, ip, 0, datetime('now') FROM device",
-            (),
-        );
-        let _ = conn.execute("DROP TABLE IF EXISTS device", ());
-        let _ = conn.execute(
-            "ALTER TABLE peer_device ADD COLUMN photo_count INTEGER DEFAULT 0;",
-            (),
-        );
-        let _ = conn.execute(
-            "ALTER TABLE peer_device ADD COLUMN video_count INTEGER DEFAULT 0;",
-            (),
-        );
-        // Full library size as announced by the peer itself (PeerLibraryStats),
-        // in contrast to photo_count/video_count which only track files
-        // received during a session.
-        let _ = conn.execute(
-            "ALTER TABLE peer_device ADD COLUMN remote_photo_count INTEGER DEFAULT 0;",
-            (),
-        );
-        let _ = conn.execute(
-            "ALTER TABLE peer_device ADD COLUMN remote_video_count INTEGER DEFAULT 0;",
-            (),
-        );
-        let _ = conn.execute("CREATE TABLE IF NOT EXISTS faces (photo_id STRING, face_id STRING PRIMARY KEY, crop_path STRING, encoded STRING, embedding BLOB, person_id STRING);", ());
-        let _ = conn.execute("CREATE TABLE IF NOT EXISTS people (id STRING PRIMARY KEY, name STRING, embedding BLOB);", ());
-        let _ = conn.execute(
-            "CREATE TABLE IF NOT EXISTS model_timings (photo_id TEXT, model TEXT, ms REAL, PRIMARY KEY(photo_id, model));",
-            (),
-        );
-        // Must run after the faces/people tables exist: created here (not above)
-        // so fresh databases get these indexes too — previously the CREATE
-        // INDEX statements ran before the tables and silently failed, leaving
-        // fresh installs without index coverage for person/face queries.
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_faces_person_id ON faces(person_id);",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_faces_person_photo ON faces(person_id, photo_id);",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_faces_photo_id ON faces(photo_id);",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_people_name ON people(name);",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE TABLE IF NOT EXISTS config(key TEXT, value TEXT);",
-            (),
-        );
-        // Deduplicate config rows (old schema had no UNIQUE constraint)
-        let _ = conn.execute(
-            "DELETE FROM config WHERE rowid NOT IN (SELECT MIN(rowid) FROM config GROUP BY key)",
-            (),
-        );
-        // Logs are no longer stored in SQLite (unbounded disk growth). The app
-        // keeps a bounded in-memory ring buffer for the log viewer and a size-
-        // rotated siegu_debug.log on disk. Drop any legacy table to reclaim space.
-        let _ = conn.execute("DROP TABLE IF EXISTS logs", ());
-
-        // Albums (local, free tier): user-created collections of photos.
-        let _ = conn.execute(
-            "CREATE TABLE IF NOT EXISTS album(\
-             id TEXT PRIMARY KEY, name TEXT NOT NULL, \
-             created_at TEXT DEFAULT (datetime('now')), \
-             cover_photo_id TEXT, sort_order INTEGER DEFAULT 0\
-             );",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE TABLE IF NOT EXISTS album_item(\
-             album_id TEXT NOT NULL, photo_id TEXT NOT NULL, \
-             added_at TEXT DEFAULT (datetime('now')), \
-             position INTEGER DEFAULT 0, \
-             PRIMARY KEY (album_id, photo_id)\
-             );",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_album_item_album ON album_item(album_id, position);",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_album_item_photo ON album_item(photo_id);",
-            (),
-        );
-        let _ = conn.execute(
-            "ALTER TABLE album ADD COLUMN kind TEXT NOT NULL DEFAULT 'manual';",
-            (),
-        );
-        let _ = conn.execute("ALTER TABLE album ADD COLUMN rule TEXT;", ());
-        let _ = conn.execute(
-            "ALTER TABLE album ADD COLUMN updated_at TEXT DEFAULT (datetime('now'));",
-            (),
-        );
-        let _ = conn.execute(
-            "ALTER TABLE album ADD COLUMN share_count INTEGER NOT NULL DEFAULT 0;",
-            (),
-        );
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_album_kind ON album(kind);",
-            (),
-        );
-
-        // Dismissed-trip signatures persist so a deleted trip does not
-        // reappear on the next sync.
-        let _ = conn.execute(
-            "CREATE TABLE IF NOT EXISTS dismissed_trip(id TEXT PRIMARY KEY);",
-            (),
-        );
-
-        Self { connection: conn }
+        // Cap the residual WAL size (64 MiB) so a long session on a nearly-full
+        // disk can never grow a multi-GB WAL before the exit checkpoint runs.
+        let _ = conn.execute("PRAGMA journal_size_limit=67108864;", ());
+        let _ = conn.pragma_update(None, "foreign_keys", "ON").ok();
+        conn
     }
 
     /// Run `PRAGMA integrity_check` and return true if the database is healthy.
@@ -1377,8 +1436,8 @@ impl Database {
     /// Search for object tags, location names, people, and month suggestions matching the query.
     pub fn list_objects(&self, query: &str) -> Vec<SearchSuggestion> {
         let mut objects = Vec::new();
-        let sql = "SELECT class, 'tag' FROM object WHERE class LIKE ?1 \
-            UNION SELECT value, 'location' FROM properties WHERE key = 'location_name' AND value LIKE ?1 \
+        let sql = "SELECT name, 'tag' FROM tag WHERE name LIKE ?1 \
+            UNION SELECT name, 'location' FROM place WHERE name LIKE ?1 \
             UNION SELECT name, 'person' FROM people WHERE name IS NOT NULL AND name LIKE ?1 \
             LIMIT 20";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
@@ -1443,7 +1502,8 @@ impl Database {
             .map(|(i, _)| format!("?{}", i + 1))
             .collect();
         let sql = format!(
-            "SELECT photo_id, class, probability FROM object WHERE photo_id IN ({})",
+            "SELECT pt.photo_id, t.name, pt.probability FROM photo_tag pt \
+             JOIN tag t ON t.id = pt.tag_id WHERE pt.photo_id IN ({})",
             placeholders.join(",")
         );
         let params: Vec<&dyn rusqlite::types::ToSql> = photos
@@ -1455,10 +1515,7 @@ impl Database {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
-                    row.get::<_, f64>(2)
-                        .ok()
-                        .or_else(|| row.get::<_, String>(2).ok().and_then(|s| s.parse().ok()))
-                        .unwrap_or(0.0),
+                    row.get::<_, f64>(2)?,
                 ))
             }) {
                 for row in iter.flatten() {
@@ -1470,6 +1527,10 @@ impl Database {
         }
     }
 
+    /// Rebuild the legacy `properties` map on each photo from the normalized
+    /// schema (generic metadata keyed via `photo_meta`, plus the typed columns
+    /// folded back as `location_name` / `Make` / `Model` / `nsfw` / `favorite` /
+    /// `transcript`). Keeps the JSON wire contract byte-for-byte compatible.
     fn enrich_properties(&self, photos: &mut [Photo]) {
         if photos.is_empty() {
             return;
@@ -1484,30 +1545,120 @@ impl Database {
             .enumerate()
             .map(|(i, _)| format!("?{}", i + 1))
             .collect();
-        let sql = format!(
-            "SELECT photo_id, key, value FROM properties WHERE photo_id IN ({})",
+
+        let build_params = |photos: &[Photo]| -> Vec<Box<dyn rusqlite::ToSql>> {
+            photos
+                .iter()
+                .map(|p| Box::new(p.id.clone()) as Box<dyn rusqlite::ToSql>)
+                .collect()
+        };
+
+        // 1) Generic metadata (arbitrary EXIF keys and uncategorized values).
+        let meta_sql = format!(
+            "SELECT pm.photo_id, mk.name, mv.text FROM photo_meta pm \
+             JOIN meta_key mk ON mk.id = pm.meta_key_id \
+             JOIN meta_value mv ON mv.id = pm.meta_value_id \
+             WHERE pm.photo_id IN ({})",
             placeholders.join(",")
         );
-        let params: Vec<&dyn rusqlite::types::ToSql> = photos
-            .iter()
-            .map(|p| &p.id as &dyn rusqlite::types::ToSql)
-            .collect();
-        if let Ok(mut stmt) = self.connection.prepare(&sql) {
-            if let Ok(iter) = stmt.query_map(params.as_slice(), |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, String>(2)
-                        .ok()
-                        .or_else(|| row.get::<_, f64>(2).ok().map(|v| v.to_string()))
-                        .or_else(|| row.get::<_, i64>(2).ok().map(|v| v.to_string()))
-                        .unwrap_or_default(),
-                ))
-            }) {
-                for row in iter.flatten() {
-                    if let Some(&i) = index.get(&row.0) {
-                        photos[i].properties.insert(row.1, row.2);
-                    }
+        {
+            let mut rows: Vec<(String, String, String)> = Vec::new();
+            if let Ok(mut stmt) = self.connection.prepare(&meta_sql) {
+                let owned: Vec<Box<dyn rusqlite::ToSql>> = build_params(photos);
+                let param_refs: Vec<&dyn rusqlite::ToSql> =
+                    owned.iter().map(|p| p.as_ref()).collect();
+                if let Ok(iter) = stmt.query_map(param_refs.as_slice(), |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                    ))
+                }) {
+                    rows.extend(iter.flatten());
+                }
+            }
+            for (photo_id, key, value) in rows {
+                if let Some(&i) = index.get(&photo_id) {
+                    photos[i].properties.insert(key, value);
+                }
+            }
+        }
+
+        // 2) Typed columns, folded back into the legacy map.
+        let typed_sql = format!(
+            "SELECT p.id, COALESCE(pl.name, ''), COALESCE(mk.name, ''), \
+             COALESCE(mdl.name, ''), COALESCE(CAST(p.nsfw_score AS TEXT), '') \
+             FROM photo p \
+             LEFT JOIN place pl ON pl.id = p.place_id \
+             LEFT JOIN camera_make mk ON mk.id = p.make_id \
+             LEFT JOIN camera_model mdl ON mdl.id = p.model_id \
+             WHERE p.id IN ({})",
+            placeholders.join(",")
+        );
+        {
+            let mut rows: Vec<(String, String, String, String, String)> = Vec::new();
+            if let Ok(mut stmt) = self.connection.prepare(&typed_sql) {
+                let owned: Vec<Box<dyn rusqlite::ToSql>> = build_params(photos);
+                let param_refs: Vec<&dyn rusqlite::ToSql> =
+                    owned.iter().map(|p| p.as_ref()).collect();
+                if let Ok(iter) = stmt.query_map(param_refs.as_slice(), |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, String>(4)?,
+                    ))
+                }) {
+                    rows.extend(iter.flatten());
+                }
+            }
+            for (id, place, make, model, nsfw) in rows {
+                let Some(&i) = index.get(&id) else {
+                    continue;
+                };
+                if !place.is_empty() {
+                    photos[i]
+                        .properties
+                        .insert("location_name".to_string(), place);
+                }
+                if !make.is_empty() {
+                    photos[i].properties.insert("Make".to_string(), make);
+                }
+                if !model.is_empty() {
+                    photos[i].properties.insert("Model".to_string(), model);
+                }
+                if !nsfw.is_empty() {
+                    photos[i].properties.insert("nsfw".to_string(), nsfw);
+                }
+                if photos[i].favorite {
+                    photos[i]
+                        .properties
+                        .insert("favorite".to_string(), "true".to_string());
+                }
+            }
+        }
+
+        // 3) Whisper transcripts.
+        let tr_sql = format!(
+            "SELECT photo_id, text FROM transcript WHERE photo_id IN ({})",
+            placeholders.join(",")
+        );
+        {
+            let mut rows: Vec<(String, String)> = Vec::new();
+            if let Ok(mut stmt) = self.connection.prepare(&tr_sql) {
+                let owned: Vec<Box<dyn rusqlite::ToSql>> = build_params(photos);
+                let param_refs: Vec<&dyn rusqlite::ToSql> =
+                    owned.iter().map(|p| p.as_ref()).collect();
+                if let Ok(iter) = stmt.query_map(param_refs.as_slice(), |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                }) {
+                    rows.extend(iter.flatten());
+                }
+            }
+            for (photo_id, text) in rows {
+                if let Some(&i) = index.get(&photo_id) {
+                    photos[i].properties.insert("transcript".to_string(), text);
                 }
             }
         }
@@ -1537,6 +1688,7 @@ impl Database {
     /// photo query. Params begin with ?1 = offset, ?2 = limit so the same
     /// parameter vector works for both paged listings and COUNT(*) queries
     /// (callers pass offset 0 / limit -1 for an unbounded count).
+    #[allow(clippy::too_many_arguments)]
     fn photo_where_clause(
         &self,
         query: &str,
@@ -1547,7 +1699,7 @@ impl Database {
         limit: usize,
     ) -> (String, Vec<Box<dyn rusqlite::ToSql>>) {
         let fav_filter = if favorites_only {
-            "AND EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite')"
+            "AND p.favorite = 1"
         } else {
             ""
         };
@@ -1562,25 +1714,49 @@ impl Database {
         let month_like = month_name_to_like(query);
         let month_param = month_like.as_ref().map(|p| p.to_string());
 
-        let q_filter = if !query.is_empty() {
+        // Build an FTS5 MATCH expression from the query tokens. Tokens are
+        // sanitized to alphanumeric runs and quoted as prefix terms ("tok"*),
+        // so the expression is always a literal blob of safe characters and can
+        // never inject SQL.
+        let mut fts_terms: Option<String> = None;
+        if !is_uuid && month_param.is_none() && !query.trim().is_empty() {
+            let tokens: Vec<String> = query
+                .split(|c: char| !c.is_alphanumeric())
+                .filter(|t| !t.is_empty())
+                .map(|t| format!("\"{t}\"*"))
+                .collect();
+            if !tokens.is_empty() {
+                fts_terms = Some(tokens.join(" AND "));
+            }
+        }
+
+        let q_filter: String = if !query.is_empty() {
             if is_uuid {
                 "AND (p.id = ?3 OR EXISTS(SELECT 1 FROM faces WHERE photo_id=p.id AND person_id = ?3))".to_string()
             } else if month_param.is_some() {
                 "AND (p.location LIKE ?3 OR p.id LIKE ?3 OR p.caption LIKE ?3 \
-                    OR EXISTS(SELECT 1 FROM object WHERE photo_id=p.id AND class LIKE ?3) \
-                    OR EXISTS(SELECT 1 FROM ocr WHERE photo_id=p.id AND text LIKE ?3) \
-                    OR EXISTS(SELECT 1 FROM faces f JOIN people p_name ON f.person_id = p_name.id WHERE f.photo_id=p.id AND p_name.name LIKE ?3) \
-                    OR EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='location_name' AND value LIKE ?3) \
-                    OR EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='transcript' AND value LIKE ?3) \
-                    OR p.created LIKE ?3 OR p.created LIKE ?4)".to_string()
+                OR EXISTS(SELECT 1 FROM photo_tag pt JOIN tag t ON t.id=pt.tag_id WHERE pt.photo_id=p.id AND t.name LIKE ?3) \
+                OR EXISTS(SELECT 1 FROM ocr WHERE photo_id=p.id AND text LIKE ?3) \
+                OR EXISTS(SELECT 1 FROM faces f JOIN people p_name ON f.person_id = p_name.id WHERE f.photo_id=p.id AND p_name.name LIKE ?3) \
+                OR EXISTS(SELECT 1 FROM place pl WHERE pl.id = p.place_id AND pl.name LIKE ?3) \
+                OR EXISTS(SELECT 1 FROM transcript WHERE photo_id=p.id AND text LIKE ?3) \
+                OR p.created LIKE ?3 OR p.created LIKE ?4)".to_string()
             } else {
-                "AND (p.location LIKE ?3 OR p.id LIKE ?3 OR p.caption LIKE ?3 \
-                    OR EXISTS(SELECT 1 FROM object WHERE photo_id=p.id AND class LIKE ?3) \
-                    OR EXISTS(SELECT 1 FROM ocr WHERE photo_id=p.id AND text LIKE ?3) \
+                let fts_or = if fts_terms.is_some() {
+                    "OR p.rowid IN (SELECT rowid FROM fts_caption WHERE fts_caption MATCH ?4) \
+                    OR p.id IN (SELECT o.photo_id FROM fts_ocr JOIN ocr o ON o.rowid = fts_ocr.rowid WHERE fts_ocr MATCH ?4) \
+                    OR p.id IN (SELECT tr.photo_id FROM fts_transcript JOIN transcript tr ON tr.rowid = fts_transcript.rowid WHERE fts_transcript MATCH ?4)"
+                } else {
+                    ""
+                };
+                format!(
+                    "AND (p.location LIKE ?3 OR p.id LIKE ?3 OR p.caption LIKE ?3 \
+                    OR EXISTS(SELECT 1 FROM photo_tag pt JOIN tag t ON t.id=pt.tag_id WHERE pt.photo_id=p.id AND t.name LIKE ?3) \
                     OR EXISTS(SELECT 1 FROM faces f JOIN people p_name ON f.person_id = p_name.id WHERE f.photo_id=p.id AND p_name.name LIKE ?3) \
-                    OR EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='location_name' AND value LIKE ?3) \
-                    OR EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='transcript' AND value LIKE ?3) \
-                    OR p.created LIKE ?3)".to_string()
+                    OR EXISTS(SELECT 1 FROM place pl WHERE pl.id = p.place_id AND pl.name LIKE ?3) \
+                    OR p.created LIKE ?3 \
+                    {fts_or})"
+                )
             }
         } else {
             String::new()
@@ -1594,6 +1770,8 @@ impl Database {
             slot += 1; // ?3 query
             if month_param.is_some() {
                 slot += 1; // ?4 month
+            } else if fts_terms.is_some() {
+                slot += 1; // ?4 MATCH
             }
         }
         if !filter.person_ids.is_empty() {
@@ -1624,14 +1802,14 @@ impl Database {
         if let Some(ref location) = filter.location {
             slot += 1;
             facet_filters.push_str(&format!(
-                " AND EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='location_name' AND value = ?{slot})"
+                " AND p.place_id IN (SELECT id FROM place WHERE name = ?{slot})"
             ));
             extra_params.push(Box::new(location.clone()));
         }
         if let Some(ref tag) = filter.tag {
             slot += 1;
             facet_filters.push_str(&format!(
-                " AND EXISTS(SELECT 1 FROM object WHERE photo_id=p.id AND class = ?{slot})"
+                " AND p.id IN (SELECT pt.photo_id FROM photo_tag pt JOIN tag t ON t.id = pt.tag_id WHERE t.name = ?{slot})"
             ));
             extra_params.push(Box::new(tag.clone()));
         }
@@ -1646,9 +1824,7 @@ impl Database {
             extra_params.push(Box::new(date_to.clone()));
         }
         if filter.favorite {
-            facet_filters.push_str(
-                " AND EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite')",
-            );
+            facet_filters.push_str(" AND p.favorite = 1");
         }
         if filter.has_faces {
             facet_filters.push_str(" AND EXISTS(SELECT 1 FROM faces WHERE photo_id=p.id)");
@@ -1661,20 +1837,19 @@ impl Database {
         if let Some(ref camera) = filter.camera {
             slot += 1;
             facet_filters.push_str(&format!(
-                " AND EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key IN ('Make','Model') AND value LIKE ?{slot})"
+                " AND (p.make_id IN (SELECT id FROM camera_make WHERE name LIKE ?{slot}) \
+                 OR p.model_id IN (SELECT id FROM camera_model WHERE name LIKE ?{slot}))"
             ));
             extra_params.push(Box::new(format!("%{camera}%")));
         }
         if filter.papers {
             facet_filters.push_str(&format!(
-                " AND EXISTS(SELECT 1 FROM object WHERE photo_id=p.id AND class IN ({paper_in}))",
+                " AND p.id IN (SELECT pt.photo_id FROM photo_tag pt JOIN tag t ON t.id = pt.tag_id WHERE t.name IN ({paper_in}))",
                 paper_in = paper_class_in_clause()
             ));
         }
         if filter.nsfw_only {
-            facet_filters.push_str(
-                " AND EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='nsfw' AND CAST(value AS REAL) >= 0.8)",
-            );
+            facet_filters.push_str(" AND p.nsfw_score IS NOT NULL AND p.nsfw_score >= 0.8");
         }
         if let Some(ref album_id) = filter.album_id {
             slot += 1;
@@ -1703,6 +1878,8 @@ impl Database {
             params.push(Box::new(q_param));
             if let Some(ref mp) = month_param {
                 params.push(Box::new(mp.clone()));
+            } else if let Some(ref terms) = fts_terms {
+                params.push(Box::new(terms.clone()));
             }
         }
         params.extend(extra_params);
@@ -1764,7 +1941,7 @@ impl Database {
         } else {
             "NULL AS encoded"
         };
-        let sql = format!("SELECT p.id, p.location, {encoded_col}, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, 
+        let sql = format!("SELECT p.id, p.location, {encoded_col}, p.latitude, p.longitude, p.created, p.favorite, p.indexed, p.caption, p.aesthetics_score,
             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received, COALESCE(p.view_only, 0), COALESCE(p.last_opened, 0)
             FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id {where_clause} {order_by} LIMIT ?1, ?2");
         if let Ok(mut stmt) = self.connection.prepare(&sql) {
@@ -1848,8 +2025,8 @@ impl Database {
     /// Distinct resolved location names with photo counts, most common first.
     pub fn get_location_counts(&self, limit: i64) -> Vec<(String, i64)> {
         let mut counts = Vec::new();
-        let sql = "SELECT value, COUNT(*) FROM properties WHERE key = 'location_name' \
-            GROUP BY value ORDER BY COUNT(*) DESC LIMIT ?1";
+        let sql = "SELECT pl.name, COUNT(*) FROM photo p JOIN place pl ON pl.id = p.place_id \
+            GROUP BY pl.name ORDER BY COUNT(*) DESC LIMIT ?1";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([limit], |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
@@ -1865,8 +2042,8 @@ impl Database {
     /// Detected object classes with photo counts, most common first.
     pub fn get_tag_counts(&self, limit: i64) -> Vec<(String, i64)> {
         let mut counts = Vec::new();
-        let sql =
-            "SELECT class, COUNT(*) FROM object GROUP BY class ORDER BY COUNT(*) DESC LIMIT ?1";
+        let sql = "SELECT t.name, COUNT(*) FROM photo_tag pt JOIN tag t ON t.id = pt.tag_id \
+            GROUP BY t.name ORDER BY COUNT(*) DESC LIMIT ?1";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([limit], |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
@@ -1907,13 +2084,13 @@ impl Database {
         SearchStats {
             photos: query_count("SELECT COUNT(*) FROM photo"),
             videos: query_count(&format!("SELECT COUNT(*) FROM photo WHERE {video_like}")),
-            favorites: query_count("SELECT COUNT(*) FROM properties WHERE key = 'favorite'"),
+            favorites: query_count("SELECT COUNT(*) FROM photo WHERE favorite = 1"),
             ocr_photos: query_count("SELECT COUNT(DISTINCT photo_id) FROM ocr"),
             faces: query_count("SELECT COUNT(*) FROM faces"),
             named_people: query_count("SELECT COUNT(*) FROM people WHERE name IS NOT NULL"),
             face_photos: query_count("SELECT COUNT(DISTINCT photo_id) FROM faces"),
             nsfw_photos: query_count(
-                "SELECT COUNT(DISTINCT photo_id) FROM properties WHERE key = 'nsfw' AND CAST(value AS REAL) >= 0.8",
+                "SELECT COUNT(*) FROM photo WHERE nsfw_score IS NOT NULL AND nsfw_score >= 0.8",
             ),
         }
     }
@@ -1924,7 +2101,7 @@ impl Database {
         let mut tiles = Vec::new();
         let sql = "SELECT id, location, encoded, created, aesthetics_score, favorite FROM ( \
             SELECT p.id, p.location, p.encoded, p.created, p.aesthetics_score, \
-                EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite') AS favorite, \
+                p.favorite AS favorite, \
                 ROW_NUMBER() OVER ( \
                     PARTITION BY substr(p.created, 1, 10) \
                     ORDER BY p.aesthetics_score DESC, p.created ASC \
@@ -1956,7 +2133,7 @@ impl Database {
     pub fn get_favorite_photos(&self, limit: i64) -> Vec<SearchPhotoTile> {
         let mut tiles = Vec::new();
         let sql = "SELECT p.id, p.location, NULL, p.created, p.aesthetics_score, 1 \
-            FROM photo p WHERE EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite') \
+            FROM photo p WHERE p.favorite = 1 \
             ORDER BY p.created DESC LIMIT ?1";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([limit], |row| {
@@ -1981,7 +2158,7 @@ impl Database {
     pub fn get_recent_photos(&self, limit: i64) -> Vec<SearchPhotoTile> {
         let mut tiles = Vec::new();
         let sql = "SELECT p.id, p.location, p.encoded, p.created, p.aesthetics_score, \
-            EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite') \
+            p.favorite \
             FROM photo p ORDER BY p.created DESC, p.id DESC LIMIT ?1";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([limit], |row| {
@@ -2006,8 +2183,9 @@ impl Database {
     pub fn get_paper_counts(&self, limit: i64) -> Vec<(String, i64)> {
         let mut counts = Vec::new();
         let sql = format!(
-            "SELECT class, COUNT(*) FROM object WHERE class IN ({paper_in}) \
-        GROUP BY class ORDER BY COUNT(*) DESC LIMIT ?1",
+            "SELECT t.name, COUNT(*) FROM photo_tag pt JOIN tag t ON t.id = pt.tag_id \
+            WHERE t.name IN ({paper_in}) \
+            GROUP BY t.name ORDER BY COUNT(*) DESC LIMIT ?1",
             paper_in = paper_class_in_clause()
         );
         if let Ok(mut stmt) = self.connection.prepare(&sql) {
@@ -2064,7 +2242,8 @@ impl Database {
                 .join(",");
 
             let sql = format!(
-                "SELECT COUNT(DISTINCT photo_id) FROM object WHERE class IN ({classes})",
+                "SELECT COUNT(DISTINCT pt.photo_id) FROM photo_tag pt JOIN tag t ON t.id = pt.tag_id \
+                 WHERE t.name IN ({classes})",
                 classes = class_in
             );
             let count: i64 = self
@@ -2079,8 +2258,9 @@ impl Database {
             // Get 4 preview photos (highest aesthetics first)
             let preview_sql = format!(
                 "SELECT DISTINCT p.id, p.encoded FROM photo p \
-                 INNER JOIN object o ON o.photo_id = p.id \
-                 WHERE o.class IN ({classes}) AND p.deleted_at IS NULL \
+                 JOIN photo_tag pt ON pt.photo_id = p.id \
+                 JOIN tag t ON t.id = pt.tag_id \
+                 WHERE t.name IN ({classes}) AND p.deleted_at IS NULL \
                  ORDER BY p.aesthetics_score DESC NULLS LAST \
                  LIMIT 4",
                 classes = class_in
@@ -2113,7 +2293,9 @@ impl Database {
     pub fn get_camera_counts(&self, limit: i64) -> Vec<(String, i64)> {
         let mut by_photo: std::collections::HashMap<String, (Option<String>, Option<String>)> =
             std::collections::HashMap::new();
-        let sql = "SELECT photo_id, key, value FROM properties WHERE key IN ('Make','Model')";
+        let sql = "SELECT p.id, COALESCE(mk.name, ''), COALESCE(mdl.name, '') \
+                FROM photo p LEFT JOIN camera_make mk ON mk.id = p.make_id \
+                LEFT JOIN camera_model mdl ON mdl.id = p.model_id";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([], |row| {
                 Ok((
@@ -2123,13 +2305,14 @@ impl Database {
                 ))
             }) {
                 for r in iter.flatten() {
-                    let (pid, key, value) = r;
-                    let entry = by_photo.entry(pid).or_default();
-                    if key == "Make" {
-                        entry.0 = Some(value);
-                    } else {
-                        entry.1 = Some(value);
-                    }
+                    let (pid, make, model) = r;
+                    by_photo.insert(
+                        pid,
+                        (
+                            if make.is_empty() { None } else { Some(make) },
+                            if model.is_empty() { None } else { Some(model) },
+                        ),
+                    );
                 }
             }
         }
@@ -2157,15 +2340,13 @@ impl Database {
     /// Ordered by most photos (used for search facets).
     pub fn get_location_groups(&self, limit: i64) -> Vec<LocationGroup> {
         let mut groups = Vec::new();
-        let sql = "SELECT pr.value AS name, COUNT(*) AS cnt, \
-            (SELECT p2.location FROM photo p2 JOIN properties pr2 ON pr2.photo_id=p2.id \
-                WHERE pr2.key='location_name' AND pr2.value=pr.value \
+        let sql = "SELECT pl.name AS name, COUNT(*) AS cnt, \
+            (SELECT p2.location FROM photo p2 WHERE p2.place_id = pl.id \
                 ORDER BY (p2.encoded != '') DESC, p2.created DESC LIMIT 1) AS rep_loc, \
-            (SELECT p2.encoded FROM photo p2 JOIN properties pr2 ON pr2.photo_id=p2.id \
-                WHERE pr2.key='location_name' AND pr2.value=pr.value \
+            (SELECT p2.encoded FROM photo p2 WHERE p2.place_id = pl.id \
                 ORDER BY (p2.encoded != '') DESC, p2.created DESC LIMIT 1) AS rep_enc \
-            FROM properties pr WHERE pr.key='location_name' \
-            GROUP BY pr.value ORDER BY cnt DESC LIMIT ?1";
+            FROM place pl JOIN photo p ON p.place_id = pl.id \
+            GROUP BY pl.id ORDER BY cnt DESC LIMIT ?1";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([limit], |row| {
                 Ok(LocationGroup {
@@ -2188,12 +2369,11 @@ impl Database {
     /// `get_album_sections` where only name / count / cover path are needed.
     pub fn get_location_groups_light(&self, limit: i64) -> Vec<LocationGroup> {
         let mut groups = Vec::new();
-        let sql = "SELECT pr.value AS name, COUNT(*) AS cnt, \
-            (SELECT p2.location FROM photo p2 JOIN properties pr2 ON pr2.photo_id=p2.id \
-                WHERE pr2.key='location_name' AND pr2.value=pr.value \
+        let sql = "SELECT pl.name AS name, COUNT(*) AS cnt, \
+            (SELECT p2.location FROM photo p2 WHERE p2.place_id = pl.id \
                 ORDER BY p2.created DESC LIMIT 1) AS rep_loc \
-            FROM properties pr WHERE pr.key='location_name' \
-            GROUP BY pr.value ORDER BY cnt DESC LIMIT ?1";
+            FROM place pl JOIN photo p ON p.place_id = pl.id \
+            GROUP BY pl.id ORDER BY cnt DESC LIMIT ?1";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([limit], |row| {
                 Ok(LocationGroup {
@@ -2239,27 +2419,24 @@ impl Database {
 
     /// Toggle the favorite status of a photo. Returns true if now favorited.
     pub fn toggle_favorite(&self, photo_id: &str) -> bool {
-        let exists = self
+        let changed = self
             .connection
-            .query_row(
-                "SELECT 1 FROM properties WHERE photo_id = ?1 AND key = 'favorite'",
+            .execute(
+                "UPDATE photo SET favorite = 1 - favorite WHERE id = ?1",
                 [photo_id],
-                |_| Ok(true),
             )
-            .unwrap_or(false);
-        if exists {
-            let _ = self.connection.execute(
-                "DELETE FROM properties WHERE photo_id = ?1 AND key = 'favorite'",
-                [photo_id],
-            );
-            false
-        } else {
-            let _ = self.connection.execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES(?1, 'favorite', 'true')",
-                [photo_id],
-            );
-            true
+            .unwrap_or(0);
+        if changed == 0 {
+            return false;
         }
+        matches!(
+            self.connection.query_row(
+                "SELECT favorite FROM photo WHERE id = ?1",
+                [photo_id],
+                |r| r.get::<_, i64>(0),
+            ),
+            Ok(1)
+        )
     }
 
     /// Set the favorite flag for many photos in a single transaction.
@@ -2275,20 +2452,14 @@ impl Database {
             .map(|id| id as &dyn rusqlite::ToSql)
             .collect();
         let affected = if favorite {
-            let sql = format!(
-                "INSERT INTO properties (photo_id, key, value) \
-                 SELECT id, 'favorite', 'true' FROM photo \
-                 WHERE id IN ({in_clause}) \
-                 AND NOT EXISTS (SELECT 1 FROM properties p2 \
-                     WHERE p2.photo_id = photo.id AND p2.key = 'favorite')"
-            );
+            let sql =
+                format!("UPDATE photo SET favorite = 1 WHERE id IN ({in_clause}) AND favorite = 0");
             self.connection
                 .execute(&sql, params.as_slice())
                 .unwrap_or(0)
         } else {
-            let sql = format!(
-                "DELETE FROM properties WHERE key = 'favorite' AND photo_id IN ({in_clause})"
-            );
+            let sql =
+                format!("UPDATE photo SET favorite = 0 WHERE id IN ({in_clause}) AND favorite = 1");
             self.connection
                 .execute(&sql, params.as_slice())
                 .unwrap_or(0)
@@ -2331,7 +2502,7 @@ impl Database {
             .map(|(i, _)| format!("?{}", i + 1))
             .collect();
         let sql = format!(
-            "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, \
+            "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, p.favorite, p.indexed, p.caption, p.aesthetics_score, \
              s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received, COALESCE(p.view_only, 0), COALESCE(p.last_opened, 0) \
              FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE p.id IN ({})",
             placeholders.join(",")
@@ -2392,7 +2563,7 @@ impl Database {
         let mut parts = Vec::new();
         if let Ok(mut stmt) = self
             .connection
-            .prepare("SELECT text FROM ocr WHERE photo_id = ?1 ORDER BY rowid")
+            .prepare("SELECT text FROM ocr WHERE photo_id = ?1 ORDER BY n")
         {
             if let Ok(rows) = stmt.query_map([photo_id], |r| r.get::<_, String>(0)) {
                 for row in rows.flatten() {
@@ -2409,7 +2580,7 @@ impl Database {
     /// Fetch the Whisper transcript for a video (single value in properties).
     pub fn get_photo_transcript(&self, photo_id: &str) -> String {
         if let Ok(value) = self.connection.query_row(
-            "SELECT value FROM properties WHERE photo_id = ?1 AND key = 'transcript' LIMIT 1",
+            "SELECT text FROM transcript WHERE photo_id = ?1 LIMIT 1",
             [photo_id],
             |r| r.get::<_, String>(0),
         ) {
@@ -2419,7 +2590,7 @@ impl Database {
     }
 
     pub fn get_photo_by_id(&self, photo_id: &str) -> Option<Photo> {
-        let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, \
+        let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, p.favorite, p.indexed, p.caption, p.aesthetics_score, \
              s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received, COALESCE(p.view_only, 0), COALESCE(p.last_opened, 0) \
              FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id WHERE p.id = ?1";
         let mut stmt = self.connection.prepare(sql).ok()?;
@@ -2797,7 +2968,7 @@ impl Database {
         limit: usize,
     ) -> Vec<Photo> {
         let mut photos = Vec::new();
-        let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, p.caption, p.aesthetics_score, 
+        let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, p.favorite, p.indexed, p.caption, p.aesthetics_score,
             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, COALESCE(p.view_only,0)
             FROM photo p LEFT JOIN ai_status s ON p.id = s.photo_id JOIN faces f ON p.id = f.photo_id WHERE f.person_id = ?1 GROUP BY p.id ORDER BY p.created DESC LIMIT ?2 OFFSET ?3";
         let params: [&dyn rusqlite::types::ToSql; 3] =
@@ -3129,9 +3300,7 @@ impl Database {
             }
         }
         for id in &photo_ids {
-            let _ = tx.execute("DELETE FROM object WHERE photo_id = ?1", [&id]);
             let _ = tx.execute("DELETE FROM faces WHERE photo_id = ?1", [&id]);
-            let _ = tx.execute("DELETE FROM properties WHERE photo_id = ?1", [&id]);
             let _ = tx.execute("DELETE FROM photo WHERE id = ?1", [&id]);
         }
         let _ = tx.execute("DELETE FROM directory WHERE name = ?1", [path]);
@@ -3174,9 +3343,7 @@ impl Database {
         };
         let mut removed = 0;
         for id in &gone {
-            let _ = tx.execute("DELETE FROM object WHERE photo_id = ?1", [id]);
             let _ = tx.execute("DELETE FROM faces WHERE photo_id = ?1", [id]);
-            let _ = tx.execute("DELETE FROM properties WHERE photo_id = ?1", [id]);
             if tx
                 .execute("DELETE FROM photo WHERE id = ?1", [id])
                 .map(|n| n > 0)
@@ -3202,18 +3369,21 @@ impl Database {
         };
 
         if let Err(e) = tx.execute(
-            "INSERT OR REPLACE INTO photo (id, location, created, latitude, longitude, encoded, caption, aesthetics_score, received) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            "INSERT INTO photo (id, location, created, latitude, longitude, encoded, caption, aesthetics_score, received) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
+             ON CONFLICT(id) DO UPDATE SET \
+               location = excluded.location, created = excluded.created, \
+               latitude = excluded.latitude, longitude = excluded.longitude, \
+               encoded = excluded.encoded, caption = excluded.caption, \
+               aesthetics_score = excluded.aesthetics_score, received = excluded.received",
             (photo.id, photo.location, photo.created, photo.latitude, photo.longitude, photo.encoded, photo.caption, photo.aesthetics_score, photo.received),
         ) {
             tracing::warn!("import_photo: failed to upsert photo {}: {e}", photo.id);
             return;
         }
 
-        if let Err(e) = tx.execute("DELETE FROM object WHERE photo_id = ?1", [photo.id]) {
-            tracing::warn!(
-                "import_photo: failed to clear objects for {}: {e}",
-                photo.id
-            );
+        if let Err(e) = tx.execute("DELETE FROM photo_tag WHERE photo_id = ?1", [photo.id]) {
+            tracing::warn!("import_photo: failed to clear tags for {}: {e}", photo.id);
         }
         if let Err(e) = tx.execute("DELETE FROM faces WHERE photo_id = ?1", [photo.id]) {
             tracing::warn!("import_photo: failed to clear faces for {}: {e}", photo.id);
@@ -3222,11 +3392,19 @@ impl Database {
         if let Ok(objects) = serde_json::from_str::<Vec<SyncObject>>(photo.objects_json) {
             for obj in &objects {
                 if let Err(e) = tx.execute(
-                    "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
-                    (photo.id, &obj.class, &obj.probability),
+                    "INSERT INTO tag (name) VALUES (?1) ON CONFLICT(name) DO NOTHING",
+                    [&obj.class],
+                ) {
+                    tracing::warn!("import_photo: failed to insert tag: {e}");
+                    continue;
+                }
+                if let Err(e) = tx.execute(
+                    "INSERT OR REPLACE INTO photo_tag (photo_id, tag_id, probability) \
+                     SELECT ?1, id, ?2 FROM tag WHERE name = ?3",
+                    (photo.id, &obj.probability, &obj.class),
                 ) {
                     tracing::warn!(
-                        "import_photo: failed to insert object for {}: {e}",
+                        "import_photo: failed to insert tag link for {}: {e}",
                         photo.id
                     );
                 }
@@ -3358,17 +3536,94 @@ impl Database {
             }
         }
         {
-            let mut prop_stmt = tx
+            let mut fav_stmt = tx
+                .prepare_cached("UPDATE photo SET favorite = ?2 WHERE id = ?1")
+                .map_err(|e| e.to_string())?;
+            let mut place_stmt = tx
                 .prepare_cached(
-                    "INSERT OR REPLACE INTO properties(photo_id, key, value) VALUES(?1, ?2, ?3)",
+                    "UPDATE photo SET place_id = (SELECT id FROM place WHERE name = ?2) WHERE id = ?1",
+                )
+                .map_err(|e| e.to_string())?;
+            let mut make_stmt = tx
+                .prepare_cached(
+                    "UPDATE photo SET make_id = (SELECT id FROM camera_make WHERE name = ?2) WHERE id = ?1",
+                )
+                .map_err(|e| e.to_string())?;
+            let mut model_stmt = tx
+                .prepare_cached(
+                    "UPDATE photo SET model_id = (SELECT id FROM camera_model WHERE name = ?2) WHERE id = ?1",
+                )
+                .map_err(|e| e.to_string())?;
+            let mut place_dict_stmt = tx
+                .prepare_cached("INSERT INTO place (name) VALUES (?1) ON CONFLICT(name) DO NOTHING")
+                .map_err(|e| e.to_string())?;
+            let mut make_dict_stmt = tx
+                .prepare_cached(
+                    "INSERT INTO camera_make (name) VALUES (?1) ON CONFLICT(name) DO NOTHING",
+                )
+                .map_err(|e| e.to_string())?;
+            let mut model_dict_stmt = tx
+                .prepare_cached(
+                    "INSERT INTO camera_model (name) VALUES (?1) ON CONFLICT(name) DO NOTHING",
+                )
+                .map_err(|e| e.to_string())?;
+            let mut nsfw_stmt = tx
+                .prepare_cached("UPDATE photo SET nsfw_score = ?2 WHERE id = ?1")
+                .map_err(|e| e.to_string())?;
+            let mut tr_stmt = tx
+                .prepare_cached(
+                    "INSERT OR REPLACE INTO transcript (photo_id, text) VALUES (?1, ?2)",
+                )
+                .map_err(|e| e.to_string())?;
+            let mut meta_key_stmt = tx
+                .prepare_cached(
+                    "INSERT INTO meta_key (name) VALUES (?1) ON CONFLICT(name) DO NOTHING",
+                )
+                .map_err(|e| e.to_string())?;
+            let mut meta_val_stmt = tx
+                .prepare_cached(
+                    "INSERT INTO meta_value (text) VALUES (?1) ON CONFLICT(text) DO NOTHING",
+                )
+                .map_err(|e| e.to_string())?;
+            let mut meta_stmt = tx
+                .prepare_cached(
+                    "INSERT OR REPLACE INTO photo_meta (photo_id, meta_key_id, meta_value_id) \
+                     VALUES (?1, (SELECT id FROM meta_key WHERE name = ?2), (SELECT id FROM meta_value WHERE text = ?3))",
                 )
                 .map_err(|e| e.to_string())?;
             for p in photos {
                 for (key, value) in &p.properties {
-                    let _ = prop_stmt.execute((&p.id, key, value));
+                    match key.as_str() {
+                        "favorite" => {
+                            let _ = fav_stmt.execute((&p.id, "1"));
+                        }
+                        "location_name" => {
+                            let _ = place_dict_stmt.execute((value,));
+                            let _ = place_stmt.execute((&p.id, value));
+                        }
+                        "Make" => {
+                            let _ = make_dict_stmt.execute((value,));
+                            let _ = make_stmt.execute((&p.id, value));
+                        }
+                        "Model" => {
+                            let _ = model_dict_stmt.execute((value,));
+                            let _ = model_stmt.execute((&p.id, value));
+                        }
+                        "nsfw" => {
+                            let _ = nsfw_stmt.execute((&p.id, value));
+                        }
+                        "transcript" => {
+                            let _ = tr_stmt.execute((&p.id, value));
+                        }
+                        _ => {
+                            let _ = meta_key_stmt.execute((key,));
+                            let _ = meta_val_stmt.execute((value,));
+                            let _ = meta_stmt.execute((&p.id, key, value));
+                        }
+                    }
                 }
                 if p.favorite {
-                    let _ = prop_stmt.execute((&p.id, "favorite", "true"));
+                    let _ = fav_stmt.execute((&p.id, "1"));
                 }
             }
         }
@@ -4372,7 +4627,7 @@ impl Database {
         // Delete associated data
         for (id, _) in &ids {
             let _ = self.connection.execute(
-                "DELETE FROM object WHERE photo_id = ?1",
+                "DELETE FROM model_timings WHERE photo_id = ?1",
                 rusqlite::params![id],
             );
             let _ = self
@@ -4380,10 +4635,6 @@ impl Database {
                 .execute("DELETE FROM ocr WHERE photo_id = ?1", rusqlite::params![id]);
             let _ = self.connection.execute(
                 "DELETE FROM faces WHERE photo_id = ?1",
-                rusqlite::params![id],
-            );
-            let _ = self.connection.execute(
-                "DELETE FROM properties WHERE photo_id = ?1",
                 rusqlite::params![id],
             );
             let _ = self.connection.execute(
@@ -4424,10 +4675,9 @@ impl Database {
             )
             .ok();
         for sql in [
-            "DELETE FROM object WHERE photo_id = ?1",
+            "DELETE FROM model_timings WHERE photo_id = ?1",
             "DELETE FROM ocr WHERE photo_id = ?1",
             "DELETE FROM faces WHERE photo_id = ?1",
-            "DELETE FROM properties WHERE photo_id = ?1",
             "DELETE FROM ai_status WHERE photo_id = ?1",
             "DELETE FROM album_item WHERE photo_id = ?1",
         ] {
@@ -4837,7 +5087,7 @@ impl Database {
     pub fn sync_trips(&self) -> i64 {
         let mut rows: Vec<(String, i64, String)> = Vec::new();
         let sql = "SELECT p.id, p.created, COALESCE( \
-            (SELECT value FROM properties WHERE photo_id = p.id AND key = 'location_name' LIMIT 1), '') \
+            (SELECT pl.name FROM place pl WHERE pl.id = p.place_id LIMIT 1), '') \
             FROM photo p WHERE p.created IS NOT NULL AND p.created != ''";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([], |r| {
@@ -5307,7 +5557,7 @@ impl Database {
         }
         let mut photos = Vec::new();
         let sql = "SELECT p.id, p.location, NULL AS encoded, p.latitude, p.longitude, p.created, \
-            EXISTS(SELECT 1 FROM properties WHERE photo_id=p.id AND key='favorite'), p.indexed, \
+            p.favorite, p.indexed, \
             p.caption, p.aesthetics_score, \
             s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, \
             s.whisper, s.sam, s.superres, p.sync_needed, p.received, COALESCE(p.view_only, 0), COALESCE(p.last_opened, 0) \
@@ -5399,6 +5649,219 @@ mod tests {
         let (photos, videos) = db.get_media_counts();
         assert!(photos >= 0);
         assert!(videos >= 0);
+    }
+
+    #[test]
+    fn test_fresh_install_schema_version() {
+        let db = test_db();
+        let v: i64 = db
+            .connection
+            .pragma_query_value(None, "user_version", |r| r.get(0))
+            .unwrap();
+        assert_eq!(v, DB_SCHEMA_VERSION as i64);
+        for t in [
+            "tag",
+            "place",
+            "camera_make",
+            "camera_model",
+            "meta_key",
+            "meta_value",
+            "photo_tag",
+            "photo_meta",
+            "transcript",
+            "ocr",
+            "fts_caption",
+            "fts_ocr",
+            "fts_transcript",
+        ] {
+            let n: i64 = db
+                .connection
+                .query_row(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type IN ('table','view') AND name=?1",
+                    [t],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(n, 1, "missing schema object {t}");
+        }
+        let migrations = schema_migrations();
+        assert!(!migrations.is_empty());
+        assert_eq!(migrations.last().unwrap().0, DB_SCHEMA_VERSION);
+        for (version, _) in &migrations {
+            assert!(*version <= DB_SCHEMA_VERSION, "migration ahead of version");
+        }
+    }
+
+    #[test]
+    fn test_legacy_pre_normalize_db_replaced_on_open() {
+        let id = TEST_COUNTER.fetch_add(1, Ordering::SeqCst);
+        let dir = std::env::temp_dir().join(format!("siegu_legacy_{}_{}", std::process::id(), id));
+        let _ = fs::remove_dir_all(&dir);
+        let _ = fs::create_dir_all(&dir);
+        let path = dir.join("siegu.db");
+        {
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE object (id INTEGER PRIMARY KEY, photo_id TEXT, class TEXT, probability REAL);
+                 CREATE TABLE properties (photo_id TEXT, key TEXT, value TEXT);
+                 INSERT INTO properties VALUES ('p1', 'Make', 'Nikon');",
+            )
+            .unwrap();
+        }
+        let db = Database::new(&dir.display().to_string());
+        assert!(
+            dir.join("siegu.db.pre-normalize").exists(),
+            "legacy file must be parked, not lost"
+        );
+        let _ = db.get_media_counts();
+
+        let v: i64 = db
+            .connection
+            .pragma_query_value(None, "user_version", |r| r.get(0))
+            .unwrap();
+        assert_eq!(v, DB_SCHEMA_VERSION as i64, "replaced db is normalized");
+        let n: i64 = db
+            .connection
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE name IN ('object','properties')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(n, 0, "legacy tables absent from active db");
+        let legacy = Connection::open(dir.join("siegu.db.pre-normalize")).unwrap();
+        let rows: i64 = legacy
+            .query_row("SELECT COUNT(*) FROM properties", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(rows, 1, "parked file keeps legacy data");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_normalized_database_is_not_replaced() {
+        let id = TEST_COUNTER.fetch_add(1, Ordering::SeqCst);
+        let dir = std::env::temp_dir().join(format!("siegu_norm_{}_{}", std::process::id(), id));
+        let _ = fs::remove_dir_all(&dir);
+        let _ = fs::create_dir_all(&dir);
+        {
+            let db = Database::new(&dir.display().to_string());
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created) VALUES ('k1','/a.jpg','2024-01-01')",
+                    (),
+                )
+                .unwrap();
+        }
+        let db = Database::new(&dir.display().to_string());
+        assert!(
+            !dir.join("siegu.db.pre-normalize").exists(),
+            "normalized db must not be replaced"
+        );
+        let n: i64 = db
+            .connection
+            .query_row("SELECT COUNT(*) FROM photo WHERE id='k1'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(n, 1, "data survives reopen over same file");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    #[should_panic(expected = "database schema migration v1 failed")]
+    fn test_failed_migration_is_fatal_and_rolls_back() {
+        let id = TEST_COUNTER.fetch_add(1, Ordering::SeqCst);
+        let dir = std::env::temp_dir().join(format!("siegu_failmig_{}_{}", std::process::id(), id));
+        let _ = fs::remove_dir_all(&dir);
+        let _ = fs::create_dir_all(&dir);
+        let path = dir.join("siegu.db");
+        {
+            let conn = Connection::open(&path).unwrap();
+            // user_version 0 with a table that conflicts with migration 1 (tag).
+            conn.execute_batch("CREATE TABLE tag (id INTEGER PRIMARY KEY);")
+                .unwrap();
+        }
+        let _ = Database::new(&dir.display().to_string());
+    }
+
+    #[test]
+    fn test_concurrent_first_open_replaces_legacy_exactly_once() {
+        // Same window as the fresh-install race, but with a pre-normalization
+        // DB: every startup thread must survive, and exactly one clean install
+        // must win (no replays, no panics, legacy parked, schema at v1).
+        use std::sync::mpsc;
+        let id = TEST_COUNTER.fetch_add(1, Ordering::SeqCst);
+        let dir = std::env::temp_dir().join(format!("siegu_concleg_{}_{}", std::process::id(), id));
+        let _ = fs::remove_dir_all(&dir);
+        let _ = fs::create_dir_all(&dir);
+        {
+            let conn = Connection::open(dir.join("siegu.db")).unwrap();
+            conn.execute_batch("CREATE TABLE object (id INTEGER PRIMARY KEY);")
+                .unwrap();
+        }
+        let (tx, rx) = mpsc::channel();
+        let thread_count = 8;
+        for _ in 0..thread_count {
+            let tx = tx.clone();
+            let dir = dir.display().to_string();
+            std::thread::spawn(move || {
+                let _db = Database::new(&dir);
+                tx.send(()).unwrap();
+            });
+        }
+        drop(tx);
+        for _ in 0..thread_count {
+            rx.recv_timeout(std::time::Duration::from_secs(10)).unwrap();
+        }
+        assert!(dir.join("siegu.db.pre-normalize").exists());
+        let db = Database::new(&dir.display().to_string());
+        let v: i64 = db
+            .connection
+            .pragma_query_value(None, "user_version", |r| r.get(0))
+            .unwrap();
+        assert_eq!(v, DB_SCHEMA_VERSION as i64);
+        let has_object: bool = db
+            .connection
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name='object')",
+                [],
+                |r| r.get::<_, i64>(0),
+            )
+            .unwrap()
+            == 1;
+        assert!(!has_object, "clean install must drop legacy tables");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_concurrent_first_open_migrates_exactly_once() {
+        // The app opens the database from many startup threads at once; every
+        // connection must come back with a usable, fully-migrated schema and
+        // no thread may panic racing the initial migration.
+        use std::sync::mpsc;
+        let id = TEST_COUNTER.fetch_add(1, Ordering::SeqCst);
+        let dir = std::env::temp_dir().join(format!("siegu_conc_{}_{}", std::process::id(), id));
+        let _ = fs::remove_dir_all(&dir);
+        let _ = fs::create_dir_all(&dir);
+        let (tx, rx) = mpsc::channel();
+        let thread_count = 8;
+        for _ in 0..thread_count {
+            let tx = tx.clone();
+            let dir = dir.display().to_string();
+            std::thread::spawn(move || {
+                let _db = Database::new(&dir);
+                tx.send(()).unwrap();
+            });
+        }
+        drop(tx);
+        for _ in 0..thread_count {
+            rx.recv_timeout(std::time::Duration::from_secs(10)).unwrap();
+        }
+        let db = Database::new(&dir.display().to_string());
+        let v: i64 = db
+            .connection
+            .pragma_query_value(None, "user_version", |r| r.get(0))
+            .unwrap();
+        assert_eq!(v, DB_SCHEMA_VERSION as i64);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     /// 512-d unit vector lying in the first two coordinates at the given angle
@@ -5570,8 +6033,14 @@ mod tests {
                 .unwrap();
             db.connection
                 .execute(
-                    "INSERT INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
-                    (id, location),
+                    "INSERT INTO place (name) VALUES (?1) ON CONFLICT(name) DO NOTHING",
+                    (location,),
+                )
+                .unwrap();
+            db.connection
+                .execute(
+                    "UPDATE photo SET place_id = (SELECT id FROM place WHERE name = ?1) WHERE id = ?2",
+                    (location, id),
                 )
                 .unwrap();
         };
@@ -5620,8 +6089,14 @@ mod tests {
                 .unwrap();
             db.connection
                 .execute(
-                    "INSERT INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
-                    (id, location),
+                    "INSERT INTO place (name) VALUES (?1) ON CONFLICT(name) DO NOTHING",
+                    (location,),
+                )
+                .unwrap();
+            db.connection
+                .execute(
+                    "UPDATE photo SET place_id = (SELECT id FROM place WHERE name = ?1) WHERE id = ?2",
+                    (location, id),
                 )
                 .unwrap();
         };
@@ -5661,8 +6136,14 @@ mod tests {
                 .unwrap();
             db.connection
                 .execute(
-                    "INSERT INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
-                    (id, "Rome, Italy"),
+                    "INSERT INTO place (name) VALUES ('Rome, Italy') ON CONFLICT(name) DO NOTHING",
+                    (),
+                )
+                .unwrap();
+            db.connection
+                .execute(
+                    "UPDATE photo SET place_id = (SELECT id FROM place WHERE name = 'Rome, Italy') WHERE id = ?1",
+                    (id,),
                 )
                 .unwrap();
         }
@@ -6389,19 +6870,38 @@ mod tests {
             .unwrap();
         db.connection
             .execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES ('p2', 'beach', '0.9')",
+                "INSERT INTO tag (name) VALUES ('beach') ON CONFLICT(name) DO NOTHING",
                 (),
             )
             .unwrap();
         db.connection
             .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'location_name', 'Paris, France')",
+                "INSERT INTO photo_tag (photo_id, tag_id, probability) \
+                 VALUES ('p2', (SELECT id FROM tag WHERE name = 'beach'), 0.9)",
                 (),
             )
             .unwrap();
         db.connection
             .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES ('p3', 'location_name', 'Tokyo, Japan')",
+                "INSERT INTO place (name) VALUES ('Paris, France') ON CONFLICT(name) DO NOTHING",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO place (name) VALUES ('Tokyo, Japan') ON CONFLICT(name) DO NOTHING",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "UPDATE photo SET place_id = (SELECT id FROM place WHERE name = 'Paris, France') WHERE id = 'p1'",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "UPDATE photo SET place_id = (SELECT id FROM place WHERE name = 'Tokyo, Japan') WHERE id = 'p3'",
                 (),
             )
             .unwrap();
@@ -6474,37 +6974,42 @@ mod tests {
             .unwrap();
         db.connection
             .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'location_name', 'Paris, France')",
+                "INSERT INTO place (name) VALUES ('Paris, France') ON CONFLICT(name) DO NOTHING",
                 (),
             )
             .unwrap();
         db.connection
             .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES ('p2', 'location_name', 'Paris, France')",
+                "UPDATE photo SET place_id = (SELECT id FROM place WHERE name = 'Paris, France') WHERE id IN ('p1', 'p2')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute("UPDATE photo SET favorite = 1 WHERE id = 'p1'", ())
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO tag (name) VALUES ('cat') ON CONFLICT(name) DO NOTHING",
                 (),
             )
             .unwrap();
         db.connection
             .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'favorite', 'true')",
+                "INSERT INTO photo_tag (photo_id, tag_id, probability) \
+                 SELECT p.id, (SELECT id FROM tag WHERE name = 'cat'), 0.9 FROM photo p WHERE p.id = 'p1'",
                 (),
             )
             .unwrap();
         db.connection
             .execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES ('p1', 'cat', '0.9')",
+                "INSERT INTO photo_tag (photo_id, tag_id, probability) \
+                 SELECT p.id, (SELECT id FROM tag WHERE name = 'cat'), 0.8 FROM photo p WHERE p.id = 'p2'",
                 (),
             )
             .unwrap();
         db.connection
             .execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES ('p2', 'cat', '0.8')",
-                (),
-            )
-            .unwrap();
-        db.connection
-            .execute(
-                "INSERT INTO ocr (photo_id, text) VALUES ('p2', 'hello')",
+                "INSERT INTO ocr (photo_id, n, text) VALUES ('p2', 0, 'hello')",
                 (),
             )
             .unwrap();
@@ -6556,7 +7061,7 @@ mod tests {
             (),
         );
         let _ = db.connection.execute(
-            "INSERT INTO ocr (photo_id, text) VALUES ('p1', 'hello'), ('p1', 'world')",
+            "INSERT INTO ocr (photo_id, n, text) VALUES ('p1', 0, 'hello'), ('p1', 1, 'world')",
             (),
         );
         let result = db.get_photo_ocr("p1");
@@ -6572,7 +7077,7 @@ mod tests {
             (),
         );
         let _ = db.connection.execute(
-            "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'transcript', '  hello from the video  ')",
+            "INSERT INTO transcript (photo_id, text) VALUES ('p1', '  hello from the video  ')",
             (),
         );
         assert_eq!(db.get_photo_transcript("p1"), "hello from the video");
@@ -6615,32 +7120,49 @@ mod tests {
                 .unwrap();
         }
         db.connection
+            .execute("UPDATE photo SET favorite = 1 WHERE id = 'p2'", ())
+            .unwrap();
+        db.connection
             .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES ('p2', 'favorite', 'true')",
+                "INSERT INTO place (name) VALUES ('Paris, France') ON CONFLICT(name) DO NOTHING",
                 (),
             )
             .unwrap();
         db.connection
             .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'location_name', 'Paris, France')",
+                "UPDATE photo SET place_id = (SELECT id FROM place WHERE name = 'Paris, France') WHERE id = 'p1'",
                 (),
             )
             .unwrap();
         db.connection
             .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'Make', 'Apple')",
+                "INSERT INTO camera_make (name) VALUES ('Apple') ON CONFLICT(name) DO NOTHING",
                 (),
             )
             .unwrap();
         db.connection
             .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'Model', 'iPhone 15 Pro')",
+                "INSERT INTO camera_model (name, make_id) VALUES ('iPhone 15 Pro', (SELECT id FROM camera_make WHERE name = 'Apple')) ON CONFLICT(name) DO NOTHING",
                 (),
             )
             .unwrap();
         db.connection
             .execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES ('p1', 'a receipt', '0.9')",
+                "UPDATE photo SET make_id = (SELECT id FROM camera_make WHERE name = 'Apple'), \
+                 model_id = (SELECT id FROM camera_model WHERE name = 'iPhone 15 Pro') WHERE id = 'p1'",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO tag (name) VALUES ('a receipt') ON CONFLICT(name) DO NOTHING",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO photo_tag (photo_id, tag_id, probability) \
+                 VALUES ('p1', (SELECT id FROM tag WHERE name = 'a receipt'), 0.9)",
                 (),
             )
             .unwrap();
@@ -6748,14 +7270,17 @@ mod tests {
                 .unwrap();
         }
         db.connection
+            .execute("UPDATE photo SET favorite = 1 WHERE id = 'p1'", ())
+            .unwrap();
+        db.connection
             .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'favorite', 'true')",
+                "INSERT INTO camera_make (name) VALUES ('Sony') ON CONFLICT(name) DO NOTHING",
                 (),
             )
             .unwrap();
         db.connection
             .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'Make', 'Sony')",
+                "UPDATE photo SET make_id = (SELECT id FROM camera_make WHERE name = 'Sony') WHERE id = 'p1'",
                 (),
             )
             .unwrap();
@@ -6767,7 +7292,14 @@ mod tests {
             .unwrap();
         db.connection
             .execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES ('p1', 'a screenshot', '0.9')",
+                "INSERT INTO tag (name) VALUES ('a screenshot') ON CONFLICT(name) DO NOTHING",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO photo_tag (photo_id, tag_id, probability) \
+                 VALUES ('p1', (SELECT id FROM tag WHERE name = 'a screenshot'), 0.9)",
                 (),
             )
             .unwrap();
@@ -7090,8 +7622,8 @@ mod tests {
             "idx_faces_person_photo",
             "idx_faces_photo_id",
             "idx_people_name",
-            "idx_object_photo_id",
-            "idx_properties_photo_id",
+            "idx_photo_tag_tag",
+            "idx_photo_place",
         ] {
             assert!(
                 indexes.iter().any(|i| i == expected),
@@ -7133,14 +7665,14 @@ mod tests {
                 "idx_faces_person_photo",
             ),
             (
-                "objects by photo",
-                "SELECT class, probability FROM object WHERE photo_id = ?1",
-                "idx_object_photo_id",
+                "photo_tag by photo",
+                "SELECT pt.tag_id FROM photo_tag pt WHERE pt.photo_id = ?1",
+                "sqlite_autoindex_photo_tag_1",
             ),
             (
-                "properties by photo",
-                "SELECT * FROM properties WHERE photo_id = ?1",
-                "idx_properties_photo_id",
+                "photo_tag by tag",
+                "SELECT pt.photo_id FROM photo_tag pt WHERE pt.tag_id = ?1",
+                "idx_photo_tag_tag",
             ),
         ];
         for (name, sql, index) in cases {
@@ -7224,8 +7756,12 @@ mod tests {
         let mut db = test_db();
         import_test_photo(&mut db, "alive", "2024-01-01 10:00:00");
         let album = db.create_album("Stale").unwrap();
-        db.add_album_items(&album.id, &["alive".into(), "ghost-photo".into()])
-            .unwrap();
+        db.add_album_items(&album.id, &["alive".into()]).unwrap();
+        // A foreign key makes stale memberships impossible, so adding a
+        // non-existent photo is rejected rather than silently recorded.
+        assert!(db
+            .add_album_items(&album.id, &["ghost-photo".into()])
+            .is_err());
 
         let ids = db.album_photo_ids(&album.id);
         assert_eq!(ids, vec!["alive".to_string()]);

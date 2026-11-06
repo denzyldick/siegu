@@ -50,6 +50,7 @@ GitHub Actions workflows in `.github/workflows/` (details in `docs/ci.md`):
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ubuntu.yml`                | Unit/integration tests, lint, mesh + view-only E2E, face-grouping E2E, full AI inference (only platform that runs ML tests)                             |
 | `macos.yml` / `windows.yml` | Unit tests, Tauri desktop build, mesh + view-only E2E                                                                                                   |
+| `gpui.yml`                  | Locked `siegu-desktop` GPUI/Ely spike check + formatting on Linux, macOS, and Windows                                                                   |
 | `android.yml`               | Cross-compile check (aarch64 + x86_64) + core tests on an x86_64 emulator                                                                               |
 | `ios.yml`                   | Cross-compile check (aarch64) + core tests on an iOS simulator                                                                                          |
 | `release.yml`               | Builds desktop installers + Android APK and gates on iOS build; triggered by a GitHub release or a `v*` tag push — artifacts auto-attach to the release |
@@ -115,6 +116,85 @@ cargo fmt --all -- --check
 
 > The old "run `cargo test` from `src-tauri/`" habit is superseded: shared
 > business logic now lives in `siegu-core`, so run `cargo test -p siegu-core`.
+
+## GPUI + Ely version policy
+
+The GPUI stack is pinned in the workspace manifest and moves as one unit:
+
+- `gpui-pre = "=0.3.11"` (imported as `gpui`)
+- `gpui-pre-platform = "=0.3.11"` (imported as `gpui_platform`)
+- `ely-gpui-component` at git revision
+  `3abe078a369a30b31638135a756f6a235e1f2982`
+
+Rules:
+
+1. **One GPUI version.** Never add `gpui-pre`, `gpui-pre-platform`, or
+   `ely-gpui-component` directly to a crate manifest. Use the workspace
+   dependencies in the root `Cargo.toml`. Mixing versions creates duplicate
+   GPUI types that cannot cross crate boundaries.
+2. **One Ely revision.** Every Ely crate comes from the same pinned revision.
+   Do not mix a crates.io Ely release with the git pin.
+3. **Upgrade together.** Bump `gpui-pre`, `gpui-pre-platform`, and the Ely git
+   revision in one change. Regenerate `Cargo.lock`, check for duplicates, build
+   the desktop spike, and re-run the Phase 0 benchmark before merging.
+4. **Locked CI.** CI and release builds use the committed `Cargo.lock`
+   (`cargo build --locked`). The lockfile records the exact Ely commit.
+5. **Track by git, do not vendor (yet).** The git revision makes upgrades
+   explicit and reproducible. Vendor Ely only if we need a local patch or the
+   upstream history becomes unavailable; if we vendor, record the same revision
+   in `Cargo.toml`.
+
+Verify locally:
+
+```bash
+# Resolve without compiling and confirm the committed lockfile is current.
+cargo metadata --locked --format-version 1 > /dev/null
+
+# There must be exactly one line per GPUI package.
+cargo tree -p siegu-ui --prefix none --format "{p}" \
+  | grep -E '^gpui-pre(-platform)? v' \
+  | cut -d' ' -f1-2 | sort -u
+
+# Full compile check of the pinned UI crate.
+cargo check -p siegu-ui --locked
+```
+
+## GPUI desktop spike
+
+`crates/siegu-desktop` is the Phase 0 smoke test for the GPUI + Ely stack. It
+opens a window with Ely `Heading`, `Paragraph`, and `Button` components and a
+light/dark theme toggle.
+
+### Linux packages
+
+Ubuntu 24.04 (the list the Ely CI uses for the same stack):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y pkg-config libfontconfig-dev libxkbcommon-x11-dev
+```
+
+The spike enables both `gpui_platform` windowing backends (`wayland` and
+`x11`). If your distribution does not resolve them transitively, install the
+matching development packages too:
+
+```bash
+sudo apt-get install -y libwayland-dev libx11-dev libx11-xcb-dev libxkbcommon-dev
+```
+
+macOS needs the Xcode command-line tools (Metal); Windows needs the current
+MSVC build tools. No additional system packages are required on either.
+
+### Run and check
+
+```bash
+cargo run -p siegu-desktop
+cargo check -p siegu-desktop --locked
+cargo fmt -p siegu-desktop -- --check
+```
+
+CI runs the locked check and formatting on Linux, macOS, and Windows via
+`.github/workflows/gpui.yml`.
 
 ## Neovim Debugging
 

@@ -17,6 +17,7 @@ platform's list.
 | `ubuntu.yml`        | push to `main`, PRs                         | Unit/integration tests, lint, mesh E2E, face-grouping E2E, full ONNX inference (the only platform that runs AI tests) |
 | `macos.yml`         | push to `main`, PRs                         | macOS: unit tests, Tauri desktop build, mesh + view-only E2E                                                          |
 | `windows.yml`       | push to `main`, PRs                         | Windows: unit tests, Tauri desktop build, mesh + view-only E2E                                                        |
+| `gpui.yml`          | push to `main`, PRs                         | GPUI/Ely `siegu-desktop` spike: formatting + locked build check on Linux, macOS, Windows                               |
 | `android.yml`       | push to `main`, PRs                         | Android: cross-compile check + core tests on an x86_64 emulator                                                       |
 | `ios.yml`           | push to `main`, PRs                         | iOS: cross-compile check + core tests on a simulator                                                                  |
 | `release.yml`       | GitHub release `created`, push of `v*` tags | Build desktop installers + Android APK, gate on iOS build, attach artifacts to the triggering release                 |

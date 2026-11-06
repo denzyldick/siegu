@@ -522,9 +522,13 @@ mod tests {
 
     #[test]
     fn toggle_favorite_adds_and_removes() {
-        let (db, _dir) = test_db();
+        let (mut db, _dir) = test_db();
+        db.store_photo_batch(&[make_photo("photo1", "/p.jpg")])
+            .unwrap();
         assert!(do_toggle_favorite(&db, "photo1"));
         assert!(!do_toggle_favorite(&db, "photo1"));
+        // Missing photos are a no-op rather than silently creating state.
+        assert!(!do_toggle_favorite(&db, "does-not-exist"));
     }
 
     #[test]
@@ -720,16 +724,10 @@ mod tests {
         ])
         .unwrap();
         db.connection
-            .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES('risky', 'nsfw', '0.95')",
-                (),
-            )
+            .execute("UPDATE photo SET nsfw_score = 0.95 WHERE id = 'risky'", ())
             .unwrap();
         db.connection
-            .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES('clean', 'nsfw', '0.20')",
-                (),
-            )
+            .execute("UPDATE photo SET nsfw_score = 0.20 WHERE id = 'clean'", ())
             .unwrap();
         let result = do_list_files_filtered(
             &db,

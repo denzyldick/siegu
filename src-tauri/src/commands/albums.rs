@@ -565,8 +565,11 @@ mod tests {
             )
             .unwrap();
         db.connection
+            .execute("INSERT INTO place (name) VALUES ('Paris, France')", ())
+            .unwrap();
+        db.connection
             .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES ('p1', 'location_name', 'Paris, France')",
+                "UPDATE photo SET place_id = (SELECT id FROM place WHERE name = 'Paris, France') WHERE id = 'p1'",
                 (),
             )
             .unwrap();

@@ -981,7 +981,7 @@ impl MeshManager {
                 let db = Database::new(config_path);
                 match db.connection.query_row(
                     "SELECT p.location, p.created, p.latitude, p.longitude,
-                     (SELECT json_group_array(json_object('class', class, 'probability', probability)) FROM object WHERE photo_id = p.id),
+                     (SELECT json_group_array(json_object('class', t.name, 'probability', CAST(pt.probability AS TEXT))) FROM photo_tag pt JOIN tag t ON t.id = pt.tag_id WHERE pt.photo_id = p.id),
                      (SELECT json_group_array(json_object('face_id', face_id, 'crop_path', crop_path, 'encoded', encoded, 'person_id', person_id)) FROM faces WHERE photo_id = p.id),
                      p.caption, p.aesthetics_score, p.encoded
                      FROM photo p WHERE p.id = ?1",
@@ -1819,7 +1819,7 @@ impl MeshManager {
                 let Ok((path, created, lat, lon, objects, faces, caption, aesthetics_score, encoded)) =
                     db.connection.query_row(
                         "SELECT p.location, p.created, p.latitude, p.longitude,
-                         (SELECT json_group_array(json_object('class', class, 'probability', probability)) FROM object WHERE photo_id = p.id),
+                         (SELECT json_group_array(json_object('class', t.name, 'probability', CAST(pt.probability AS TEXT))) FROM photo_tag pt JOIN tag t ON t.id = pt.tag_id WHERE pt.photo_id = p.id),
                          (SELECT json_group_array(json_object('face_id', face_id, 'crop_path', crop_path, 'encoded', encoded, 'person_id', person_id)) FROM faces WHERE photo_id = p.id),
                          p.caption, p.aesthetics_score, p.encoded
                          FROM photo p WHERE p.id = ?1",

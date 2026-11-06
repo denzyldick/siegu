@@ -373,18 +373,28 @@ mod tests {
     #[test]
     fn get_top_tags_with_objects() {
         let (db, _dir) = test_db();
-        db.connection
-            .execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
-                ("p1", "cat", "0.95"),
-            )
-            .unwrap();
-        db.connection
-            .execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
-                ("p2", "dog", "0.88"),
-            )
-            .unwrap();
+        for (i, (pid, tag)) in [("p1", "cat"), ("p2", "dog")].into_iter().enumerate() {
+            let location = format!("/tg{i}.jpg");
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location) VALUES (?1, ?2)",
+                    rusqlite::params![pid, location],
+                )
+                .unwrap();
+            db.connection
+                .execute(
+                    "INSERT INTO tag (name) VALUES (?1) ON CONFLICT(name) DO NOTHING",
+                    (tag,),
+                )
+                .unwrap();
+            db.connection
+                .execute(
+                    "INSERT INTO photo_tag (photo_id, tag_id, probability) \
+                     VALUES (?1, (SELECT id FROM tag WHERE name = ?2), 0.9)",
+                    (pid, tag),
+                )
+                .unwrap();
+        }
         let tags = do_get_top_tags(&db);
         let tag_titles: Vec<_> = tags.iter().map(|t| t.title.as_str()).collect();
         assert!(tag_titles.contains(&"cat"));

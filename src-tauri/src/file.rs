@@ -340,6 +340,7 @@ fn read_file_base64_inner(app: &tauri::AppHandle, path: String) -> String {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use std::path::Path;
 

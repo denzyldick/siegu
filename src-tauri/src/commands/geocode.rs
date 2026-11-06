@@ -34,14 +34,32 @@ mod tests {
         let (db, _dir) = test_db();
         db.connection
             .execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
-                ("p1", "cat", "0.95"),
+                "INSERT INTO photo (id, location) VALUES ('p1', '/a.jpg')",
+                (),
             )
             .unwrap();
         db.connection
             .execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
-                ("p2", "dog", "0.88"),
+                "INSERT INTO photo (id, location) VALUES ('p2', '/b.jpg')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute("INSERT INTO tag (name) VALUES ('cat')", ())
+            .unwrap();
+        db.connection
+            .execute("INSERT INTO tag (name) VALUES ('dog')", ())
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO photo_tag (photo_id, tag_id, probability) VALUES ('p1', (SELECT id FROM tag WHERE name = 'cat'), 0.95)",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO photo_tag (photo_id, tag_id, probability) VALUES ('p2', (SELECT id FROM tag WHERE name = 'dog'), 0.88)",
+                (),
             )
             .unwrap();
         let result = do_list_objects(&db, "cat");
@@ -70,8 +88,17 @@ mod tests {
         let (db, _dir) = test_db();
         db.connection
             .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
-                ("p1", "Paris, France"),
+                "INSERT INTO photo (id, location) VALUES ('p1', '/a.jpg')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute("INSERT INTO place (name) VALUES ('Paris, France')", ())
+            .unwrap();
+        db.connection
+            .execute(
+                "UPDATE photo SET place_id = (SELECT id FROM place WHERE name = 'Paris, France') WHERE id = 'p1'",
+                (),
             )
             .unwrap();
         let result = do_list_objects(&db, "Paris");
@@ -85,8 +112,17 @@ mod tests {
         let (db, _dir) = test_db();
         db.connection
             .execute(
-                "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
-                ("p1", "mountain", "0.9"),
+                "INSERT INTO photo (id, location) VALUES ('p1', '/a.jpg')",
+                (),
+            )
+            .unwrap();
+        db.connection
+            .execute("INSERT INTO tag (name) VALUES ('mountain')", ())
+            .unwrap();
+        db.connection
+            .execute(
+                "INSERT INTO photo_tag (photo_id, tag_id, probability) VALUES ('p1', (SELECT id FROM tag WHERE name = 'mountain'), 0.9)",
+                (),
             )
             .unwrap();
         db.connection

@@ -347,10 +347,10 @@ pub fn dispatch(ctx: &RpcContext, name: &str, payload: &Value) -> Result<Value, 
         }
         "trash_duplicate_members" => {
             let ids = payload.string_vec("ids")?;
-            let mut trashed = 0usize;
+            let mut trashed = Vec::new();
             for id in &ids {
                 if db.trash_photo(id).is_ok() {
-                    trashed += 1;
+                    trashed.push(id.clone());
                 }
             }
             Ok(json!(trashed))
@@ -1036,8 +1036,11 @@ mod tests {
         {
             let seed = Database::new(c.config_path);
             seed.connection
+                .execute("INSERT INTO tag (name) VALUES (?1)", ["beach"])
+                .unwrap();
+            seed.connection
                 .execute(
-                    "INSERT INTO object (photo_id, class, probability) VALUES (?1, ?2, ?3)",
+                    "INSERT INTO photo_tag (photo_id, tag_id, probability) VALUES (?1, (SELECT id FROM tag WHERE name = ?2), ?3)",
                     ["p1", "beach", "0.9"],
                 )
                 .unwrap();

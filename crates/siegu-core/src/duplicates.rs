@@ -367,6 +367,8 @@ pub struct DuplicateMemberView {
     pub location: String,
     pub aesthetics: Option<f64>,
     pub is_best: bool,
+    /// On-disk bytes of the member's source file (0 when the file is gone).
+    pub bytes: u64,
 }
 
 /// A duplicate group enriched for the UI: per-member metadata, a human label,
@@ -380,14 +382,6 @@ pub struct DuplicateGroupView {
     pub kind: String,
     /// Number of bytes that would be freed by trashing every non-best member.
     pub reclaimable_bytes: u64,
-}
-
-/// Bytes on disk for a photo's source file (from its location path).
-fn file_bytes(db: &Database, id: &str) -> u64 {
-    db.get_photo_location(id)
-        .and_then(|p| std::fs::metadata(&p).ok())
-        .map(|m| m.len())
-        .unwrap_or(0)
 }
 
 /// Total on-disk bytes of every photo/video currently in the library: the sum
@@ -421,11 +415,15 @@ fn enrich(db: &Database, group: &DuplicateGroup, kind: &str) -> DuplicateGroupVi
     let mut members: Vec<DuplicateMemberView> = group
         .members
         .iter()
-        .map(|id| DuplicateMemberView {
-            id: id.clone(),
-            location: db.get_photo_location(id).unwrap_or_default(),
-            aesthetics: db.quality_scores().get(id).copied(),
-            is_best: Some(id.as_str()) == group.best_id.as_deref(),
+        .map(|id| {
+            let location = db.get_photo_location(id).unwrap_or_default();
+            DuplicateMemberView {
+                id: id.clone(),
+                location: location.clone(),
+                aesthetics: db.quality_scores().get(id).copied(),
+                is_best: Some(id.as_str()) == group.best_id.as_deref(),
+                bytes: std::fs::metadata(&location).map(|m| m.len()).unwrap_or(0),
+            }
         })
         .collect();
     members.sort_by(|a, b| {
@@ -434,11 +432,7 @@ fn enrich(db: &Database, group: &DuplicateGroup, kind: &str) -> DuplicateGroupVi
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    let reclaimable_bytes = members
-        .iter()
-        .filter(|m| !m.is_best)
-        .map(|m| file_bytes(db, &m.id))
-        .sum();
+    let reclaimable_bytes = members.iter().filter(|m| !m.is_best).map(|m| m.bytes).sum();
 
     DuplicateGroupView {
         members,

@@ -43,7 +43,7 @@ fn hold_scan_guard(app: &tauri::AppHandle) -> Option<siegu_core::scanner::ScanSe
 
 /// Pure business logic — testable without Tauri.
 pub fn do_resolve_photo_locations(db: &Database) -> usize {
-    let sql = "SELECT id, latitude, longitude FROM photo WHERE (latitude != 0.0 OR longitude != 0.0) AND id NOT IN (SELECT photo_id FROM properties WHERE key = 'location_name')";
+    let sql = "SELECT id, latitude, longitude FROM photo WHERE (latitude != 0.0 OR longitude != 0.0) AND place_id IS NULL";
     let mut resolved = 0usize;
     if let Ok(mut stmt) = db.connection.prepare(sql) {
         if let Ok(rows) = stmt.query_map([], |row| {
@@ -58,7 +58,11 @@ pub fn do_resolve_photo_locations(db: &Database) -> usize {
                 if let Some((city, country)) = siegu_core::geocode::find_nearest_city(lat, lon) {
                     let location_name = format!("{}, {}", city, country);
                     let _ = db.connection.execute(
-                        "INSERT OR REPLACE INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
+                        "INSERT INTO place (name) VALUES (?1) ON CONFLICT(name) DO NOTHING",
+                        rusqlite::params![location_name],
+                    );
+                    let _ = db.connection.execute(
+                        "UPDATE photo SET place_id = (SELECT id FROM place WHERE name = ?2) WHERE id = ?1",
                         rusqlite::params![id, location_name],
                     );
                     resolved += 1;
@@ -230,18 +234,30 @@ mod tests {
     #[test]
     fn get_location_names_with_data() {
         let (db, _dir) = test_db();
-        db.connection
-            .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
-                ("p1", "Paris, France"),
-            )
-            .unwrap();
-        db.connection
-            .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
-                ("p2", "Tokyo, Japan"),
-            )
-            .unwrap();
+        for (i, (id, place)) in [("p1", "Paris, France"), ("p2", "Tokyo, Japan")]
+            .into_iter()
+            .enumerate()
+        {
+            let location = format!("/loc{i}.jpg");
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location) VALUES (?1, ?2)",
+                    rusqlite::params![id, location],
+                )
+                .unwrap();
+            db.connection
+                .execute(
+                    "INSERT INTO place (name) VALUES (?1) ON CONFLICT(name) DO NOTHING",
+                    (place,),
+                )
+                .unwrap();
+            db.connection
+                .execute(
+                    "UPDATE photo SET place_id = (SELECT id FROM place WHERE name = ?1) WHERE id = ?2",
+                    (place, id),
+                )
+                .unwrap();
+        }
         let names = do_get_location_names(&db);
         assert_eq!(names.len(), 2);
         assert_eq!(names[0], "Paris, France");
@@ -251,16 +267,22 @@ mod tests {
     #[test]
     fn get_location_names_distinct() {
         let (db, _dir) = test_db();
+        for (i, id) in ["p1", "p2"].iter().enumerate() {
+            let location = format!("/distinct{i}.jpg");
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location) VALUES (?1, ?2)",
+                    rusqlite::params![id, location],
+                )
+                .unwrap();
+        }
         db.connection
-            .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
-                ("p1", "Paris, France"),
-            )
+            .execute("INSERT INTO place (name) VALUES ('Paris, France')", ())
             .unwrap();
         db.connection
             .execute(
-                "INSERT INTO properties (photo_id, key, value) VALUES (?1, 'location_name', ?2)",
-                ("p2", "Paris, France"),
+                "UPDATE photo SET place_id = (SELECT id FROM place WHERE name = 'Paris, France')",
+                (),
             )
             .unwrap();
         let names = do_get_location_names(&db);

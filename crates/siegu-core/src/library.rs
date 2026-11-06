@@ -276,7 +276,7 @@ pub fn do_get_top_tags(db: &Database) -> Vec<SearchSuggestion> {
 
     if let Ok(mut stmt) = db
         .connection
-        .prepare("SELECT class FROM object GROUP BY class ORDER BY COUNT(*) DESC LIMIT 5")
+        .prepare("SELECT name FROM tag GROUP BY name ORDER BY COUNT(*) DESC LIMIT 5")
     {
         if let Ok(iter) = stmt.query_map([], |row| {
             Ok(SearchSuggestion {
@@ -292,7 +292,7 @@ pub fn do_get_top_tags(db: &Database) -> Vec<SearchSuggestion> {
 
     if let Ok(mut stmt) = db
         .connection
-        .prepare("SELECT value FROM properties WHERE key = 'location_name' GROUP BY value ORDER BY COUNT(*) DESC LIMIT 5")
+        .prepare("SELECT pl.name FROM place pl JOIN photo p ON p.place_id = pl.id GROUP BY pl.name ORDER BY COUNT(*) DESC LIMIT 5")
     {
         if let Ok(iter) = stmt.query_map([], |row| {
             Ok(SearchSuggestion {
@@ -328,10 +328,9 @@ pub fn do_get_top_tags(db: &Database) -> Vec<SearchSuggestion> {
 /// Distinct location names in the library, alphabetically (for the map filter).
 pub fn do_get_location_names(db: &Database) -> Vec<String> {
     let mut names = Vec::new();
-    if let Ok(mut stmt) = db
-        .connection
-        .prepare("SELECT DISTINCT value FROM properties WHERE key = 'location_name' ORDER BY value")
-    {
+    if let Ok(mut stmt) = db.connection.prepare(
+        "SELECT DISTINCT pl.name FROM place pl JOIN photo p ON p.place_id = pl.id ORDER BY pl.name",
+    ) {
         if let Ok(rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
             names.extend(rows.flatten());
         }

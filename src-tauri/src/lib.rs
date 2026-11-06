@@ -141,7 +141,7 @@ pub fn run() {
     }));
 
     #[allow(clippy::expect_used)] // Fatal: a Tauri app that fails to launch cannot function
-    builder
+    let result = builder
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_fs::init())
@@ -424,6 +424,84 @@ pub fn run() {
             // File
             file::read_file_base64,
         ])
-        .run(tauri::generate_context!())
-        .expect("fatal: error while running the tauri application");
+        .run(tauri::generate_context!());
+    // Graceful shutdown: `run` returns only after the app really quits
+    // (the window close is a hide-to-tray). Flush the WAL into the main
+    // database and refresh query-planner statistics before we exit, so a
+    // multi-GB WAL never survives a clean quit — that steals space on
+    // tight filesystems and leaves a large replay for next boot.
+    checkpoint_on_exit();
+    result.expect("fatal: error while running the tauri application");
+}
+
+/// Flush the WAL into the main database and run `PRAGMA optimize` via a fresh
+/// short-lived connection, mirroring the app's normal pattern. Best-effort by
+/// design: shutdown should never be blocked by a slow flush.
+fn checkpoint_on_exit() {
+    let Some(dir) = crate::log::app_config_dir() else {
+        return;
+    };
+    let db_path = dir.join("siegu.db");
+    if !db_path.exists() {
+        return;
+    }
+    if let Ok(flushed) = checkpoint_db(&db_path) {
+        tracing::debug!("checkpointed db on exit frames={flushed}");
+    }
+}
+
+/// `PRAGMA wal_checkpoint(TRUNCATE)` then `PRAGMA optimize`. Returns the number
+/// of WAL frames checkpointed (0 when there was nothing to flush).
+fn checkpoint_db(db_path: &std::path::Path) -> rusqlite::Result<usize> {
+    let conn = rusqlite::Connection::open(db_path)?;
+    let flushed: usize = conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
+        row.get::<_, i64>(2).map(|v| v as usize)
+    })?;
+    let _ = conn.execute_batch("PRAGMA optimize;");
+    conn.close().ok();
+    Ok(flushed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::checkpoint_db;
+
+    #[test]
+    fn checkpoint_db_truncates_the_wal() {
+        let dir = std::env::temp_dir().join(format!("siegu_ckpt_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("siegu.db");
+        // Keep the writer open so nothing checkpoints the WAL behind our back
+        // (closing the last connection auto-checkpoints on close).
+        let mut writer = rusqlite::Connection::open(&path).unwrap();
+        writer
+            .execute_batch("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0;")
+            .unwrap();
+        writer
+            .execute_batch("CREATE TABLE probe (x INTEGER);")
+            .unwrap();
+        let tx = writer.transaction().unwrap();
+        for i in 0..200_000i64 {
+            tx.execute("INSERT INTO probe VALUES (?1)", [i]).unwrap();
+        }
+        tx.commit().unwrap();
+        let wal = std::path::PathBuf::from(format!("{}-wal", path.display()));
+        let wal_before = wal.metadata().map(|m| m.len()).unwrap_or(0);
+        assert!(wal_before > 0, "expected a non-empty WAL before checkpoint");
+        let _flushed = checkpoint_db(&path).unwrap();
+        let wal_after = wal.metadata().map(|m| m.len()).unwrap_or(0);
+        assert_eq!(
+            wal_after, 0,
+            "TRUNCATE checkpoint must leave an empty WAL ({wal_before} -> {wal_after})"
+        );
+        // The durable guarantee at exit: all committed rows survived.
+        let check = rusqlite::Connection::open(&path).unwrap();
+        let count: i64 = check
+            .query_row("SELECT COUNT(*) FROM probe", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 200_000);
+        drop(writer);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
