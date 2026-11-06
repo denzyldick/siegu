@@ -1,12 +1,10 @@
-name: GPUI desktop
+name: GPUI web WASM build
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -16,14 +14,13 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  check:
-    name: GPUI desktop (${{ matrix.os }})
+  build:
+    name: Build WASM (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-latest, windows-latest]
-
+        os: [ubuntu-24.04]
     steps:
       - uses: actions/checkout@v4
 
@@ -36,10 +33,10 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config libfontconfig-dev libxkbcommon-x11-dev
+          sudo apt-get install -y pkg-config
 
       - name: Check formatting
-        run: cargo fmt -p siegu-desktop -- --check
+        run: cargo fmt -p siegu-web -- --check
 
-      - name: Check GPUI desktop spike
-        run: cargo check -p siegu-desktop --locked
+      - name: Build WASM spike
+        run: cargo build -p siegu-web --target wasm32-unknown-unknown --release
