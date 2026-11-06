@@ -6,6 +6,7 @@ members = [
     "crates/siegu-signal",
     "crates/siegu-ui",
     "crates/siegu-desktop",
+    "crates/siegu-web",
     "src-tauri",
 ]
 

@@ -1,0 +1,12 @@
+[package]
+name = "siegu-web"
+version = "0.1.0"
+description = "GPUI + Ely WASM web spike"
+authors = ["Denzyl Dick"]
+edition = "2021"
+publish = false
+
+[dependencies]
+ely-gpui-component = { workspace = true }
+gpui = { workspace = true }
+gpui_platform = { workspace = true, features = ["font-kit", "wayland", "x11"] }
