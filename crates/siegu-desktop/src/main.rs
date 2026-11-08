@@ -1,10 +1,12 @@
+use std::collections::HashMap;
 use std::rc::Rc;
 
-use siegu_core::{config::default_config_dir, Database, Photo};
+use siegu_core::database::{Album, LocationGroup};
+use siegu_core::{config::default_config_dir, Database, PersonWithFace, Photo};
 use siegu_ui::{
     ely::{
         self,
-        primitives::FocusScope,
+        primitives::{FocusScope, IconName},
         theme::{Mode, Theme},
         typography::{Heading, Paragraph},
     },
@@ -12,11 +14,11 @@ use siegu_ui::{
         div, px, size, AnyElement, App, AppContext, Bounds, Context, FocusHandle, IntoElement,
         ParentElement, Render, Styled, TitlebarOptions, Window, WindowBounds, WindowOptions,
     },
-    gpui_platform, PhotoCard, PhotoGrid, SieguAppShell,
+    gpui_platform, InfoCard, PhotoCard, PhotoGrid, SieguAppShell,
 };
 
 /// A top-level place in the app. Keep the ids in sync with `siegu_ui::nav`.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Section {
     Library,
     Map,
@@ -59,34 +61,56 @@ impl Section {
     fn subtitle(self) -> &'static str {
         match self {
             Self::Library => "Every photo and video, all in one place.",
-            Self::Map => "Photos with location data will appear here.",
-            Self::People => "Detected faces will be grouped here.",
-            Self::Collections => "Albums and saved searches will appear here.",
-            Self::Settings => "Library folders, AI models, and sync settings.",
+            Self::Map => "Places from your geotagged photos.",
+            Self::People => "Detected faces, grouped by person.",
+            Self::Collections => "Albums and saved searches.",
+            Self::Settings => "A read-only view of your local configuration.",
         }
     }
 }
 
-/// The desktop shell. Reads the local library for the Library section; the
-/// remaining sections are placeholders until they are ported from the Tauri UI.
+/// Everything the desktop shell reads from the local library once at startup.
+#[derive(Default)]
+struct LibraryData {
+    photos: Vec<Photo>,
+    people: Vec<PersonWithFace>,
+    places: Vec<LocationGroup>,
+    albums: Vec<Album>,
+    settings: Vec<(String, String)>,
+    models: Vec<String>,
+}
+
+/// Config keys that are safe to show in a read-only desktop view. Tokens and
+/// passwords are deliberately excluded.
+const DISPLAY_SETTINGS: &[(&str, &str)] = &[
+    ("theme", "Theme"),
+    ("language", "Language"),
+    ("tier", "Tier"),
+    ("indexing_mode", "Indexing mode"),
+    ("scan_threads", "Scan threads"),
+    ("ml_threads", "ML threads"),
+    ("ml_memory_budget_mb", "ML memory budget (MB)"),
+    ("max_storage_mb", "Max storage (MB)"),
+    ("auto_scan", "Auto scan"),
+    ("sync_enabled", "Sync enabled"),
+    ("last_scan_completed", "Last scan completed"),
+];
+
+/// The desktop shell. Reads the local library and renders one section at a time.
 struct Siegu {
     focus: FocusHandle,
     section: Section,
-    photos: Vec<Photo>,
+    data: LibraryData,
 }
 
 impl Siegu {
     fn body(&self) -> AnyElement {
         let content: AnyElement = match self.section {
-            Section::Library if self.photos.is_empty() => empty_library(),
-            Section::Library => {
-                let mut grid = PhotoGrid::new();
-                for photo in &self.photos {
-                    grid = grid.child(photo_card(photo));
-                }
-                grid.into_any_element()
-            }
-            other => placeholder(other),
+            Section::Library => self.library_view(),
+            Section::Map => self.map_view(),
+            Section::People => self.people_view(),
+            Section::Collections => self.collections_view(),
+            Section::Settings => self.settings_view(),
         };
 
         div()
@@ -105,17 +129,145 @@ impl Siegu {
             .child(content)
             .into_any_element()
     }
+
+    fn library_view(&self) -> AnyElement {
+        if self.data.photos.is_empty() {
+            return empty_state(
+                "No photos yet.",
+                "Add folders and run a scan in Siegu, then reopen this window.",
+            );
+        }
+        let mut grid = PhotoGrid::new();
+        for photo in &self.data.photos {
+            grid = grid.child(photo_card(photo));
+        }
+        grid.into_any_element()
+    }
+
+    fn map_view(&self) -> AnyElement {
+        if self.data.places.is_empty() {
+            return empty_state(
+                "No places yet.",
+                "Photos with GPS or resolved location data will appear here.",
+            );
+        }
+        let mut grid = PhotoGrid::new();
+        for place in &self.data.places {
+            grid = grid.child(
+                InfoCard::new(IconName::MapPin, place.name.clone())
+                    .detail(plural(place.count as usize, "photo")),
+            );
+        }
+        grid.into_any_element()
+    }
+
+    fn people_view(&self) -> AnyElement {
+        if self.data.people.is_empty() {
+            return empty_state(
+                "No people yet.",
+                "Named faces from your library will be grouped here.",
+            );
+        }
+        let mut grid = PhotoGrid::new();
+        for person in &self.data.people {
+            grid = grid.child(
+                InfoCard::new(IconName::Users, person.name.clone())
+                    .detail(plural(person.face_count as usize, "face")),
+            );
+        }
+        grid.into_any_element()
+    }
+
+    fn collections_view(&self) -> AnyElement {
+        if self.data.albums.is_empty() {
+            return empty_state(
+                "No collections yet.",
+                "Albums you create in Siegu will appear here.",
+            );
+        }
+        let mut grid = PhotoGrid::new();
+        for album in &self.data.albums {
+            grid = grid.child(
+                InfoCard::new(IconName::Layers, album.name.clone())
+                    .detail(plural(album.item_count as usize, "photo")),
+            );
+        }
+        grid.into_any_element()
+    }
+
+    fn settings_view(&self) -> AnyElement {
+        if self.data.settings.is_empty() && self.data.models.is_empty() {
+            return empty_state(
+                "Nothing configured yet.",
+                "Open Siegu and change a setting; it will show up here.",
+            );
+        }
+        let mut grid = PhotoGrid::new();
+        for (label, value) in &self.data.settings {
+            grid = grid
+                .child(InfoCard::new(IconName::Settings, label.clone()).detail(clip(value, 42)));
+        }
+        if !self.data.models.is_empty() {
+            grid = grid.child(
+                InfoCard::new(IconName::Sparkles, "AI models")
+                    .detail(clip(&self.data.models.join(", "), 42)),
+            );
+        }
+        grid.into_any_element()
+    }
 }
 
 /// Opens the existing local library, if any. We never create a database here:
 /// the desktop spike must not leave side effects in a user's real config dir.
-fn load_photos() -> Vec<Photo> {
+fn load_library() -> LibraryData {
     let dir = default_config_dir();
     if !dir.join("siegu.db").exists() {
-        return Vec::new();
+        return LibraryData::default();
     }
     let db = Database::new(&dir.display().to_string());
-    db.list_photos("", 0, 60, false, false)
+    let state = db.get_state();
+    LibraryData {
+        photos: db.list_photos("", 0, 60, false, false),
+        people: db.get_people(),
+        places: db.get_location_groups(60),
+        albums: db.list_albums(),
+        settings: safe_settings(&state),
+        models: enabled_models(&state),
+    }
+}
+
+/// Only the curated, non-secret settings that are actually present.
+fn safe_settings(state: &HashMap<String, String>) -> Vec<(String, String)> {
+    DISPLAY_SETTINGS
+        .iter()
+        .filter_map(|(key, label)| {
+            state
+                .get(*key)
+                .filter(|value| !value.is_empty())
+                .map(|value| ((*label).to_string(), value.clone()))
+        })
+        .collect()
+}
+
+/// Human-readable names of the AI models turned on in the config.
+fn enabled_models(state: &HashMap<String, String>) -> Vec<String> {
+    let mut models: Vec<String> = state
+        .iter()
+        .filter(|(key, value)| {
+            key.starts_with("model_enabled_") && matches!(value.as_str(), "1" | "true" | "True")
+        })
+        .map(|(key, _)| {
+            let name = key.trim_start_matches("model_enabled_");
+            let mut chars = name.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                None => String::new(),
+            }
+        })
+        .filter(|name| !name.is_empty())
+        .collect();
+    models.sort();
+    models
 }
 
 fn photo_card(photo: &Photo) -> PhotoCard {
@@ -145,7 +297,26 @@ fn display_date(created: &str) -> String {
         .to_string()
 }
 
-fn empty_library() -> AnyElement {
+fn plural(count: usize, noun: &str) -> String {
+    if count == 1 {
+        format!("{count} {noun}")
+    } else {
+        format!("{count} {noun}s")
+    }
+}
+
+/// Shorten a value so it fits on one line without splitting a character.
+fn clip(value: &str, max: usize) -> String {
+    let mut chars = value.chars();
+    let clipped: String = chars.by_ref().take(max).collect();
+    if chars.next().is_some() {
+        format!("{clipped}…")
+    } else {
+        clipped
+    }
+}
+
+fn empty_state(title: &str, hint: &str) -> AnyElement {
     div()
         .flex()
         .flex_1()
@@ -154,21 +325,8 @@ fn empty_library() -> AnyElement {
         .items_center()
         .justify_center()
         .gap_2()
-        .child(Paragraph::new("No photos yet."))
-        .child(Paragraph::new(
-            "Add folders and run a scan in Siegu, then reopen this window.",
-        ))
-        .into_any_element()
-}
-
-fn placeholder(section: Section) -> AnyElement {
-    div()
-        .flex()
-        .flex_1()
-        .min_h(px(240.0))
-        .items_center()
-        .justify_center()
-        .child(Paragraph::new(section.subtitle()))
+        .child(Paragraph::new(title.to_string()))
+        .child(Paragraph::new(hint.to_string()))
         .into_any_element()
 }
 
@@ -217,11 +375,64 @@ fn main() {
                     Siegu {
                         focus,
                         section: Section::Library,
-                        photos: load_photos(),
+                        data: load_library(),
                     }
                 })
             })
             .expect("window failed to open");
             cx.activate(true);
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn section_ids_round_trip() {
+        for section in [
+            Section::Library,
+            Section::Map,
+            Section::People,
+            Section::Collections,
+            Section::Settings,
+        ] {
+            assert_eq!(Section::from_id(section.id()), section);
+        }
+    }
+
+    #[test]
+    fn unknown_section_falls_back_to_library() {
+        assert_eq!(Section::from_id("nope"), Section::Library);
+    }
+
+    #[test]
+    fn plural_handles_singular_and_plural() {
+        assert_eq!(plural(1, "face"), "1 face");
+        assert_eq!(plural(2, "face"), "2 faces");
+    }
+
+    #[test]
+    fn clip_respects_character_boundaries() {
+        assert_eq!(clip("hello", 10), "hello");
+        assert_eq!(clip("héllo", 3), "hél…");
+    }
+
+    #[test]
+    fn safe_settings_hides_secrets() {
+        let mut state = HashMap::new();
+        state.insert("theme".to_string(), "dark".to_string());
+        state.insert("signaling_token".to_string(), "secret".to_string());
+        let settings = safe_settings(&state);
+        assert_eq!(settings, vec![("Theme".to_string(), "dark".to_string())]);
+    }
+
+    #[test]
+    fn enabled_models_reads_model_toggles() {
+        let mut state = HashMap::new();
+        state.insert("model_enabled_clip".to_string(), "true".to_string());
+        state.insert("model_enabled_face".to_string(), "false".to_string());
+        state.insert("model_enabled_arcface".to_string(), "1".to_string());
+        assert_eq!(enabled_models(&state), vec!["Arcface", "Clip"]);
+    }
 }

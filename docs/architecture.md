@@ -158,7 +158,8 @@ siegu/
 │       ├── app_shell.rs          # SieguAppShell (title bar + sidebar + body)
 │       ├── nav.rs                # sidebar sections + active-item callback
 │       ├── photo_grid.rs         # responsive PhotoGrid over Ely SimpleGrid
-│       └── photo_card.rs         # PhotoCard (thumbnail, title, date)
+│       ├── photo_card.rs         # PhotoCard (thumbnail, title, date)
+│       └── info_card.rs          # InfoCard for people/places/albums/settings
 │
 ├── crates/siegu-desktop/         # Native GPUI + Ely desktop spike
 │   └── src/main.rs               # section switching + reads the local library
