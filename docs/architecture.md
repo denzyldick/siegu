@@ -45,11 +45,20 @@ the contract; TypeScript is generated from it.
 ## Crate Dependency Graph
 
 ```
-siegu-cli ──→ siegu-core
-siegu-tauri ──→ siegu-core
+siegu-cli     ──→ siegu-core
+siegu-tauri   ──→ siegu-core
+siegu-desktop ──→ siegu-core
+              └─→ siegu-ui ──→ gpui + Ely
+siegu-web     ──→ gpui + Ely
 ```
 
 `siegu-core` has zero Tauri dependency and can be used standalone.
+
+`siegu-ui` is the shared GPUI + Ely component layer (`SieguAppShell`, `PhotoGrid`,
+`PhotoCard`, sidebar nav). It is the only crate that names the pinned
+`gpui`/`gpui_platform`/`ely-gpui-component` versions; consumers use its
+re-exports. `siegu-desktop` is the native GPUI spike (enable its `desktop` feature
+for the Linux Wayland/X11 backends); `siegu-web` is the WASM spike.
 
 ## The RPC facade
 
@@ -143,6 +152,19 @@ siegu/
 │   └── src/
 │       ├── main.rs               # command groups: scan/analyze/mesh/web/...
 │       └── web.rs                # `siegu-cli web` host: static SPA + /rpc → dispatch
+│
+├── crates/siegu-ui/              # Shared GPUI + Ely component layer
+│   └── src/
+│       ├── app_shell.rs          # SieguAppShell (title bar + sidebar + body)
+│       ├── nav.rs                # sidebar sections + active-item callback
+│       ├── photo_grid.rs         # responsive PhotoGrid over Ely SimpleGrid
+│       └── photo_card.rs         # PhotoCard (thumbnail, title, date)
+│
+├── crates/siegu-desktop/         # Native GPUI + Ely desktop spike
+│   └── src/main.rs               # section switching + reads the local library
+│
+├── crates/siegu-web/             # GPUI + Ely WASM web spike (CI: gpui.yml)
+│   └── src/main.rs
 │
 ├── src-tauri/                    # Tauri desktop/mobile shell
 │   └── src/

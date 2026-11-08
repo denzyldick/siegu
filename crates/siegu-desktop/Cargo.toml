@@ -12,6 +12,5 @@ name = "siegu-desktop"
 path = "src/main.rs"
 
 [dependencies]
-ely-gpui-component = { workspace = true }
-gpui = { workspace = true }
-gpui_platform = { workspace = true, features = ["font-kit", "wayland", "x11"] }
+siegu-core = { workspace = true, default-features = true }
+siegu-ui = { workspace = true, features = ["desktop"] }

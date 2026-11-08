@@ -162,8 +162,10 @@ cargo check -p siegu-ui --locked
 ## GPUI desktop spike
 
 `crates/siegu-desktop` is the Phase 0 smoke test for the GPUI + Ely stack. It
-opens a window with Ely `Heading`, `Paragraph`, and `Button` components and a
-light/dark theme toggle.
+builds on the shared `siegu-ui` component layer (`SieguAppShell`, `PhotoGrid`,
+`PhotoCard`, sidebar navigation) and reads the local library when one exists,
+falling back to an empty state. The sidebar switches between the Library, Map,
+People, Collections, and Settings sections.
 
 ### Linux packages
 
@@ -174,9 +176,9 @@ sudo apt-get update
 sudo apt-get install -y pkg-config libfontconfig-dev libxkbcommon-x11-dev
 ```
 
-The spike enables both `gpui_platform` windowing backends (`wayland` and
-`x11`). If your distribution does not resolve them transitively, install the
-matching development packages too:
+The `siegu-ui` `desktop` feature enables both `gpui_platform` windowing backends
+(`wayland` and `x11`); `siegu-desktop` turns it on. If your distribution does not
+resolve them transitively, install the matching development packages too:
 
 ```bash
 sudo apt-get install -y libwayland-dev libx11-dev libx11-xcb-dev libxkbcommon-dev
@@ -193,8 +195,10 @@ cargo check -p siegu-desktop --locked
 cargo fmt -p siegu-desktop -- --check
 ```
 
-CI runs the locked check and formatting on Linux, macOS, and Windows via
-`.github/workflows/gpui.yml`.
+CI type-checks the spike through the platform workflows' workspace-wide
+`cargo check --all-targets` (and `cargo fmt --check` on Linux). The
+`.github/workflows/gpui.yml` workflow builds the separate `siegu-web` WASM
+spike.
 
 ## Neovim Debugging
 

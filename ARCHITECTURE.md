@@ -18,11 +18,20 @@ Siegu is a cross-platform, privacy-first media library with local AI indexing an
 ## Crate Dependency Graph
 
 ```
-siegu-cli ──→ siegu-core
-siegu-tauri ──→ siegu-core
+siegu-cli     ──→ siegu-core
+siegu-tauri   ──→ siegu-core
+siegu-desktop ──→ siegu-core
+              └─→ siegu-ui ──→ gpui + Ely
+siegu-web     ──→ gpui + Ely
 ```
 
 `siegu-core` has zero Tauri dependency and can be used standalone (CLI).
+
+`siegu-ui` is the shared GPUI + Ely component layer. It is the only crate that
+names the pinned `gpui`/`gpui_platform`/`ely-gpui-component` versions; consumers
+(`siegu-desktop`, and later `siegu-web`) use its re-exports so the versions live
+in one place. `siegu-desktop` is the native GPUI spike; `siegu-web` is the WASM
+spike.
 
 ## Detailed Documentation
 

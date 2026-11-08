@@ -1,0 +1,27 @@
+[package]
+name = "siegu-ui"
+version = "0.1.0"
+description = "Shared GPUI + Ely component layer for Siegu"
+authors = ["Denzyl Dick"]
+license-file = "../../LICENSE"
+edition = "2021"
+publish = false
+
+[lib]
+name = "siegu_ui"
+crate-type = ["rlib"]
+
+[features]
+default = []
+# Linux/desktop GPUI backends. Enable from a desktop binary so the shared layer
+# stays the only crate that names the pinned GPUI/Ely packages.
+desktop = [
+    "gpui_platform/font-kit",
+    "gpui_platform/wayland",
+    "gpui_platform/x11",
+]
+
+[dependencies]
+gpui = { workspace = true }
+gpui_platform = { workspace = true }
+ely-gpui-component = { workspace = true }

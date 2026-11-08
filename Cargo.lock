@@ -10059,9 +10059,8 @@ dependencies = [
 name = "siegu-desktop"
 version = "0.1.0"
 dependencies = [
- "ely-gpui-component",
- "gpui-pre",
- "gpui-pre-platform",
+ "siegu-core",
+ "siegu-ui",
 ]
 
 [[package]]
