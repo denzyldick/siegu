@@ -36,6 +36,8 @@ export interface DuplicateScanResult {
 }
 
 export interface ScanProgress {
+  /** Which scan stage is running ("hashing", "clip-stills", "clip-videos"). */
+  stage?: string;
   done: number;
   total: number;
 }
