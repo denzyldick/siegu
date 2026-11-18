@@ -29,6 +29,9 @@ jobs:
           workspaces: .
           rust-components: rustfmt
 
+      - name: Check formatting
+        run: cargo fmt -p siegu-web -- --check
+
       # GPUI's wasm_thread uses `#![feature(stdarch_wasm_atomic_wait)]`, so the
       # WASM spike only builds on nightly.
       - name: Set up nightly Rust for WASM
@@ -41,9 +44,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config
-
-      - name: Check formatting
-        run: cargo fmt -p siegu-web -- --check
 
       - name: Build WASM spike
         run: cargo +nightly build -p siegu-web --target wasm32-unknown-unknown --release
