@@ -299,11 +299,12 @@ impl Governor {
         }
     }
 
-    /// Overrides the cached level without touching the host. Test-only: sets
-    /// the sample timestamp to "now" so the forced value is not refreshed away.
+    /// Overrides the cached level without touching the host. Test-only: pins
+    /// the sample timestamp far in the future so the forced value is never
+    /// refreshed away by a concurrent `level()` call.
     #[cfg(test)]
     pub fn force_level(&self, level: Pressure) {
-        self.last_sample_ms.store(now_ms(), Ordering::Relaxed);
+        self.last_sample_ms.store(u64::MAX / 2, Ordering::Relaxed);
         self.level.store(level as u8, Ordering::Relaxed);
     }
 
@@ -412,23 +413,31 @@ mod tests {
 
     #[test]
     fn pressurized_levels_serialize_until_guard_dropped() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::{Arc, Barrier};
+
         for level in [Pressure::Elevated, Pressure::Critical] {
-            let g = std::sync::Arc::new(Governor::new());
+            let g = Arc::new(Governor::new());
             g.force_level(level);
 
             let first = g.acquire(&|_| {});
-            let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-            let done_ref = std::sync::Arc::clone(&done);
-            let g2 = std::sync::Arc::clone(&g);
+            let done = Arc::new(AtomicBool::new(false));
+            let ready = Arc::new(Barrier::new(2));
+            let done_ref = Arc::clone(&done);
+            let ready_ref = Arc::clone(&ready);
+            let g2 = Arc::clone(&g);
             let blocked = std::thread::spawn(move || {
+                ready_ref.wait();
                 let _second = g2.acquire(&|_| {});
                 done_ref.store(true, Ordering::SeqCst);
             });
 
-            // The second acquisition must be blocked by the gate the first
-            // guard still holds. Allow enough time for the spawned thread to
-            // reach acquire() on slow/contended CI runners.
-            std::thread::sleep(Duration::from_millis(250));
+            // Ensure the spawned thread is at the acquire call, then give it a
+            // moment to block on the gate held by `first`. While `first` holds
+            // the gate, `acquire` cannot complete for pressured levels, so
+            // `done` must remain false regardless of scheduling.
+            ready.wait();
+            std::thread::sleep(Duration::from_millis(50));
             assert!(
                 !done.load(Ordering::SeqCst),
                 "{level:?}: second acquire should block behind the first"

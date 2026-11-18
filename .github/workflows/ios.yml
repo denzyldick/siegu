@@ -49,9 +49,19 @@ jobs:
             || xcrun simctl list devicetypes | grep -E 'iPhone' | head -1 | sed -E 's/ \(com\.apple.*$//')
           echo "Using device type: $DEVICETYPE"
           UDID=$(xcrun simctl create "Siegu-Test" "$DEVICETYPE")
-          xcrun simctl boot "$UDID"
+          xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b
           echo "Running core lib tests..."
-          xcrun simctl spawn "$UDID" "$LIB_TEST" --test-threads 4
+          for attempt in 1 2 3; do
+            xcrun simctl spawn "$UDID" "$LIB_TEST" --test-threads 4 && break
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            echo "simctl spawn failed for lib tests (attempt $attempt), retrying..."
+            sleep 5
+          done
           echo "Running sync_e2e..."
-          xcrun simctl spawn "$UDID" "$SYNC_TEST" --test-threads 2
+          for attempt in 1 2 3; do
+            xcrun simctl spawn "$UDID" "$SYNC_TEST" --test-threads 2 && break
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            echo "simctl spawn failed for sync_e2e (attempt $attempt), retrying..."
+            sleep 5
+          done

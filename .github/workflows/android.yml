@@ -72,15 +72,30 @@ jobs:
 
       - name: Locate test binaries
         run: |
-          LIB_TEST=$(find target -path '*x86_64-linux-android*/deps/siegu_core-*' -type f ! -name '*.*' | head -1)
-          SYNC_TEST=$(find target -path '*x86_64-linux-android*/deps/sync_e2e-*' -type f ! -name '*.*' | head -1)
+          locate_test_bin() {
+            local name="$1"
+            local bin=""
+            bin=$(find target -path "*x86_64-linux-android*/deps/${name}-*" -type f ! -name '*.*' 2>/dev/null | head -1)
+            if [ -z "$bin" ]; then
+              bin=$(find target -path "*/deps/${name}-*" -type f ! -name '*.*' 2>/dev/null | grep 'x86_64-linux-android' | head -1 || true)
+            fi
+            if [ -z "$bin" ]; then
+              bin=$(find target -path "*/deps/${name}-*" -type f ! -name '*.*' ! -path '*/build/*' 2>/dev/null | head -1)
+            fi
+            echo "$bin"
+          }
+
+          LIB_TEST=$(locate_test_bin siegu_core)
+          SYNC_TEST=$(locate_test_bin sync_e2e)
           echo "LIB_TEST=$LIB_TEST" >> "$GITHUB_ENV"
           echo "SYNC_TEST=$SYNC_TEST" >> "$GITHUB_ENV"
           echo "LIB_TEST=$LIB_TEST"
           echo "SYNC_TEST=$SYNC_TEST"
           if [ -z "$LIB_TEST" ] || [ -z "$SYNC_TEST" ]; then
             echo "Test binaries not found; listing candidate files:" >&2
-            find target -name 'siegu_core-*' -o -name 'sync_e2e-*' || true
+            find target -name 'siegu_core-*' -o -name 'sync_e2e-*' 2>/dev/null || true
+            echo "Listing deps directories:" >&2
+            find target -type d -name deps 2>/dev/null || true
             exit 1
           fi
           chmod +x "$LIB_TEST" "$SYNC_TEST"
