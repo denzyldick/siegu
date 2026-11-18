@@ -117,6 +117,11 @@ jobs:
 
       - name: AI Pipeline Integration Test
         shell: bash
+        env:
+          # CI integration tests expect the full model suite to load; bypass the
+          # default physical-RAM-derived memory budget so heavy models aren't
+          # skipped on runner environments.
+          SIEGU_ML_MEMORY_BUDGET_MB: "16384"
         run: |
           bash ../scripts/download-models.sh
           cargo test -- --ignored test_full_inference_on_sample

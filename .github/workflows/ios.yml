@@ -39,8 +39,14 @@ jobs:
 
       - name: Locate test binaries
         run: |
-          echo "LIB_TEST=$(find target/aarch64-apple-ios-sim/debug/deps -maxdepth 1 -type f -perm -u+x -name 'siegu_core-*' | head -1)" >> $GITHUB_ENV
-          echo "SYNC_TEST=$(find target/aarch64-apple-ios-sim/debug/deps -maxdepth 1 -type f -perm -u+x -name 'sync_e2e-*' | head -1)" >> $GITHUB_ENV
+          LIB_TEST=$(find target/aarch64-apple-ios-sim/debug/deps -maxdepth 1 -type f -perm -u+x -name 'siegu_core-*' | head -1)
+          SYNC_TEST=$(find target/aarch64-apple-ios-sim/debug/deps -maxdepth 1 -type f -perm -u+x -name 'sync_e2e-*' | head -1)
+          echo "LIB_TEST=$LIB_TEST" >> "$GITHUB_ENV"
+          echo "SYNC_TEST=$SYNC_TEST" >> "$GITHUB_ENV"
+          # Ad-hoc sign cross-compiled test binaries; freshly booted simulators
+          # can otherwise reject spawn with NSPOSIXErrorDomain code 13.
+          if [ -n "$LIB_TEST" ]; then codesign --force --sign - "$LIB_TEST" || true; fi
+          if [ -n "$SYNC_TEST" ]; then codesign --force --sign - "$SYNC_TEST" || true; fi
 
       - name: Run tests on iOS simulator
         run: |
@@ -51,17 +57,19 @@ jobs:
           UDID=$(xcrun simctl create "Siegu-Test" "$DEVICETYPE")
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b
+          # Give the simulator a moment to settle after boot before spawning.
+          sleep 10
           echo "Running core lib tests..."
-          for attempt in 1 2 3; do
+          for attempt in 1 2 3 4 5; do
             xcrun simctl spawn "$UDID" "$LIB_TEST" --test-threads 4 && break
-            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            if [ "$attempt" -eq 5 ]; then exit 1; fi
             echo "simctl spawn failed for lib tests (attempt $attempt), retrying..."
-            sleep 5
+            sleep 10
           done
           echo "Running sync_e2e..."
-          for attempt in 1 2 3; do
+          for attempt in 1 2 3 4 5; do
             xcrun simctl spawn "$UDID" "$SYNC_TEST" --test-threads 2 && break
-            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            if [ "$attempt" -eq 5 ]; then exit 1; fi
             echo "simctl spawn failed for sync_e2e (attempt $attempt), retrying..."
-            sleep 5
+            sleep 10
           done
