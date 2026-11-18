@@ -15,6 +15,7 @@
 use std::collections::HashMap;
 
 use crate::database::Database;
+#[cfg(feature = "ml")]
 use crate::ml_engine::models::ModelEngine;
 
 /// Perceptual dHash hamming-distance threshold: photos at or below this many
@@ -286,6 +287,7 @@ pub fn detect_all(db: &Database, include_clip: bool) -> Vec<DuplicateGroup> {
 /// Decode a representative RGB image for a photo/video to embed with CLIP.
 /// Stills come from their stored thumbnail; videos from the first extracted
 /// frame. Returns `None` when nothing usable is available.
+#[cfg(feature = "ml")]
 fn representative_rgb(db: &Database, location: &str, is_video: bool) -> Option<image::RgbImage> {
     if is_video {
         let frames = crate::ml_engine::whisper::extract_frames(location);
@@ -304,6 +306,7 @@ fn representative_rgb(db: &Database, location: &str, is_video: bool) -> Option<i
 /// This is what makes the CLIP stage do real work on a first scan (the current
 /// "too fast" symptom): every embedding computed here is stored to
 /// `photo.clip_embedding` so re-scans hit the fast comparison-only path.
+#[cfg(feature = "ml")]
 pub fn backfill_clip_embeddings(
     db: &Database,
     model: &ModelEngine,
@@ -334,6 +337,7 @@ pub fn backfill_clip_embeddings(
 /// when `include_videos`, videos), then return the enriched CLIP duplicate
 /// groups for the selected media types. Returns the groups and how many
 /// embeddings were newly computed. The provided model must already be loaded.
+#[cfg(feature = "ml")]
 pub fn detect_clip_with_backfill(
     db: &Database,
     model: &ModelEngine,

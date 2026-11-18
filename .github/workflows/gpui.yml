@@ -29,6 +29,13 @@ jobs:
           workspaces: .
           rust-components: rustfmt
 
+      # GPUI's wasm_thread uses `#![feature(stdarch_wasm_atomic_wait)]`, so the
+      # WASM spike only builds on nightly.
+      - name: Set up nightly Rust for WASM
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: wasm32-unknown-unknown
+
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -39,4 +46,4 @@ jobs:
         run: cargo fmt -p siegu-web -- --check
 
       - name: Build WASM spike
-        run: cargo build -p siegu-web --target wasm32-unknown-unknown --release
+        run: cargo +nightly build -p siegu-web --target wasm32-unknown-unknown --release

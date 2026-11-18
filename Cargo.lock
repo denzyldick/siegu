@@ -10087,6 +10087,7 @@ dependencies = [
  "ely-gpui-component",
  "gpui-pre",
  "gpui-pre-platform",
+ "wasm-bindgen",
 ]
 
 [[package]]

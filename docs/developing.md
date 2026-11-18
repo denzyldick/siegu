@@ -50,7 +50,7 @@ GitHub Actions workflows in `.github/workflows/` (details in `docs/ci.md`):
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ubuntu.yml`                | Unit/integration tests, lint, mesh + view-only E2E, face-grouping E2E, full AI inference (only platform that runs ML tests)                             |
 | `macos.yml` / `windows.yml` | Unit tests, Tauri desktop build, mesh + view-only E2E                                                                                                   |
-| `gpui.yml`                  | Locked `siegu-desktop` GPUI/Ely spike check + formatting on Linux, macOS, and Windows                                                                   |
+| `gpui.yml`                  | `siegu-web` GPUI/Ely WASM build + formatting on Linux                                                                                                  |
 | `android.yml`               | Cross-compile check (aarch64 + x86_64) + core tests on an x86_64 emulator                                                                               |
 | `ios.yml`                   | Cross-compile check (aarch64) + core tests on an iOS simulator                                                                                          |
 | `release.yml`               | Builds desktop installers + Android APK and gates on iOS build; triggered by a GitHub release or a `v*` tag push — artifacts auto-attach to the release |
@@ -199,6 +199,16 @@ CI type-checks the spike through the platform workflows' workspace-wide
 `cargo check --all-targets` (and `cargo fmt --check` on Linux). The
 `.github/workflows/gpui.yml` workflow builds the separate `siegu-web` WASM
 spike.
+
+### Build the web spike
+
+`crates/siegu-web` targets `wasm32-unknown-unknown` and requires **nightly**
+(GPUI's `wasm_thread` uses `#![feature(stdarch_wasm_atomic_wait)]`):
+
+```bash
+rustup toolchain install nightly --profile minimal --target wasm32-unknown-unknown
+cargo +nightly build -p siegu-web --target wasm32-unknown-unknown --release
+```
 
 ## Neovim Debugging
 
