@@ -74,12 +74,21 @@ jobs:
           LIB_TEST=$(python3 -c $'import json\nexe=\'\'\nfor line in open(\'/tmp/siegu-core-lib-test.json\',encoding=\'utf-8\',errors=\'replace\'):\n try:\n  msg=json.loads(line)\n except Exception:\n  continue\n if msg.get(\'reason\')==\'compiler-artifact\' and msg.get(\'executable\'):\n  t=msg.get(\'target\') or {}\n  if t.get(\'name\')==\'siegu_core\' and t.get(\'test\') is True:\n   exe=msg[\'executable\']\nprint(exe)')
           SYNC_TEST=$(python3 -c $'import json\nexe=\'\'\nfor line in open(\'/tmp/siegu-core-sync-e2e-test.json\',encoding=\'utf-8\',errors=\'replace\'):\n try:\n  msg=json.loads(line)\n except Exception:\n  continue\n if msg.get(\'reason\')==\'compiler-artifact\' and msg.get(\'executable\'):\n  t=msg.get(\'target\') or {}\n  if t.get(\'name\')==\'sync_e2e\' and t.get(\'test\') is True:\n   exe=msg[\'executable\']\nprint(exe)')
 
+          if [ -z "$LIB_TEST" ]; then
+            LIB_TEST=$(find target -type f -path '*x86_64-linux-android*' -name 'siegu_core-*' ! -name '*.d' ! -name '*.rlib' ! -name '*.rmeta' ! -name '*.so' ! -path '*/.fingerprint/*' ! -path '*/incremental/*' 2>/dev/null | head -1 || true)
+          fi
+          if [ -z "$SYNC_TEST" ]; then
+            SYNC_TEST=$(find target -type f -path '*x86_64-linux-android*' -name 'sync_e2e-*' ! -name '*.d' ! -name '*.rlib' ! -name '*.rmeta' ! -name '*.so' ! -path '*/.fingerprint/*' ! -path '*/incremental/*' 2>/dev/null | head -1 || true)
+          fi
+
           echo "LIB_TEST=$LIB_TEST" >> "$GITHUB_ENV"
           echo "SYNC_TEST=$SYNC_TEST" >> "$GITHUB_ENV"
           echo "LIB_TEST=$LIB_TEST"
           echo "SYNC_TEST=$SYNC_TEST"
           if [ -z "$LIB_TEST" ] || [ -z "$SYNC_TEST" ]; then
-            echo "Test binaries not found in cargo JSON output; listing candidate files:" >&2
+            echo "Test binaries not found; dumping compiler-artifact executables from JSON:" >&2
+            python3 -c $'import json\nfor path in [\'/tmp/siegu-core-lib-test.json\',\'/tmp/siegu-core-sync-e2e-test.json\']:\n print("---", path, "---")\n for line in open(path,encoding=\'utf-8\',errors=\'replace\'):\n  try:\n   msg=json.loads(line)\n  except Exception:\n   continue\n  if msg.get(\'reason\')==\'compiler-artifact\' and msg.get(\'executable\'):\n   t=msg.get(\'target\') or {}\n   print(t.get(\'name\'), t.get(\'kind\'), t.get(\'test\'), msg.get(\'executable\'))' >&2 || true
+            echo "Listing candidate files:" >&2
             find target -name 'siegu_core-*' -o -name 'sync_e2e-*' 2>/dev/null || true
             echo "Listing deps directories:" >&2
             find target -type d -name deps 2>/dev/null || true
