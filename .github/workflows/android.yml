@@ -63,36 +63,61 @@ jobs:
 
       - name: Build core tests for Android (x86_64)
         run: |
+          set -euo pipefail
           # ort-sys ships no prebuilt ONNX Runtime for x86_64-linux-android, so
           # the emulator test binaries are built with siegu-core's default
           # features (ml) disabled. Core lib + sync_e2e tests don't need ML, and
           # the aarch64 check above still validates the ML/ort cross-compile.
-          cargo ndk -t x86_64-linux-android --platform 24 test -p siegu-core --lib --no-run --no-default-features
-          cargo ndk -t x86_64-linux-android --platform 24 test -p siegu-core --test sync_e2e --no-run --no-default-features
+          cargo ndk -t x86_64-linux-android --platform 24 test -p siegu-core --lib --no-run --no-default-features --message-format=json-render-diagnostics > /tmp/siegu-core-lib-test.json
+          cargo ndk -t x86_64-linux-android --platform 24 test -p siegu-core --test sync_e2e --no-run --no-default-features --message-format=json-render-diagnostics > /tmp/siegu-core-sync-e2e-test.json
 
-      - name: Locate test binaries
-        run: |
-          locate_test_bin() {
-            local name="$1"
-            local bin=""
-            bin=$(find target -path "*x86_64-linux-android*/deps/${name}-*" -type f ! -name '*.*' 2>/dev/null | head -1)
-            if [ -z "$bin" ]; then
-              bin=$(find target -path "*/deps/${name}-*" -type f ! -name '*.*' 2>/dev/null | grep 'x86_64-linux-android' | head -1 || true)
-            fi
-            if [ -z "$bin" ]; then
-              bin=$(find target -path "*/deps/${name}-*" -type f ! -name '*.*' ! -path '*/build/*' 2>/dev/null | head -1)
-            fi
-            echo "$bin"
-          }
+          LIB_TEST=$(python3 - <<'PY'
+import json
+path = '/tmp/siegu-core-lib-test.json'
+exe = ''
+for line in open(path, 'r', encoding='utf-8', errors='replace'):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        msg = json.loads(line)
+    except Exception:
+        continue
+    if msg.get('reason') != 'compiler-artifact' or not msg.get('executable'):
+        continue
+    target = msg.get('target') or {}
+    if target.get('name') == 'siegu_core' and target.get('test') is True:
+        exe = msg['executable']
+print(exe)
+PY
+)
+          SYNC_TEST=$(python3 - <<'PY'
+import json
+path = '/tmp/siegu-core-sync-e2e-test.json'
+exe = ''
+for line in open(path, 'r', encoding='utf-8', errors='replace'):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        msg = json.loads(line)
+    except Exception:
+        continue
+    if msg.get('reason') != 'compiler-artifact' or not msg.get('executable'):
+        continue
+    target = msg.get('target') or {}
+    if target.get('name') == 'sync_e2e' and target.get('test') is True:
+        exe = msg['executable']
+print(exe)
+PY
+)
 
-          LIB_TEST=$(locate_test_bin siegu_core)
-          SYNC_TEST=$(locate_test_bin sync_e2e)
           echo "LIB_TEST=$LIB_TEST" >> "$GITHUB_ENV"
           echo "SYNC_TEST=$SYNC_TEST" >> "$GITHUB_ENV"
           echo "LIB_TEST=$LIB_TEST"
           echo "SYNC_TEST=$SYNC_TEST"
           if [ -z "$LIB_TEST" ] || [ -z "$SYNC_TEST" ]; then
-            echo "Test binaries not found; listing candidate files:" >&2
+            echo "Test binaries not found in cargo JSON output; listing candidate files:" >&2
             find target -name 'siegu_core-*' -o -name 'sync_e2e-*' 2>/dev/null || true
             echo "Listing deps directories:" >&2
             find target -type d -name deps 2>/dev/null || true
