@@ -426,8 +426,9 @@ mod tests {
             });
 
             // The second acquisition must be blocked by the gate the first
-            // guard still holds.
-            std::thread::sleep(Duration::from_millis(80));
+            // guard still holds. Allow enough time for the spawned thread to
+            // reach acquire() on slow/contended CI runners.
+            std::thread::sleep(Duration::from_millis(250));
             assert!(
                 !done.load(Ordering::SeqCst),
                 "{level:?}: second acquire should block behind the first"

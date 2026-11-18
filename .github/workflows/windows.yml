@@ -78,9 +78,10 @@ jobs:
       # target/debug/{,examples,deps} but never creates `examples`. When Windows
       # symlinks are unavailable it falls back to fs::copy() and panics with
       # "The system cannot find the path specified" if that directory is absent.
+      # cargo test runs in src-tauri/, so create the dirs in its target dir.
       - name: Create ORT dylib output directories
         shell: bash
-        run: mkdir -p target/debug/examples target/debug/deps
+        run: mkdir -p src-tauri/target/debug/examples src-tauri/target/debug/deps
 
       - run: cargo test
         working-directory: src-tauri

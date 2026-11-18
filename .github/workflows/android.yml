@@ -72,8 +72,18 @@ jobs:
 
       - name: Locate test binaries
         run: |
-          echo "LIB_TEST=$(find target/x86_64-linux-android/debug/deps -maxdepth 1 -type f -perm -u+x -name 'siegu_core-*' | head -1)" >> $GITHUB_ENV
-          echo "SYNC_TEST=$(find target/x86_64-linux-android/debug/deps -maxdepth 1 -type f -perm -u+x -name 'sync_e2e-*' | head -1)" >> $GITHUB_ENV
+          LIB_TEST=$(find target -path '*x86_64-linux-android*/deps/siegu_core-*' -type f ! -name '*.*' | head -1)
+          SYNC_TEST=$(find target -path '*x86_64-linux-android*/deps/sync_e2e-*' -type f ! -name '*.*' | head -1)
+          echo "LIB_TEST=$LIB_TEST" >> "$GITHUB_ENV"
+          echo "SYNC_TEST=$SYNC_TEST" >> "$GITHUB_ENV"
+          echo "LIB_TEST=$LIB_TEST"
+          echo "SYNC_TEST=$SYNC_TEST"
+          if [ -z "$LIB_TEST" ] || [ -z "$SYNC_TEST" ]; then
+            echo "Test binaries not found; listing candidate files:" >&2
+            find target -name 'siegu_core-*' -o -name 'sync_e2e-*' || true
+            exit 1
+          fi
+          chmod +x "$LIB_TEST" "$SYNC_TEST"
 
       - name: Run tests on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
