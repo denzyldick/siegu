@@ -38,4 +38,14 @@ ignore = [
   # --- misc transitive, no upstream fix available ----------------------
   "RUSTSEC-2024-0436", # paste 1.0.15 (latest; used by image -> exr -> pulp)
   "RUSTSEC-2025-0119", # number_prefix 0.4.0 (indicatif, used by siegu-cli)
+  "RUSTSEC-2026-0387", # crypto-bigint 0.5.5 timing variability; transitive via webrtc-rs (pinned git rev) -> dtls -> ecdsa/p256, no compatible patched release in that stack.
+
+  # --- GPUI/Ely transitive, unmaintained upstream ----------------------
+  "RUSTSEC-2026-0543", # chrono 0.4.45
+  "RUSTSEC-2026-0441", # pin-utils 0.1.0
+  "RUSTSEC-2026-0206", # rustybuzz 0.20.1
+  "RUSTSEC-2026-0192", # ttf-parser 0.25.1
+  "RUSTSEC-2026-0371", # zbus_names 4.3.4
+  "RUSTSEC-2026-0370", # zvariant 5.13.1
+  "RUSTSEC-2026-0372", # zvariant_derive 5.13.1
 ]
