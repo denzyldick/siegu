@@ -74,18 +74,24 @@ jobs:
       # here to avoid triple-running them on every PR (the main driver of long
       # CI time; the model download alone was several hundred MB per runner).
 
-      # ort-sys's copy-dylibs step writes ONNX Runtime DLLs into
-      # target/debug/{,examples,deps} but never creates `examples`. When Windows
-      # symlinks are unavailable it falls back to fs::copy() and panics with
-      # "The system cannot find the path specified" if that directory is absent.
-      # Create the dirs in all target locations cargo/ort-sys may use (repo root
-      # and src-tauri/, across common profiles).
+      # ort-sys's copy-dylibs step writes ONNX Runtime DLLs next to built
+      # artifacts. When Windows symlinks are unavailable it falls back to
+      # fs::copy() and panics with "The system cannot find the path specified"
+      # if a destination directory is absent. ort-sys 2.x derives destination
+      # directories from OUT_DIR (e.g. target/debug/build and its examples/deps
+      # subdirs, and/or the profile dir), so create all plausible locations.
       - name: Create ORT dylib output directories
         shell: bash
         run: |
           for base in target src-tauri/target; do
             for profile in debug release; do
-              mkdir -p "$base/$profile/examples" "$base/$profile/deps"
+              mkdir -p \
+                "$base/$profile" \
+                "$base/$profile/examples" \
+                "$base/$profile/deps" \
+                "$base/$profile/build" \
+                "$base/$profile/build/examples" \
+                "$base/$profile/build/deps"
             done
           done
 
