@@ -34,19 +34,38 @@ jobs:
 
       - name: Build core tests for iOS simulator (aarch64)
         run: |
-          cargo test -p siegu-core --lib --no-run --target aarch64-apple-ios-sim
-          cargo test -p siegu-core --test sync_e2e --no-run --target aarch64-apple-ios-sim
+          # Cargo 1.100 changed the test-binary layout; capture the real paths
+          # from cargo instead of guessing debug/deps.
+          cargo test -p siegu-core --lib --no-run --target aarch64-apple-ios-sim --message-format=json-render-diagnostics > /tmp/siegu-core-ios-lib-test.json
+          cargo test -p siegu-core --test sync_e2e --no-run --target aarch64-apple-ios-sim --message-format=json-render-diagnostics > /tmp/siegu-core-ios-sync-e2e-test.json
 
       - name: Locate test binaries
         run: |
-          LIB_TEST=$(find target/aarch64-apple-ios-sim/debug/deps -maxdepth 1 -type f -perm -u+x -name 'siegu_core-*' | head -1)
-          SYNC_TEST=$(find target/aarch64-apple-ios-sim/debug/deps -maxdepth 1 -type f -perm -u+x -name 'sync_e2e-*' | head -1)
+          set -euo pipefail
+          LIB_TEST=$(python3 -c $'import json\nexe=""\nfor line in open("/tmp/siegu-core-ios-lib-test.json",encoding="utf-8",errors="replace"):\n try:\n  msg=json.loads(line)\n except Exception:\n  continue\n if msg.get("reason")=="compiler-artifact" and msg.get("executable"):\n  t=msg.get("target") or {}\n  if t.get("name")=="siegu_core" and t.get("test") is True:\n   exe=msg["executable"]\nprint(exe)')
+          SYNC_TEST=$(python3 -c $'import json\nexe=""\nfor line in open("/tmp/siegu-core-ios-sync-e2e-test.json",encoding="utf-8",errors="replace"):\n try:\n  msg=json.loads(line)\n except Exception:\n  continue\n if msg.get("reason")=="compiler-artifact" and msg.get("executable"):\n  t=msg.get("target") or {}\n  if t.get("name")=="sync_e2e" and t.get("test") is True:\n   exe=msg["executable"]\nprint(exe)')
+
+          # Fallback for older cargo layouts.
+          if [ -z "$LIB_TEST" ]; then
+            LIB_TEST=$(find target/aarch64-apple-ios-sim/debug -type f -name 'siegu_core-*' ! -name '*.d' ! -name '*.rlib' ! -name '*.rmeta' ! -path '*/.fingerprint/*' ! -path '*/incremental/*' 2>/dev/null | head -1 || true)
+          fi
+          if [ -z "$SYNC_TEST" ]; then
+            SYNC_TEST=$(find target/aarch64-apple-ios-sim/debug -type f -name 'sync_e2e-*' ! -name '*.d' ! -name '*.rlib' ! -name '*.rmeta' ! -path '*/.fingerprint/*' ! -path '*/incremental/*' 2>/dev/null | head -1 || true)
+          fi
+
+          echo "LIB_TEST=$LIB_TEST"
+          echo "SYNC_TEST=$SYNC_TEST"
+          if [ -z "$LIB_TEST" ] || [ -z "$SYNC_TEST" ]; then
+            echo "Test binaries not found; dumping compiler-artifact executables:" >&2
+            python3 -c $'import json\nfor path in ["/tmp/siegu-core-ios-lib-test.json","/tmp/siegu-core-ios-sync-e2e-test.json"]:\n print("---", path, "---")\n for line in open(path,encoding="utf-8",errors="replace"):\n  try:\n   msg=json.loads(line)\n  except Exception:\n   continue\n  if msg.get("reason")=="compiler-artifact" and msg.get("executable"):\n   t=msg.get("target") or {}\n   print(t.get("name"), t.get("kind"), t.get("test"), msg.get("executable"))' >&2 || true
+            exit 1
+          fi
+
           echo "LIB_TEST=$LIB_TEST" >> "$GITHUB_ENV"
           echo "SYNC_TEST=$SYNC_TEST" >> "$GITHUB_ENV"
-          # Ad-hoc sign cross-compiled test binaries; freshly booted simulators
-          # can otherwise reject spawn with NSPOSIXErrorDomain code 13.
-          if [ -n "$LIB_TEST" ]; then codesign --force --sign - "$LIB_TEST" || true; fi
-          if [ -n "$SYNC_TEST" ]; then codesign --force --sign - "$SYNC_TEST" || true; fi
+          chmod +x "$LIB_TEST" "$SYNC_TEST"
+          # Ad-hoc sign cross-compiled test binaries before spawning them.
+          codesign --force --sign - "$LIB_TEST" "$SYNC_TEST"
 
       - name: Run tests on iOS simulator
         run: |
@@ -59,19 +78,16 @@ jobs:
           xcrun simctl bootstatus "$UDID" -b
           # Give the simulator a moment to settle after boot before spawning.
           sleep 10
-          # Standalone mode uses a NULL mach bootstrap port. Plain Rust test
-          # binaries do not need simulator services, and this avoids launchd
-          # rejecting repeated spawns with EACCES / "name exists" on CI hosts.
           echo "Running core lib tests..."
           for attempt in 1 2 3 4 5; do
-            xcrun simctl spawn --standalone "$UDID" "$LIB_TEST" --test-threads 4 && break
+            xcrun simctl spawn "$UDID" "$LIB_TEST" --test-threads 4 && break
             if [ "$attempt" -eq 5 ]; then exit 1; fi
             echo "simctl spawn failed for lib tests (attempt $attempt), retrying..."
             sleep 10
           done
           echo "Running sync_e2e..."
           for attempt in 1 2 3 4 5; do
-            xcrun simctl spawn --standalone "$UDID" "$SYNC_TEST" --test-threads 2 && break
+            xcrun simctl spawn "$UDID" "$SYNC_TEST" --test-threads 2 && break
             if [ "$attempt" -eq 5 ]; then exit 1; fi
             echo "simctl spawn failed for sync_e2e (attempt $attempt), retrying..."
             sleep 10

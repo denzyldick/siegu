@@ -98,6 +98,10 @@ jobs:
 
       - name: Run tests on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          # Recent emulator versions require an explicit opt-in for software
+          # CPU emulation on Linux runners without KVM.
+          ANDROID_I_WANT_MY_TCG: 'yes'
         with:
           # x86_64 guests on an x86_64 host use KVM, so they boot fast and
           # reliably. arm64-v8a images cannot use KVM here and routinely time
