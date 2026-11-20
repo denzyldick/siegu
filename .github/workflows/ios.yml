@@ -59,16 +59,19 @@ jobs:
           xcrun simctl bootstatus "$UDID" -b
           # Give the simulator a moment to settle after boot before spawning.
           sleep 10
+          # Standalone mode uses a NULL mach bootstrap port. Plain Rust test
+          # binaries do not need simulator services, and this avoids launchd
+          # rejecting repeated spawns with EACCES / "name exists" on CI hosts.
           echo "Running core lib tests..."
           for attempt in 1 2 3 4 5; do
-            xcrun simctl spawn "$UDID" "$LIB_TEST" --test-threads 4 && break
+            xcrun simctl spawn --standalone "$UDID" "$LIB_TEST" --test-threads 4 && break
             if [ "$attempt" -eq 5 ]; then exit 1; fi
             echo "simctl spawn failed for lib tests (attempt $attempt), retrying..."
             sleep 10
           done
           echo "Running sync_e2e..."
           for attempt in 1 2 3 4 5; do
-            xcrun simctl spawn "$UDID" "$SYNC_TEST" --test-threads 2 && break
+            xcrun simctl spawn --standalone "$UDID" "$SYNC_TEST" --test-threads 2 && break
             if [ "$attempt" -eq 5 ]; then exit 1; fi
             echo "simctl spawn failed for sync_e2e (attempt $attempt), retrying..."
             sleep 10
