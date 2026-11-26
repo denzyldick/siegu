@@ -9942,8 +9942,12 @@ dependencies = [
 name = "siegu-desktop"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
+ "jwalk",
+ "rayon",
  "siegu-core",
  "siegu-ui",
+ "tokio",
 ]
 
 [[package]]

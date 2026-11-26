@@ -12,5 +12,9 @@ name = "siegu-desktop"
 path = "src/main.rs"
 
 [dependencies]
+base64 = { workspace = true }
+jwalk = "0.8.1"
+rayon = { workspace = true }
+tokio = { workspace = true }
 siegu-core = { workspace = true, default-features = true }
 siegu-ui = { workspace = true, features = ["desktop"] }

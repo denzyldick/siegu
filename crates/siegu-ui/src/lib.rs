@@ -9,12 +9,14 @@ pub use ely_gpui_component as ely;
 pub use gpui;
 pub use gpui_platform;
 pub use info_card::InfoCard;
+pub use media_viewer::MediaViewer;
 pub use nav::siegu_nav_items;
 pub use photo_card::PhotoCard;
 pub use photo_grid::PhotoGrid;
 
 mod app_shell;
 mod info_card;
+mod media_viewer;
 mod nav;
 mod photo_card;
 mod photo_grid;
