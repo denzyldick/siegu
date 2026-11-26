@@ -92,7 +92,8 @@ const PHOTO_WINDOW_SIZE: usize = 180;
 const PHOTO_GAP: Pixels = px(16.0);
 const PHOTO_CARD_WIDTH: Pixels = px(220.0);
 const PHOTO_ROW_HEIGHT: Pixels = px(236.0);
-const LIBRARY_HEADER_HEIGHT: Pixels = px(64.0);
+const LIBRARY_MONTH_HEADER_HEIGHT: Pixels = px(64.0);
+const LIBRARY_DAY_HEADER_HEIGHT: Pixels = px(40.0);
 
 /// A library photo paired with its pre-resolved thumbnail source.
 #[derive(Clone)]
@@ -134,15 +135,23 @@ impl PhotoWindow {
     }
 }
 
-/// One virtual row in the date-grouped library. Headers and photo rows have
-/// different heights, so they live in GPUI's variable-height `ListState`.
+/// What one virtual item in the date-grouped library represents.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LibraryItemKind {
+    Month,
+    Day,
+    Photos,
+}
+
+/// One virtual item in the date-grouped library. Month/day headers and photo
+/// rows have different heights, so they live in variable-height `ListState`.
 #[derive(Clone, Copy, Debug)]
 struct LibraryItem {
+    kind: LibraryItemKind,
     group: usize,
     row: usize,
     group_start: usize,
     group_count: usize,
-    is_header: bool,
 }
 
 /// A person paired with their pre-resolved representative face thumbnail.
@@ -428,7 +437,7 @@ impl Siegu {
         modal
     }
 
-    /// Render one virtual item: either a month/year header or one photo row.
+    /// Render one virtual item: a month header, day header, or photo row.
     fn library_item(
         &mut self,
         item_ix: usize,
@@ -438,8 +447,10 @@ impl Siegu {
         let Some(item) = self.library_items.get(item_ix).copied() else {
             return div().h(PHOTO_ROW_HEIGHT).into_any_element();
         };
-        if item.is_header {
-            return self.library_header(item.group, cx);
+        match item.kind {
+            LibraryItemKind::Month => return self.library_month_header(item, cx),
+            LibraryItemKind::Day => return self.library_day_header(item, cx),
+            LibraryItemKind::Photos => {}
         }
 
         let (first, last) = row_bounds(item.row, columns, item.group_count);
@@ -465,33 +476,49 @@ impl Siegu {
         row_view.into_any_element()
     }
 
-    fn library_header(&self, group_ix: usize, cx: &Context<Self>) -> AnyElement {
-        let Some(group) = self.data.date_groups.get(group_ix) else {
-            return div().h(LIBRARY_HEADER_HEIGHT).into_any_element();
+    fn library_month_header(&self, item: LibraryItem, cx: &Context<Self>) -> AnyElement {
+        let Some(group) = self.data.date_groups.get(item.group) else {
+            return div().h(LIBRARY_MONTH_HEADER_HEIGHT).into_any_element();
         };
-        let theme = cx.theme();
         let title = month_label(&group.key, cx);
-        let count = i18n::text(
-            cx,
-            "media.items_count",
-            &[("count", &group.count.to_string())],
-        );
         div()
             .flex()
             .items_center()
             .justify_between()
-            .h(LIBRARY_HEADER_HEIGHT)
+            .h(LIBRARY_MONTH_HEADER_HEIGHT)
             .px_1()
             .child(Heading::h3(title))
-            .child(
-                div()
-                    .rounded_full()
-                    .border_1()
-                    .border_color(theme.colors.border)
-                    .px_2()
-                    .py_1()
-                    .child(Paragraph::new(count)),
-            )
+            .child(self.library_count_pill(item.group_count, cx))
+            .into_any_element()
+    }
+
+    fn library_day_header(&self, item: LibraryItem, cx: &Context<Self>) -> AnyElement {
+        let Some(group) = self.data.date_groups.get(item.group) else {
+            return div().h(LIBRARY_DAY_HEADER_HEIGHT).into_any_element();
+        };
+        let title = day_label(&group.key, cx);
+        div()
+            .flex()
+            .items_center()
+            .justify_between()
+            .h(LIBRARY_DAY_HEADER_HEIGHT)
+            .pl_4()
+            .pr_1()
+            .child(Heading::h4(title))
+            .child(self.library_count_pill(item.group_count, cx))
+            .into_any_element()
+    }
+
+    fn library_count_pill(&self, count: usize, cx: &Context<Self>) -> AnyElement {
+        let theme = cx.theme();
+        let label = i18n::text(cx, "media.items_count", &[("count", &count.to_string())]);
+        div()
+            .rounded_full()
+            .border_1()
+            .border_color(theme.colors.border)
+            .px_2()
+            .py_1()
+            .child(Paragraph::new(label))
             .into_any_element()
     }
 
@@ -562,8 +589,8 @@ impl Siegu {
         self.viewer_override = None;
     }
 
-    /// Flatten month buckets into virtual list items. The bucket counts come
-    /// from SQLite, so this stays small even for a 100k-photo library.
+    /// Flatten day buckets into month/day virtual list items. The bucket counts
+    /// come from SQLite, so this stays small even for a 100k-photo library.
     fn rebuild_library_items(&mut self, columns: usize) {
         let columns = columns.max(1);
         self.library_items = library_items_for_groups(&self.data.date_groups, columns);
@@ -1888,30 +1915,54 @@ fn row_bounds(row: usize, columns: usize, total: usize) -> (usize, usize) {
 
 fn library_items_for_groups(groups: &[PhotoDateGroup], columns: usize) -> Vec<LibraryItem> {
     let columns = columns.max(1);
-    let total: usize = groups.iter().map(|group| group.count).sum();
-    let mut items = Vec::with_capacity(total / columns + groups.len());
+    let days: Vec<(usize, &PhotoDateGroup)> = groups
+        .iter()
+        .enumerate()
+        .filter(|(_, group)| group.count > 0)
+        .collect();
+    let total: usize = days.iter().map(|(_, group)| group.count).sum();
+    let mut items = Vec::with_capacity(total / columns + days.len() * 2);
     let mut start = 0usize;
-    for (group_ix, group) in groups.iter().enumerate() {
-        if group.count == 0 {
-            continue;
+    let mut ix = 0usize;
+
+    while ix < days.len() {
+        // Day buckets arrive newest-first, so a month's days are contiguous.
+        let key = month_key(&days[ix].1.key);
+        let first_day = ix;
+        let month_start = start;
+        let mut month_count = 0usize;
+        while ix < days.len() && month_key(&days[ix].1.key) == key {
+            month_count += days[ix].1.count;
+            ix += 1;
         }
+
         items.push(LibraryItem {
-            group: group_ix,
+            kind: LibraryItemKind::Month,
+            group: days[first_day].0,
             row: 0,
-            group_start: start,
-            group_count: group.count,
-            is_header: true,
+            group_start: month_start,
+            group_count: month_count,
         });
-        for row in 0..group.count.div_ceil(columns) {
+
+        for (group_ix, group) in &days[first_day..ix] {
             items.push(LibraryItem {
-                group: group_ix,
-                row,
+                kind: LibraryItemKind::Day,
+                group: *group_ix,
+                row: 0,
                 group_start: start,
                 group_count: group.count,
-                is_header: false,
             });
+            for row in 0..group.count.div_ceil(columns) {
+                items.push(LibraryItem {
+                    kind: LibraryItemKind::Photos,
+                    group: *group_ix,
+                    row,
+                    group_start: start,
+                    group_count: group.count,
+                });
+            }
+            start += group.count;
         }
-        start += group.count;
     }
     items
 }
@@ -2341,9 +2392,17 @@ fn display_date(created: &str) -> String {
         .to_string()
 }
 
-/// A section title for a `YYYY-MM` bucket from `list_photo_date_groups`.
-fn month_label(key: &str, cx: &App) -> SharedString {
-    let (year, month) = key.split_once('-').unwrap_or(("", ""));
+/// The `YYYY-MM` month part of a `YYYY-MM-DD` bucket, or empty for unknown dates.
+fn month_key(day_key: &str) -> &str {
+    day_key
+        .get(..7)
+        .filter(|key| key.as_bytes().get(4) == Some(&b'-'))
+        .unwrap_or("")
+}
+
+/// A month section title, e.g. `March 2026`.
+fn month_label(day_key: &str, cx: &App) -> SharedString {
+    let (year, month) = month_key(day_key).split_once('-').unwrap_or(("", ""));
     let Some(name_key) = month_name_key(month) else {
         return i18n::text(cx, "media.recent", &[]);
     };
@@ -2353,6 +2412,26 @@ fn month_label(key: &str, cx: &App) -> SharedString {
     } else {
         format!("{name} {year}").into()
     }
+}
+
+/// A day section title, e.g. `March 5, 2026`.
+fn day_label(day_key: &str, cx: &App) -> SharedString {
+    let (Some(year), Some(month), Some(day)) =
+        (day_key.get(0..4), day_key.get(5..7), day_key.get(8..10))
+    else {
+        return i18n::text(cx, "media.recent", &[]);
+    };
+    let Some(name_key) = month_name_key(month) else {
+        return i18n::text(cx, "media.recent", &[]);
+    };
+    let day = day.trim_start_matches('0');
+    let day = if day.is_empty() { "0" } else { day };
+    let month = i18n::text(cx, &format!("media.months.{name_key}"), &[]);
+    i18n::text(
+        cx,
+        "media.day_label",
+        &[("month", &month), ("day", day), ("year", year)],
+    )
 }
 
 fn month_name_key(month: &str) -> Option<&'static str> {
@@ -2766,14 +2845,18 @@ mod tests {
     }
 
     #[test]
-    fn library_items_interleave_headers_and_photo_rows() {
+    fn library_items_interleave_month_day_headers_and_photo_rows() {
         let groups = vec![
             PhotoDateGroup {
-                key: "2026-03".into(),
-                count: 5,
+                key: "2026-03-20".into(),
+                count: 3,
             },
             PhotoDateGroup {
-                key: "2025-12".into(),
+                key: "2026-03-05".into(),
+                count: 2,
+            },
+            PhotoDateGroup {
+                key: "2025-12-31".into(),
                 count: 3,
             },
             PhotoDateGroup {
@@ -2781,39 +2864,55 @@ mod tests {
                 count: 1,
             },
             PhotoDateGroup {
-                key: "2025-11".into(),
+                key: "2025-11-30".into(),
                 count: 0,
             },
         ];
         let items = library_items_for_groups(&groups, 2);
-        assert_eq!(items.len(), 9);
+        assert_eq!(items.len(), 13);
 
-        assert!(items[0].is_header);
-        assert_eq!(items[0].group, 0);
+        assert_eq!(items[0].kind, LibraryItemKind::Month);
         assert_eq!(
-            (items[1].row, items[1].group_start, items[1].group_count),
+            (items[0].group, items[0].group_start, items[0].group_count),
             (0, 0, 5)
         );
+        assert_eq!(items[1].kind, LibraryItemKind::Day);
+        assert_eq!((items[1].group, items[1].group_count), (0, 3));
+        assert_eq!(items[2].kind, LibraryItemKind::Photos);
         assert_eq!(
             (items[2].row, items[2].group_start, items[2].group_count),
-            (1, 0, 5)
+            (0, 0, 3)
         );
+        assert_eq!(items[4].kind, LibraryItemKind::Day);
         assert_eq!(
-            (items[3].row, items[3].group_start, items[3].group_count),
-            (2, 0, 5)
+            (items[4].group, items[4].group_start, items[4].group_count),
+            (1, 3, 2)
         );
-
-        assert!(items[4].is_header);
-        assert_eq!((items[4].group, items[4].group_start), (1, 5));
-        assert!(!items[6].is_header);
-        assert_eq!((items[6].row, items[6].group_start), (1, 5));
-
-        assert!(items[7].is_header);
-        assert_eq!((items[7].group, items[7].group_start), (2, 8));
+        assert_eq!(items[6].kind, LibraryItemKind::Month);
         assert_eq!(
-            (items[8].row, items[8].group_start, items[8].group_count),
-            (0, 8, 1)
+            (items[6].group, items[6].group_start, items[6].group_count),
+            (2, 5, 3)
         );
+        assert_eq!(items[7].kind, LibraryItemKind::Day);
+        assert_eq!(items[10].kind, LibraryItemKind::Month);
+        assert_eq!(
+            (
+                items[10].group,
+                items[10].group_start,
+                items[10].group_count
+            ),
+            (3, 8, 1)
+        );
+        assert_eq!(items[12].kind, LibraryItemKind::Photos);
+        assert_eq!((items[12].row, items[12].group_start), (0, 8));
+    }
+
+    #[test]
+    fn month_key_extracts_the_month_from_a_day_bucket() {
+        assert_eq!(month_key("2026-03-20"), "2026-03");
+        assert_eq!(month_key("2026-03"), "2026-03");
+        assert_eq!(month_key(""), "");
+        assert_eq!(month_key("not-a-date"), "");
     }
 
     #[test]

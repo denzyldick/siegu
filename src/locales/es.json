@@ -211,6 +211,7 @@
       "november": "noviembre",
       "december": "diciembre"
     },
+    "day_label": "{day} de {month} de {year}",
     "items_count": "{count} elementos",
     "your_library_empty": "Tu biblioteca está vacía",
     "scanning_in_progress": "Escaneando tu biblioteca",

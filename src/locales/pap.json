@@ -211,6 +211,7 @@
       "november": "november",
       "december": "desember"
     },
+    "day_label": "{day} di {month} di {year}",
     "items_count": "{count} artíkulo",
     "your_library_empty": "Bo biblioteka ta bashí",
     "scanning_in_progress": "Ta skené bo biblioteka",

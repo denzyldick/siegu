@@ -172,7 +172,7 @@ pub struct PhotoFilter {
     pub album_id: Option<String>,
 }
 
-/// A month bucket used by date-grouped library views. `key` is `YYYY-MM`;
+/// A day bucket used by date-grouped library views. `key` is `YYYY-MM-DD`;
 /// photos without a usable timestamp share the empty key and sort last.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PhotoDateGroup {
@@ -1917,8 +1917,8 @@ impl Database {
             .unwrap_or(0)
     }
 
-    /// Count matching photos per month without loading any photo rows. Used by
-    /// date-grouped library grids to place section headers before paging in
+    /// Count matching photos per day without loading any photo rows. Used by
+    /// date-grouped library grids to place month/day headers before paging in
     /// thumbnails.
     pub fn list_photo_date_groups(
         &self,
@@ -1930,13 +1930,13 @@ impl Database {
         let (where_clause, params) =
             self.photo_where_clause(query, favorites_only, videos_only, filter, 0, -1);
         let sql = format!(
-            "SELECT CASE WHEN length(p.created) >= 7 \
+            "SELECT CASE WHEN length(p.created) >= 10 \
                           AND substr(p.created, 5, 1) = '-' \
                           AND substr(p.created, 8, 1) = '-' \
-                     THEN substr(p.created, 1, 7) ELSE '' END AS month, \
+                     THEN substr(p.created, 1, 10) ELSE '' END AS day, \
                     COUNT(*) \
              FROM photo p {where_clause} \
-             GROUP BY month ORDER BY month DESC LIMIT ?1, ?2"
+             GROUP BY day ORDER BY day DESC LIMIT ?1, ?2"
         );
         let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
         self.connection
@@ -7028,11 +7028,15 @@ mod tests {
             db.list_photo_date_groups("", false, false, &PhotoFilter::default()),
             vec![
                 PhotoDateGroup {
-                    key: "2026-03".into(),
-                    count: 2,
+                    key: "2026-03-20".into(),
+                    count: 1,
                 },
                 PhotoDateGroup {
-                    key: "2025-12".into(),
+                    key: "2026-03-05".into(),
+                    count: 1,
+                },
+                PhotoDateGroup {
+                    key: "2025-12-31".into(),
                     count: 1,
                 },
                 PhotoDateGroup {
@@ -7045,7 +7049,7 @@ mod tests {
         assert_eq!(
             db.list_photo_date_groups("", true, false, &PhotoFilter::default()),
             vec![PhotoDateGroup {
-                key: "2025-12".into(),
+                key: "2025-12-31".into(),
                 count: 1,
             }]
         );
