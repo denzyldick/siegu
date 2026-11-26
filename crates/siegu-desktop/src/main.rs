@@ -73,13 +73,13 @@ impl Section {
         }
     }
 
-    fn subtitle(self) -> &'static str {
+    fn subtitle(self, cx: &App) -> SharedString {
         match self {
-            Self::Library => "Every photo and video, all in one place.",
-            Self::Map => "Places from your geotagged photos.",
-            Self::People => "Detected faces, grouped by person.",
-            Self::Collections => "Albums and saved searches.",
-            Self::Settings => "Local appearance, library, and AI model configuration.",
+            Self::Library => "Every photo and video, all in one place.".into(),
+            Self::Map => i18n::text(cx, "map.desc", &[]),
+            Self::People => i18n::text(cx, "people.desc", &[]),
+            Self::Collections => i18n::text(cx, "albums.desc", &[]),
+            Self::Settings => i18n::text(cx, "settings.desc", &[]),
         }
     }
 }
@@ -898,7 +898,7 @@ impl Siegu {
                     .flex_col()
                     .gap_1()
                     .child(Heading::h2(self.section_title(cx)))
-                    .child(Paragraph::new(self.section.subtitle())),
+                    .child(Paragraph::new(self.section.subtitle(cx))),
             )
             .child(content)
             .into_any_element()
@@ -936,15 +936,15 @@ impl Siegu {
         let weak_scan = cx.entity().downgrade();
 
         let has_filters = !self.search_query.is_empty() || self.favorites_only || self.videos_only;
-        let (empty_title, empty_hint) = if has_filters {
+        let (empty_title, empty_hint): (SharedString, SharedString) = if has_filters {
             (
-                "No matching photos.",
-                "Try clearing your search or filters.",
+                i18n::text(cx, "media.no_results", &[]),
+                i18n::text(cx, "search.clear_all", &[]),
             )
         } else {
             (
-                "No photos yet.",
-                "Add folders and run a scan in Siegu, then reopen this window.",
+                i18n::text(cx, "media.your_library_empty", &[]),
+                i18n::text(cx, "media.add_folder_hint", &[]),
             )
         };
 
@@ -961,17 +961,20 @@ impl Siegu {
                     .child(SearchInput::new("library-search", &self.search_input)),
             )
             .child(
-                Button::new("library-add-folder", "Add folder")
-                    .icon(IconName::FolderPlus)
-                    .on_click(move |_, _, app| prompt_for_folders(weak_add.clone(), app, false)),
+                Button::new(
+                    "library-add-folder",
+                    i18n::text(cx, "settings.add_folder", &[]),
+                )
+                .icon(IconName::FolderPlus)
+                .on_click(move |_, _, app| prompt_for_folders(weak_add.clone(), app, false)),
             )
             .child(
                 Button::new(
                     "library-scan",
                     if self.scan_running {
-                        "Scanning…"
+                        i18n::text(cx, "sync.scanning", &[])
                     } else {
-                        "Scan now"
+                        i18n::text(cx, "scan.scan_button", &[])
                     },
                 )
                 .icon(IconName::RefreshCw)
@@ -985,7 +988,7 @@ impl Siegu {
             )
             .child(
                 Switch::new("filter-favorites", self.favorites_only)
-                    .label("Favorites")
+                    .label(i18n::text(cx, "search.magic.favorites", &[]))
                     .on_change(move |on, _, cx| {
                         if let Some(entity) = weak_fav.upgrade() {
                             entity.update(cx, |state, cx| {
@@ -998,7 +1001,7 @@ impl Siegu {
             )
             .child(
                 Switch::new("filter-videos", self.videos_only)
-                    .label("Videos")
+                    .label(i18n::text(cx, "search.magic.videos", &[]))
                     .on_change(move |on, _, cx| {
                         if let Some(entity) = weak_vid.upgrade() {
                             entity.update(cx, |state, cx| {
@@ -1009,15 +1012,18 @@ impl Siegu {
                         }
                     }),
             )
-            .children(
-                (self.data.total_photos > 0)
-                    .then(|| Paragraph::new(plural(self.data.total_photos, "photo"))),
-            );
+            .children((self.data.total_photos > 0).then(|| {
+                Paragraph::new(i18n::text(
+                    cx,
+                    "search.photos_count",
+                    &[("count", &self.data.total_photos.to_string())],
+                ))
+            }));
 
         let width = self.grid_width.clone();
         let columns = columns_for(*width.read(cx), PHOTO_CARD_WIDTH, PHOTO_GAP).max(1) as usize;
         let grid = if self.data.total_photos == 0 {
-            empty_state(empty_title, empty_hint)
+            empty_state(&empty_title, &empty_hint)
         } else {
             uniform_list(
                 (
@@ -1202,7 +1208,7 @@ impl Siegu {
                     .gap_3()
                     .child(div().flex_1().child(Paragraph::new(folder.clone())))
                     .child(
-                        Button::new(("remove-folder", idx), "Remove")
+                        Button::new(("remove-folder", idx), i18n::text(cx, "common.remove", &[]))
                             .icon(IconName::Trash2)
                             .on_click(move |_, _, app| {
                                 if let Some(entity) = weak.upgrade() {
@@ -1235,19 +1241,24 @@ impl Siegu {
                     .flex()
                     .items_center()
                     .justify_between()
-                    .child(Heading::h3("Library folders"))
+                    .child(Heading::h3(i18n::text(cx, "settings.folders", &[])))
                     .child(
-                        Button::new("settings-add-folder", "Add folder")
-                            .icon(IconName::FolderPlus)
-                            .on_click(move |_, _, app| {
-                                prompt_for_folders(weak_add_folder.clone(), app, false)
-                            }),
+                        Button::new(
+                            "settings-add-folder",
+                            i18n::text(cx, "settings.add_folder", &[]),
+                        )
+                        .icon(IconName::FolderPlus)
+                        .on_click(move |_, _, app| {
+                            prompt_for_folders(weak_add_folder.clone(), app, false)
+                        }),
                     ),
             )
             .children((!self.folders.is_empty()).then_some(folder_rows))
-            .children(self.folders.is_empty().then(|| {
-                Paragraph::new("No folders yet. Add one to start building your library.")
-            }));
+            .children(
+                self.folders
+                    .is_empty()
+                    .then(|| Paragraph::new(i18n::text(cx, "settings.no_folders", &[]))),
+            );
 
         let toggles = div()
             .flex()
@@ -1370,7 +1381,7 @@ impl Siegu {
                     .flex()
                     .flex_col()
                     .gap_2()
-                    .child(Heading::h3("AI Models"))
+                    .child(Heading::h3(i18n::text(cx, "settings.ai_models", &[])))
                     .child(model_row)
             }))
             .children((!self.data.settings.is_empty()).then_some(grid))

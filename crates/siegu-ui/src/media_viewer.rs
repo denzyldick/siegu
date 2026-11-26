@@ -9,8 +9,8 @@ use ely_gpui_component::{
     typography::Paragraph,
 };
 use gpui::{
-    div, px, App, ElementId, ImageSource, IntoElement, ObjectFit, ParentElement, RenderOnce,
-    Resource, SharedString, Styled, Window,
+    div, px, App, ElementId, ImageSource, InteractiveElement, IntoElement, KeyDownEvent, ObjectFit,
+    ParentElement, RenderOnce, Resource, SharedString, Styled, Window,
 };
 
 /// A fullscreen modal viewer for a single library photo, with zoom, pan, and
@@ -98,6 +98,8 @@ impl RenderOnce for MediaViewer {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
         let on_close = self.on_close;
+        let on_prev = self.on_prev.clone();
+        let on_next = self.on_next.clone();
         let mut dialog = Dialog::new(self.id.clone(), self.title, move |window, cx| {
             on_close(window, cx);
         })
@@ -122,7 +124,7 @@ impl RenderOnce for MediaViewer {
             });
         }
 
-        if let Some(on_prev) = self.on_prev {
+        if let Some(on_prev) = on_prev.clone() {
             dialog = dialog.action(move |_| {
                 Button::new("mv-prev", "Previous")
                     .icon(IconName::ArrowLeft)
@@ -130,7 +132,7 @@ impl RenderOnce for MediaViewer {
             });
         }
 
-        if let Some(on_next) = self.on_next {
+        if let Some(on_next) = on_next.clone() {
             dialog = dialog.action(move |_| {
                 Button::new("mv-next", "Next")
                     .icon(IconName::ArrowRight)
@@ -187,7 +189,22 @@ impl RenderOnce for MediaViewer {
                 .into_any_element(),
         };
 
-        dialog.child(stage)
+        let dialog = dialog.child(stage);
+        let (keys_prev, keys_next) = (on_prev, on_next);
+        div()
+            .size_full()
+            .on_key_down(move |event: &KeyDownEvent, window, cx| {
+                let callback = match event.keystroke.key.as_str() {
+                    "left" => keys_prev.as_ref(),
+                    "right" => keys_next.as_ref(),
+                    _ => return,
+                };
+                if let Some(callback) = callback {
+                    cx.stop_propagation();
+                    callback(window, cx);
+                }
+            })
+            .child(dialog)
     }
 }
 
@@ -200,9 +217,13 @@ mod tests {
     fn media_viewer_collects_fields() {
         let viewer = MediaViewer::new("mv", "Lake", |_, _| {})
             .detail("2026-08-01")
-            .source(PathBuf::from("/tmp/lake.jpg"));
+            .source(PathBuf::from("/tmp/lake.jpg"))
+            .on_prev(|_, _| {})
+            .on_next(|_, _| {});
         assert_eq!(viewer.title.as_ref(), "Lake");
         assert_eq!(viewer.detail.as_deref(), Some("2026-08-01"));
         assert!(viewer.source.is_some());
+        assert!(viewer.on_prev.is_some());
+        assert!(viewer.on_next.is_some());
     }
 }

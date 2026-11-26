@@ -1696,7 +1696,7 @@ impl Database {
         videos_only: bool,
         filter: &PhotoFilter,
         offset: usize,
-        limit: usize,
+        limit: i64,
     ) -> (String, Vec<Box<dyn rusqlite::ToSql>>) {
         let fav_filter = if favorites_only {
             "AND p.favorite = 1"
@@ -1873,7 +1873,7 @@ impl Database {
             format!("%{query}%")
         };
         let mut params: Vec<Box<dyn rusqlite::ToSql>> =
-            vec![Box::new(offset as i64), Box::new(limit as i64)];
+            vec![Box::new(offset as i64), Box::new(limit)];
         if !query.is_empty() {
             params.push(Box::new(q_param));
             if let Some(ref mp) = month_param {
@@ -1896,8 +1896,11 @@ impl Database {
         filter: &PhotoFilter,
     ) -> i64 {
         let (where_clause, params) =
-            self.photo_where_clause(query, favorites_only, videos_only, filter, 0, usize::MAX);
-        let sql = format!("SELECT COUNT(*) FROM photo p {where_clause}");
+            self.photo_where_clause(query, favorites_only, videos_only, filter, 0, -1);
+        // Keep ?1/?2 bound (offset 0, limit -1 = unbounded in SQLite) so the
+        // same parameter vector and placeholder numbering as paged lists works.
+        let sql =
+            format!("SELECT COUNT(*) FROM (SELECT p.id FROM photo p {where_clause} LIMIT ?1, ?2)");
         let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
         self.connection
             .prepare(&sql)
@@ -1920,8 +1923,14 @@ impl Database {
         include_encoded: bool,
     ) -> Vec<Photo> {
         let mut photos = Vec::new();
-        let (where_clause, params) =
-            self.photo_where_clause(query, favorites_only, videos_only, filter, offset, limit);
+        let (where_clause, params) = self.photo_where_clause(
+            query,
+            favorites_only,
+            videos_only,
+            filter,
+            offset,
+            limit as i64,
+        );
 
         let order_by = if let Some(order) = filter.order_by.as_deref() {
             match order {
@@ -7051,6 +7060,19 @@ mod tests {
         assert_eq!(stats.faces, 1);
         assert_eq!(stats.named_people, 1);
         assert_eq!(stats.face_photos, 1);
+
+        assert_eq!(
+            db.count_photos_filtered("", false, false, &PhotoFilter::default()),
+            3
+        );
+        assert_eq!(
+            db.count_photos_filtered("", false, true, &PhotoFilter::default()),
+            1
+        );
+        assert_eq!(
+            db.count_photos_filtered("", true, false, &PhotoFilter::default()),
+            1
+        );
     }
 
     #[test]
