@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -39,7 +39,8 @@ use siegu_ui::{
         Pixels, Render, SharedString, Styled, SystemNotification, TitlebarOptions, WeakEntity,
         Window, WindowBounds, WindowOptions,
     },
-    gpui_platform, i18n, InfoCard, MediaViewer, PhotoCard, PhotoGrid, SieguAppShell,
+    gpui_platform, i18n, insight_percent, InfoCard, MediaViewer, PhotoCard, PhotoGrid,
+    SieguAppShell, ViewerField, ViewerInsight, ViewerMetadata, ViewerPerson,
 };
 use tokio::sync::mpsc::{self, UnboundedSender};
 use url::Url;
@@ -306,6 +307,9 @@ struct Siegu {
     drill_down: Option<DrillDown>,
     selected_photo: Option<usize>,
     viewer_override: Option<PhotoEntry>,
+    /// Cached metadata for the open viewer, keyed by photo id. Opening a viewer
+    /// reads a few linked SQLite tables once instead of on every repaint.
+    viewer_metadata: Option<(String, ViewerMetadata)>,
     onboarding: bool,
     folders: Vec<String>,
     scan_status: ScanStatus,
@@ -362,12 +366,13 @@ impl Siegu {
     }
 
     fn viewer_for(
-        &self,
+        &mut self,
         idx: usize,
         entry: PhotoEntry,
         total: usize,
         cx: &Context<Self>,
     ) -> MediaViewer {
+        let metadata = self.viewer_metadata_for(&entry.photo, cx);
         let weak_close = cx.entity().downgrade();
         let weak_fav = cx.entity().downgrade();
         let photo_id = entry.photo.id.clone();
@@ -393,6 +398,7 @@ impl Siegu {
         )
         .detail(detail)
         .favorite(entry.photo.favorite)
+        .metadata(metadata)
         .on_toggle_favorite(move |_, cx| {
             if let Some(entity) = weak_fav.upgrade() {
                 let id = photo_id.clone();
@@ -444,6 +450,89 @@ impl Siegu {
             modal = modal.fallback(thumb.clone());
         }
         modal
+    }
+
+    /// Metadata for the open viewer, cached per photo id so repaints do not
+    /// reopen SQLite. Faces and OCR live in linked tables, not on the photo row.
+    fn viewer_metadata_for(&mut self, photo: &Photo, cx: &App) -> ViewerMetadata {
+        if self
+            .viewer_metadata
+            .as_ref()
+            .is_some_and(|(id, _)| id == &photo.id)
+        {
+            return self.viewer_metadata.as_ref().unwrap().1.clone();
+        }
+
+        let dir = default_config_dir();
+        let db = Database::new(&dir.display().to_string());
+        let is_video = is_video_path(&photo.location);
+        let recognized_text = if is_video {
+            String::new()
+        } else {
+            db.get_photo_ocr(&photo.id)
+        };
+        let transcript = photo
+            .properties
+            .get("transcript")
+            .filter(|text| !text.trim().is_empty())
+            .cloned()
+            .unwrap_or_else(|| db.get_photo_transcript(&photo.id));
+
+        let unnamed = i18n::text(cx, "media_viewer.unnamed", &[]).to_string();
+        let mut seen = HashSet::new();
+        let people = db
+            .get_faces_for_photo(&photo.id)
+            .into_iter()
+            .filter_map(|face| {
+                let key = face
+                    .person_id
+                    .clone()
+                    .unwrap_or_else(|| face.face_id.clone());
+                if !seen.insert(key) {
+                    return None;
+                }
+                let name = face
+                    .person_name
+                    .filter(|name| !name.trim().is_empty())
+                    .unwrap_or_else(|| unnamed.clone());
+                Some(ViewerPerson {
+                    name,
+                    thumbnail: resolve_image_source(
+                        Some(face.encoded.as_str()),
+                        Some(face.crop_path.as_str()),
+                    ),
+                })
+            })
+            .collect();
+
+        let mut insights = photo
+            .objects
+            .iter()
+            .map(|(name, score)| ViewerInsight {
+                name: name.clone(),
+                percent: insight_percent(*score),
+            })
+            .collect::<Vec<_>>();
+        insights.sort_by(|a, b| b.percent.cmp(&a.percent).then_with(|| a.name.cmp(&b.name)));
+
+        let metadata = ViewerMetadata {
+            file_path: photo.location.clone(),
+            caption: photo
+                .caption
+                .as_deref()
+                .map(str::trim)
+                .filter(|caption| !caption.is_empty())
+                .map(str::to_string),
+            aesthetics_score: photo.aesthetics_score.filter(|score| score.is_finite()),
+            recognized_text,
+            transcript,
+            is_video,
+            camera: camera_fields(photo, cx),
+            people,
+            insights,
+        };
+        self.viewer_metadata = Some((photo.id.clone(), metadata.clone()));
+        metadata
     }
 
     /// Render one virtual item: a month header, day header, or photo row.
@@ -1963,8 +2052,16 @@ fn opened_media_request(request: &[String]) -> Option<PathBuf> {
 
 fn photo_entry_from_path(path: &Path) -> Option<PhotoEntry> {
     let location = path.to_string_lossy().into_owned();
-    let metadata = extract_photo_metadata(path);
-    let photo = photo_from_metadata(&location, &metadata);
+    let dir = default_config_dir();
+    let indexed = dir.join("siegu.db").exists().then(|| {
+        let db = Database::new(&dir.display().to_string());
+        db.find_photo_id_by_location(&location)
+            .and_then(|id| db.get_photo_by_id(&id))
+    });
+    let photo = indexed.flatten().unwrap_or_else(|| {
+        let metadata = extract_photo_metadata(path);
+        photo_from_metadata(&location, &metadata)
+    });
     let thumbnail = resolve_thumbnail(&photo);
     Some(PhotoEntry { photo, thumbnail })
 }
@@ -2052,6 +2149,100 @@ fn folder_name(path: &str) -> String {
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| path.to_string())
+}
+
+fn is_video_path(path: &str) -> bool {
+    let extension = path
+        .rsplit_once('.')
+        .map(|(_, extension)| extension.to_ascii_lowercase());
+    matches!(
+        extension.as_deref(),
+        Some("mp4" | "webm" | "mov" | "avi" | "mkv" | "m4v")
+    )
+}
+
+fn non_empty_prop<'a>(props: &'a HashMap<String, String>, key: &str) -> Option<&'a str> {
+    props
+        .get(key)
+        .map(String::as_str)
+        .filter(|value| !value.trim().is_empty())
+}
+
+/// The legacy viewer's resolution line: PixelXDimension/Y first, then ImageWidth/Length.
+fn exif_dimensions(props: &HashMap<String, String>) -> Option<String> {
+    [
+        ("PixelXDimension", "PixelYDimension"),
+        ("ImageWidth", "ImageLength"),
+    ]
+    .into_iter()
+    .find_map(|(width, height)| {
+        let width = non_empty_prop(props, width)?;
+        let height = non_empty_prop(props, height)?;
+        Some(format!("{width} × {height}"))
+    })
+}
+
+fn push_prop_field(
+    fields: &mut Vec<ViewerField>,
+    props: &HashMap<String, String>,
+    key: &str,
+    label_key: &str,
+    cx: &App,
+) {
+    if let Some(value) = non_empty_prop(props, key) {
+        fields.push(ViewerField {
+            label: i18n::text(cx, label_key, &[]),
+            value: value.to_string(),
+        });
+    }
+}
+
+/// Localized EXIF rows for the viewer's Camera Settings section.
+fn camera_fields(photo: &Photo, cx: &App) -> Vec<ViewerField> {
+    let props = &photo.properties;
+    let mut fields = Vec::new();
+
+    let make = non_empty_prop(props, "Make");
+    let model = non_empty_prop(props, "Model");
+    let camera = match (make, model) {
+        (Some(make), Some(model)) => Some(format!("{make} {model}")),
+        (Some(value), None) | (None, Some(value)) => Some(value.to_string()),
+        (None, None) => None,
+    };
+    if let Some(camera) = camera {
+        fields.push(ViewerField {
+            label: i18n::text(cx, "search.cameras", &[]),
+            value: camera,
+        });
+    }
+    if let Some(date) =
+        non_empty_prop(props, "DateTimeOriginal").or_else(|| non_empty_prop(props, "DateTime"))
+    {
+        fields.push(ViewerField {
+            label: i18n::text(cx, "media_viewer.date_taken", &[]),
+            value: date.to_string(),
+        });
+    }
+    if let Some(dimensions) = exif_dimensions(props) {
+        fields.push(ViewerField {
+            label: i18n::text(cx, "media_viewer.resolution", &[]),
+            value: dimensions,
+        });
+    }
+    for (key, label_key) in [
+        ("PhotographicSensitivity", "media_viewer.iso"),
+        ("ExposureTime", "media_viewer.shutter"),
+        ("FNumber", "media_viewer.aperture"),
+        ("LensModel", "media_viewer.lens"),
+        ("FocalLength", "media_viewer.focal_length"),
+        ("Flash", "media_viewer.flash"),
+        ("WhiteBalance", "media_viewer.white_balance"),
+        ("MeteringMode", "media_viewer.metering_mode"),
+        ("Software", "media_viewer.software"),
+    ] {
+        push_prop_field(&mut fields, props, key, label_key, cx);
+    }
+    fields
 }
 
 fn is_initialized() -> bool {
@@ -2795,6 +2986,7 @@ fn main() {
                         selected_photo: None,
                         viewer_override: opened_media_request(&initial_request)
                             .and_then(|path| photo_entry_from_path(&path)),
+                        viewer_metadata: None,
                         onboarding,
                         folders,
                         scan_status: ScanStatus::default(),
@@ -3009,6 +3201,25 @@ mod tests {
     fn folder_name_uses_the_last_path_component() {
         assert_eq!(folder_name("/tmp/photos/summer"), "summer");
         assert_eq!(folder_name("photos"), "photos");
+    }
+
+    #[test]
+    fn viewer_detects_video_files_by_extension() {
+        assert!(is_video_path("/photos/clip.MP4"));
+        assert!(is_video_path("clip.mov"));
+        assert!(!is_video_path("/photos/sunset.jpg"));
+        assert!(!is_video_path("/photos/no-extension"));
+    }
+
+    #[test]
+    fn viewer_exif_dimensions_prefer_pixel_dimensions() {
+        let mut props = HashMap::new();
+        props.insert("ImageWidth".to_string(), "4000".to_string());
+        props.insert("ImageLength".to_string(), "3000".to_string());
+        assert_eq!(exif_dimensions(&props).as_deref(), Some("4000 × 3000"));
+        props.insert("PixelXDimension".to_string(), "6000".to_string());
+        props.insert("PixelYDimension".to_string(), "4000".to_string());
+        assert_eq!(exif_dimensions(&props).as_deref(), Some("6000 × 4000"));
     }
 
     #[test]

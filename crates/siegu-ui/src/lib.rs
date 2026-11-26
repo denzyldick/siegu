@@ -10,7 +10,9 @@ pub use gpui;
 pub use gpui_platform;
 pub use info_card::InfoCard;
 pub mod i18n;
-pub use media_viewer::MediaViewer;
+pub use media_viewer::{
+    insight_percent, MediaViewer, ViewerField, ViewerInsight, ViewerMetadata, ViewerPerson,
+};
 pub use nav::siegu_nav_items;
 pub use photo_card::PhotoCard;
 pub use photo_grid::PhotoGrid;

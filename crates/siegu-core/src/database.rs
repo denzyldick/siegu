@@ -2644,6 +2644,19 @@ impl Database {
         String::new()
     }
 
+    /// Resolve an indexed file path to its photo row. Used when the OS opens a
+    /// media file in the GPUI desktop so the viewer keeps the library's AI and
+    /// face metadata instead of a freshly extracted stub.
+    pub fn find_photo_id_by_location(&self, location: &str) -> Option<String> {
+        self.connection
+            .query_row(
+                "SELECT id FROM photo WHERE location = ?1 LIMIT 1",
+                [location],
+                |row| row.get(0),
+            )
+            .ok()
+    }
+
     pub fn get_photo_by_id(&self, photo_id: &str) -> Option<Photo> {
         let sql = "SELECT p.id, p.location, p.encoded, p.latitude, p.longitude, p.created, p.favorite, p.indexed, p.caption, p.aesthetics_score, \
              s.clip, s.face, s.ocr, s.nsfw, s.aesthetics, s.yolo, s.blip, s.arcface, s.midas, s.whisper, s.sam, s.superres, p.sync_needed, p.received, COALESCE(p.view_only, 0), COALESCE(p.last_opened, 0) \
@@ -7168,6 +7181,20 @@ mod tests {
             db.count_photos_filtered("", true, false, &PhotoFilter::default()),
             1
         );
+    }
+
+    #[test]
+    fn test_find_photo_id_by_location() {
+        let db = test_db();
+        let _ = db.connection.execute(
+            "INSERT INTO photo (id, location, created, encoded) VALUES ('p1', '/a.jpg', '2026-01-01', '')",
+            (),
+        );
+        assert_eq!(
+            db.find_photo_id_by_location("/a.jpg").as_deref(),
+            Some("p1")
+        );
+        assert_eq!(db.find_photo_id_by_location("/missing.jpg"), None);
     }
 
     #[test]
