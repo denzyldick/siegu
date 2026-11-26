@@ -1,5 +1,7 @@
 use std::collections::HashMap;
+use std::io;
 use std::path::{Path, PathBuf};
+use std::process::{Child, Command, Stdio};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -429,7 +431,14 @@ impl Siegu {
             && !entry.photo.location.is_empty()
             && Path::new(&entry.photo.location).exists()
         {
-            modal = modal.source(PathBuf::from(&entry.photo.location));
+            let location = PathBuf::from(&entry.photo.location);
+            modal = modal.source(location.clone());
+            let weak_explorer = cx.entity().downgrade();
+            modal = modal.on_show_in_explorer(move |_, cx| {
+                if let Some(entity) = weak_explorer.upgrade() {
+                    entity.update(cx, |_, cx| reveal_in_file_manager(&location, cx));
+                }
+            });
         }
         if let Some(thumb) = &entry.thumbnail {
             modal = modal.fallback(thumb.clone());
@@ -1844,6 +1853,58 @@ fn notify_scan(title: &str, body: &str, cx: &mut App) {
         body: body.into(),
         actions: Vec::new(),
     });
+}
+
+/// Reveal a local media file in the platform's file manager. We spawn the
+/// process instead of blocking the UI, then reap it on a short-lived thread.
+fn reveal_in_file_manager(path: &Path, cx: &mut App) {
+    let body = match spawn_file_manager(path) {
+        Ok(mut child) => {
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
+            i18n::text(cx, "media_viewer.opened_in_explorer", &[])
+        }
+        Err(error) => {
+            eprintln!("failed to open file manager: {error}");
+            i18n::text(cx, "media_viewer.explorer_error", &[])
+        }
+    };
+    cx.show_system_notification(SystemNotification {
+        tag: "siegu-explorer".into(),
+        title: i18n::text(cx, "app.name", &[]),
+        body,
+        actions: Vec::new(),
+    });
+}
+
+fn spawn_file_manager(path: &Path) -> io::Result<Child> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let _ = parent;
+
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut command = Command::new("explorer.exe");
+        command.arg(format!("/select,{}", path.display()));
+        command
+    };
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut command = Command::new("open");
+        command.arg("-R").arg(path);
+        command
+    };
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let mut command = {
+        let mut command = Command::new("xdg-open");
+        command.arg(parent);
+        command
+    };
+
+    command.stdout(Stdio::null()).stderr(Stdio::null()).spawn()
 }
 
 fn path_from_open_arg(arg: &str) -> Option<PathBuf> {

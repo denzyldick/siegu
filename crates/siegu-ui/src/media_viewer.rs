@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use crate::i18n;
 use ely_gpui_component::{
     buttons::Button,
     media::ImageViewer,
@@ -27,6 +28,7 @@ pub struct MediaViewer {
     on_toggle_favorite: Option<Rc<dyn Fn(&mut Window, &mut App)>>,
     on_prev: Option<Rc<dyn Fn(&mut Window, &mut App)>>,
     on_next: Option<Rc<dyn Fn(&mut Window, &mut App)>>,
+    on_show_in_explorer: Option<Rc<dyn Fn(&mut Window, &mut App)>>,
     on_close: Rc<dyn Fn(&mut Window, &mut App)>,
 }
 
@@ -47,6 +49,7 @@ impl MediaViewer {
             on_toggle_favorite: None,
             on_prev: None,
             on_next: None,
+            on_show_in_explorer: None,
             on_close: Rc::new(on_close),
         }
     }
@@ -92,6 +95,16 @@ impl MediaViewer {
         self.on_next = Some(Rc::new(handler));
         self
     }
+
+    /// Invoked when the user asks to reveal the original file in the OS file
+    /// manager. Omit it when the file is not available locally.
+    pub fn on_show_in_explorer(
+        mut self,
+        handler: impl Fn(&mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_show_in_explorer = Some(Rc::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for MediaViewer {
@@ -121,6 +134,16 @@ impl RenderOnce for MediaViewer {
                 } else {
                     btn
                 }
+            });
+        }
+
+        if let Some(on_show_in_explorer) = self.on_show_in_explorer.clone() {
+            let label = i18n::text(cx, "media_viewer.show_in_explorer", &[]);
+            dialog = dialog.action(move |_| {
+                let handler = on_show_in_explorer.clone();
+                Button::new("mv-show-in-explorer", label)
+                    .icon(IconName::FolderOpen)
+                    .on_click(move |_, window, cx| handler(window, cx))
             });
         }
 
@@ -219,11 +242,13 @@ mod tests {
             .detail("2026-08-01")
             .source(PathBuf::from("/tmp/lake.jpg"))
             .on_prev(|_, _| {})
-            .on_next(|_, _| {});
+            .on_next(|_, _| {})
+            .on_show_in_explorer(|_, _| {});
         assert_eq!(viewer.title.as_ref(), "Lake");
         assert_eq!(viewer.detail.as_deref(), Some("2026-08-01"));
         assert!(viewer.source.is_some());
         assert!(viewer.on_prev.is_some());
         assert!(viewer.on_next.is_some());
+        assert!(viewer.on_show_in_explorer.is_some());
     }
 }
