@@ -16,5 +16,6 @@ base64 = { workspace = true }
 jwalk = "0.8.1"
 rayon = { workspace = true }
 tokio = { workspace = true }
+url = { workspace = true }
 siegu-core = { workspace = true, default-features = true }
 siegu-ui = { workspace = true, features = ["desktop"] }

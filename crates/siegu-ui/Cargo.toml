@@ -25,3 +25,4 @@ desktop = [
 gpui = { workspace = true }
 gpui_platform = { workspace = true }
 ely-gpui-component = { workspace = true }
+serde_json = { workspace = true }

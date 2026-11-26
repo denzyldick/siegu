@@ -1,9 +1,12 @@
 use std::collections::HashMap;
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+mod app_ipc;
 
 use base64::Engine as _;
 use rayon::prelude::*;
@@ -19,8 +22,8 @@ use siegu_ui::{
         self,
         buttons::Button,
         feedback::Banner,
-        forms::{InputEvent, SearchInput, Switch, TextInput},
-        layout::ScrollArea,
+        forms::{Choice, InputEvent, SearchInput, Select, Switch, TextInput},
+        layout::{columns_for, ScrollArea},
         motion::ProgressBar,
         overlays::Dialog,
         primitives::{FocusScope, IconName, Severity},
@@ -28,14 +31,16 @@ use siegu_ui::{
         typography::{Heading, Paragraph},
     },
     gpui::{
-        div, px, size, AnyElement, App, AppContext, AsyncApp, Bounds, Context, Entity, FocusHandle,
-        Image, ImageFormat, ImageSource, InteractiveElement, IntoElement, KeyDownEvent,
-        ParentElement, PathPromptOptions, Render, Styled, TitlebarOptions, WeakEntity, Window,
-        WindowBounds, WindowOptions,
+        canvas, div, px, size, uniform_list, AnyElement, App, AppContext, AsyncApp, Bounds,
+        Context, ElementId, Entity, FocusHandle, Image, ImageFormat, ImageSource,
+        InteractiveElement, IntoElement, KeyDownEvent, ParentElement, PathPromptOptions, Pixels,
+        Render, ScrollStrategy, SharedString, Styled, SystemNotification, TitlebarOptions,
+        UniformListScrollHandle, WeakEntity, Window, WindowBounds, WindowOptions,
     },
-    gpui_platform, InfoCard, MediaViewer, PhotoCard, PhotoGrid, SieguAppShell,
+    gpui_platform, i18n, InfoCard, MediaViewer, PhotoCard, PhotoGrid, SieguAppShell,
 };
 use tokio::sync::mpsc::{self, UnboundedSender};
+use url::Url;
 
 /// A top-level place in the app. Keep the ids in sync with `siegu_ui::nav`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -68,16 +73,6 @@ impl Section {
         }
     }
 
-    fn title(self) -> &'static str {
-        match self {
-            Self::Library => "Library",
-            Self::Map => "Map",
-            Self::People => "People",
-            Self::Collections => "Collections",
-            Self::Settings => "Settings",
-        }
-    }
-
     fn subtitle(self) -> &'static str {
         match self {
             Self::Library => "Every photo and video, all in one place.",
@@ -89,12 +84,49 @@ impl Section {
     }
 }
 
-const PAGE_SIZE: usize = 60;
+const PHOTO_WINDOW_SIZE: usize = 180;
+const PHOTO_GAP: Pixels = px(16.0);
+const PHOTO_CARD_WIDTH: Pixels = px(220.0);
+const PHOTO_ROW_HEIGHT: Pixels = px(276.0);
 
 /// A library photo paired with its pre-resolved thumbnail source.
+#[derive(Clone)]
 struct PhotoEntry {
     photo: Photo,
     thumbnail: Option<ImageSource>,
+}
+
+/// A bounded, contiguous slice of library photos. The virtual grid only needs
+/// the rows in view, so we never hold the whole library in memory.
+#[derive(Default)]
+struct PhotoWindow {
+    query: String,
+    favorites_only: bool,
+    videos_only: bool,
+    start: usize,
+    photos: Vec<PhotoEntry>,
+}
+
+impl PhotoWindow {
+    fn matches(&self, query: &str, favorites_only: bool, videos_only: bool) -> bool {
+        self.query == query
+            && self.favorites_only == favorites_only
+            && self.videos_only == videos_only
+    }
+
+    fn contains(&self, index: usize) -> bool {
+        index >= self.start && index - self.start < self.photos.len()
+    }
+
+    fn get(&self, index: usize) -> Option<&PhotoEntry> {
+        self.contains(index)
+            .then(|| &self.photos[index - self.start])
+    }
+
+    fn clear(&mut self) {
+        self.photos.clear();
+        self.start = 0;
+    }
 }
 
 /// A person paired with their pre-resolved representative face thumbnail.
@@ -118,7 +150,6 @@ struct AlbumEntry {
 /// Everything the desktop shell reads from the local library once at startup.
 #[derive(Default)]
 struct LibraryData {
-    photos: Vec<PhotoEntry>,
     total_photos: usize,
     people: Vec<PersonEntry>,
     places: Vec<PlaceEntry>,
@@ -128,6 +159,7 @@ struct LibraryData {
     dark_mode: bool,
     auto_scan: bool,
     sync_enabled: bool,
+    language: String,
 }
 
 /// Config keys that are safe to show in the desktop settings view. Tokens and
@@ -216,9 +248,13 @@ struct Siegu {
     search_query: String,
     favorites_only: bool,
     videos_only: bool,
-    library_limit: usize,
+    library_window: PhotoWindow,
+    grid_width: Entity<Pixels>,
+    grid_scroll: UniformListScrollHandle,
+    grid_generation: usize,
     drill_down: Option<DrillDown>,
     selected_photo: Option<usize>,
+    viewer_override: Option<PhotoEntry>,
     onboarding: bool,
     folders: Vec<String>,
     scan_status: ScanStatus,
@@ -228,35 +264,240 @@ struct Siegu {
 }
 
 impl Siegu {
-    fn active_photos(&self) -> &[PhotoEntry] {
+    fn section_title(&self, cx: &App) -> SharedString {
+        match self.section {
+            Section::Library => i18n::text(cx, "dock.home", &[]),
+            Section::Map => i18n::text(cx, "dock.map", &[]),
+            Section::People => i18n::text(cx, "search.people_section", &[]),
+            Section::Collections => i18n::text(cx, "dock.collections", &[]),
+            Section::Settings => i18n::text(cx, "dock.settings", &[]),
+        }
+    }
+
+    fn active_count(&self) -> usize {
         self.drill_down
             .as_ref()
-            .map(|dd| dd.photos.as_slice())
-            .unwrap_or(&self.data.photos)
+            .map(|dd| dd.photos.len())
+            .unwrap_or(self.data.total_photos)
+    }
+
+    /// Returns one absolute photo from the active grid, loading a small window
+    /// from SQLite when the virtual list has not reached it yet.
+    fn photo_at(&mut self, index: usize) -> Option<PhotoEntry> {
+        if let Some(drill_down) = &self.drill_down {
+            return drill_down.photos.get(index).cloned();
+        }
+        if index >= self.data.total_photos {
+            return None;
+        }
+        if !self.library_window.contains(index) {
+            self.ensure_library_window(index, index + 1);
+        }
+        self.library_window.get(index).cloned()
+    }
+
+    /// Opens a media file from "Open with…" or a second app launch.
+    fn open_media_file(&mut self, path: PathBuf) {
+        let Some(entry) = photo_entry_from_path(&path) else {
+            return;
+        };
+        self.section = Section::Library;
+        self.drill_down = None;
+        self.selected_photo = None;
+        self.viewer_override = Some(entry);
+    }
+
+    fn viewer_for(
+        &self,
+        idx: usize,
+        entry: PhotoEntry,
+        total: usize,
+        cx: &Context<Self>,
+    ) -> MediaViewer {
+        let weak_close = cx.entity().downgrade();
+        let weak_fav = cx.entity().downgrade();
+        let photo_id = entry.photo.id.clone();
+        let detail = format!(
+            "{}  •  {} of {}",
+            display_date(&entry.photo.created),
+            idx + 1,
+            total
+        );
+
+        let mut modal = MediaViewer::new(
+            ("media-viewer", idx),
+            display_name(&entry.photo),
+            move |_, cx| {
+                if let Some(entity) = weak_close.upgrade() {
+                    entity.update(cx, |state, cx| {
+                        state.selected_photo = None;
+                        state.viewer_override = None;
+                        cx.notify();
+                    });
+                }
+            },
+        )
+        .detail(detail)
+        .favorite(entry.photo.favorite)
+        .on_toggle_favorite(move |_, cx| {
+            if let Some(entity) = weak_fav.upgrade() {
+                let id = photo_id.clone();
+                entity.update(cx, |state, cx| {
+                    state.toggle_photo_favorite(&id);
+                    cx.notify();
+                });
+            }
+        });
+
+        if idx > 0 {
+            let weak_prev = cx.entity().downgrade();
+            modal = modal.on_prev(move |_, cx| {
+                if let Some(entity) = weak_prev.upgrade() {
+                    entity.update(cx, |state, cx| {
+                        state.selected_photo = Some(idx - 1);
+                        cx.notify();
+                    });
+                }
+            });
+        }
+
+        if idx + 1 < total {
+            let weak_next = cx.entity().downgrade();
+            modal = modal.on_next(move |_, cx| {
+                if let Some(entity) = weak_next.upgrade() {
+                    entity.update(cx, |state, cx| {
+                        state.selected_photo = Some(idx + 1);
+                        cx.notify();
+                    });
+                }
+            });
+        }
+
+        if !entry.photo.view_only
+            && !entry.photo.location.is_empty()
+            && Path::new(&entry.photo.location).exists()
+        {
+            modal = modal.source(PathBuf::from(&entry.photo.location));
+        }
+        if let Some(thumb) = &entry.thumbnail {
+            modal = modal.fallback(thumb.clone());
+        }
+        modal
+    }
+
+    fn library_row(
+        &mut self,
+        row: usize,
+        columns: usize,
+        cx: &mut Context<Self>,
+    ) -> Vec<AnyElement> {
+        let (first, last) = row_bounds(row, columns, self.data.total_photos);
+        self.ensure_library_window(first, last);
+
+        let mut row_view = div().flex().items_start().gap_4().h(PHOTO_ROW_HEIGHT);
+        for index in first..last {
+            let Some(entry) = self.library_window.get(index).cloned() else {
+                continue;
+            };
+            let weak = cx.entity().downgrade();
+            row_view = row_view.child(photo_card(index, &entry, move |_, app| {
+                if let Some(entity) = weak.upgrade() {
+                    entity.update(app, |state, cx| {
+                        state.selected_photo = Some(index);
+                        cx.notify();
+                    });
+                }
+            }));
+        }
+        vec![row_view.into_any_element()]
+    }
+
+    fn ensure_library_window(&mut self, first: usize, last: usize) {
+        let last = last.min(self.data.total_photos);
+        if last <= first {
+            return;
+        }
+        if self
+            .library_window
+            .matches(&self.search_query, self.favorites_only, self.videos_only)
+            && first >= self.library_window.start
+            && last <= self.library_window.start + self.library_window.photos.len()
+        {
+            return;
+        }
+
+        let dir = default_config_dir();
+        if !dir.join("siegu.db").exists() {
+            return;
+        }
+        let start = first.saturating_sub(PHOTO_WINDOW_SIZE / 3);
+        let end = (last + PHOTO_WINDOW_SIZE * 2 / 3).min(self.data.total_photos);
+        if end <= start {
+            return;
+        }
+        let db = Database::new(&dir.display().to_string());
+        let mut photos = db.list_photos_filtered(
+            &self.search_query,
+            start,
+            end - start,
+            self.favorites_only,
+            self.videos_only,
+            &PhotoFilter::default(),
+            false,
+        );
+        let ids: Vec<String> = photos.iter().map(|photo| photo.id.clone()).collect();
+        let encoded = db.get_photo_encoded_batch(&ids);
+        for photo in &mut photos {
+            if let Some(value) = encoded.get(&photo.id) {
+                photo.encoded = value.clone();
+            }
+        }
+        let photos = photos
+            .into_iter()
+            .map(|photo| {
+                let thumbnail = resolve_thumbnail(&photo);
+                PhotoEntry { photo, thumbnail }
+            })
+            .collect();
+        self.library_window = PhotoWindow {
+            query: self.search_query.clone(),
+            favorites_only: self.favorites_only,
+            videos_only: self.videos_only,
+            start,
+            photos,
+        };
+    }
+
+    fn reset_library_grid(&mut self) {
+        self.library_window.clear();
+        self.grid_generation = self.grid_generation.wrapping_add(1);
+        self.grid_scroll.scroll_to_item(0, ScrollStrategy::Top);
+        self.selected_photo = None;
+        self.viewer_override = None;
     }
 
     fn reload_library_photos(&mut self) {
         let dir = default_config_dir();
         if !dir.join("siegu.db").exists() {
-            self.data.photos.clear();
             self.data.total_photos = 0;
-            return;
+        } else {
+            let db = Database::new(&dir.display().to_string());
+            self.data.total_photos = db
+                .count_photos_filtered(
+                    &self.search_query,
+                    self.favorites_only,
+                    self.videos_only,
+                    &PhotoFilter::default(),
+                )
+                .max(0) as usize;
         }
-        let db = Database::new(&dir.display().to_string());
-        let (photos, total) = query_library_photos(
-            &db,
-            &self.search_query,
-            self.library_limit,
-            self.favorites_only,
-            self.videos_only,
-        );
-        self.data.photos = photos;
-        self.data.total_photos = total;
-        self.selected_photo = None;
+        self.reset_library_grid();
     }
 
     fn refresh_data(&mut self) {
         self.data = load_library();
+        self.library_window.clear();
+        self.grid_generation = self.grid_generation.wrapping_add(1);
         self.selected_photo = None;
     }
 
@@ -409,13 +650,15 @@ impl Siegu {
                 };
             }
             ScanMessage::Complete { files_found } => {
+                let message = format!(
+                    "Scan complete — {} new media file{}.",
+                    files_found,
+                    if files_found == 1 { "" } else { "s" }
+                );
+                notify_scan("Siegu scan complete", &message, cx);
                 self.scan_status = ScanStatus {
                     phase: ScanPhase::Complete,
-                    message: format!(
-                        "Scan complete — {} new media file{}.",
-                        files_found,
-                        if files_found == 1 { "" } else { "s" }
-                    ),
+                    message,
                     current: self.scan_status.total,
                     total: self.scan_status.total,
                     files_found,
@@ -431,6 +674,7 @@ impl Siegu {
                 };
             }
             ScanMessage::Failed(message) => {
+                notify_scan("Siegu scan failed", &message, cx);
                 self.scan_status = ScanStatus {
                     phase: ScanPhase::Failed,
                     message,
@@ -460,17 +704,20 @@ impl Siegu {
         }
         let db = Database::new(&dir.display().to_string());
         let new_fav = db.toggle_favorite(photo_id);
-        for entry in &mut self.data.photos {
+        for entry in &mut self.library_window.photos {
             if entry.photo.id == photo_id {
                 entry.photo.favorite = new_fav;
             }
         }
-        if let Some(dd) = &mut self.drill_down {
-            for entry in &mut dd.photos {
+        if let Some(drill_down) = &mut self.drill_down {
+            for entry in &mut drill_down.photos {
                 if entry.photo.id == photo_id {
                     entry.photo.favorite = new_fav;
                 }
             }
+        }
+        if self.drill_down.is_none() && self.favorites_only {
+            self.reload_library_photos();
         }
     }
 
@@ -499,6 +746,7 @@ impl Siegu {
             photos,
         });
         self.selected_photo = None;
+        self.viewer_override = None;
     }
 
     fn status_view(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -610,6 +858,7 @@ impl Siegu {
                                         entity.update(cx, |state, cx| {
                                             state.drill_down = None;
                                             state.selected_photo = None;
+                                            state.viewer_override = None;
                                             cx.notify();
                                         });
                                     }
@@ -639,6 +888,8 @@ impl Siegu {
         div()
             .flex()
             .flex_col()
+            .size_full()
+            .min_h_0()
             .gap_4()
             .p_6()
             .child(
@@ -646,7 +897,7 @@ impl Siegu {
                     .flex()
                     .flex_col()
                     .gap_1()
-                    .child(Heading::h2(self.section.title()))
+                    .child(Heading::h2(self.section_title(cx)))
                     .child(Paragraph::new(self.section.subtitle())),
             )
             .child(content)
@@ -681,7 +932,6 @@ impl Siegu {
     fn library_view(&self, cx: &mut Context<Self>) -> AnyElement {
         let weak_fav = cx.entity().downgrade();
         let weak_vid = cx.entity().downgrade();
-        let weak_more = cx.entity().downgrade();
         let weak_add = cx.entity().downgrade();
         let weak_scan = cx.entity().downgrade();
 
@@ -740,7 +990,6 @@ impl Siegu {
                         if let Some(entity) = weak_fav.upgrade() {
                             entity.update(cx, |state, cx| {
                                 state.favorites_only = on;
-                                state.library_limit = PAGE_SIZE;
                                 state.reload_library_photos();
                                 cx.notify();
                             });
@@ -754,43 +1003,66 @@ impl Siegu {
                         if let Some(entity) = weak_vid.upgrade() {
                             entity.update(cx, |state, cx| {
                                 state.videos_only = on;
-                                state.library_limit = PAGE_SIZE;
                                 state.reload_library_photos();
                                 cx.notify();
                             });
                         }
                     }),
             )
-            .children((self.data.total_photos > 0).then(|| {
-                Paragraph::new(format!(
-                    "{} of {}",
-                    self.data.photos.len(),
-                    self.data.total_photos
-                ))
-            }));
+            .children(
+                (self.data.total_photos > 0)
+                    .then(|| Paragraph::new(plural(self.data.total_photos, "photo"))),
+            );
 
-        let grid = self.photo_grid_view(&self.data.photos, empty_title, empty_hint, cx);
-        let has_more = self.data.photos.len() < self.data.total_photos;
+        let width = self.grid_width.clone();
+        let columns = columns_for(*width.read(cx), PHOTO_CARD_WIDTH, PHOTO_GAP).max(1) as usize;
+        let grid = if self.data.total_photos == 0 {
+            empty_state(empty_title, empty_hint)
+        } else {
+            uniform_list(
+                (
+                    ElementId::from(("library-grid", self.grid_generation)),
+                    columns.to_string(),
+                ),
+                self.data.total_photos.div_ceil(columns),
+                cx.processor(move |state: &mut Siegu, rows: Range<usize>, _, cx| {
+                    rows.flat_map(|row| state.library_row(row, columns, cx))
+                        .collect()
+                }),
+            )
+            .track_scroll(&self.grid_scroll)
+            .flex_1()
+            .min_h_0()
+            .into_any_element()
+        };
 
         div()
+            .relative()
             .flex()
             .flex_col()
+            .size_full()
+            .min_h_0()
             .gap_4()
             .child(toolbar)
             .child(grid)
-            .children(has_more.then(|| {
-                div().flex().justify_center().pt_2().child(
-                    Button::new("library-load-more", "Load more").on_click(move |_, _, cx| {
-                        if let Some(entity) = weak_more.upgrade() {
-                            entity.update(cx, |state, cx| {
-                                state.library_limit += PAGE_SIZE;
-                                state.reload_library_photos();
+            .child(
+                canvas(
+                    move |bounds, window, cx| {
+                        if *width.read(cx) != bounds.size.width {
+                            width.update(cx, |value, cx| {
+                                *value = bounds.size.width;
                                 cx.notify();
                             });
+                            window.request_animation_frame();
                         }
-                    }),
+                    },
+                    |_, _, _, _| {},
                 )
-            }))
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full(),
+            )
             .into_any_element()
     }
 
@@ -917,6 +1189,7 @@ impl Siegu {
         let weak_sync = cx.entity().downgrade();
         let weak_folder = cx.entity().downgrade();
         let weak_add_folder = cx.entity().downgrade();
+        let weak_language = cx.entity().downgrade();
 
         let mut folder_rows = div().flex().flex_col().gap_2();
         for (idx, folder) in self.folders.iter().enumerate() {
@@ -1022,6 +1295,37 @@ impl Siegu {
                     }),
             );
 
+        let language_choices = i18n::CODES
+            .iter()
+            .map(|code| Choice::new(*code, i18n::language_label(cx, code)));
+        let language_section = div()
+            .flex()
+            .flex_col()
+            .gap_2()
+            .child(Heading::h3(i18n::text(cx, "language.label", &[])))
+            .child(
+                Select::new("setting-language", language_choices)
+                    .label(i18n::text(cx, "language.label", &[]))
+                    .selected(self.data.language.clone())
+                    .on_change(move |value, _, cx| {
+                        let code = value.to_string();
+                        if let Some(entity) = weak_language.upgrade() {
+                            entity.update(cx, |state, cx| {
+                                let code = i18n::normalize(&code);
+                                state.data.language = code.clone();
+                                for (label, value) in &mut state.data.settings {
+                                    if label == "Language" {
+                                        *value = code.clone();
+                                    }
+                                }
+                                persist_setting("language", &code);
+                                i18n::set_language(&code, cx);
+                                cx.notify();
+                            });
+                        }
+                    }),
+            );
+
         let mut model_row = div().flex().flex_wrap().items_center().gap_5();
         for (idx, (key, label, enabled)) in self.data.models.iter().enumerate() {
             let weak_model = cx.entity().downgrade();
@@ -1060,6 +1364,7 @@ impl Siegu {
             .gap_5()
             .child(folders_section)
             .child(toggles)
+            .child(language_section)
             .children((!self.data.models.is_empty()).then(|| {
                 div()
                     .flex()
@@ -1071,6 +1376,83 @@ impl Siegu {
             .children((!self.data.settings.is_empty()).then_some(grid))
             .into_any_element()
     }
+}
+
+const OPEN_WITH_EXTENSIONS: &[&str] = &[
+    "jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "heic", "heif", "avif", "mp4", "webm",
+    "mov", "avi", "mkv", "m4v",
+];
+
+fn notify_scan(title: &str, body: &str, cx: &mut App) {
+    cx.show_system_notification(SystemNotification {
+        tag: "siegu-scan".into(),
+        title: title.into(),
+        body: body.into(),
+        actions: Vec::new(),
+    });
+}
+
+fn path_from_open_arg(arg: &str) -> Option<PathBuf> {
+    if let Ok(url) = Url::parse(arg) {
+        if url.scheme() == "file" {
+            return url.to_file_path().ok();
+        }
+        return None;
+    }
+    Some(PathBuf::from(arg))
+}
+
+fn path_is_openable(path: &Path) -> bool {
+    if !path.is_file() {
+        return false;
+    }
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| OPEN_WITH_EXTENSIONS.contains(&extension.to_ascii_lowercase().as_str()))
+        .unwrap_or(false)
+}
+
+/// Find the first supported media file in a process argument list.
+fn opened_media_arg(args: &[String]) -> Option<PathBuf> {
+    args.iter()
+        .filter_map(|arg| path_from_open_arg(arg))
+        .find(|path| path_is_openable(path))
+}
+
+/// Find the first supported media file in a single-instance payload, whose
+/// first field is the sending process's working directory.
+fn opened_media_request(request: &[String]) -> Option<PathBuf> {
+    let cwd = request.first().map(PathBuf::from).unwrap_or_default();
+    let resolved: Vec<String> = request
+        .iter()
+        .skip(1)
+        .map(|arg| {
+            path_from_open_arg(arg)
+                .map(|path| {
+                    if path.is_relative() {
+                        cwd.join(path)
+                    } else {
+                        path
+                    }
+                })
+                .map(|path| path.to_string_lossy().into_owned())
+                .unwrap_or_else(|| arg.clone())
+        })
+        .collect();
+    opened_media_arg(&resolved)
+}
+
+fn photo_entry_from_path(path: &Path) -> Option<PhotoEntry> {
+    let location = path.to_string_lossy().into_owned();
+    let metadata = extract_photo_metadata(path);
+    let photo = photo_from_metadata(&location, &metadata);
+    let thumbnail = resolve_thumbnail(&photo);
+    Some(PhotoEntry { photo, thumbnail })
+}
+
+fn row_bounds(row: usize, columns: usize, total: usize) -> (usize, usize) {
+    let first = row * columns;
+    (first, (first + columns).min(total))
 }
 
 fn step_index(current: Option<usize>, delta: isize, len: usize) -> Option<usize> {
@@ -1257,27 +1639,6 @@ fn run_scan(
     let _ = tx.send(ScanMessage::Complete { files_found });
 }
 
-fn query_library_photos(
-    db: &Database,
-    query: &str,
-    limit: usize,
-    favorites_only: bool,
-    videos_only: bool,
-) -> (Vec<PhotoEntry>, usize) {
-    let total = db
-        .count_photos_filtered(query, favorites_only, videos_only, &PhotoFilter::default())
-        .max(0) as usize;
-    let photos = db
-        .list_photos(query, 0, limit, favorites_only, videos_only)
-        .into_iter()
-        .map(|photo| {
-            let thumbnail = resolve_thumbnail(&photo);
-            PhotoEntry { photo, thumbnail }
-        })
-        .collect();
-    (photos, total)
-}
-
 /// Opens the existing local library, if any. We never create a database here:
 /// the desktop spike must not leave side effects in a user's real config dir.
 fn load_library() -> LibraryData {
@@ -1287,7 +1648,9 @@ fn load_library() -> LibraryData {
     }
     let db = Database::new(&dir.display().to_string());
     let state = db.get_state();
-    let (photos, total_photos) = query_library_photos(&db, "", PAGE_SIZE, false, false);
+    let total_photos = db
+        .count_photos_filtered("", false, false, &PhotoFilter::default())
+        .max(0) as usize;
     let people = db
         .get_people()
         .into_iter()
@@ -1333,6 +1696,7 @@ fn load_library() -> LibraryData {
         .get("sync_enabled")
         .map(|v| is_truthy(v))
         .unwrap_or(false);
+    let language = language_from_state(&state);
 
     let mut settings = safe_settings(&state);
     if let Some(last_scan) = db.get_last_scan_time() {
@@ -1340,7 +1704,6 @@ fn load_library() -> LibraryData {
     }
 
     LibraryData {
-        photos,
         total_photos,
         people,
         places,
@@ -1350,7 +1713,15 @@ fn load_library() -> LibraryData {
         dark_mode,
         auto_scan,
         sync_enabled,
+        language,
     }
+}
+
+fn language_from_state(state: &HashMap<String, String>) -> String {
+    state
+        .get("language")
+        .map(|value| i18n::normalize(value))
+        .unwrap_or_else(|| "en".to_string())
 }
 
 fn persist_setting(key: &str, value: &str) {
@@ -1521,90 +1892,27 @@ impl Render for Siegu {
                     state.section = Section::from_id(id);
                     state.drill_down = None;
                     state.selected_photo = None;
+                    state.viewer_override = None;
                     cx.notify();
                 });
             }
         });
 
-        let viewer = self.selected_photo.and_then(|idx| {
-            let active = self.active_photos();
-            let total = active.len();
-            let entry = active.get(idx)?;
-            let weak_close = cx.entity().downgrade();
-            let weak_fav = cx.entity().downgrade();
-            let photo_id = entry.photo.id.clone();
-            let detail = format!(
-                "{}  •  {} of {}",
-                display_date(&entry.photo.created),
-                idx + 1,
-                total
-            );
+        let viewer = if let Some(entry) = self.viewer_override.clone() {
+            Some(self.viewer_for(0, entry, 1, cx))
+        } else {
+            self.selected_photo.and_then(|idx| {
+                let total = self.active_count();
+                let entry = self.photo_at(idx)?;
+                Some(self.viewer_for(idx, entry, total, cx))
+            })
+        };
 
-            let mut modal = MediaViewer::new(
-                ("media-viewer", idx),
-                display_name(&entry.photo),
-                move |_, cx| {
-                    if let Some(entity) = weak_close.upgrade() {
-                        entity.update(cx, |state, cx| {
-                            state.selected_photo = None;
-                            cx.notify();
-                        });
-                    }
-                },
-            )
-            .detail(detail)
-            .favorite(entry.photo.favorite)
-            .on_toggle_favorite(move |_, cx| {
-                if let Some(entity) = weak_fav.upgrade() {
-                    let id = photo_id.clone();
-                    entity.update(cx, |state, cx| {
-                        state.toggle_photo_favorite(&id);
-                        cx.notify();
-                    });
-                }
-            });
-
-            if idx > 0 {
-                let weak_prev = cx.entity().downgrade();
-                modal = modal.on_prev(move |_, cx| {
-                    if let Some(entity) = weak_prev.upgrade() {
-                        entity.update(cx, |state, cx| {
-                            state.selected_photo = Some(idx - 1);
-                            cx.notify();
-                        });
-                    }
-                });
-            }
-
-            if idx + 1 < total {
-                let weak_next = cx.entity().downgrade();
-                modal = modal.on_next(move |_, cx| {
-                    if let Some(entity) = weak_next.upgrade() {
-                        entity.update(cx, |state, cx| {
-                            state.selected_photo = Some(idx + 1);
-                            cx.notify();
-                        });
-                    }
-                });
-            }
-
-            if !entry.photo.view_only
-                && !entry.photo.location.is_empty()
-                && Path::new(&entry.photo.location).exists()
-            {
-                modal = modal.source(PathBuf::from(&entry.photo.location));
-            }
-            if let Some(thumb) = &entry.thumbnail {
-                modal = modal.fallback(thumb.clone());
-            }
-            Some(modal)
-        });
-
-        let shell_title = self
+        let shell_title: SharedString = self
             .drill_down
             .as_ref()
-            .map(|dd| dd.title.as_str())
-            .unwrap_or_else(|| self.section.title());
+            .map(|dd| dd.title.clone().into())
+            .unwrap_or_else(|| self.section_title(cx));
         let status = self.status_view(cx);
         let onboarding = if self.onboarding {
             Some(self.onboarding_view(cx))
@@ -1612,6 +1920,17 @@ impl Render for Siegu {
             None
         };
         let weak_keys = cx.entity().downgrade();
+        let library_owns_scroll = self.section == Section::Library && self.drill_down.is_none();
+        let shell_body = self.body(cx);
+        let shell_body = if library_owns_scroll {
+            shell_body
+        } else {
+            ScrollArea::new("siegu-shell-scroll")
+                .vertical()
+                .size_full()
+                .child(shell_body)
+                .into_any_element()
+        };
 
         FocusScope::new(&self.focus)
             .root()
@@ -1631,7 +1950,10 @@ impl Render for Siegu {
                         };
                         let handled = match event.keystroke.key.as_str() {
                             "escape" => entity.update(cx, |state, cx| {
-                                let handled = if state.selected_photo.is_some() {
+                                let handled = if state.viewer_override.is_some() {
+                                    state.viewer_override = None;
+                                    true
+                                } else if state.selected_photo.is_some() {
                                     state.selected_photo = None;
                                     true
                                 } else if state.drill_down.is_some() {
@@ -1650,7 +1972,7 @@ impl Render for Siegu {
                                 if state.selected_photo.is_none() {
                                     return false;
                                 }
-                                let len = state.active_photos().len();
+                                let len = state.active_count();
                                 if len == 0 {
                                     return false;
                                 }
@@ -1671,12 +1993,7 @@ impl Render for Siegu {
                             SieguAppShell::new(shell_title)
                                 .active(self.section.id())
                                 .on_nav(on_nav)
-                                .child(
-                                    ScrollArea::new("siegu-shell-scroll")
-                                        .vertical()
-                                        .size_full()
-                                        .child(self.body(cx)),
-                                ),
+                                .child(shell_body),
                         ),
                     ),
             )
@@ -1686,9 +2003,41 @@ impl Render for Siegu {
 }
 
 fn main() {
-    gpui_platform::application()
+    const DESKTOP_APP_ID: &str = "io.denzyl.siegu.gpui";
+
+    let initial_request = app_ipc::current_request();
+    let (request_tx, mut request_rx) = mpsc::unbounded_channel::<Vec<String>>();
+    let url_tx = request_tx.clone();
+    match app_ipc::claim() {
+        app_ipc::Instance::Secondary => return,
+        app_ipc::Instance::Primary(Some(instance)) => {
+            instance.serve(move |request| {
+                let _ = request_tx.send(request);
+            });
+        }
+        app_ipc::Instance::Primary(None) => {}
+    }
+
+    let application = gpui_platform::application();
+    application.on_open_urls(move |urls| {
+        let mut request = vec![std::env::current_dir()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned()];
+        request.extend(urls);
+        let _ = url_tx.send(request);
+    });
+    application
         .with_assets(ely::Assets)
-        .run(|cx: &mut App| {
+        .run(move |cx: &mut App| {
+            cx.set_app_identity(DESKTOP_APP_ID, "Siegu");
+            cx.on_system_notification_response(|_, cx| {
+                for window in cx.windows() {
+                    if let Some(handle) = window.downcast::<Siegu>() {
+                        let _ = handle.update(cx, |_, window, _| window.activate_window());
+                    }
+                }
+            });
             ely::init(cx).expect("Ely failed to start");
             let onboarding = !is_initialized();
             let folders = {
@@ -1700,6 +2049,7 @@ fn main() {
                 }
             };
             let data = load_library();
+            i18n::install(cx, &data.language);
             Theme::set_mode_now(
                 if data.dark_mode {
                     Mode::Dark
@@ -1724,14 +2074,17 @@ fn main() {
                     let focus = cx.focus_handle();
                     window.focus(&focus, cx);
                     let search_input = cx.new(|cx| {
-                        TextInput::new(window, cx).placeholder("Search photos, objects, captions…")
+                        TextInput::new(window, cx).placeholder(i18n::text(
+                            cx,
+                            "search.placeholder",
+                            &[],
+                        ))
                     });
                     cx.subscribe(&search_input, |state: &mut Siegu, input, event, cx| {
                         if matches!(event, InputEvent::Changed | InputEvent::Submit) {
                             let query = input.read(cx).text().to_string();
                             if query != state.search_query {
                                 state.search_query = query;
-                                state.library_limit = PAGE_SIZE;
                                 state.reload_library_photos();
                                 cx.notify();
                             }
@@ -1746,9 +2099,14 @@ fn main() {
                         search_query: String::new(),
                         favorites_only: false,
                         videos_only: false,
-                        library_limit: PAGE_SIZE,
+                        library_window: PhotoWindow::default(),
+                        grid_width: cx.new(|_| Pixels::ZERO),
+                        grid_scroll: UniformListScrollHandle::new(),
+                        grid_generation: 0,
                         drill_down: None,
                         selected_photo: None,
+                        viewer_override: opened_media_request(&initial_request)
+                            .and_then(|path| photo_entry_from_path(&path)),
                         onboarding,
                         folders,
                         scan_status: ScanStatus::default(),
@@ -1760,6 +2118,31 @@ fn main() {
             })
             .expect("window failed to open");
             cx.activate(true);
+
+            cx.spawn(move |cx: &mut AsyncApp| {
+                let cx = cx.clone();
+                async move {
+                    while let Some(request) = request_rx.recv().await {
+                        let path = opened_media_request(&request);
+                        cx.update(|cx| {
+                            for window in cx.windows() {
+                                let Some(handle) = window.downcast::<Siegu>() else {
+                                    continue;
+                                };
+                                let _ = handle.update(cx, |state, window, cx| {
+                                    window.activate_window();
+                                    if let Some(path) = path.clone() {
+                                        state.open_media_file(path);
+                                    }
+                                    cx.notify();
+                                });
+                                break;
+                            }
+                        });
+                    }
+                }
+            })
+            .detach();
         });
 }
 
@@ -1783,6 +2166,44 @@ mod tests {
     #[test]
     fn unknown_section_falls_back_to_library() {
         assert_eq!(Section::from_id("nope"), Section::Library);
+    }
+
+    #[test]
+    fn opened_media_arg_accepts_paths_and_file_urls() {
+        let path =
+            std::env::temp_dir().join(format!("siegu-open-{}-{}.JPG", std::process::id(), "photo"));
+        std::fs::write(&path, b"not-an-image").expect("test file");
+        let path_arg = path.to_string_lossy().into_owned();
+        let url_arg = Url::from_file_path(&path).expect("file url").to_string();
+        assert_eq!(
+            opened_media_arg(&["--flag".into(), path_arg.clone()]),
+            Some(path.clone())
+        );
+        assert_eq!(opened_media_arg(&[url_arg]), Some(path.clone()));
+        assert_eq!(opened_media_arg(&["notes.txt".into()]), None);
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn opened_media_request_resolves_relative_arguments() {
+        let dir = std::env::temp_dir().join(format!("siegu-open-dir-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("test dir");
+        let file = dir.join("relative.png");
+        std::fs::write(&file, b"not-an-image").expect("test file");
+        let request = vec![
+            dir.to_string_lossy().into_owned(),
+            "relative.png".to_string(),
+        ];
+        assert_eq!(opened_media_request(&request), Some(file.clone()));
+        std::fs::remove_file(file).ok();
+        std::fs::remove_dir(dir).ok();
+    }
+
+    #[test]
+    fn virtual_rows_map_to_absolute_photo_indices() {
+        assert_eq!(row_bounds(0, 4, 10), (0, 4));
+        assert_eq!(row_bounds(2, 4, 10), (8, 10));
+        assert_eq!(row_bounds(3, 4, 10), (12, 10));
     }
 
     #[test]
@@ -1818,6 +2239,16 @@ mod tests {
     fn clip_respects_character_boundaries() {
         assert_eq!(clip("hello", 10), "hello");
         assert_eq!(clip("héllo", 3), "hél…");
+    }
+
+    #[test]
+    fn language_from_state_validates_stored_values() {
+        let mut state = HashMap::new();
+        assert_eq!(language_from_state(&state), "en");
+        state.insert("language".to_string(), "pt-BR".to_string());
+        assert_eq!(language_from_state(&state), "pt");
+        state.insert("language".to_string(), "unknown".to_string());
+        assert_eq!(language_from_state(&state), "en");
     }
 
     #[test]

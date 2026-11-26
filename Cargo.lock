@@ -9948,6 +9948,7 @@ dependencies = [
  "siegu-core",
  "siegu-ui",
  "tokio",
+ "url",
 ]
 
 [[package]]
@@ -9965,6 +9966,7 @@ dependencies = [
  "ely-gpui-component",
  "gpui-pre",
  "gpui-pre-platform",
+ "serde_json",
 ]
 
 [[package]]

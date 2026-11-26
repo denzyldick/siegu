@@ -1,4 +1,4 @@
-name: GPUI web WASM build
+name: GPUI builds (WASM + native desktop)
 
 on:
   push:
@@ -47,3 +47,117 @@ jobs:
 
       - name: Build WASM spike
         run: cargo +nightly build -p siegu-web --target wasm32-unknown-unknown --release
+
+  # ── Native GPUI desktop spike: checks + release binary artifact ────────
+  desktop:
+    name: Package desktop (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: linux
+            archive: siegu-desktop-linux.tar.gz
+          - os: macos-latest
+            target: macos
+            archive: siegu-desktop-macos.tar.gz
+          - os: windows-latest
+            target: windows
+            archive: siegu-desktop-windows.zip
+    env:
+      ORT_STRATEGY: download
+
+    steps:
+      - name: Force LF line endings (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+        with:
+          workspaces: .
+          rust-components: rustfmt
+          cache-key-suffix: desktop-${{ matrix.target }}
+
+      # Same package list as docs/developing.md: GPUI needs fontconfig and both
+      # X11/xkbcommon and Wayland development files for the `desktop` feature.
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libfontconfig-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libx11-xcb-dev libxkbcommon-dev
+
+      # Mirrors macos.yml: no GPUI-specific system packages are needed (Metal
+      # comes with the Xcode command-line tools), but keep the shared tools.
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install pkg-config nasm
+
+      - name: Set up MSVC dev environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      # ort-sys (enabled by siegu-core's default `ml` feature) copies ONNX
+      # Runtime DLLs next to built artifacts via copy-dylibs. Its fallback for
+      # missing symlinks panics if the destination directories don't exist.
+      - name: Create ORT dylib output directories (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          for profile in debug release; do
+            mkdir -p \
+              "target/$profile" \
+              "target/$profile/examples" \
+              "target/$profile/deps" \
+              "target/$profile/build" \
+              "target/$profile/build/examples" \
+              "target/$profile/build/deps"
+          done
+
+      - name: Check formatting
+        run: cargo fmt -p siegu-desktop -p siegu-ui -- --check
+
+      - name: Check desktop crate
+        run: cargo check --locked -p siegu-desktop
+
+      - name: Test desktop crate
+        run: cargo test --locked -p siegu-desktop
+
+      - name: Build desktop release binary
+        run: cargo build --locked --release -p siegu-desktop
+
+      # Archives contain a single top-level folder holding the executable plus
+      # README/LICENSE, so extraction doesn't scatter files into the CWD.
+      - name: Package desktop binary (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          stage="stage/siegu-desktop-${{ matrix.target }}"
+          mkdir -p "$stage"
+          cp target/release/siegu-desktop "$stage/"
+          cp README.md LICENSE "$stage/"
+          tar -czf "${{ matrix.archive }}" -C stage "siegu-desktop-${{ matrix.target }}"
+          ls -lh "${{ matrix.archive }}"
+
+      - name: Package desktop binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $stage = "stage/siegu-desktop-${{ matrix.target }}"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item "target/release/siegu-desktop.exe" $stage
+          Copy-Item "README.md", "LICENSE" $stage
+          Compress-Archive -Path $stage -DestinationPath "${{ matrix.archive }}" -Force
+          Get-Item "${{ matrix.archive }}" | Select-Object Name, Length
+
+      - name: Upload desktop archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: siegu-desktop-${{ matrix.target }}
+          path: ${{ matrix.archive }}
+          if-no-files-found: error
+          retention-days: 7
