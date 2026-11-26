@@ -165,7 +165,7 @@ cargo check -p siegu-ui --locked
 builds on the shared `siegu-ui` component layer (`SieguAppShell`, `PhotoGrid`,
 `PhotoCard`, sidebar navigation) and reads the local library when one exists,
 falling back to an empty state. The sidebar switches between the Library, Map,
-People, Collections, and Settings sections.
+People, Collections, Space saver (duplicates), and Settings sections.
 
 ### Linux packages
 

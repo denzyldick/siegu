@@ -14,7 +14,7 @@ pub struct NavItemDef {
 }
 
 /// The built-in navigation sections, in display order.
-pub const NAV_ITEMS: [NavItemDef; 5] = [
+pub const NAV_ITEMS: [NavItemDef; 6] = [
     NavItemDef {
         id: "library",
         icon: IconName::LayoutGrid,
@@ -34,6 +34,11 @@ pub const NAV_ITEMS: [NavItemDef; 5] = [
         id: "collections",
         icon: IconName::Layers,
         label: "Collections",
+    },
+    NavItemDef {
+        id: "duplicates",
+        icon: IconName::Copy,
+        label: "Space saver",
     },
     NavItemDef {
         id: "settings",
@@ -67,6 +72,16 @@ mod tests {
     #[test]
     fn nav_items_are_in_order() {
         let ids: Vec<&str> = NAV_ITEMS.iter().map(|i| i.id).collect();
-        assert_eq!(ids, ["library", "map", "people", "collections", "settings"]);
+        assert_eq!(
+            ids,
+            [
+                "library",
+                "map",
+                "people",
+                "collections",
+                "duplicates",
+                "settings"
+            ]
+        );
     }
 }

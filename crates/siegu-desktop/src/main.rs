@@ -11,6 +11,7 @@ mod app_ipc;
 use base64::Engine as _;
 use rayon::prelude::*;
 use siegu_core::database::{Album, LocationGroup, PhotoFilter};
+use siegu_core::duplicates::{self, DuplicateGroupView, DuplicateStats};
 use siegu_core::{
     config::default_config_dir,
     memory_pressure,
@@ -20,13 +21,13 @@ use siegu_core::{
 use siegu_ui::{
     ely::{
         self,
-        buttons::Button,
+        buttons::{Button, ButtonVariant},
         feedback::Banner,
         forms::{Choice, InputEvent, SearchInput, Select, Switch, TextInput},
         layout::{columns_for, ScrollArea},
         motion::ProgressBar,
         overlays::Dialog,
-        primitives::{FocusScope, IconName, Severity},
+        primitives::{FocusScope, Icon, IconName, Image as ElyImage, Severity},
         theme::{Mode, Theme},
         typography::{Heading, Paragraph},
     },
@@ -49,6 +50,7 @@ enum Section {
     Map,
     People,
     Collections,
+    Duplicates,
     Settings,
 }
 
@@ -58,6 +60,7 @@ impl Section {
             "map" => Self::Map,
             "people" => Self::People,
             "collections" => Self::Collections,
+            "duplicates" => Self::Duplicates,
             "settings" => Self::Settings,
             _ => Self::Library,
         }
@@ -69,6 +72,7 @@ impl Section {
             Self::Map => "map",
             Self::People => "people",
             Self::Collections => "collections",
+            Self::Duplicates => "duplicates",
             Self::Settings => "settings",
         }
     }
@@ -79,6 +83,7 @@ impl Section {
             Self::Map => i18n::text(cx, "map.desc", &[]),
             Self::People => i18n::text(cx, "people.desc", &[]),
             Self::Collections => i18n::text(cx, "albums.desc", &[]),
+            Self::Duplicates => i18n::text(cx, "duplicates.desc", &[]),
             Self::Settings => i18n::text(cx, "settings.desc", &[]),
         }
     }
@@ -240,6 +245,28 @@ enum ScanMessage {
     Failed(String),
 }
 
+/// Duplicate detection is lazy: the first visit to Space saver hashes files in
+/// a background thread, and the result is cached until something changes it.
+struct DuplicateData {
+    groups: Vec<DuplicateGroupView>,
+    stats: DuplicateStats,
+    library_bytes: u64,
+}
+
+#[derive(Default)]
+struct DuplicateStatus {
+    running: bool,
+    done: usize,
+    total: usize,
+    error: Option<String>,
+}
+
+enum DuplicateMessage {
+    Progress { done: usize, total: usize },
+    Complete(DuplicateData),
+    Failed(String),
+}
+
 /// The desktop shell. Reads the local library and renders one section at a time.
 struct Siegu {
     focus: FocusHandle,
@@ -260,6 +287,8 @@ struct Siegu {
     scan_status: ScanStatus,
     scan_running: bool,
     scan_abort: Option<Arc<AtomicBool>>,
+    duplicates: Option<DuplicateData>,
+    duplicate_status: DuplicateStatus,
     data: LibraryData,
 }
 
@@ -270,6 +299,7 @@ impl Siegu {
             Section::Map => i18n::text(cx, "dock.map", &[]),
             Section::People => i18n::text(cx, "search.people_section", &[]),
             Section::Collections => i18n::text(cx, "dock.collections", &[]),
+            Section::Duplicates => i18n::text(cx, "dock.duplicates", &[]),
             Section::Settings => i18n::text(cx, "dock.settings", &[]),
         }
     }
@@ -697,6 +727,99 @@ impl Siegu {
         cx.notify();
     }
 
+    /// Kicks off duplicate detection the first time Space saver is opened, or
+    /// when the user asks for a rescan after removing duplicates.
+    fn ensure_duplicates(&mut self, cx: &mut Context<Self>) {
+        if self.duplicates.is_none() && !self.duplicate_status.running {
+            self.start_duplicates_scan(cx);
+        }
+    }
+
+    fn start_duplicates_scan(&mut self, cx: &mut Context<Self>) {
+        if self.duplicate_status.running {
+            return;
+        }
+        let dir = default_config_dir();
+        if !dir.join("siegu.db").exists() {
+            return;
+        }
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        self.duplicate_status = DuplicateStatus {
+            running: true,
+            ..Default::default()
+        };
+        let _ = std::thread::Builder::new()
+            .name("siegu-duplicates".to_string())
+            .spawn(move || run_duplicate_scan(dir, tx));
+
+        cx.spawn(move |this: WeakEntity<Siegu>, cx: &mut AsyncApp| {
+            let cx = cx.clone();
+            async move {
+                while let Some(message) = rx.recv().await {
+                    let alive = cx.update(|app| match this.upgrade() {
+                        Some(entity) => {
+                            entity.update(app, |state, cx| {
+                                state.apply_duplicate_message(message, cx);
+                            });
+                            true
+                        }
+                        None => false,
+                    });
+                    if !alive {
+                        break;
+                    }
+                }
+            }
+        })
+        .detach();
+        cx.notify();
+    }
+
+    fn apply_duplicate_message(&mut self, message: DuplicateMessage, cx: &mut Context<Self>) {
+        match message {
+            DuplicateMessage::Progress { done, total } => {
+                self.duplicate_status.done = done;
+                self.duplicate_status.total = total;
+            }
+            DuplicateMessage::Complete(data) => {
+                self.duplicate_status = DuplicateStatus::default();
+                self.duplicates = Some(data);
+            }
+            DuplicateMessage::Failed(message) => {
+                self.duplicate_status = DuplicateStatus {
+                    error: Some(message),
+                    ..Default::default()
+                };
+            }
+        }
+        cx.notify();
+    }
+
+    /// Trashes every non-best member of one group, then refreshes the library
+    /// and recomputes the remaining groups in the background.
+    fn trash_duplicate_group(&mut self, idx: usize, cx: &mut Context<Self>) {
+        let Some(group) = self
+            .duplicates
+            .as_ref()
+            .and_then(|data| data.groups.get(idx))
+            .cloned()
+        else {
+            return;
+        };
+        let dir = default_config_dir();
+        if !dir.join("siegu.db").exists() {
+            return;
+        }
+        let db = Database::new(&dir.display().to_string());
+        let trashed = duplicates::trash_group_non_best(&db, &group);
+        if trashed == 0 {
+            return;
+        }
+        self.duplicates = None;
+        self.refresh_data();
+        self.start_duplicates_scan(cx);
+    }
+
     fn toggle_photo_favorite(&mut self, photo_id: &str) {
         let dir = default_config_dir();
         if !dir.join("siegu.db").exists() {
@@ -831,7 +954,7 @@ impl Siegu {
         .into_any_element()
     }
 
-    fn body(&self, cx: &mut Context<Self>) -> AnyElement {
+    fn body(&mut self, cx: &mut Context<Self>) -> AnyElement {
         if let Some(dd) = &self.drill_down {
             let weak = cx.entity().downgrade();
             let content = self.photo_grid_view(
@@ -882,6 +1005,7 @@ impl Siegu {
             Section::Map => self.map_view(cx),
             Section::People => self.people_view(cx),
             Section::Collections => self.collections_view(cx),
+            Section::Duplicates => self.duplicates_view(cx),
             Section::Settings => self.settings_view(cx),
         };
 
@@ -1189,6 +1313,223 @@ impl Siegu {
         grid.into_any_element()
     }
 
+    fn duplicates_view(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        self.ensure_duplicates(cx);
+
+        let weak_scan = cx.entity().downgrade();
+        let toolbar = div().flex().flex_wrap().items_center().gap_3().child(
+            Button::new("duplicates-scan", i18n::text(cx, "duplicates.refresh", &[]))
+                .icon(IconName::RefreshCw)
+                .loading(self.duplicate_status.running)
+                .disabled(self.duplicate_status.running)
+                .on_click(move |_, _, app| {
+                    if let Some(entity) = weak_scan.upgrade() {
+                        entity.update(app, |state, cx| state.start_duplicates_scan(cx));
+                    }
+                }),
+        );
+
+        let error = self.duplicate_status.error.as_ref().map(|message| {
+            Banner::new("duplicates-error", Severity::Danger, message.clone()).into_any_element()
+        });
+        let progress = self.duplicate_status.running.then(|| {
+            let done = self.duplicate_status.done;
+            let total = self.duplicate_status.total;
+            let bar = if total > 0 {
+                ProgressBar::new(
+                    "duplicates-progress",
+                    (done as f32 / total as f32).clamp(0.0, 1.0),
+                )
+                .into_any_element()
+            } else {
+                ProgressBar::indeterminate("duplicates-progress").into_any_element()
+            };
+            div()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(Paragraph::new(i18n::text(cx, "duplicates.scanning", &[])))
+                .child(bar)
+                .child(Paragraph::new(i18n::text(
+                    cx,
+                    "duplicates.scanning_count",
+                    &[("done", &done.to_string()), ("total", &total.to_string())],
+                )))
+                .into_any_element()
+        });
+
+        let Some(data) = self.duplicates.as_ref() else {
+            let hint = if self.duplicate_status.running {
+                i18n::text(cx, "duplicates.scanning_hint", &[])
+            } else {
+                "Add a folder and scan your library to find duplicates.".into()
+            };
+            return div()
+                .flex()
+                .flex_col()
+                .size_full()
+                .min_h_0()
+                .gap_4()
+                .child(toolbar)
+                .children(error)
+                .children(progress)
+                .child(empty_state(&i18n::text(cx, "duplicates.title", &[]), &hint))
+                .into_any_element();
+        };
+
+        let stats = div()
+            .flex()
+            .flex_wrap()
+            .gap_3()
+            .child(
+                InfoCard::new(
+                    "duplicate-library-size",
+                    IconName::HardDrive,
+                    i18n::text(cx, "duplicates.storage_total", &[]),
+                )
+                .detail(human_bytes(data.library_bytes)),
+            )
+            .child(
+                InfoCard::new(
+                    "duplicate-groups",
+                    IconName::Copy,
+                    i18n::text(cx, "duplicates.groups", &[]),
+                )
+                .detail(data.stats.group_count.to_string()),
+            )
+            .child(
+                InfoCard::new(
+                    "duplicate-count",
+                    IconName::Layers,
+                    i18n::text(cx, "duplicates.duplicates", &[]),
+                )
+                .detail(data.stats.duplicate_count.to_string()),
+            )
+            .child(
+                InfoCard::new(
+                    "duplicate-reclaimable",
+                    IconName::Zap,
+                    i18n::text(cx, "duplicates.reclaimable", &[]),
+                )
+                .detail(human_bytes(data.stats.reclaimable_bytes)),
+            );
+
+        let groups: AnyElement = if data.groups.is_empty() {
+            empty_state(
+                &i18n::text(cx, "duplicates.no_duplicates", &[]),
+                &i18n::text(cx, "duplicates.no_duplicates_desc", &[]),
+            )
+        } else {
+            let mut grid = div().flex().flex_wrap().gap_3();
+            for (idx, group) in data.groups.iter().enumerate() {
+                let kind = duplicate_kind_label(cx, &group.kind);
+                let count = plural(group.members.len(), "photo");
+                let reclaimable = human_bytes(group.reclaimable_bytes);
+                let thumb = group
+                    .members
+                    .iter()
+                    .find(|member| member.is_best)
+                    .or_else(|| group.members.first())
+                    .and_then(|member| resolve_image_source(None, Some(member.location.as_str())));
+                let leading = match thumb {
+                    Some(source) => ElyImage::new(("duplicate-thumb", idx), source)
+                        .w(px(44.0))
+                        .h(px(44.0))
+                        .flex_none()
+                        .rounded(px(8.0))
+                        .into_any_element(),
+                    None => div()
+                        .w(px(44.0))
+                        .h(px(44.0))
+                        .flex_none()
+                        .child(Icon::new(IconName::Copy))
+                        .into_any_element(),
+                };
+
+                let ids: Vec<String> = group
+                    .members
+                    .iter()
+                    .map(|member| member.id.clone())
+                    .collect();
+                let drill_title = kind.to_string();
+                let drill_subtitle = format!("{} · {}", count, reclaimable);
+                let weak_view = cx.entity().downgrade();
+                let view_button = Button::new(
+                    ("duplicate-view", idx),
+                    i18n::text(cx, "duplicates.contents", &[]),
+                )
+                .icon(IconName::FolderOpen)
+                .on_click(move |_, _, app| {
+                    if let Some(entity) = weak_view.upgrade() {
+                        let ids = ids.clone();
+                        let title = drill_title.clone();
+                        let subtitle = drill_subtitle.clone();
+                        entity.update(app, |state, cx| {
+                            state.open_drill_down(title, subtitle, |db| {
+                                ids.iter().filter_map(|id| db.get_photo_by_id(id)).collect()
+                            });
+                            cx.notify();
+                        });
+                    }
+                });
+
+                let remove_count = group.members.len().saturating_sub(1);
+                let weak_trash = cx.entity().downgrade();
+                let trash_button = Button::new(
+                    ("duplicate-trash", idx),
+                    i18n::text(
+                        cx,
+                        "duplicates.trash_duplicates",
+                        &[("count", &remove_count.to_string())],
+                    ),
+                )
+                .variant(ButtonVariant::Danger)
+                .icon(IconName::Trash2)
+                .on_click(move |_, _, app| {
+                    if let Some(entity) = weak_trash.upgrade() {
+                        entity.update(app, |state, cx| state.trash_duplicate_group(idx, cx));
+                    }
+                });
+
+                grid = grid.child(
+                    div()
+                        .id(("duplicate-group", idx))
+                        .w(px(320.0))
+                        .flex()
+                        .flex_col()
+                        .gap_3()
+                        .p_3()
+                        .child(
+                            div().flex().items_center().gap_3().child(leading).child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_1()
+                                    .child(Paragraph::new(kind))
+                                    .child(Paragraph::new(count))
+                                    .child(Paragraph::new(reclaimable)),
+                            ),
+                        )
+                        .child(div().flex().gap_2().child(view_button).child(trash_button)),
+                );
+            }
+            grid.into_any_element()
+        };
+
+        div()
+            .flex()
+            .flex_col()
+            .size_full()
+            .min_h_0()
+            .gap_4()
+            .child(toolbar)
+            .children(error)
+            .children(progress)
+            .child(stats)
+            .child(groups)
+            .into_any_element()
+    }
+
     fn settings_view(&self, cx: &mut Context<Self>) -> AnyElement {
         let weak_theme = cx.entity().downgrade();
         let weak_scan = cx.entity().downgrade();
@@ -1404,7 +1745,11 @@ fn notify_scan(title: &str, body: &str, cx: &mut App) {
 }
 
 fn path_from_open_arg(arg: &str) -> Option<PathBuf> {
-    if let Ok(url) = Url::parse(arg) {
+    // A Windows drive path such as `C:\photos\x.jpg` parses as a URL with the
+    // scheme `c`, so only attempt URL parsing when an explicit `://` delimiter
+    // is present.
+    if arg.contains("://") {
+        let url = Url::parse(arg).ok()?;
         if url.scheme() == "file" {
             return url.to_file_path().ok();
         }
@@ -1650,6 +1995,34 @@ fn run_scan(
     let _ = tx.send(ScanMessage::Complete { files_found });
 }
 
+/// Computes duplicate groups off the UI thread. The first pass hashes every
+/// file; later passes reuse the stored hashes. Progress is throttled so a large
+/// library does not flood the UI channel.
+fn run_duplicate_scan(config_dir: PathBuf, tx: UnboundedSender<DuplicateMessage>) {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let db = Database::new(&config_dir.display().to_string());
+        let groups = duplicates::detect_all_view_progress(&db, false, true, &mut |done, total| {
+            if done % 100 == 0 || done == total {
+                let _ = tx.send(DuplicateMessage::Progress { done, total });
+            }
+        });
+        let stats = duplicates::duplicate_stats_from_views(&groups);
+        let library_bytes = duplicates::library_overview(&db).library_bytes;
+        (groups, stats, library_bytes)
+    }));
+    let message = match result {
+        Ok((groups, stats, library_bytes)) => DuplicateMessage::Complete(DuplicateData {
+            groups,
+            stats,
+            library_bytes,
+        }),
+        Err(_) => {
+            DuplicateMessage::Failed("Duplicate detection failed. Try scanning again.".to_string())
+        }
+    };
+    let _ = tx.send(message);
+}
+
 /// Opens the existing local library, if any. We never create a database here:
 /// the desktop spike must not leave side effects in a user's real config dir.
 fn load_library() -> LibraryData {
@@ -1866,6 +2239,30 @@ fn plural(count: usize, noun: &str) -> String {
         format!("{count} {noun}")
     } else {
         format!("{count} {noun}s")
+    }
+}
+
+/// A compact size label for storage counters.
+fn human_bytes(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+    if bytes >= GB {
+        format!("{:.1} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.1} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.1} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{bytes} B")
+    }
+}
+
+fn duplicate_kind_label(cx: &App, kind: &str) -> SharedString {
+    match kind {
+        "exact" => i18n::text(cx, "duplicates.kind_exact", &[]),
+        "perceptual" => i18n::text(cx, "duplicates.kind_perceptual", &[]),
+        _ => i18n::text(cx, "duplicates.kind_clip", &[]),
     }
 }
 
@@ -2123,6 +2520,8 @@ fn main() {
                         scan_status: ScanStatus::default(),
                         scan_running: false,
                         scan_abort: None,
+                        duplicates: None,
+                        duplicate_status: DuplicateStatus::default(),
                         data,
                     }
                 })
@@ -2168,6 +2567,7 @@ mod tests {
             Section::Map,
             Section::People,
             Section::Collections,
+            Section::Duplicates,
             Section::Settings,
         ] {
             assert_eq!(Section::from_id(section.id()), section);
@@ -2193,6 +2593,14 @@ mod tests {
         assert_eq!(opened_media_arg(&[url_arg]), Some(path.clone()));
         assert_eq!(opened_media_arg(&["notes.txt".into()]), None);
         std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn windows_drive_paths_are_not_parsed_as_urls() {
+        let path = "C:\\photos\\summer\\image.JPG";
+        assert_eq!(path_from_open_arg(path), Some(PathBuf::from(path)));
+        assert!(path_from_open_arg("file:///C:/photos/image.JPG").is_some());
+        assert!(path_from_open_arg("https://example.com/image.JPG").is_none());
     }
 
     #[test]
@@ -2250,6 +2658,14 @@ mod tests {
     fn clip_respects_character_boundaries() {
         assert_eq!(clip("hello", 10), "hello");
         assert_eq!(clip("héllo", 3), "hél…");
+    }
+
+    #[test]
+    fn human_bytes_formats_storage_counters() {
+        assert_eq!(human_bytes(512), "512 B");
+        assert_eq!(human_bytes(1536), "1.5 KB");
+        assert_eq!(human_bytes(2 * 1024 * 1024), "2.0 MB");
+        assert_eq!(human_bytes(3 * 1024 * 1024 * 1024), "3.0 GB");
     }
 
     #[test]
