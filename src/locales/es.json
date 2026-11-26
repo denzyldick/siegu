@@ -197,6 +197,20 @@
     "reset": "Restablecer filtros"
   },
   "media": {
+    "months": {
+      "january": "enero",
+      "february": "febrero",
+      "march": "marzo",
+      "april": "abril",
+      "may": "mayo",
+      "june": "junio",
+      "july": "julio",
+      "august": "agosto",
+      "september": "septiembre",
+      "october": "octubre",
+      "november": "noviembre",
+      "december": "diciembre"
+    },
     "items_count": "{count} elementos",
     "your_library_empty": "Tu biblioteca está vacía",
     "scanning_in_progress": "Escaneando tu biblioteca",

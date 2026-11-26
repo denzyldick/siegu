@@ -197,6 +197,20 @@
     "reset": "Filters resetten"
   },
   "media": {
+    "months": {
+      "january": "januari",
+      "february": "februari",
+      "march": "maart",
+      "april": "april",
+      "may": "mei",
+      "june": "juni",
+      "july": "juli",
+      "august": "augustus",
+      "september": "september",
+      "october": "oktober",
+      "november": "november",
+      "december": "december"
+    },
     "items_count": "{count} items",
     "your_library_empty": "Je bibliotheek is leeg",
     "scanning_in_progress": "Bibliotheek wordt gescand",

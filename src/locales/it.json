@@ -197,6 +197,20 @@
     "reset": "Reimposta Filtri"
   },
   "media": {
+    "months": {
+      "january": "gennaio",
+      "february": "febbraio",
+      "march": "marzo",
+      "april": "aprile",
+      "may": "maggio",
+      "june": "giugno",
+      "july": "luglio",
+      "august": "agosto",
+      "september": "settembre",
+      "october": "ottobre",
+      "november": "novembre",
+      "december": "dicembre"
+    },
     "items_count": "{count} elementi",
     "your_library_empty": "La tua libreria è vuota",
     "scanning_in_progress": "Scansione della libreria in corso",

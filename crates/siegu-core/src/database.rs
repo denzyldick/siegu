@@ -172,6 +172,14 @@ pub struct PhotoFilter {
     pub album_id: Option<String>,
 }
 
+/// A month bucket used by date-grouped library views. `key` is `YYYY-MM`;
+/// photos without a usable timestamp share the empty key and sort last.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoDateGroup {
+    pub key: String,
+    pub count: usize,
+}
+
 /// How a non-manual album computes its membership.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -1907,6 +1915,44 @@ impl Database {
             .ok()
             .and_then(|mut stmt| stmt.query_row(param_refs.as_slice(), |row| row.get(0)).ok())
             .unwrap_or(0)
+    }
+
+    /// Count matching photos per month without loading any photo rows. Used by
+    /// date-grouped library grids to place section headers before paging in
+    /// thumbnails.
+    pub fn list_photo_date_groups(
+        &self,
+        query: &str,
+        favorites_only: bool,
+        videos_only: bool,
+        filter: &PhotoFilter,
+    ) -> Vec<PhotoDateGroup> {
+        let (where_clause, params) =
+            self.photo_where_clause(query, favorites_only, videos_only, filter, 0, -1);
+        let sql = format!(
+            "SELECT CASE WHEN length(p.created) >= 7 \
+                          AND substr(p.created, 5, 1) = '-' \
+                          AND substr(p.created, 8, 1) = '-' \
+                     THEN substr(p.created, 1, 7) ELSE '' END AS month, \
+                    COUNT(*) \
+             FROM photo p {where_clause} \
+             GROUP BY month ORDER BY month DESC LIMIT ?1, ?2"
+        );
+        let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        self.connection
+            .prepare(&sql)
+            .ok()
+            .and_then(|mut stmt| {
+                stmt.query_map(param_refs.as_slice(), |row| {
+                    Ok(PhotoDateGroup {
+                        key: row.get(0).unwrap_or_default(),
+                        count: row.get::<_, i64>(1).unwrap_or(0).max(0) as usize,
+                    })
+                })
+                .ok()
+                .map(|rows| rows.flatten().collect())
+            })
+            .unwrap_or_default()
     }
 
     /// List photos with search, pagination, favorite/video filters, and facet
@@ -6958,6 +7004,51 @@ mod tests {
             ..Default::default()
         });
         assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn test_list_photo_date_groups() {
+        let db = test_db();
+        for (id, created, favorite) in [
+            ("p1", "2026-03-05 10:00:00", 0),
+            ("p2", "2026-03-20", 0),
+            ("p3", "2025-12-31T12:00:00", 1),
+            ("p4", "", 0),
+        ] {
+            db.connection
+                .execute(
+                    "INSERT INTO photo (id, location, created, encoded, favorite) \
+                     VALUES (?1, ?2, ?3, '', ?4)",
+                    (id, format!("/{id}.jpg"), created, favorite),
+                )
+                .unwrap();
+        }
+
+        assert_eq!(
+            db.list_photo_date_groups("", false, false, &PhotoFilter::default()),
+            vec![
+                PhotoDateGroup {
+                    key: "2026-03".into(),
+                    count: 2,
+                },
+                PhotoDateGroup {
+                    key: "2025-12".into(),
+                    count: 1,
+                },
+                PhotoDateGroup {
+                    key: String::new(),
+                    count: 1,
+                },
+            ]
+        );
+
+        assert_eq!(
+            db.list_photo_date_groups("", true, false, &PhotoFilter::default()),
+            vec![PhotoDateGroup {
+                key: "2025-12".into(),
+                count: 1,
+            }]
+        );
     }
 
     #[test]

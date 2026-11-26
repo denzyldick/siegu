@@ -11,13 +11,14 @@ use gpui::{
     RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window,
 };
 
-/// A single library photo: a thumbnail (or placeholder), title, and the date it was taken.
+/// A single library photo: a thumbnail or placeholder, with optional caption and date.
 #[derive(IntoElement)]
 pub struct PhotoCard {
     id: ElementId,
     title: SharedString,
     date: Option<SharedString>,
     source: Option<ImageSource>,
+    image_only: bool,
     on_click: Option<Rc<dyn Fn(&mut Window, &mut App)>>,
 }
 
@@ -29,6 +30,7 @@ impl PhotoCard {
             title: title.into(),
             date: None,
             source: None,
+            image_only: false,
             on_click: None,
         }
     }
@@ -36,6 +38,13 @@ impl PhotoCard {
     /// The date the photo was taken, shown under the title.
     pub fn date(mut self, date: impl Into<SharedString>) -> Self {
         self.date = Some(date.into());
+        self
+    }
+
+    /// Show only the media, without caption or date text. This is the library
+    /// grid treatment: the date lives in the section header instead.
+    pub fn image_only(mut self) -> Self {
+        self.image_only = true;
         self
     }
 
@@ -55,12 +64,14 @@ impl PhotoCard {
 impl RenderOnce for PhotoCard {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
-        let mut header = CardHeader::new(self.title);
-        if let Some(date) = self.date {
-            header = header.description(date);
-        }
+        let aspect = if self.image_only { 1.0 } else { 4.0 / 3.0 };
+        let height = if self.image_only {
+            px(220.0)
+        } else {
+            px(260.0)
+        };
 
-        let thumb = AspectRatio::new(4.0 / 3.0)
+        let thumb = AspectRatio::new(aspect)
             .rounded(theme.radius(Radius::Sm))
             .overflow_hidden()
             .bg(theme.colors.sunken)
@@ -80,11 +91,15 @@ impl RenderOnce for PhotoCard {
                     .into_any_element(),
             });
 
-        let card = Card::new()
-            .w(px(220.0))
-            .h(px(260.0))
-            .child(header)
-            .child(thumb);
+        let mut card = Card::new().w(px(220.0)).h(height);
+        if !self.image_only {
+            let mut header = CardHeader::new(self.title);
+            if let Some(date) = self.date {
+                header = header.description(date);
+            }
+            card = card.child(header);
+        }
+        card = card.child(thumb);
 
         div()
             .id(self.id)
@@ -109,5 +124,14 @@ mod tests {
         assert_eq!(card.title.as_ref(), "Sunset");
         assert_eq!(card.date.as_deref(), Some("2026-08-01"));
         assert!(card.source.is_some());
+        assert!(!card.image_only);
+    }
+
+    #[test]
+    fn image_only_card_drops_caption_and_date() {
+        let card = PhotoCard::new("p1", "Sunset")
+            .date("2026-08-01")
+            .image_only();
+        assert!(card.image_only);
     }
 }

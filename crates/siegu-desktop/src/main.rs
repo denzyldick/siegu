@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -10,7 +9,7 @@ mod app_ipc;
 
 use base64::Engine as _;
 use rayon::prelude::*;
-use siegu_core::database::{Album, LocationGroup, PhotoFilter};
+use siegu_core::database::{Album, LocationGroup, PhotoDateGroup, PhotoFilter};
 use siegu_core::duplicates::{self, DuplicateGroupView, DuplicateStats};
 use siegu_core::{
     config::default_config_dir,
@@ -28,15 +27,15 @@ use siegu_ui::{
         motion::ProgressBar,
         overlays::Dialog,
         primitives::{FocusScope, Icon, IconName, Image as ElyImage, Severity},
-        theme::{Mode, Theme},
+        theme::{ActiveTheme, Mode, Theme},
         typography::{Heading, Paragraph},
     },
     gpui::{
-        canvas, div, px, size, uniform_list, AnyElement, App, AppContext, AsyncApp, Bounds,
-        Context, ElementId, Entity, FocusHandle, Image, ImageFormat, ImageSource,
-        InteractiveElement, IntoElement, KeyDownEvent, ParentElement, PathPromptOptions, Pixels,
-        Render, ScrollStrategy, SharedString, Styled, SystemNotification, TitlebarOptions,
-        UniformListScrollHandle, WeakEntity, Window, WindowBounds, WindowOptions,
+        canvas, div, list, px, size, AnyElement, App, AppContext, AsyncApp, Bounds, Context,
+        Entity, FocusHandle, Image, ImageFormat, ImageSource, InteractiveElement, IntoElement,
+        KeyDownEvent, ListAlignment, ListOffset, ListState, ParentElement, PathPromptOptions,
+        Pixels, Render, SharedString, Styled, SystemNotification, TitlebarOptions, WeakEntity,
+        Window, WindowBounds, WindowOptions,
     },
     gpui_platform, i18n, InfoCard, MediaViewer, PhotoCard, PhotoGrid, SieguAppShell,
 };
@@ -92,7 +91,8 @@ impl Section {
 const PHOTO_WINDOW_SIZE: usize = 180;
 const PHOTO_GAP: Pixels = px(16.0);
 const PHOTO_CARD_WIDTH: Pixels = px(220.0);
-const PHOTO_ROW_HEIGHT: Pixels = px(276.0);
+const PHOTO_ROW_HEIGHT: Pixels = px(236.0);
+const LIBRARY_HEADER_HEIGHT: Pixels = px(64.0);
 
 /// A library photo paired with its pre-resolved thumbnail source.
 #[derive(Clone)]
@@ -134,6 +134,17 @@ impl PhotoWindow {
     }
 }
 
+/// One virtual row in the date-grouped library. Headers and photo rows have
+/// different heights, so they live in GPUI's variable-height `ListState`.
+#[derive(Clone, Copy, Debug)]
+struct LibraryItem {
+    group: usize,
+    row: usize,
+    group_start: usize,
+    group_count: usize,
+    is_header: bool,
+}
+
 /// A person paired with their pre-resolved representative face thumbnail.
 struct PersonEntry {
     person: PersonWithFace,
@@ -156,6 +167,7 @@ struct AlbumEntry {
 #[derive(Default)]
 struct LibraryData {
     total_photos: usize,
+    date_groups: Vec<PhotoDateGroup>,
     people: Vec<PersonEntry>,
     places: Vec<PlaceEntry>,
     albums: Vec<AlbumEntry>,
@@ -276,9 +288,10 @@ struct Siegu {
     favorites_only: bool,
     videos_only: bool,
     library_window: PhotoWindow,
+    library_items: Vec<LibraryItem>,
+    library_columns: usize,
+    library_list: ListState,
     grid_width: Entity<Pixels>,
-    grid_scroll: UniformListScrollHandle,
-    grid_generation: usize,
     drill_down: Option<DrillDown>,
     selected_photo: Option<usize>,
     viewer_override: Option<PhotoEntry>,
@@ -415,13 +428,23 @@ impl Siegu {
         modal
     }
 
-    fn library_row(
+    /// Render one virtual item: either a month/year header or one photo row.
+    fn library_item(
         &mut self,
-        row: usize,
+        item_ix: usize,
         columns: usize,
         cx: &mut Context<Self>,
-    ) -> Vec<AnyElement> {
-        let (first, last) = row_bounds(row, columns, self.data.total_photos);
+    ) -> AnyElement {
+        let Some(item) = self.library_items.get(item_ix).copied() else {
+            return div().h(PHOTO_ROW_HEIGHT).into_any_element();
+        };
+        if item.is_header {
+            return self.library_header(item.group, cx);
+        }
+
+        let (first, last) = row_bounds(item.row, columns, item.group_count);
+        let first = item.group_start + first;
+        let last = item.group_start + last;
         self.ensure_library_window(first, last);
 
         let mut row_view = div().flex().items_start().gap_4().h(PHOTO_ROW_HEIGHT);
@@ -439,7 +462,37 @@ impl Siegu {
                 }
             }));
         }
-        vec![row_view.into_any_element()]
+        row_view.into_any_element()
+    }
+
+    fn library_header(&self, group_ix: usize, cx: &Context<Self>) -> AnyElement {
+        let Some(group) = self.data.date_groups.get(group_ix) else {
+            return div().h(LIBRARY_HEADER_HEIGHT).into_any_element();
+        };
+        let theme = cx.theme();
+        let title = month_label(&group.key, cx);
+        let count = i18n::text(
+            cx,
+            "media.items_count",
+            &[("count", &group.count.to_string())],
+        );
+        div()
+            .flex()
+            .items_center()
+            .justify_between()
+            .h(LIBRARY_HEADER_HEIGHT)
+            .px_1()
+            .child(Heading::h3(title))
+            .child(
+                div()
+                    .rounded_full()
+                    .border_1()
+                    .border_color(theme.colors.border)
+                    .px_2()
+                    .py_1()
+                    .child(Paragraph::new(count)),
+            )
+            .into_any_element()
     }
 
     fn ensure_library_window(&mut self, first: usize, last: usize) {
@@ -500,16 +553,29 @@ impl Siegu {
 
     fn reset_library_grid(&mut self) {
         self.library_window.clear();
-        self.grid_generation = self.grid_generation.wrapping_add(1);
-        self.grid_scroll.scroll_to_item(0, ScrollStrategy::Top);
+        self.rebuild_library_items(self.library_columns);
+        self.library_list.scroll_to(ListOffset {
+            item_ix: 0,
+            offset_in_item: Pixels::ZERO,
+        });
         self.selected_photo = None;
         self.viewer_override = None;
+    }
+
+    /// Flatten month buckets into virtual list items. The bucket counts come
+    /// from SQLite, so this stays small even for a 100k-photo library.
+    fn rebuild_library_items(&mut self, columns: usize) {
+        let columns = columns.max(1);
+        self.library_items = library_items_for_groups(&self.data.date_groups, columns);
+        self.library_columns = columns;
+        self.library_list.reset(self.library_items.len());
     }
 
     fn reload_library_photos(&mut self) {
         let dir = default_config_dir();
         if !dir.join("siegu.db").exists() {
             self.data.total_photos = 0;
+            self.data.date_groups.clear();
         } else {
             let db = Database::new(&dir.display().to_string());
             self.data.total_photos = db
@@ -520,6 +586,12 @@ impl Siegu {
                     &PhotoFilter::default(),
                 )
                 .max(0) as usize;
+            self.data.date_groups = db.list_photo_date_groups(
+                &self.search_query,
+                self.favorites_only,
+                self.videos_only,
+                &PhotoFilter::default(),
+            );
         }
         self.reset_library_grid();
     }
@@ -527,7 +599,11 @@ impl Siegu {
     fn refresh_data(&mut self) {
         self.data = load_library();
         self.library_window.clear();
-        self.grid_generation = self.grid_generation.wrapping_add(1);
+        self.rebuild_library_items(self.library_columns);
+        self.library_list.scroll_to(ListOffset {
+            item_ix: 0,
+            offset_in_item: Pixels::ZERO,
+        });
         self.selected_photo = None;
     }
 
@@ -1053,7 +1129,7 @@ impl Siegu {
         grid.into_any_element()
     }
 
-    fn library_view(&self, cx: &mut Context<Self>) -> AnyElement {
+    fn library_view(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let weak_fav = cx.entity().downgrade();
         let weak_vid = cx.entity().downgrade();
         let weak_add = cx.entity().downgrade();
@@ -1146,21 +1222,20 @@ impl Siegu {
 
         let width = self.grid_width.clone();
         let columns = columns_for(*width.read(cx), PHOTO_CARD_WIDTH, PHOTO_GAP).max(1) as usize;
+        if self.library_columns != columns
+            || (self.library_items.is_empty() && self.data.total_photos > 0)
+        {
+            self.rebuild_library_items(columns);
+        }
         let grid = if self.data.total_photos == 0 {
             empty_state(&empty_title, &empty_hint)
         } else {
-            uniform_list(
-                (
-                    ElementId::from(("library-grid", self.grid_generation)),
-                    columns.to_string(),
-                ),
-                self.data.total_photos.div_ceil(columns),
-                cx.processor(move |state: &mut Siegu, rows: Range<usize>, _, cx| {
-                    rows.flat_map(|row| state.library_row(row, columns, cx))
-                        .collect()
+            list(
+                self.library_list.clone(),
+                cx.processor(move |state: &mut Siegu, ix: usize, _, cx| {
+                    state.library_item(ix, columns, cx)
                 }),
             )
-            .track_scroll(&self.grid_scroll)
             .flex_1()
             .min_h_0()
             .into_any_element()
@@ -1811,6 +1886,36 @@ fn row_bounds(row: usize, columns: usize, total: usize) -> (usize, usize) {
     (first, (first + columns).min(total))
 }
 
+fn library_items_for_groups(groups: &[PhotoDateGroup], columns: usize) -> Vec<LibraryItem> {
+    let columns = columns.max(1);
+    let total: usize = groups.iter().map(|group| group.count).sum();
+    let mut items = Vec::with_capacity(total / columns + groups.len());
+    let mut start = 0usize;
+    for (group_ix, group) in groups.iter().enumerate() {
+        if group.count == 0 {
+            continue;
+        }
+        items.push(LibraryItem {
+            group: group_ix,
+            row: 0,
+            group_start: start,
+            group_count: group.count,
+            is_header: true,
+        });
+        for row in 0..group.count.div_ceil(columns) {
+            items.push(LibraryItem {
+                group: group_ix,
+                row,
+                group_start: start,
+                group_count: group.count,
+                is_header: false,
+            });
+        }
+        start += group.count;
+    }
+    items
+}
+
 fn step_index(current: Option<usize>, delta: isize, len: usize) -> Option<usize> {
     if len == 0 {
         return None;
@@ -2035,6 +2140,7 @@ fn load_library() -> LibraryData {
     let total_photos = db
         .count_photos_filtered("", false, false, &PhotoFilter::default())
         .max(0) as usize;
+    let date_groups = db.list_photo_date_groups("", false, false, &PhotoFilter::default());
     let people = db
         .get_people()
         .into_iter()
@@ -2089,6 +2195,7 @@ fn load_library() -> LibraryData {
 
     LibraryData {
         total_photos,
+        date_groups,
         people,
         places,
         albums,
@@ -2203,7 +2310,7 @@ fn photo_card(
     on_click: impl Fn(&mut Window, &mut App) + 'static,
 ) -> PhotoCard {
     let mut card = PhotoCard::new(("photo", idx), display_name(&entry.photo))
-        .date(display_date(&entry.photo.created))
+        .image_only()
         .on_click(on_click);
     if let Some(thumb) = &entry.thumbnail {
         card = card.source(thumb.clone());
@@ -2232,6 +2339,38 @@ fn display_date(created: &str) -> String {
         .next()
         .unwrap_or(created)
         .to_string()
+}
+
+/// A section title for a `YYYY-MM` bucket from `list_photo_date_groups`.
+fn month_label(key: &str, cx: &App) -> SharedString {
+    let (year, month) = key.split_once('-').unwrap_or(("", ""));
+    let Some(name_key) = month_name_key(month) else {
+        return i18n::text(cx, "media.recent", &[]);
+    };
+    let name = i18n::text(cx, &format!("media.months.{name_key}"), &[]);
+    if year.is_empty() {
+        name
+    } else {
+        format!("{name} {year}").into()
+    }
+}
+
+fn month_name_key(month: &str) -> Option<&'static str> {
+    match month.parse::<u8>() {
+        Ok(1) => Some("january"),
+        Ok(2) => Some("february"),
+        Ok(3) => Some("march"),
+        Ok(4) => Some("april"),
+        Ok(5) => Some("may"),
+        Ok(6) => Some("june"),
+        Ok(7) => Some("july"),
+        Ok(8) => Some("august"),
+        Ok(9) => Some("september"),
+        Ok(10) => Some("october"),
+        Ok(11) => Some("november"),
+        Ok(12) => Some("december"),
+        _ => None,
+    }
 }
 
 fn plural(count: usize, noun: &str) -> String {
@@ -2508,9 +2647,10 @@ fn main() {
                         favorites_only: false,
                         videos_only: false,
                         library_window: PhotoWindow::default(),
+                        library_items: Vec::new(),
+                        library_columns: 1,
+                        library_list: ListState::new(0, ListAlignment::Top, px(128.0)),
                         grid_width: cx.new(|_| Pixels::ZERO),
-                        grid_scroll: UniformListScrollHandle::new(),
-                        grid_generation: 0,
                         drill_down: None,
                         selected_photo: None,
                         viewer_override: opened_media_request(&initial_request)
@@ -2623,6 +2763,69 @@ mod tests {
         assert_eq!(row_bounds(0, 4, 10), (0, 4));
         assert_eq!(row_bounds(2, 4, 10), (8, 10));
         assert_eq!(row_bounds(3, 4, 10), (12, 10));
+    }
+
+    #[test]
+    fn library_items_interleave_headers_and_photo_rows() {
+        let groups = vec![
+            PhotoDateGroup {
+                key: "2026-03".into(),
+                count: 5,
+            },
+            PhotoDateGroup {
+                key: "2025-12".into(),
+                count: 3,
+            },
+            PhotoDateGroup {
+                key: String::new(),
+                count: 1,
+            },
+            PhotoDateGroup {
+                key: "2025-11".into(),
+                count: 0,
+            },
+        ];
+        let items = library_items_for_groups(&groups, 2);
+        assert_eq!(items.len(), 9);
+
+        assert!(items[0].is_header);
+        assert_eq!(items[0].group, 0);
+        assert_eq!(
+            (items[1].row, items[1].group_start, items[1].group_count),
+            (0, 0, 5)
+        );
+        assert_eq!(
+            (items[2].row, items[2].group_start, items[2].group_count),
+            (1, 0, 5)
+        );
+        assert_eq!(
+            (items[3].row, items[3].group_start, items[3].group_count),
+            (2, 0, 5)
+        );
+
+        assert!(items[4].is_header);
+        assert_eq!((items[4].group, items[4].group_start), (1, 5));
+        assert!(!items[6].is_header);
+        assert_eq!((items[6].row, items[6].group_start), (1, 5));
+
+        assert!(items[7].is_header);
+        assert_eq!((items[7].group, items[7].group_start), (2, 8));
+        assert_eq!(
+            (items[8].row, items[8].group_start, items[8].group_count),
+            (0, 8, 1)
+        );
+    }
+
+    #[test]
+    fn month_name_keys_cover_all_twelve_months() {
+        let keys: Vec<_> = (1..=12)
+            .filter_map(|m| month_name_key(&m.to_string()))
+            .collect();
+        assert_eq!(keys.len(), 12);
+        assert_eq!(keys[0], "january");
+        assert_eq!(keys[11], "december");
+        assert_eq!(month_name_key("13"), None);
+        assert_eq!(month_name_key("03"), Some("march"));
     }
 
     #[test]

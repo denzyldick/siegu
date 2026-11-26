@@ -197,6 +197,20 @@
     "reset": "Reinisiá Filtronan"
   },
   "media": {
+    "months": {
+      "january": "januari",
+      "february": "februari",
+      "march": "maart",
+      "april": "april",
+      "may": "mei",
+      "june": "juni",
+      "july": "juli",
+      "august": "augustus",
+      "september": "september",
+      "october": "oktober",
+      "november": "november",
+      "december": "desember"
+    },
     "items_count": "{count} artíkulo",
     "your_library_empty": "Bo biblioteka ta bashí",
     "scanning_in_progress": "Ta skené bo biblioteka",

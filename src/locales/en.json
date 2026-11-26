@@ -182,6 +182,20 @@
     "name_dialog_hint": "Type a new name, or pick an existing person to add these faces to."
   },
   "media": {
+    "months": {
+      "january": "January",
+      "february": "February",
+      "march": "March",
+      "april": "April",
+      "may": "May",
+      "june": "June",
+      "july": "July",
+      "august": "August",
+      "september": "September",
+      "october": "October",
+      "november": "November",
+      "december": "December"
+    },
     "items_count": "{count} items",
     "your_library_empty": "Your library is empty",
     "scanning_in_progress": "Scanning your library",
