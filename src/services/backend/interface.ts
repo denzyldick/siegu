@@ -1,5 +1,5 @@
 /**
- * A single seam between the local Tauri app and a browser guest (#19, Phase 1).
+ * A single seam between the local Tauri app and a browser guest.
  *
  * Both implementations expose the same operations, so the UI layer can be
  * written once and switched by build/runtime mode. Data ops mirror the
@@ -56,7 +56,7 @@ export interface Backend {
 export type BackendMode = 'tauri' | 'webHost' | 'guest';
 
 /**
- * The three runtime UI modes (#24):
+ * The three runtime UI modes:
  *  - `tauri`    — native desktop Tauri app (unchanged behavior)
  *  - `webHost`  — browser is the OWNER of a library mounted on a `siegu web`
  *                 instance (Mode A); full GUI over HTTP/RPC, no pairing

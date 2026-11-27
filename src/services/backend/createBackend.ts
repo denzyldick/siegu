@@ -5,7 +5,7 @@ import type { GuestClient } from './guest';
 import type { Backend, BackendMode } from './interface';
 
 /**
- * Pick a `Backend` by mode (#24):
+ * Pick a `Backend` by mode:
  *  - `tauri`   — local desktop client (default)
  *  - `webHost` — browser owner of a `siegu web` library, over HTTP/RPC (Mode A)
  *  - `guest`   — browser pairing to a remote Siegu over WebRTC (Mode B); needs a

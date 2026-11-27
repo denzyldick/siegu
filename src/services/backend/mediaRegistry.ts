@@ -1,5 +1,5 @@
 /**
- * Module-level registry for the active media backend resolver (#24, Phase 1).
+ * Module-level registry for the active media backend resolver.
  *
  * `useMediaUrl`'s mode-aware resolvers need to reach the active `Backend`
  * (webHost/guest/tauri) WITHOUT importing a store: stores make the composable

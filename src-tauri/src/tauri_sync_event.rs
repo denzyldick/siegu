@@ -200,7 +200,7 @@ impl SyncEvent for TauriSyncEvent {
         }
     }
 
-    /// Peer sent us a read-only manifest (#9): hand it to the frontend so the
+    /// Peer sent us a read-only manifest: hand it to the frontend so the
     /// guest gallery can render without any data being written locally.
     fn on_view_manifest(&self, photos: &[siegu_core::PhotoSyncInfo]) {
         match serde_json::to_string(&photos) {

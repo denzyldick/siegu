@@ -63,7 +63,7 @@ async function ensurePort(): Promise<number | null> {
 export function useMediaUrl() {
   void ensurePort();
 
-  // ── Tauri-only: media streams from the local media-server HTTP routes (#10).
+  // ── Tauri-only: media streams from the local media-server HTTP routes.
   //    Only meaningful on desktop; in browser modes the port stays null and
   //    components must use the mode-aware `thumbSrc`/`originalSrc`/`videoSrc`
   //    below, which delegate to the active Backend (`/media|/thumb` on webHost,
@@ -88,7 +88,7 @@ export function useMediaUrl() {
   }
 
   // Evicted (view-only) items stream through the media server's /remote
-  // route, which pulls bytes from the peer on demand (#10).
+  // route, which pulls bytes from the peer on demand.
   function remoteImageUrl(id: string | number): string | null {
     if (!sharedPort.value) return null;
     return `http://127.0.0.1:${sharedPort.value}/remote/${encodeURIComponent(String(id))}`;

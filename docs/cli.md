@@ -112,13 +112,13 @@ siegu-cli mesh status
 siegu-cli mesh disconnect
 siegu-cli mesh quota
 
-# Browse a peer's library view-only and verify the manifest (#9, e2e helper)
+# Browse a peer's library view-only and verify the manifest (e2e helper)
 siegu-cli mesh browse myroom --server ws://192.168.1.100:8080
 
-# Browse in album-share mode for a specific album (#16)
+# Browse in album-share mode for a specific album
 siegu-cli mesh browse myroom --album <album-id>
 
-# Send a single RPC command to the peer and print its reply (#19, e2e helper)
+# Send a single RPC command to the peer and print its reply (e2e helper)
 siegu-cli mesh rpc myroom list_files --server ws://192.168.1.100:8080
 siegu-cli mesh rpc myroom toggle_favorite '{"id": "<photo-id>"}'
 
@@ -156,7 +156,7 @@ siegu-cli serve --port 8080
 
 ### `siegu-cli web`
 
-Share this machine's library as a browser gallery (#11, #19). Starts an
+Share this machine's library as a browser gallery. Starts an
 embedded signaling server plus a small static web server and prints a one-off
 link. Opening the link is the consent step — anyone holding it can browse the
 library until the command stops. Nothing is downloaded or written on the

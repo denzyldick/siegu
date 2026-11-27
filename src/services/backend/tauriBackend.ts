@@ -1,7 +1,6 @@
 /**
  * Local Tauri `Backend` adapter: delegates data ops to the existing `tauri.ts`
- * commands and resolves media through the local media-server HTTP routes
- * (#19, Phase 1).
+ * commands and resolves media through the local media-server HTTP routes.
  */
 import {
   getPhotoById,

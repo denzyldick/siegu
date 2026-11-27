@@ -38,7 +38,7 @@ impl Room {
     /// Drop entries whose WebSocket sink is gone (abrupt disconnects leave
     /// the TCP socket to die asynchronously). Without this a fast reconnect
     /// sees ghost peers: inflated counts, offers broadcast to nobody, and
-    /// duplicate WebRTC sessions (#16).
+    /// duplicate WebRTC sessions.
     fn prune_dead(&mut self) {
         self.clients.retain(|_, tx| !tx.is_closed());
     }
@@ -148,7 +148,7 @@ pub async fn start_with_config(config: ServerConfig) -> LanServer {
         );
 
     // When a webclient dist directory is configured, serve the SPA so
-    // guests can open the share link directly in a browser (#16).
+    // guests can open the share link directly in a browser.
     // All six routes are always present so the boxed filter type is
     // identical in both branches; when `web_dist` is None the web routes
     // simply reject and warp falls through to the WS/health routes.
@@ -606,7 +606,7 @@ async fn handle_connection(
                     );
                     // Introduce the newcomer to peers that were already here,
                     // so an initiating host joining late learns concrete
-                    // identities instead of offering blindly (#16).
+                    // identities instead of offering blindly.
                     for peer_id in &existing_peers {
                         send(
                             &tx_write,
@@ -727,7 +727,7 @@ async fn handle_connection(
                                 peers: existing_peers.clone(),
                             },
                         );
-                        // Same introductions as the LAN path (#16).
+                        // Same introductions as the LAN path.
                         for peer_id in &existing_peers {
                             send(
                                 &tx_write,
@@ -741,7 +741,7 @@ async fn handle_connection(
                         for client in notify {
                             // The joiner's conn key rides along so an
                             // initiating host can target its offer at this
-                            // specific guest instead of broadcasting (#16).
+                            // specific guest instead of broadcasting.
                             send(
                                 &client,
                                 &SignalMessage::PeerJoined {
@@ -886,7 +886,7 @@ async fn handle_connection(
                     for client in room.clients.values() {
                         // Remote guests never send a Join frame, so their
                         // d_id is empty: fall back to the conn key, which is
-                        // what per-peer host sessions are keyed by (#16).
+                        // what per-peer host sessions are keyed by.
                         let leaver = if d_id.is_empty() {
                             ck.clone()
                         } else {
@@ -935,7 +935,7 @@ async fn relay(
     mut msg: SignalMessage,
 ) {
     // Stamp the sender so a multi-guest host can tell which peer a
-    // reply belongs to and route it to the right WebRTC session (#16).
+    // reply belongs to and route it to the right WebRTC session.
     if let SignalMessage::Offer { from, .. }
     | SignalMessage::Answer { from, .. }
     | SignalMessage::IceCandidate { from, .. } = &mut msg

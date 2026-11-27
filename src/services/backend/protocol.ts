@@ -1,5 +1,5 @@
 /**
- * Pure, side-effect-free types + helpers for the WebRTC RPC guest backend (#19).
+ * Pure, side-effect-free types + helpers for the WebRTC RPC guest backend.
  * No DOM / WebRTC / network dependencies — everything here is unit-testable.
  *
  * Message shapes mirror `crates/siegu-core/src/mesh.rs` and `rpc.rs`:

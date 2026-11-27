@@ -11,7 +11,7 @@ export interface SyncProgress {
   items_total: number;
 }
 
-/** One entry of a peer's read-only manifest (#9 view-only browsing). */
+/** One entry of a peer's read-only manifest (view-only browsing). */
 export interface ViewPhoto {
   id: string;
   location: string;

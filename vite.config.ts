@@ -45,7 +45,7 @@ export default defineConfig(async () => ({
     },
     // Browser (webHost) dev ergonomics: proxy the Rust host's data-plane routes
     // so the full app in a browser resolves /session, /rpc, /thumb and /media
-    // same-origin (Mode A, #24/#26/#28). Desktop (Tauri) is unaffected.
+    // same-origin for webHost mode. Desktop (Tauri) is unaffected.
     proxy: process.env.SIEGU_WEB_HOST
       ? {
           '/session': { target: process.env.SIEGU_WEB_HOST },

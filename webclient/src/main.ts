@@ -1,5 +1,5 @@
 /**
- * siegu view-only web client (#11).
+ * siegu view-only web client.
  *
  * Speaks the same SignalMessage (WebSocket) + SyncMessage (WebRTC data
  * channel) protocols as native peers. The CLI side (`siegu web`) is the

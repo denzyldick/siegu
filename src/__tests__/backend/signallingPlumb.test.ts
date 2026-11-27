@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { resolveSignalingBase } from '@/services/signalling';
 
 /**
- * Phase 4: hosted `wss://` signalling plumbing.
+ *: hosted `wss://` signalling plumbing.
  *
  * A Mode B guest must be able to pair by code + token against a remote
  * signaler, not just the `/ws` bridge of the CLI host that served the page.

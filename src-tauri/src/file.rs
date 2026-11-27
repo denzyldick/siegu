@@ -172,7 +172,7 @@ pub fn scan_folder(
     let total_new_clone = Arc::clone(&total_new);
     let last_emit_ms = AtomicU64::new(0);
 
-    // Phase 1 — collect media paths on jwalk's dedicated pool.
+    // collect media paths on jwalk's dedicated pool.
     let media_paths: Vec<PathBuf> = jwalk::WalkDir::new(&directory)
         .follow_links(false)
         .parallelism(jwalk::Parallelism::RayonNewPool(4))
@@ -182,7 +182,7 @@ pub fn scan_folder(
         .filter(|p| siegu_core::scanner::is_media_file(p))
         .collect();
 
-    // Phase 2 — extract metadata chunk by chunk on the global pool, handing each
+    // extract metadata chunk by chunk on the global pool, handing each
     // finished chunk to the batch writer before moving on.
     let mut result: Result<(), ()> = Ok(());
     for chunk in media_paths.chunks(SCAN_CHUNK_SIZE) {

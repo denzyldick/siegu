@@ -1,7 +1,7 @@
 //! Tauri command wrappers for ML analysis / indexing.
 //!
 //! The business logic lives in `siegu_core::ml_commands` (single source of
-//! truth shared with the RPC facade, issue #42). These `#[tauri::command]`
+//! truth shared with the RPC facade,). These `#[tauri::command]`
 //! functions only add the Tauri-shell concerns: pulling the config path and
 //! emitting host-UI log lines. Names are part of the frontend contract
 //! (`src/services/tauri.ts`) and must not change.

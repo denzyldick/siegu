@@ -62,8 +62,8 @@ curl "http://localhost:8787/verify?email=you@example.com" \
   -H "x-siegu-token: $SIEGU_VERIFY_TOKEN"
 ```
 
-## Caveat / roadmap
+## Caveat
 
 There is **no paid/Pro feature gating in the Siegu desktop app yet** — this
 worker records entitlement, and the app stores `tier=paid`, but nothing is
-locked in the app. Gating real features behind `tier` is future work.
+locked in the app.

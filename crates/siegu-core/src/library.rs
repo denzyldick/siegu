@@ -1,8 +1,8 @@
-//! Library business logic shared by every frontend surface (#19).
+//! Library business logic shared by every frontend surface.
 //!
 //! These functions used to live in `src-tauri/src/commands/{photos,search}.rs`
 //! as `do_*` helpers. They are pure over [`Database`] so the Tauri app, CLI
-//! hosts and RPC dispatch (#19) all run the exact same code. src-tauri
+//! hosts and RPC dispatch all run the exact same code. src-tauri
 //! re-exports them; behavior is unchanged.
 
 use serde::Serialize;

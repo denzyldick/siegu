@@ -1,5 +1,5 @@
 /**
- * Runtime UI-mode detection (#24, Phase 1).
+ * Runtime UI-mode detection.
  *
  * One binary / Vue build serves three runtime modes:
  *   - `desktop` (BackendMode 'tauri') — native Tauri app, unchanged.
@@ -23,7 +23,7 @@ export interface DetectedMode {
   /** Present only when mode === 'guest'. */
   session?: GuestSession;
   /** Present only when mode === 'webHost': the host-issued data-plane token
-   *  that authorizes `/rpc`, `/thumb`, `/media` (#28). */
+   *  that authorizes `/rpc`, `/thumb`, `/media`. */
   webHostToken?: string;
 }
 

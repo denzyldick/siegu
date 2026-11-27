@@ -75,13 +75,13 @@ pub struct MeshTransport {
     pub event: Arc<dyn SyncEvent>,
     sync_tx: Arc<Mutex<Option<UnboundedSender<SyncMessage>>>>,
     external_tx: Option<Arc<Mutex<Option<UnboundedSender<SyncMessage>>>>>,
-    /// RPC permission for browser guests (#19). `None` (the default) rejects
+    /// RPC permission for browser guests. `None` (the default) rejects
     /// CommandRequest messages entirely; device-to-device mesh sessions never
     /// opt in, only `siegu web --share-mode ...` does.
     share_mode: Option<crate::rpc::ShareMode>,
     /// When set, the receiver branch skips ManifestRequest/CatchUp on channel
     /// open: the guest drives EnterViewOnly/RPC itself and must never trigger
-    /// a full sync push from the sharer (#9/#19).
+    /// a full sync push from the sharer.
     view_only_client: bool,
     /// Backpressure counter: number of messages queued in the outbound channel.
     /// The pump loop decrements after each successful send.
@@ -135,7 +135,7 @@ impl MeshTransport {
     }
 
     /// Enable RPC dispatch for this session with the given permission level
-    /// (#19). Only web-share hosts should call this.
+    ///. Only web-share hosts should call this.
     pub fn with_share_mode(mut self, mode: crate::rpc::ShareMode) -> Self {
         self.share_mode = Some(mode);
         self
@@ -205,7 +205,7 @@ impl MeshTransport {
 
     /// ICE configuration: Google STUN by default, plus a TURN server when
     /// `SIEGU_TURN_URLS` is set (comma-separated URLs), with optional
-    /// `SIEGU_TURN_USERNAME` / `SIEGU_TURN_CREDENTIAL` (#16). TURN lets
+    /// `SIEGU_TURN_USERNAME` / `SIEGU_TURN_CREDENTIAL`. TURN lets
     /// guests on cellular networks reach a home NAT.
     fn rtc_configuration() -> RTCConfiguration {
         Self::rtc_configuration_from_turn(
@@ -348,8 +348,7 @@ impl MeshTransport {
         // Outbound queue: CLI callers push SyncMessages through here and the
         // on-open pump drains them onto this guest's channel. Binding per
         // session means the most recent guest wins the public send_message /
-        // /remote restore path; proper per-peer fan-out lands with #19
-        // Phase 1.
+        // /remote restore path.
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<SyncMessage>();
         *self.sync_tx.lock().await = Some(tx.clone());
         if let Some(ext) = &self.external_tx {
@@ -410,7 +409,7 @@ impl MeshTransport {
                 .await;
                 event.on_log("DEBUG [host] sent VersionNegotiate");
                 // View-only/RPC guests drive their own pulls; a stray
-                // ManifestRequest would trigger a full sync push (#9/#19).
+                // ManifestRequest would trigger a full sync push.
                 if !skip_pull {
                     let _ =
                         MeshManager::send_sync_message(&dc, &SyncMessage::ManifestRequest).await;
@@ -610,7 +609,7 @@ impl MeshTransport {
         };
         // Hosts (and any initiator) keep one session per peer so guests are
         // isolated: a second join works after the first guest left, and
-        // simultaneous viewers never share WebRTC state (#16).
+        // simultaneous viewers never share WebRTC state.
         if self.is_initiator {
             let mut sessions: HashMap<String, PeerSession> = HashMap::new();
             self.host_signal_loop(
@@ -728,7 +727,7 @@ impl MeshTransport {
         Ok(())
     }
 
-    /// Signalling loop for initiating hosts (#16): every peer gets its own
+    /// Signalling loop for initiating hosts: every peer gets its own
     /// [`PeerSession`] keyed by the identity the signalling server stamps on
     /// frames (LAN `device_id`, remote conn key). Offers are targeted at one
     /// guest, answers/ICE are routed back to the session that owns them, and
@@ -991,7 +990,7 @@ impl MeshTransport {
     }
 
     /// Legacy single-peer loop for joining/receiving guests: one PC, one
-    /// data channel, exactly the pre-#16 behavior.
+    /// data channel, exactly the earlier behavior.
     #[allow(clippy::too_many_lines)]
     async fn guest_signal_loop(
         &self,
@@ -1026,13 +1025,13 @@ impl MeshTransport {
             *ext.lock().await = Some(tx.clone());
         }
         // Bind on-demand media pulls (/remote/{id}) to this session: covers
-        // view-only browsing (#9) and restore pulls of evicted items (#10).
+        // view-only browsing and restore pulls of evicted items.
         crate::view_only::state().bind_session(tx);
         let sync_rx = Arc::new(Mutex::new(rx));
 
         // In multi-guest rooms the server relays every guest's answer/ICE to
         // all other peers (target "peer" broadcasts), so a guest must only
-        // accept frames from the host it actually negotiated with (#16).
+        // accept frames from the host it actually negotiated with.
         let mut host_key: Option<String> = None;
 
         let mut m = MediaEngine::default();
@@ -1442,7 +1441,7 @@ impl MeshTransport {
                         SignalMessage::PeerDisconnected { device_id } => {
                             // In multi-guest rooms this fires when ANY peer
                             // leaves; only our negotiated host owns the
-                            // ephemeral view-only state (#16).
+                            // ephemeral view-only state.
                             let foreign_guest = match (&host_key, &device_id) {
                                 (Some(expected), id) => !id.is_empty() && id != expected,
                                 _ => false,

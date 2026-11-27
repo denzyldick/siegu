@@ -1,7 +1,7 @@
 use crate::common::get_config_path;
 use crate::database;
 
-// Business logic lives in siegu-core (#19) so CLI hosts and RPC guests run
+// Business logic lives in siegu-core so CLI hosts and RPC guests run
 // the exact same functions as this app.
 #[allow(unused_imports)] // some are only used by the unit tests below
 pub use siegu_core::library::{

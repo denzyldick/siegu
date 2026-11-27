@@ -1,5 +1,5 @@
 /**
- * Backend abstraction (#19, Phase 1).
+ * Backend abstraction.
  *
  * `GuestClient` + `createPeerTransport` let the browser Vue app act as a
  * guest against a hosting `siegu web` device. The `Backend` interface is the

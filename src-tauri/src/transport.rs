@@ -229,7 +229,7 @@ async fn serve_media_file(
 }
 
 /// Serve an in-memory media item fetched over the view-only data channel
-/// (#9). Key format: `<photo_id>` for originals, `thumb:<photo_id>` for
+///. Key format: `<photo_id>` for originals, `thumb:<photo_id>` for
 /// thumbnails. On a miss we ask the peer and wait briefly for the transfer.
 async fn serve_remote_media(
     key: String,
@@ -243,7 +243,7 @@ async fn serve_remote_media(
     };
     let media = match state.get(&key) {
         Some(m) => {
-            // Track opens for the storage-cap LRU (#10): recently viewed
+            // Track opens for the storage-cap LRU: recently viewed
             // originals are evicted last.
             if !thumbnail {
                 let db = siegu_core::database::Database::new(config_path);

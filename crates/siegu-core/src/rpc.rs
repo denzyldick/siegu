@@ -1,4 +1,4 @@
-//! RPC dispatch for browser guests (#19).
+//! RPC dispatch for browser guests.
 //!
 //! A guest speaks `SyncMessage::CommandRequest` over the WebRTC data channel;
 //! this module maps `name + JSON payload` onto the exact same business
@@ -28,7 +28,7 @@ use crate::rpc_catalog::{self, Tier};
 /// self-hoster sets for guests. `Owner` is the configured-owner capability: a
 /// client authenticated to its own host (docker-compose / CLI `web_token`)
 /// may additionally run heavy host work (ML, sync/session/device) — see
-/// [`Tier`] and issue #42.
+/// [`Tier`] and.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ShareMode {
     /// Guests may browse and read only. Default.
@@ -1060,7 +1060,7 @@ mod tests {
     }
 }
 
-/// Security tests for the ML capability boundary (issue #19 / #42): a guest
+/// Security tests for the ML capability boundary: a guest
 /// principal (read-only or rw share, `ml: None`) must never run owner/ML
 /// commands, while the owner principal (with a live worker) can.
 #[cfg(all(test, feature = "ml"))]

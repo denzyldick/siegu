@@ -14,7 +14,7 @@ export const useSyncStore = defineStore('sync', () => {
   const connection = ref<'idle' | 'connected' | 'offline'>('idle');
   const connectionMode = ref<'lan' | 'internet' | null>(null);
   const activePeerId = ref<string | null>(null);
-  /** #9 view-only browsing state. */
+  /** view-only browsing state. */
   const viewOnlyActive = ref(false);
   const viewOnlyPhotos = ref<ViewPhoto[]>([]);
   const viewOnlyLoading = ref(false);
@@ -126,7 +126,7 @@ export const useSyncStore = defineStore('sync', () => {
     }
   });
 
-  /** Ask the peer for a read-only look at their library (#9). */
+  /** Ask the peer for a read-only look at their library. */
   async function browseOnly(): Promise<void> {
     viewOnlyLoading.value = true;
     viewOnlyPhotos.value = [];

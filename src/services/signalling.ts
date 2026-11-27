@@ -42,7 +42,7 @@ export async function pingSignalling(url: string): Promise<PingResult> {
  * Browser-safe signalling *base* ("host[:port]") for a Mode B guest. A guest is
  * allowed to pair by code + token against a remote `wss://` signaler, not just
  * the CLI host that served the page. Resolution order (enables the "pair from
- * anywhere" web.whatsapp.com goal, Phase 4):
+ * anywhere" web.whatsapp.com goal):
  *
  *   1. `window.sieguSignalingHost` (injected by the host when it wants guests to
  *      use a hosted relay instead of its own local `/ws` bridge);

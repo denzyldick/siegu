@@ -1116,7 +1116,7 @@ impl Database {
         results
     }
 
-    /// Sync info for every photo in an album (#16): manual albums read
+    /// Sync info for every photo in an album: manual albums read
     /// `album_item` rows; smart/trip albums resolve their stored rule through
     /// the same filtered-query machinery the UI uses. Deleted photos are
     /// excluded either way.
@@ -4002,7 +4002,7 @@ impl Database {
         }
     }
 
-    /// Mark a photo's local original as evicted (#10): the DB row and
+    /// Mark a photo's local original as evicted: the DB row and
     /// thumbnail stay, only the full-size file is gone.
     pub fn mark_view_only(&self, id: &str) {
         if let Err(e) = self
@@ -4034,7 +4034,7 @@ impl Database {
         }
     }
 
-    /// Candidates for storage-cap eviction (#10). ONLY peer-received copies
+    /// Candidates for storage-cap eviction. ONLY peer-received copies
     /// are ever evictable — originals imported by this device's user exist
     /// nowhere else and must never be deleted. Least-recently-opened first;
     /// never-opened rows (last_opened = 0) fall back to oldest created.
@@ -4359,7 +4359,7 @@ pub struct Photo {
     /// True when this row was imported from a peer (a backup copy).
     #[serde(default)]
     pub received: bool,
-    /// True when the local original was evicted (#10): metadata + thumbnail
+    /// True when the local original was evicted: metadata + thumbnail
     /// stay, the full-size file is pulled on demand from a peer.
     #[serde(default)]
     pub view_only: bool,

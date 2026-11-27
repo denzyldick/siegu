@@ -1,5 +1,5 @@
 /**
- * Browser-aware `invoke` (#24, Phase 1 data plane).
+ * Browser-aware `invoke` (data plane).
  *
  * In a Tauri shell this is a thin pass-through to `@tauri-apps/api/core.invoke`.
  * In a plain browser (webHost/guest modes) it serves the commands the `siegu

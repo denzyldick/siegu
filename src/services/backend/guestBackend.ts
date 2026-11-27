@@ -1,6 +1,6 @@
 /**
  * Guest-mode `Backend` adapter: routes data ops and media over the WebRTC RPC
- * client in `guest.ts` (#19, Phase 1).
+ * client in `guest.ts`.
  */
 import type { GuestClient } from './guest';
 import type { Backend } from './interface';

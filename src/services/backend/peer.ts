@@ -1,5 +1,5 @@
 /**
- * WebRTC guest transport for the RPC web backend (#19, Phase 1).
+ * WebRTC guest transport for the RPC web backend.
  *
  * Mirrors the proven connectivity in `webclient/main.ts`: the CLI host
  * (`siegu web`) is the initiator, creates the room and sends the WebRTC

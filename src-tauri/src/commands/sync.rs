@@ -14,7 +14,7 @@ pub struct LanHostInfo {
     pub port: u16,
 }
 
-/// Storage usage against the configured cap (#10).
+/// Storage usage against the configured cap.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct StorageUsage {
     pub used: u64,
@@ -724,7 +724,7 @@ pub async fn request_start_sync(state: tauri::State<'_, crate::WebRtcState>) -> 
         .map_err(|e| e.to_string())
 }
 
-/// Enter view-only mode on the active connection (#9): bind the media cache
+/// Enter view-only mode on the active connection: bind the media cache
 /// to this session and ask the peer for its read-only manifest.
 #[tauri::command]
 pub async fn enter_view_only(state: tauri::State<'_, crate::WebRtcState>) -> Result<(), String> {
@@ -740,7 +740,7 @@ pub async fn enter_view_only(state: tauri::State<'_, crate::WebRtcState>) -> Res
         .map_err(|e| e.to_string())
 }
 
-/// Pull the original of an evicted (view-only) photo from the peer (#10).
+/// Pull the original of an evicted (view-only) photo from the peer.
 /// The transfer persists via the normal receive path and clears view_only.
 #[tauri::command]
 pub async fn fetch_original(
@@ -759,7 +759,7 @@ pub async fn fetch_original(
     .map_err(|e| e.to_string())
 }
 
-/// Current storage usage vs. the configured cap, in bytes (#10).
+/// Current storage usage vs. the configured cap, in bytes.
 #[tauri::command]
 pub async fn storage_usage(app: tauri::AppHandle) -> Result<StorageUsage, String> {
     let config_path = get_config_path(&app);

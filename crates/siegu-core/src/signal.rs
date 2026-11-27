@@ -20,7 +20,7 @@ pub enum SignalMessage {
         payload: String,
         target: String,
         /// Sender identity stamped by the signalling server so a
-        /// multi-guest host can route replies back (#16). Absent on
+        /// multi-guest host can route replies back. Absent on
         /// frames from servers that predate per-peer routing.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         from: Option<String>,

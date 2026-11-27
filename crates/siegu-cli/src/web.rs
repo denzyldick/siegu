@@ -188,7 +188,7 @@ fn mime_for(path: &Path) -> &'static str {
 }
 
 /// A uniform 404 reply for denied webHost data requests: never reveals that the
-/// protected surface exists (#28). Body type `Vec<u8>` matches the media/thumb
+/// protected surface exists. Body type `Vec<u8>` matches the media/thumb
 /// handlers so the reply type unifies.
 fn denied_response() -> warp::http::Response<Vec<u8>> {
     warp::http::Response::builder()
@@ -279,7 +279,7 @@ async fn serve_static(
 
     // ── webHost (Mode A) HTTP surface ──────────────────────────────────────
     // Owner of a mounted library reaches the same business functions + media
-    // over HTTP instead of WebRTC (#26). `POST /rpc` mirrors the RPC dispatch;
+    // over HTTP instead of WebRTC. `POST /rpc` mirrors the RPC dispatch;
     // `/thumb/{id}` and `/media/{id}` serve bytes by photo id, root-scoped.
 
     let rpc_config = config_path.clone();
@@ -452,11 +452,11 @@ async fn serve_static(
 pub struct WebOptions {
     pub http_port: u16,
     pub config: Option<String>,
-    /// RPC permission for connected browsers (#19). ReadOnly by default;
+    /// RPC permission for connected browsers. ReadOnly by default;
     /// `--share-mode rw` lets guests mutate favorites/trash.
     pub share_mode: siegu_core::ShareMode,
     /// Optional hosted signalling server (`wss://…`) to pair through instead of
-    /// the embedded loopback one (#27, Phase 4). Lets guests connect from any
+    /// the embedded loopback one. Lets guests connect from any
     /// network by code + token.
     pub server: Option<String>,
     /// When true, the bearer of the printed `web_token` is the library Owner on
@@ -466,7 +466,7 @@ pub struct WebOptions {
 }
 
 /// `siegu web`: share this machine's library as a view-only gallery in any
-/// browser (#11). Runs an embedded signalling server plus a small static file
+/// browser. Runs an embedded signalling server plus a small static file
 /// server; possession of the printed URL+code grants one-off viewing access.
 pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
     let config_path = opts
@@ -479,13 +479,13 @@ pub async fn run(opts: WebOptions) -> Result<(), BoxError> {
     // Distinct token for the signalling plane (WebRTC room join).
     let token = uuid::Uuid::new_v4().to_string();
     // Distinct token for the webHost (Mode A) HTTP data plane: `/rpc`, `/thumb`,
-    // `/media` are gated behind it so serving media now (since #26) doesn't make
+    // `/media` are gated behind it so serving media now doesn't make
     // the static plane read the library to anyone who can reach the port.
     let web_token = uuid::Uuid::new_v4().to_string();
 
     // Signalling: either embed our own loopback server (default) or, with
     // `--server <wss://…>`, connect to a hosted signaler shared across devices
-    // so a guest can pair by code + token from anywhere (Phase 4).
+    // so a guest can pair by code + token from anywhere.
     let mut signal: Option<_> = None;
     let signal_url = if let Some(server) = opts.server.clone() {
         let url = server.trim_end_matches('/').to_string();

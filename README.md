@@ -6,8 +6,6 @@
 [![GitHub Stars](https://img.shields.io/github/stars/denzyldick/siegu?style=flat-square&logo=github)](https://github.com/denzyldick/siegu/stargazers)
 [![License](https://img.shields.io/github/license/denzyldick/siegu?style=flat-square)](LICENSE)
 
-**Learn more, browse screenshots, and support the project (Pro / Family plans) at [siegu.io](https://denzyldick.github.io/siegu/).**
-
 ![Siegu gallery](docs/img/gallery.png)
 
 Siegu (say it _see-goo_) is a **private, local-first photo and video manager**

@@ -1,5 +1,5 @@
 /**
- * Guest RPC backend (#19, Phase 1): talks to a hosting `siegu web` device over
+ * Guest RPC backend: talks to a hosting `siegu web` device over
  * a WebRTC data channel using the same `CommandRequest`/`CommandResponse`
  * envelope the desktop Tauri commands use. Media (thumbnails + originals) is
  * pulled on demand over the same channel and cached as blob URLs.

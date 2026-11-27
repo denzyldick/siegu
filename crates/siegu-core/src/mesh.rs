@@ -10,7 +10,7 @@ use crate::sync_transport::{
     cleanup_sync_temp, resolve_sync_target_dir, sanitize_filename, sync_temp_dir,
 };
 
-/// Shared view-only session state (#9). One mesh session can be active at a
+/// Shared view-only session state. One mesh session can be active at a
 /// time, so a process-global registry is sufficient.
 fn view_state() -> &'static crate::view_only::ViewOnlyState {
     crate::view_only::state()
@@ -45,7 +45,7 @@ pub enum SyncPhase {
     #[default]
     Idle,
     Syncing,
-    /// Browsing a peer's library without writing anything (#9).
+    /// Browsing a peer's library without writing anything.
     ViewOnly,
     Completed,
 }
@@ -100,7 +100,7 @@ pub enum SyncMessage {
         aesthetics_score: Option<f64>,
         #[serde(default)]
         encoded: String,
-        /// Receiver hint (#10): this transfer re-materializes an evicted
+        /// Receiver hint: this transfer re-materializes an evicted
         /// original, so the quota gate is bypassed and view_only is cleared.
         #[serde(default)]
         restore: bool,
@@ -162,9 +162,9 @@ pub enum SyncMessage {
     VersionReject {
         reason: String,
     },
-    /// Viewer asks to browse the peer's library without any writes (#9).
+    /// Viewer asks to browse the peer's library without any writes.
     EnterViewOnly,
-    /// Guest asks to browse one shared album only (#16). The manifest is
+    /// Guest asks to browse one shared album only. The manifest is
     /// scoped to album members and every media request is membership-checked.
     EnterAlbumShare {
         #[serde(default)]
@@ -182,7 +182,7 @@ pub enum SyncMessage {
         id: String,
         #[serde(default)]
         thumbnail: bool,
-        /// #10: the requester wants the original re-materialized locally
+        ///: the requester wants the original re-materialized locally
         /// (quota gate bypassed on their side, view_only cleared).
         #[serde(default)]
         restore: bool,
@@ -196,7 +196,7 @@ pub enum SyncMessage {
         #[serde(with = "base64_bytes")]
         data: Vec<u8>,
     },
-    /// Generic RPC envelope (#19): the browser guest invokes the same
+    /// Generic RPC envelope: the browser guest invokes the same
     /// `do_*` business functions the Tauri app calls, without a local
     /// backend. One variant covers every command; results come back as
     /// JSON values so the payload schema stays owned by the command.
@@ -249,7 +249,7 @@ pub struct OutgoingFile {
     pub caption: Option<String>,
     pub aesthetics_score: Option<f64>,
     pub encoded: String,
-    /// #10 hint carried in FileHeader so the receiver can bypass its quota
+    /// hint carried in FileHeader so the receiver can bypass its quota
     /// gate and clear the view_only flag once the bytes land.
     pub restore: bool,
 }
@@ -269,11 +269,11 @@ pub struct IncomingFile {
     pub caption: Option<String>,
     pub aesthetics_score: Option<f64>,
     pub encoded: String,
-    /// None when receiving in metadata-only mode (#10): the device is over
+    /// None when receiving in metadata-only mode: the device is over
     /// its storage cap, so chunks are discarded and only the DB row (with
     /// thumbnail) is kept, marked view_only.
     pub file: Option<tokio::fs::File>,
-    /// True for on-demand re-fetches of an evicted item (#10): bypasses the
+    /// True for on-demand re-fetches of an evicted item: bypasses the
     /// quota gate and clears view_only once materialized.
     pub restore: bool,
 }
@@ -305,13 +305,13 @@ pub trait SyncEvent: Send + Sync {
     ) {
     }
     /// Called once when a view-only peer finishes receiving our manifest
-    /// chunks (#9): the UI builds an ephemeral read-only gallery from it.
+    /// chunks: the UI builds an ephemeral read-only gallery from it.
     fn on_view_manifest(&self, _photos: &[PhotoSyncInfo]) {}
     /// Called when a guest enters an album share (#share). Lets the host
     /// notify the sharer and record a per-album view.
     fn on_album_viewed(&self, _album_id: &str, _album_name: &str) {}
     /// Called when the connected peer answers one of our CommandRequests
-    /// (#19). Default no-op; drivers/clients override to await results.
+    ///. Default no-op; drivers/clients override to await results.
     fn on_command_response(
         &self,
         _id: u64,
@@ -524,7 +524,7 @@ impl MeshManager {
         Ok(())
     }
 
-    /// Chunked manifest for a view-only client (#9): metadata only, no
+    /// Chunked manifest for a view-only client: metadata only, no
     /// counters or sync state involved.
     pub async fn send_manifest_view_only(
         dc: &Arc<webrtc::data_channel::RTCDataChannel>,
@@ -1103,7 +1103,7 @@ impl MeshManager {
                     return;
                 }
 
-                // Storage cap (#10). A restore pull always gets through (the
+                // Storage cap. A restore pull always gets through (the
                 // user explicitly asked for this file back); everything else
                 // first tries to make room by evicting least-recently-opened
                 // peer-received originals. If the cap still can't fit the
@@ -1203,7 +1203,7 @@ impl MeshManager {
                 }
                 let mut incoming = incoming_files.lock().await;
                 if let Some(file_state) = incoming.get_mut(&id) {
-                    // Metadata-only receive (#10): drop the bytes.
+                    // Metadata-only receive: drop the bytes.
                     let Some(file) = file_state.file.as_mut() else {
                         return;
                     };
@@ -1248,7 +1248,7 @@ impl MeshManager {
                 }
                 let mut incoming = incoming_files.lock().await;
                 if let Some(mut file_state) = incoming.remove(&id) {
-                    // Metadata-only receive (#10): nothing was written to
+                    // Metadata-only receive: nothing was written to
                     // disk. Persist the row + thumbnail and flag it as
                     // view_only so the UI can pull the original on demand.
                     let Some(file) = file_state.file.as_mut() else {
@@ -1363,7 +1363,7 @@ impl MeshManager {
                             "Failed to move file to {final_path:?}. Error: {e}"
                         ));
                     } else if file_state.restore {
-                        // On-demand restore of an evicted item (#10): persist
+                        // On-demand restore of an evicted item: persist
                         // silently — no batch counters, and clear the
                         // view_only flag so the UI stops showing the pull
                         // icon. Budget headroom was already secured at
@@ -1692,7 +1692,7 @@ impl MeshManager {
                 }
             }
             SyncMessage::EnterAlbumShare { album_id } => {
-                // Album-scoped share (#16): the guest only ever learns about
+                // Album-scoped share: the guest only ever learns about
                 // (and can only fetch) photos that belong to this album.
                 let db = Database::new(config_path);
                 let Some(album) = db.get_album(&album_id) else {
@@ -1724,7 +1724,7 @@ impl MeshManager {
                     let members: std::collections::HashSet<String> =
                         photos.iter().map(|p| p.id.clone()).collect();
                     // Scope is PER SESSION so concurrent guests don't grant
-                    // or deny each other's fetches (#16).
+                    // or deny each other's fetches.
                     *session_scope.lock().await = Some(crate::view_only::AlbumScope {
                         members,
                         album_id: album_id.clone(),
@@ -1767,7 +1767,7 @@ impl MeshManager {
                 thumbnail,
                 restore,
             } => {
-                // Album-scoped share (#16): refuse anything outside the
+                // Album-scoped share: refuse anything outside the
                 // shared album, or the link would leak the whole library to
                 // anyone guessing photo ids. Borrow instead of clone: the
                 // membership set can be large, and each request used to
@@ -1872,7 +1872,7 @@ impl MeshManager {
                 );
             }
             SyncMessage::CommandRequest { id, name, payload } => {
-                // RPC from a browser guest (#19). Disabled unless the host
+                // RPC from a browser guest. Disabled unless the host
                 // session was created with an explicit share mode; the reply
                 // is generated off the message loop so slow SQLite work never
                 // blocks sync traffic.
@@ -1950,7 +1950,7 @@ impl MeshManager {
 
 impl MeshManager {
     /// Free at least `need_bytes` by evicting least-recently-opened
-    /// peer-received originals (#10). Returns the number of bytes actually
+    /// peer-received originals. Returns the number of bytes actually
     /// freed. Only `received` rows are ever candidates — user-imported
     /// originals exist nowhere else and are never deleted.
     pub fn evict_originals(config_path: &str, need_bytes: u64) -> u64 {
@@ -2147,7 +2147,7 @@ mod tests {
 
     #[test]
     fn test_file_header_restore_defaults_false_for_old_peers() {
-        // Peers running the pre-#10 protocol send neither restore field;
+        // Peers running the earlier protocol send neither restore field;
         // both must deserialize with restore=false.
         let json = r#"{"type":"FileHeader","id":"x","filename":"a.jpg","relative_path":"a.jpg","size":1,"checksum":"c","created":"2024-01-01","latitude":null,"longitude":null,"objects":"[]","faces":"[]","caption":null,"aesthetics_score":null,"encoded":""}"#;
         let decoded: SyncMessage = serde_json::from_str(json).unwrap();

@@ -4,7 +4,7 @@ import { buildIceServers, createPeerTransport } from '@/services/backend/peer';
 import type { GuestSession } from '@/services/backend/protocol';
 
 /**
- * Phase 4: the `signalingBase` a guest supplies must reach `createPeerTransport`
+ *: the `signalingBase` a guest supplies must reach `createPeerTransport`
  * (and from there the signaler's `/ws`), so a Mode B guest can pair against a
  * hosted `wss://` relay rather than only the serving host's own bridge.
  *

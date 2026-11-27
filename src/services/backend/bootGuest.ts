@@ -1,5 +1,5 @@
 /**
- * Guest Mode B boot wiring (#19/#25, Phase 2).
+ * Guest Mode B boot wiring.
  *
  * Builds a connected {@link GuestClient} over a real {@link PeerTransport} for
  * the `#code.token` session detected at runtime. The served SPA is typically
@@ -34,7 +34,7 @@ export interface GuestBoot {
  * Build a connected guest session. Pass `transportOverride` in tests to avoid
  * constructing a real WebSocket/RTCPeerConnection. `signalingBase` is the
  * `host[:port]` of the signaler the guest connects to: pass a remote one (e.g.
- * `siegu.io`) to pair via a hosted `wss://` relay (Phase 4); when omitted in a
+ * `siegu.io`) to pair via a hosted `wss://` relay; when omitted in a
  * browser the default resolves to the serving origin's `/ws` bridge.
  */
 export function bootGuest(

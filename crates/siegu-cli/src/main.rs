@@ -25,13 +25,13 @@ const ALL_DEMOS: &str = "landscapes,people,cities,food,videos";
 pub struct CliSyncEvent {
     pub config_path: String,
     pub sync_tx: SharedSyncTx,
-    /// Signalled when the WebRTC data channel is ready (#19 e2e driver).
+    /// Signalled when the WebRTC data channel is ready (e2e driver).
     pub ready: Arc<tokio::sync::Notify>,
-    /// Last completed view-only manifest (#9 e2e driver).
+    /// Last completed view-only manifest (e2e driver).
     pub view_manifest: Arc<tokio::sync::Mutex<Vec<PhotoSyncInfo>>>,
     /// Signalled when `view_manifest` is complete.
     pub view_notify: Arc<tokio::sync::Notify>,
-    /// Latest CommandResponse from the peer (#19 e2e driver).
+    /// Latest CommandResponse from the peer (e2e driver).
     pub rpc_slot: SharedRpcSlot,
     /// Signalled whenever `rpc_slot` is updated.
     pub rpc_notify: Arc<tokio::sync::Notify>,
@@ -239,7 +239,7 @@ enum Commands {
         action: MeshAction,
     },
     /// Seed the library with bundled demo datasets (one album per category) so
-    /// the landing page can open the web app pre-loaded with a demo (#7/#8).
+    /// the landing page can open the web app pre-loaded with a demo.
     SeedDemo {
         /// Comma-separated category directories under the demo root to seed
         #[arg(long, default_value = ALL_DEMOS)]
@@ -250,24 +250,24 @@ enum Commands {
         #[arg(short, long)]
         config: Option<String>,
     },
-    /// Share this library as a view-only gallery in a browser (#11)
+    /// Share this library as a view-only gallery in a browser
     Web {
         /// Port for the static web client (signalling picks its own port)
         #[arg(short, long, default_value = "8787")]
         port: u16,
         #[arg(short, long)]
         config: Option<String>,
-        /// Permission level for connected browsers (#19): ro (default) allows
+        /// Permission level for connected browsers: ro (default) allows
         /// browsing only; rw also allows favorites/trash mutations.
         #[arg(long, default_value = "ro")]
         share_mode: String,
-        /// Hosted signalling server (`wss://…`) to pair through (Phase 4/#27).
+        /// Hosted signalling server (`wss://…`) to pair through.
         /// When set, guests on other networks can connect by code + token.
         #[arg(long)]
         server: Option<String>,
         /// Treat the bearer of the printed `web_token` as the library Owner on
-        /// this host: full capability including ML analysis/indexing (issue #19
-        /// follow-up). Off by default so `--share-mode` still caps the web
+        /// this host: full capability including ML analysis/indexing.
+        /// Off by default so `--share-mode` still caps the web
         /// bearer. `--owner-mode` implies `--share-mode rw` for the web host.
         #[arg(long)]
         owner_mode: bool,
@@ -276,7 +276,7 @@ enum Commands {
 
 #[derive(Subcommand)]
 enum MeshAction {
-    /// Create a manual album from the first N photos and print its ID (#16).
+    /// Create a manual album from the first N photos and print its ID.
     /// Test helper for scripts/e2e-view-only.sh.
     SeedAlbum {
         /// Album name
@@ -296,7 +296,7 @@ enum MeshAction {
         /// Room ID to use when connecting via --server (required with --server)
         #[arg(long)]
         room: Option<String>,
-        /// Permission level for connected peers (#19): ro (default) allows
+        /// Permission level for connected peers: ro (default) allows
         /// browsing only; rw also allows favorites/trash mutations.
         #[arg(long, default_value = "ro")]
         share_mode: String,
@@ -316,7 +316,7 @@ enum MeshAction {
         #[arg(short, long)]
         config: Option<String>,
     },
-    /// Browse a peer's library read-only (#9): enter view-only mode, verify
+    /// Browse a peer's library read-only: enter view-only mode, verify
     /// manifest + thumbnail + restore pull, then stay alive. Prints greppable
     /// VIEWONLY markers for scripts/e2e-view-only.sh.
     Browse {
@@ -330,7 +330,7 @@ enum MeshAction {
         initiator: bool,
         #[arg(short, long)]
         config: Option<String>,
-        /// Enter album-share mode (#16): send EnterAlbumShare for this album
+        /// Enter album-share mode: send EnterAlbumShare for this album
         /// instead of EnterViewOnly and verify the host enforces membership.
         #[arg(long)]
         album: Option<String>,
@@ -338,7 +338,7 @@ enum MeshAction {
         #[arg(long, default_value = "siegu-browser")]
         name: String,
     },
-    /// Send a single CommandRequest to the peer and print its reply (#19).
+    /// Send a single CommandRequest to the peer and print its reply.
     /// Used by scripts/e2e-view-only.sh to exercise the RPC surface.
     Rpc {
         /// Room ID
@@ -1273,7 +1273,7 @@ impl MeshDriver {
     }
 }
 
-/// View-only e2e driver (#9/#10/#19): connect to a host, enter view-only
+/// View-only e2e driver: connect to a host, enter view-only
 /// mode and exercise the whole read-only surface — manifest, thumbnail
 /// fetch, sync-guard probe and a restore pull. Each stage prints a greppable
 /// `VIEWONLY ...` marker for scripts/e2e-view-only.sh; any stage failure
@@ -1356,7 +1356,7 @@ async fn cmd_mesh_browse(
     cli_line!("VIEWONLY SYNC-GUARD PROBE SENT");
     tokio::time::sleep(Duration::from_secs(2)).await;
 
-    // ── stage 3b (album share): membership enforcement (#16) ──────────────
+    // ── stage 3b (album share): membership enforcement ──────────────
     // A photo outside the shared album must NOT be served; the host drops
     // the FetchMediaRequest, so no media ever arrives for the bogus id.
     if album_id.is_some() {
@@ -1379,7 +1379,7 @@ async fn cmd_mesh_browse(
         }
     }
 
-    // ── stage 4: restore pull (#10) re-materializes the original locally ──
+    // ── stage 4: restore pull re-materializes the original locally ──
     if tx
         .send(SyncMessage::FetchMediaRequest {
             id: first_id.clone(),
@@ -1417,7 +1417,7 @@ async fn cmd_mesh_browse(
     handle.abort();
 }
 
-/// Test helper for scripts/e2e-view-only.sh (#16): build a manual album from
+/// Test helper for scripts/e2e-view-only.sh: build a manual album from
 /// the first N photos in this library and print its ID on stdout.
 fn cmd_seed_album(config_dir: &Path, name: &str, take_first: usize) {
     let db = Database::new(&config_dir.display().to_string());
@@ -1464,7 +1464,7 @@ fn resolve_demo_root(flag: Option<&Path>) -> Option<PathBuf> {
     )
 }
 
-/// Seed the library with the bundled demo datasets (#7/#8). For each category
+/// Seed the library with the bundled demo datasets. For each category
 /// it copies `demos/<category>/*.{jpg,jpeg,png,mp4,...}` into
 /// `<config>/demo/<category>/`, indexes them into `siegu.db`, registers the
 /// demo root as a watched directory, and creates one album per category plus a
@@ -1782,7 +1782,7 @@ fn poster_data_url_for(media_path: &Path) -> Option<String> {
     Some(siegu_core::thumbnail::encode_thumbnail_data_url(&bytes))
 }
 
-/// One-shot RPC driver (#19): connect, send a single CommandRequest and
+/// One-shot RPC driver: connect, send a single CommandRequest and
 /// print the peer's reply as `RPC RESULT ok=<bool> <json>` / `RPC ERROR ...`.
 /// Exit code 0 on success, 3 when the command itself failed (ok=false).
 async fn cmd_mesh_rpc(

@@ -136,7 +136,7 @@ Rules:
    Do not mix a crates.io Ely release with the git pin.
 3. **Upgrade together.** Bump `gpui-pre`, `gpui-pre-platform`, and the Ely git
    revision in one change. Regenerate `Cargo.lock`, check for duplicates, build
-   the desktop spike, and re-run the Phase 0 benchmark before merging.
+   the desktop spike, and re-run the desktop benchmark before merging.
 4. **Locked CI.** CI and release builds use the committed `Cargo.lock`
    (`cargo build --locked`). The lockfile records the exact Ely commit.
 5. **Track by git, do not vendor (yet).** The git revision makes upgrades
@@ -161,7 +161,7 @@ cargo check -p siegu-ui --locked
 
 ## GPUI desktop spike
 
-`crates/siegu-desktop` is the Phase 0 smoke test for the GPUI + Ely stack. It
+`crates/siegu-desktop` is the smoke test for the GPUI + Ely stack. It
 builds on the shared `siegu-ui` component layer (`SieguAppShell`, `PhotoGrid`,
 `PhotoCard`, sidebar navigation) and reads the local library when one exists,
 falling back to an empty state. The sidebar switches between the Library, Map,

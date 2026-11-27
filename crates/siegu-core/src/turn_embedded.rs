@@ -1,4 +1,4 @@
-//! Built-in TURN relay (#16/#17).
+//! Built-in TURN relay.
 //!
 //! Siegu ships a tiny TURN server inside the host app instead of requiring a
 //! separate coturn install. When enabled it listens for UDP TURN traffic and

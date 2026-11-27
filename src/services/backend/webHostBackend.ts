@@ -1,18 +1,17 @@
 /**
- * WebHost-mode `Backend` adapter (#24/#26, Mode A).
+ * WebHost-mode `Backend` adapter (Mode A).
  *
  * The browser is the OWNER of a library mounted on a `siegu web` instance, so it
- * talks to its own Rust host over HTTP rather than pairing over WebRTC (Option 1
- * from `docs/architecture-web-modes.md`).
+ * talks to its own Rust host over HTTP rather than pairing over WebRTC.
  *
- * Wire contract (implemented on the Rust side in PHASE-3, #26; auth in #28):
+ * Wire contract:
  *   - `POST /rpc`        body `{ name, payload }` → `{ ok, result?, error? }`
  *                        (mirrors `crates::rpc::dispatch`, `--share-mode ro/rw`),
  *                        requires `Authorization: Bearer <webToken>`
  *   - `GET  /thumb/{id}?token=<webToken>` → thumbnail bytes (image mime)
  *   - `GET  /media/{id}?token=<webToken>` → original bytes   (image/video mime)
  *
- * `webToken` (from `/session`) is required once #28 gates the host routes.
+ * `webToken` (from `/session`) authorizes the host routes.
  *
  * The TS side is fully functional once those routes exist; before then, calls
  * reject with a clear "not implemented / route unavailable" error.
@@ -70,8 +69,8 @@ async function rpc<T>(
 }
 
 /**
- * Build an HTTP media URL for `id`. The host resolves id → file bytes, and
- * (once #28 land) requires the `?token=` query since `<img>` can't send headers.
+ * Build an HTTP media URL for `id`. The host resolves id → file bytes and
+ * requires the `?token=` query since `<img>` can't send headers.
  */
 function mediaUrlFor(id: number | string, kind: MediaKind, webHostToken?: string): string {
   const path = `${kind === 'thumb' ? THUMB_PATH : MEDIA_PATH}/${String(id)}`;

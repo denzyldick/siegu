@@ -1,5 +1,5 @@
 /**
- * Runtime-mode store (#24, Phase 1).
+ * Runtime-mode store.
  *
  * Exposes the detected UI mode (`tauri` / `webHost` / `guest` / `onboarding`)
  * and a lazily-created shared `Backend` instance so stores and components drive
