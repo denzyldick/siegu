@@ -65,6 +65,7 @@ pub struct MediaViewer {
     favorite: bool,
     metadata: Option<ViewerMetadata>,
     on_toggle_favorite: Option<Rc<dyn Fn(&mut Window, &mut App)>>,
+    on_add_to_album: Option<Rc<dyn Fn(&mut Window, &mut App)>>,
     on_prev: Option<Rc<dyn Fn(&mut Window, &mut App)>>,
     on_next: Option<Rc<dyn Fn(&mut Window, &mut App)>>,
     on_show_in_explorer: Option<Rc<dyn Fn(&mut Window, &mut App)>>,
@@ -87,6 +88,7 @@ impl MediaViewer {
             favorite: false,
             metadata: None,
             on_toggle_favorite: None,
+            on_add_to_album: None,
             on_prev: None,
             on_next: None,
             on_show_in_explorer: None,
@@ -127,6 +129,12 @@ impl MediaViewer {
     /// Invoked when the user clicks the Favorite toggle action.
     pub fn on_toggle_favorite(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
         self.on_toggle_favorite = Some(Rc::new(handler));
+        self
+    }
+
+    /// Enables the "Add to Collection" action for this photo.
+    pub fn on_add_to_album(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_add_to_album = Some(Rc::new(handler));
         self
     }
 
@@ -184,6 +192,16 @@ impl RenderOnce for MediaViewer {
                 } else {
                     btn
                 }
+            });
+        }
+
+        if let Some(on_add_to_album) = self.on_add_to_album.clone() {
+            let label = i18n::text(cx, "media_viewer.add_to_album", &[]);
+            dialog = dialog.action(move |_| {
+                let handler = on_add_to_album.clone();
+                Button::new("mv-add-to-album", label)
+                    .icon(IconName::FolderPlus)
+                    .on_click(move |_, window, cx| handler(window, cx))
             });
         }
 

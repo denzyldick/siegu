@@ -12,7 +12,9 @@ mod tile_http;
 
 use base64::Engine as _;
 use rayon::prelude::*;
-use siegu_core::database::{Album, DeviceInfo, PersonMatch, PhotoDateGroup, PhotoFilter};
+use siegu_core::database::{
+    Album, AlbumKind, DeviceInfo, PersonMatch, PhotoDateGroup, PhotoFilter,
+};
 use siegu_core::devices::{
     list_devices as list_core_devices, remove_device as remove_core_device,
     rename_device as rename_core_device, storage_percent,
@@ -604,6 +606,26 @@ enum PersonDialog {
     },
 }
 
+/// A pending collection dialog. Text inputs are entities so typed values
+/// survive repaints while the dialog is open.
+#[derive(Clone)]
+enum AlbumDialog {
+    Create {
+        field: Entity<TextInput>,
+    },
+    Rename {
+        id: String,
+        field: Entity<TextInput>,
+    },
+    Delete {
+        id: String,
+    },
+    AddTo {
+        photo_id: String,
+        field: Entity<TextInput>,
+    },
+}
+
 /// The desktop shell. Reads the local library and renders one section at a time.
 struct Siegu {
     focus: FocusHandle,
@@ -643,6 +665,8 @@ struct Siegu {
     device_dialog: Option<DeviceDialog>,
     device_error: Option<String>,
     person_dialog: Option<PersonDialog>,
+    album_dialog: Option<AlbumDialog>,
+    album_error: Option<String>,
     data: LibraryData,
     _appearance: Subscription,
 }
@@ -848,7 +872,9 @@ impl Siegu {
         let metadata = self.viewer_metadata_for(&entry.photo, cx);
         let weak_close = cx.entity().downgrade();
         let weak_fav = cx.entity().downgrade();
+        let weak_album = cx.entity().downgrade();
         let photo_id = entry.photo.id.clone();
+        let album_photo_id = photo_id.clone();
         let detail = format!(
             "{}  •  {} of {}",
             display_date(&entry.photo.created),
@@ -877,6 +903,17 @@ impl Siegu {
                 let id = photo_id.clone();
                 entity.update(cx, |state, cx| {
                     state.toggle_photo_favorite(&id);
+                    cx.notify();
+                });
+            }
+        })
+        .on_add_to_album(move |window, cx| {
+            if let Some(entity) = weak_album.upgrade() {
+                let photo_id = album_photo_id.clone();
+                entity.update(cx, |state, cx| {
+                    let field = cx.new(|cx| TextInput::new(window, cx));
+                    state.album_error = None;
+                    state.album_dialog = Some(AlbumDialog::AddTo { photo_id, field });
                     cx.notify();
                 });
             }
@@ -2494,40 +2531,136 @@ impl Siegu {
         grid.into_any_element()
     }
 
-    fn collections_view(&self, cx: &mut Context<Self>) -> AnyElement {
-        if self.data.albums.is_empty() {
-            return empty_state(
-                "No collections yet.",
-                "Albums you create in Siegu will appear here.",
-            );
-        }
-        let mut grid = PhotoGrid::new();
-        for (idx, entry) in self.data.albums.iter().enumerate() {
-            let weak = cx.entity().downgrade();
-            let album_id = entry.album.id.clone();
-            let name = entry.album.name.clone();
-            let detail = plural(entry.album.item_count as usize, "photo");
-            let mut card = InfoCard::new(("album", idx), IconName::Layers, name.clone())
-                .detail(detail.clone())
-                .on_click(move |_, cx| {
-                    if let Some(entity) = weak.upgrade() {
-                        let id = album_id.clone();
-                        let title = name.clone();
-                        let subtitle = detail.clone();
+    fn collections_view(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let weak_create = cx.entity().downgrade();
+        let toolbar = div().flex().flex_wrap().items_center().gap_3().child(
+            Button::new("album-create", i18n::text(cx, "albums.new_album", &[]))
+                .icon(IconName::FolderPlus)
+                .on_click(move |_, window, app| {
+                    if let Some(entity) = weak_create.upgrade() {
+                        entity.update(app, |state, cx| {
+                            let field = cx.new(|cx| TextInput::new(window, cx));
+                            state.album_error = None;
+                            state.album_dialog = Some(AlbumDialog::Create { field });
+                            cx.notify();
+                        });
+                    }
+                }),
+        );
+
+        let weak_dismiss = cx.entity().downgrade();
+        let error = self.album_error.as_ref().map(|message| {
+            Banner::new("albums-error", Severity::Danger, message.clone())
+                .action(i18n::text(cx, "common.close", &[]), move |_, cx| {
+                    if let Some(entity) = weak_dismiss.upgrade() {
                         entity.update(cx, |state, cx| {
-                            state.open_drill_down(title, subtitle, |db| {
-                                db.get_album_contents(&id, 0, 60)
+                            state.album_error = None;
+                            cx.notify();
+                        });
+                    }
+                })
+                .into_any_element()
+        });
+
+        let body = if self.data.albums.is_empty() {
+            empty_state(
+                &i18n::text(cx, "albums.no_albums", &[]),
+                &i18n::text(cx, "albums.no_albums_hint", &[]),
+            )
+        } else {
+            let mut grid = PhotoGrid::new();
+            for (idx, entry) in self.data.albums.iter().enumerate() {
+                let weak = cx.entity().downgrade();
+                let album_id = entry.album.id.clone();
+                let name = entry.album.name.clone();
+                let detail = i18n::text(
+                    cx,
+                    "albums.items_count",
+                    &[("count", &entry.album.item_count.to_string())],
+                );
+                let mut card = InfoCard::new(("album", idx), IconName::Layers, name.clone())
+                    .detail(detail.clone())
+                    .on_click(move |_, cx| {
+                        if let Some(entity) = weak.upgrade() {
+                            let id = album_id.clone();
+                            let title = name.clone();
+                            let subtitle = detail.clone();
+                            entity.update(cx, |state, cx| {
+                                state.open_drill_down(title, subtitle.to_string(), |db| {
+                                    db.get_album_contents(&id, 0, 60)
+                                });
+                                cx.notify();
                             });
+                        }
+                    });
+                if let Some(thumb) = &entry.thumbnail {
+                    card = card.source(thumb.clone());
+                }
+
+                let weak_rename = cx.entity().downgrade();
+                let rename_id = entry.album.id.clone();
+                let rename_name = entry.album.name.clone();
+                let rename = Button::new(
+                    ("album-rename", idx),
+                    i18n::text(cx, "albums.rename_album", &[]),
+                )
+                .icon(IconName::Pencil)
+                .variant(ButtonVariant::Ghost)
+                .on_click(move |_, window, app| {
+                    if let Some(entity) = weak_rename.upgrade() {
+                        let id = rename_id.clone();
+                        let name = rename_name.clone();
+                        entity.update(app, |state, cx| {
+                            let field = cx.new(|cx| TextInput::new(window, cx));
+                            field.update(cx, |input, cx| input.set_text(name, cx));
+                            state.album_error = None;
+                            state.album_dialog = Some(AlbumDialog::Rename { id, field });
                             cx.notify();
                         });
                     }
                 });
-            if let Some(thumb) = &entry.thumbnail {
-                card = card.source(thumb.clone());
+
+                let weak_delete = cx.entity().downgrade();
+                let delete_id = entry.album.id.clone();
+                let delete = Button::new(
+                    ("album-delete", idx),
+                    i18n::text(cx, "albums.delete_album", &[]),
+                )
+                .icon(IconName::Trash2)
+                .variant(ButtonVariant::Ghost)
+                .on_click(move |_, _, app| {
+                    if let Some(entity) = weak_delete.upgrade() {
+                        let id = delete_id.clone();
+                        entity.update(app, |state, cx| {
+                            state.album_error = None;
+                            state.album_dialog = Some(AlbumDialog::Delete { id });
+                            cx.notify();
+                        });
+                    }
+                });
+
+                grid = grid.child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(card)
+                        .child(div().flex().gap_2().child(rename).child(delete)),
+                );
             }
-            grid = grid.child(card);
-        }
-        grid.into_any_element()
+            grid.into_any_element()
+        };
+
+        div()
+            .flex()
+            .flex_col()
+            .size_full()
+            .min_h_0()
+            .gap_3()
+            .child(toolbar)
+            .children(error)
+            .child(body)
+            .into_any_element()
     }
 
     fn duplicates_view(&mut self, cx: &mut Context<Self>) -> AnyElement {
@@ -3115,6 +3248,98 @@ impl Siegu {
         }
     }
 
+    /// Close a collection dialog after a successful write and reload every
+    /// local view that can depend on album membership.
+    fn close_album_dialog(&mut self, cx: &mut Context<Self>) {
+        self.album_dialog = None;
+        self.album_error = None;
+        self.refresh_data();
+        cx.notify();
+    }
+
+    /// Like [`Self::close_album_dialog`], but also drops an open drill-down or
+    /// viewer built from an album that no longer exists or changed identity.
+    fn finish_album_mutation(&mut self, cx: &mut Context<Self>) {
+        self.drill_down = None;
+        self.selected_photo = None;
+        self.viewer_override = None;
+        self.close_album_dialog(cx);
+    }
+
+    fn apply_album_result(
+        &mut self,
+        result: Result<(), String>,
+        cx: &mut Context<Self>,
+        close_views: bool,
+    ) {
+        match result {
+            Ok(()) => {
+                if close_views {
+                    self.finish_album_mutation(cx);
+                } else {
+                    self.close_album_dialog(cx);
+                }
+            }
+            Err(error) => {
+                self.album_error = Some(error);
+                cx.notify();
+            }
+        }
+    }
+
+    fn create_album(&mut self, name: &str, cx: &mut Context<Self>) {
+        let dir = default_config_dir();
+        if !dir.join("siegu.db").exists() {
+            return;
+        }
+        let db = Database::new(&dir.display().to_string());
+        let result = db.create_album(name).map(|_| ());
+        self.apply_album_result(result, cx, true);
+    }
+
+    fn rename_album(&mut self, id: &str, name: &str, cx: &mut Context<Self>) {
+        let dir = default_config_dir();
+        if !dir.join("siegu.db").exists() {
+            return;
+        }
+        let db = Database::new(&dir.display().to_string());
+        let result = db.rename_album(id, name);
+        self.apply_album_result(result, cx, true);
+    }
+
+    fn delete_album(&mut self, id: &str, cx: &mut Context<Self>) {
+        let dir = default_config_dir();
+        if !dir.join("siegu.db").exists() {
+            return;
+        }
+        let db = Database::new(&dir.display().to_string());
+        let result = db.delete_album(id);
+        self.apply_album_result(result, cx, true);
+    }
+
+    fn add_photo_to_album(&mut self, album_id: &str, photo_id: &str, cx: &mut Context<Self>) {
+        let dir = default_config_dir();
+        if !dir.join("siegu.db").exists() {
+            return;
+        }
+        let db = Database::new(&dir.display().to_string());
+        let result = db.add_album_items(album_id, &[photo_id.to_string()]);
+        self.apply_album_result(result, cx, false);
+    }
+
+    fn create_album_and_add_photo(&mut self, name: &str, photo_id: &str, cx: &mut Context<Self>) {
+        let dir = default_config_dir();
+        if !dir.join("siegu.db").exists() {
+            return;
+        }
+        let db = Database::new(&dir.display().to_string());
+        let result = db.create_album(name).and_then(|album| {
+            db.add_album_items(&album.id, &[photo_id.to_string()])?;
+            Ok(())
+        });
+        self.apply_album_result(result, cx, false);
+    }
+
     fn devices_view(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let weak_reload = cx.entity().downgrade();
         let toolbar = div().flex().flex_wrap().items_center().gap_3().child(
@@ -3556,6 +3781,173 @@ impl Siegu {
                                 });
                             }
                         })
+                })
+                .into_any_element()]
+            }
+        }
+    }
+
+    fn album_dialogs(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let Some(dialog) = self.album_dialog.clone() else {
+            return Vec::new();
+        };
+        let weak_close = cx.entity().downgrade();
+        let close = move |_: &mut Window, cx: &mut App| {
+            if let Some(entity) = weak_close.upgrade() {
+                entity.update(cx, |state, cx| {
+                    state.album_dialog = None;
+                    state.album_error = None;
+                    cx.notify();
+                });
+            }
+        };
+
+        match dialog {
+            AlbumDialog::Create { field } => {
+                let weak_submit = cx.entity().downgrade();
+                vec![PromptDialog::new(
+                    "album-create",
+                    i18n::text(cx, "albums.new_album", &[]),
+                    &field,
+                    close,
+                )
+                .label(i18n::text(cx, "albums.new_album_placeholder", &[]))
+                .submit(i18n::text(cx, "common.create", &[]))
+                .check(|text| {
+                    if text.trim().is_empty() {
+                        Err("Collection name cannot be empty".into())
+                    } else {
+                        Ok(())
+                    }
+                })
+                .on_submit(move |text, _, app| {
+                    if let Some(entity) = weak_submit.upgrade() {
+                        let name = text.trim().to_string();
+                        entity.update(app, |state, cx| state.create_album(&name, cx));
+                    }
+                })
+                .into_any_element()]
+            }
+            AlbumDialog::Rename { id, field } => {
+                let weak_submit = cx.entity().downgrade();
+                let submit_id = id.clone();
+                vec![PromptDialog::new(
+                    format!("album-rename-{id}"),
+                    i18n::text(cx, "albums.rename_album", &[]),
+                    &field,
+                    close,
+                )
+                .label(i18n::text(cx, "albums.rename_placeholder", &[]))
+                .submit(i18n::text(cx, "common.save", &[]))
+                .check(|text| {
+                    if text.trim().is_empty() {
+                        Err("Collection name cannot be empty".into())
+                    } else {
+                        Ok(())
+                    }
+                })
+                .on_submit(move |text, _, app| {
+                    if let Some(entity) = weak_submit.upgrade() {
+                        let id = submit_id.clone();
+                        let name = text.trim().to_string();
+                        entity.update(app, |state, cx| state.rename_album(&id, &name, cx));
+                    }
+                })
+                .into_any_element()]
+            }
+            AlbumDialog::Delete { id } => {
+                let weak_confirm = cx.entity().downgrade();
+                let confirm_id = id.clone();
+                vec![ConfirmDialog::new(
+                    format!("album-delete-{id}"),
+                    i18n::text(cx, "albums.delete_confirm_title", &[]),
+                    i18n::text(cx, "albums.delete_confirm", &[]),
+                    close,
+                )
+                .confirm(i18n::text(cx, "common.delete", &[]))
+                .destructive()
+                .on_confirm(move |_, app| {
+                    if let Some(entity) = weak_confirm.upgrade() {
+                        let id = confirm_id.clone();
+                        entity.update(app, |state, cx| state.delete_album(&id, cx));
+                    }
+                })
+                .into_any_element()]
+            }
+            AlbumDialog::AddTo { photo_id, field } => {
+                let weak_create = cx.entity().downgrade();
+                let create_field = field.clone();
+                let create_photo_id = photo_id.clone();
+                let create = Button::new("album-add-create", i18n::text(cx, "common.create", &[]))
+                    .icon(IconName::FolderPlus)
+                    .on_click(move |_, _, app| {
+                        let name = create_field.read(app).text().trim().to_string();
+                        if name.is_empty() {
+                            return;
+                        }
+                        if let Some(entity) = weak_create.upgrade() {
+                            let photo_id = create_photo_id.clone();
+                            entity.update(app, |state, cx| {
+                                state.create_album_and_add_photo(&name, &photo_id, cx);
+                            });
+                        }
+                    });
+
+                let rows = manual_album_rows(self.data.albums.iter().map(|entry| &entry.album));
+                let mut album_list = div().flex().flex_col().gap_1();
+                if rows.is_empty() {
+                    album_list = album_list.child(Paragraph::new(i18n::text(
+                        cx,
+                        "albums.no_albums_yet",
+                        &[],
+                    )));
+                } else {
+                    for (idx, (album_id, album_name)) in rows.into_iter().enumerate() {
+                        let weak_add = cx.entity().downgrade();
+                        let add_album_id = album_id;
+                        let add_photo_id = photo_id.clone();
+                        album_list = album_list.child(
+                            Button::new(("album-add-item", idx), album_name)
+                                .icon(IconName::Layers)
+                                .variant(ButtonVariant::Ghost)
+                                .on_click(move |_, _, app| {
+                                    if let Some(entity) = weak_add.upgrade() {
+                                        let album_id = add_album_id.clone();
+                                        let photo_id = add_photo_id.clone();
+                                        entity.update(app, |state, cx| {
+                                            state.add_photo_to_album(&album_id, &photo_id, cx);
+                                        });
+                                    }
+                                }),
+                        );
+                    }
+                }
+
+                let error = self.album_error.as_ref().map(|message| {
+                    Banner::new("album-add-error", Severity::Danger, message.clone())
+                        .into_any_element()
+                });
+                let cancel_label = i18n::text(cx, "common.cancel", &[]);
+                vec![Dialog::new(
+                    "album-add-to",
+                    i18n::text(cx, "media_viewer.add_to_album", &[]),
+                    close,
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_3()
+                        .child(field.clone())
+                        .child(div().flex().justify_end().child(create))
+                        .children(error)
+                        .child(album_list),
+                )
+                .action(move |close| {
+                    let label = cancel_label.clone();
+                    Button::new("album-add-cancel", label)
+                        .variant(ButtonVariant::Ghost)
+                        .on_click(move |_, window, app| close(window, app))
                 })
                 .into_any_element()]
             }
@@ -4511,6 +4903,16 @@ fn person_display_name(name: &str, unnamed: &str) -> String {
     }
 }
 
+/// Albums that accept explicit membership. Smart and trip albums compute their
+/// contents from rules, so they are hidden from the add-to-collection picker.
+fn manual_album_rows<'a>(albums: impl IntoIterator<Item = &'a Album>) -> Vec<(String, String)> {
+    albums
+        .into_iter()
+        .filter(|album| album.kind == AlbumKind::Manual)
+        .map(|album| (album.id.clone(), album.name.clone()))
+        .collect()
+}
+
 /// Candidate rows for the person merge dialog: every person except the one
 /// being replaced, with unnamed groups given a localized display name.
 fn person_option_rows<'a>(
@@ -4596,6 +4998,8 @@ impl Render for Siegu {
                     state.device_dialog = None;
                     state.device_error = None;
                     state.person_dialog = None;
+                    state.album_dialog = None;
+                    state.album_error = None;
                     if state.section == Section::Devices {
                         state.reload_devices(cx);
                     }
@@ -4647,6 +5051,11 @@ impl Render for Siegu {
         };
         let person_dialogs = if self.person_dialog.is_some() {
             self.person_dialogs(cx)
+        } else {
+            Vec::new()
+        };
+        let album_dialogs = if self.album_dialog.is_some() {
+            self.album_dialogs(cx)
         } else {
             Vec::new()
         };
@@ -4720,6 +5129,7 @@ impl Render for Siegu {
             .children(onboarding)
             .children(device_dialogs)
             .children(person_dialogs)
+            .children(album_dialogs)
     }
 }
 
@@ -4968,6 +5378,8 @@ fn main() {
                         device_dialog: None,
                         device_error: None,
                         person_dialog: None,
+                        album_dialog: None,
+                        album_error: None,
                         data,
                         _appearance: appearance,
                     }
@@ -5588,6 +6000,39 @@ mod tests {
             vec![
                 ("a".to_string(), "Other faces".to_string()),
                 ("c".to_string(), "Grace".to_string()),
+            ]
+        );
+    }
+
+    fn test_album(id: &str, name: &str, kind: AlbumKind) -> Album {
+        Album {
+            id: id.to_string(),
+            name: name.to_string(),
+            created_at: String::new(),
+            cover_photo_id: None,
+            sort_order: 0,
+            item_count: 0,
+            kind,
+            rule: None,
+            updated_at: None,
+            share_count: 0,
+        }
+    }
+
+    #[test]
+    fn add_to_collection_only_offers_manual_albums() {
+        let albums = vec![
+            test_album("a", "Holiday", AlbumKind::Manual),
+            test_album("b", "Best shots", AlbumKind::Smart),
+            test_album("c", "Trip to Rome", AlbumKind::Trip),
+            test_album("d", "Family", AlbumKind::Manual),
+        ];
+
+        assert_eq!(
+            manual_album_rows(albums.iter()),
+            vec![
+                ("a".to_string(), "Holiday".to_string()),
+                ("d".to_string(), "Family".to_string()),
             ]
         );
     }
