@@ -12,12 +12,13 @@ mod tile_http;
 
 use base64::Engine as _;
 use rayon::prelude::*;
-use siegu_core::database::{Album, DeviceInfo, PhotoDateGroup, PhotoFilter};
+use siegu_core::database::{Album, DeviceInfo, PersonMatch, PhotoDateGroup, PhotoFilter};
 use siegu_core::devices::{
     list_devices as list_core_devices, remove_device as remove_core_device,
     rename_device as rename_core_device, storage_percent,
 };
 use siegu_core::duplicates::{self, DuplicateGroupView, DuplicateStats};
+use siegu_core::library::do_get_search_facets;
 use siegu_core::map::{cluster_map_points, frame_map_points, MapCluster, MapFraming};
 use siegu_core::{
     config::default_config_dir,
@@ -30,7 +31,7 @@ use siegu_ui::{
         self,
         buttons::{Button, ButtonVariant},
         feedback::Banner,
-        forms::{Choice, InputEvent, SearchInput, Select, Switch, TextInput},
+        forms::{Choice, InputEvent, MultiSelect, SearchInput, Select, Switch, TextInput},
         layout::{columns_for, ScrollArea},
         maps::{LatLon, MapMarker, MapView, MapViewport, Tile, WorldMap},
         motion::ProgressBar,
@@ -230,18 +231,16 @@ struct PhotoEntry {
 /// the rows in view, so we never hold the whole library in memory.
 #[derive(Default)]
 struct PhotoWindow {
-    query: String,
-    favorites_only: bool,
-    videos_only: bool,
+    /// Debug rendering of the complete `PhotoFilter`, so any facet change
+    /// invalidates cached thumbnails instead of showing rows from the old filter.
+    filter_key: String,
     start: usize,
     photos: Vec<PhotoEntry>,
 }
 
 impl PhotoWindow {
-    fn matches(&self, query: &str, favorites_only: bool, videos_only: bool) -> bool {
-        self.query == query
-            && self.favorites_only == favorites_only
-            && self.videos_only == videos_only
+    fn matches(&self, filter_key: &str) -> bool {
+        self.filter_key == filter_key
     }
 
     fn contains(&self, index: usize) -> bool {
@@ -251,11 +250,6 @@ impl PhotoWindow {
     fn get(&self, index: usize) -> Option<&PhotoEntry> {
         self.contains(index)
             .then(|| &self.photos[index - self.start])
-    }
-
-    fn clear(&mut self) {
-        self.photos.clear();
-        self.start = 0;
     }
 }
 
@@ -290,12 +284,182 @@ struct AlbumEntry {
     thumbnail: Option<ImageSource>,
 }
 
+/// Facet values offered by the library filter panel. They come from the local
+/// SQLite indexes; no network or second device is involved.
+#[derive(Clone, Default)]
+struct SearchFacetsData {
+    /// `(person id, display name)`; an empty name is an unnamed face group.
+    people: Vec<(String, String)>,
+    locations: Vec<String>,
+    tags: Vec<String>,
+    cameras: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum SearchSort {
+    #[default]
+    Newest,
+    Best,
+    Random,
+}
+
+impl SearchSort {
+    /// The three orders the legacy toolbar offers.
+    fn values() -> [Self; 3] {
+        [Self::Newest, Self::Best, Self::Random]
+    }
+
+    fn from_setting(value: &str) -> Self {
+        match value {
+            "best" => Self::Best,
+            "random" => Self::Random,
+            _ => Self::Newest,
+        }
+    }
+
+    fn as_setting(self) -> &'static str {
+        match self {
+            Self::Newest => "newest",
+            Self::Best => "best",
+            Self::Random => "random",
+        }
+    }
+
+    fn label_key(self) -> &'static str {
+        match self {
+            Self::Newest => "search.sort_newest",
+            Self::Best => "search.sort_best",
+            Self::Random => "search.sort_random",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum SearchStorageFilter {
+    #[default]
+    Any,
+    Stored,
+    NotStored,
+}
+
+impl SearchStorageFilter {
+    fn from_setting(value: &str) -> Self {
+        match value {
+            "stored" => Self::Stored,
+            "not_stored" => Self::NotStored,
+            _ => Self::Any,
+        }
+    }
+
+    fn as_setting(self) -> &'static str {
+        match self {
+            Self::Any => "any",
+            Self::Stored => "stored",
+            Self::NotStored => "not_stored",
+        }
+    }
+}
+
+/// Desktop-side search state. The query, favorites and videos switches remain
+/// separate for the existing toolbar; everything here maps to `PhotoFilter`
+/// fields that the core database already knows how to apply.
+#[derive(Clone, Debug, Default)]
+struct SearchFilterState {
+    person_ids: Vec<String>,
+    person_match: PersonMatch,
+    person_alone: bool,
+    location: Option<String>,
+    tag: Option<String>,
+    date_from: Option<String>,
+    date_to: Option<String>,
+    camera: Option<String>,
+    aesthetics_min: Option<f64>,
+    has_faces: bool,
+    papers: bool,
+    nsfw_only: bool,
+    storage: SearchStorageFilter,
+    sort: SearchSort,
+}
+
+impl SearchFilterState {
+    fn to_photo_filter(&self) -> PhotoFilter {
+        let (random, order_by) = match self.sort {
+            SearchSort::Random => (true, None),
+            sort => (false, Some(sort.as_setting().to_string())),
+        };
+        PhotoFilter {
+            person_ids: self.person_ids.clone(),
+            person_match: self.person_match,
+            person_alone: self.person_alone,
+            location: self.location.clone(),
+            tag: self.tag.clone(),
+            date_from: self.date_from.clone(),
+            date_to: self.date_to.clone(),
+            query: None,
+            videos: None,
+            favorite: false,
+            has_faces: self.has_faces,
+            aesthetics_min: self.aesthetics_min,
+            camera: self.camera.clone(),
+            papers: self.papers,
+            nsfw_only: self.nsfw_only,
+            stored_only: self.storage == SearchStorageFilter::Stored,
+            not_stored_only: self.storage == SearchStorageFilter::NotStored,
+            random,
+            order_by,
+            album_id: None,
+        }
+    }
+
+    fn is_active(&self) -> bool {
+        !self.person_ids.is_empty()
+            || self.person_alone
+            || self.location.is_some()
+            || self.tag.is_some()
+            || self.date_from.is_some()
+            || self.date_to.is_some()
+            || self.camera.is_some()
+            || self.aesthetics_min.is_some()
+            || self.has_faces
+            || self.papers
+            || self.nsfw_only
+            || self.storage != SearchStorageFilter::Any
+            || self.sort != SearchSort::Newest
+    }
+
+    fn clear_chip(&mut self, id: &str) {
+        match id {
+            "people" => {
+                self.person_ids.clear();
+                self.person_match = PersonMatch::And;
+            }
+            "person_alone" => self.person_alone = false,
+            "location" => self.location = None,
+            "tag" => self.tag = None,
+            "date_range" => {
+                self.date_from = None;
+                self.date_to = None;
+            }
+            "camera" => self.camera = None,
+            "quality" => self.aesthetics_min = None,
+            "faces" => self.has_faces = false,
+            "papers" => self.papers = false,
+            "nsfw" => self.nsfw_only = false,
+            "storage" => self.storage = SearchStorageFilter::Any,
+            "sort" => self.sort = SearchSort::Newest,
+            "all" => *self = Self::default(),
+            _ => {}
+        }
+    }
+}
+
 /// Everything the desktop shell reads from the local library once at startup.
 #[derive(Default)]
 struct LibraryData {
     total_photos: usize,
     date_groups: Vec<PhotoDateGroup>,
     people: Vec<PersonEntry>,
+    facets: SearchFacetsData,
     map_point_count: usize,
     map_clusters: Vec<MapCluster>,
     map_framing: MapFraming,
@@ -432,10 +596,16 @@ struct Siegu {
     section: Section,
     search_input: Entity<TextInput>,
     search_query: String,
+    recent_searches: Vec<String>,
+    date_from_input: Entity<TextInput>,
+    date_to_input: Entity<TextInput>,
+    camera_input: Entity<TextInput>,
     map_tile_url_input: Entity<TextInput>,
     map_tile_key_input: Entity<TextInput>,
     favorites_only: bool,
     videos_only: bool,
+    search_filters: SearchFilterState,
+    filters_open: bool,
     library_window: PhotoWindow,
     library_items: Vec<LibraryItem>,
     library_columns: usize,
@@ -480,6 +650,151 @@ impl Siegu {
             .as_ref()
             .map(|dd| dd.photos.len())
             .unwrap_or(self.data.total_photos)
+    }
+
+    fn current_photo_filter(&self) -> PhotoFilter {
+        self.search_filters.to_photo_filter()
+    }
+
+    fn filter_signature(&self) -> String {
+        photo_filter_signature(
+            &self.search_query,
+            self.favorites_only,
+            self.videos_only,
+            &self.current_photo_filter(),
+        )
+    }
+
+    /// Keep the text inputs in sync after a chip removal or a full reset.
+    /// Their subscriptions see the same value and do not re-run the query.
+    fn sync_filter_inputs(&mut self, cx: &mut Context<Self>) {
+        let date_from = self.search_filters.date_from.clone().unwrap_or_default();
+        let date_to = self.search_filters.date_to.clone().unwrap_or_default();
+        let camera = self.search_filters.camera.clone().unwrap_or_default();
+        let query = self.search_query.clone();
+        self.date_from_input
+            .update(cx, |input, cx| input.set_text(date_from, cx));
+        self.date_to_input
+            .update(cx, |input, cx| input.set_text(date_to, cx));
+        self.camera_input
+            .update(cx, |input, cx| input.set_text(camera, cx));
+        self.search_input
+            .update(cx, |input, cx| input.set_text(query, cx));
+    }
+
+    fn clear_filter(&mut self, id: &str, cx: &mut Context<Self>) {
+        if id == "all" {
+            self.search_query.clear();
+            self.favorites_only = false;
+            self.videos_only = false;
+            self.search_filters = SearchFilterState::default();
+        } else {
+            match id {
+                "query" => {
+                    self.search_query.clear();
+                    self.search_input
+                        .update(cx, |input, cx| input.set_text(String::new(), cx));
+                }
+                "favorites" => self.favorites_only = false,
+                "videos" => self.videos_only = false,
+                other => self.search_filters.clear_chip(other),
+            }
+        }
+        self.sync_filter_inputs(cx);
+        self.reload_library_photos();
+        cx.notify();
+    }
+
+    fn filter_chips(&self, cx: &App) -> Vec<(String, SharedString)> {
+        let mut chips = Vec::new();
+        if !self.search_query.is_empty() {
+            chips.push((
+                "query".to_string(),
+                i18n::text(
+                    cx,
+                    "search.results_for",
+                    &[("query", clip(&self.search_query, 28).as_str())],
+                ),
+            ));
+        }
+        if self.favorites_only {
+            chips.push((
+                "favorites".to_string(),
+                i18n::text(cx, "search.magic.favorites", &[]),
+            ));
+        }
+        if self.videos_only {
+            chips.push((
+                "videos".to_string(),
+                i18n::text(cx, "search.magic.videos", &[]),
+            ));
+        }
+        if !self.search_filters.person_ids.is_empty() {
+            let label = i18n::text(cx, "search.people", &[]);
+            chips.push((
+                "people".to_string(),
+                format!("{} ({})", label, self.search_filters.person_ids.len()).into(),
+            ));
+        }
+        if self.search_filters.person_alone {
+            chips.push((
+                "person_alone".to_string(),
+                i18n::text(cx, "search.person_alone", &[]),
+            ));
+        }
+        if let Some(value) = &self.search_filters.location {
+            chips.push(("location".to_string(), value.clone().into()));
+        }
+        if let Some(value) = &self.search_filters.tag {
+            chips.push(("tag".to_string(), value.clone().into()));
+        }
+        if self.search_filters.date_from.is_some() || self.search_filters.date_to.is_some() {
+            let from = self.search_filters.date_from.as_deref().unwrap_or("…");
+            let to = self.search_filters.date_to.as_deref().unwrap_or("…");
+            chips.push(("date_range".to_string(), format!("{from} – {to}").into()));
+        }
+        if let Some(value) = &self.search_filters.camera {
+            chips.push(("camera".to_string(), value.clone().into()));
+        }
+        if let Some(value) = self.search_filters.aesthetics_min {
+            chips.push((
+                "quality".to_string(),
+                format!(
+                    "{} {}",
+                    i18n::text(cx, "search.advanced.quality", &[]),
+                    value
+                )
+                .into(),
+            ));
+        }
+        if self.search_filters.has_faces {
+            chips.push((
+                "faces".to_string(),
+                i18n::text(cx, "search.magic.faces", &[]),
+            ));
+        }
+        if self.search_filters.papers {
+            chips.push((
+                "papers".to_string(),
+                i18n::text(cx, "search.magic.papers", &[]),
+            ));
+        }
+        if self.search_filters.nsfw_only {
+            chips.push(("nsfw".to_string(), i18n::text(cx, "search.magic.nsfw", &[])));
+        }
+        if self.search_filters.storage != SearchStorageFilter::Any {
+            let key = match self.search_filters.storage {
+                SearchStorageFilter::Stored => "search.magic.stored",
+                SearchStorageFilter::NotStored => "search.magic.not_stored",
+                SearchStorageFilter::Any => "filters.all",
+            };
+            chips.push(("storage".to_string(), i18n::text(cx, key, &[])));
+        }
+        if self.search_filters.sort != SearchSort::Newest {
+            let label = i18n::text(cx, self.search_filters.sort.label_key(), &[]);
+            chips.push(("sort".to_string(), label));
+        }
+        chips
     }
 
     /// Returns one absolute photo from the active grid, loading a small window
@@ -814,9 +1129,9 @@ impl Siegu {
         if last <= first {
             return;
         }
-        if self
-            .library_window
-            .matches(&self.search_query, self.favorites_only, self.videos_only)
+        let filter = self.current_photo_filter();
+        let filter_key = self.filter_signature();
+        if self.library_window.matches(&filter_key)
             && first >= self.library_window.start
             && last <= self.library_window.start + self.library_window.photos.len()
         {
@@ -839,7 +1154,7 @@ impl Siegu {
             end - start,
             self.favorites_only,
             self.videos_only,
-            &PhotoFilter::default(),
+            &filter,
             false,
         );
         let ids: Vec<String> = photos.iter().map(|photo| photo.id.clone()).collect();
@@ -857,16 +1172,17 @@ impl Siegu {
             })
             .collect();
         self.library_window = PhotoWindow {
-            query: self.search_query.clone(),
-            favorites_only: self.favorites_only,
-            videos_only: self.videos_only,
+            filter_key,
             start,
             photos,
         };
     }
 
     fn reset_library_grid(&mut self) {
-        self.library_window.clear();
+        self.library_window = PhotoWindow {
+            filter_key: self.filter_signature(),
+            ..Default::default()
+        };
         self.rebuild_library_items(self.library_columns);
         self.library_list.scroll_to(ListOffset {
             item_ix: 0,
@@ -892,19 +1208,20 @@ impl Siegu {
             self.data.date_groups.clear();
         } else {
             let db = Database::new(&dir.display().to_string());
+            let filter = self.current_photo_filter();
             self.data.total_photos = db
                 .count_photos_filtered(
                     &self.search_query,
                     self.favorites_only,
                     self.videos_only,
-                    &PhotoFilter::default(),
+                    &filter,
                 )
                 .max(0) as usize;
             self.data.date_groups = db.list_photo_date_groups(
                 &self.search_query,
                 self.favorites_only,
                 self.videos_only,
-                &PhotoFilter::default(),
+                &filter,
             );
         }
         self.reset_library_grid();
@@ -912,7 +1229,10 @@ impl Siegu {
 
     fn refresh_data(&mut self) {
         self.data = load_library();
-        self.library_window.clear();
+        self.library_window = PhotoWindow {
+            filter_key: self.filter_signature(),
+            ..Default::default()
+        };
         self.rebuild_library_items(self.library_columns);
         self.library_list.scroll_to(ListOffset {
             item_ix: 0,
@@ -1444,13 +1764,348 @@ impl Siegu {
         grid.into_any_element()
     }
 
+    /// Local advanced filters. Every control writes straight into
+    /// `SearchFilterState` and reloads the SQLite-backed library; facets are
+    /// read from the local indexes when the library loads.
+    fn advanced_filters_view(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme();
+        let weak = cx.entity().downgrade();
+
+        let people_choices: Vec<Choice> = self
+            .data
+            .facets
+            .people
+            .iter()
+            .map(|(id, name)| {
+                let label = if name.is_empty() {
+                    i18n::text(cx, "search.unnamed_faces", &[])
+                } else {
+                    name.clone().into()
+                };
+                Choice::new(id.clone(), label)
+            })
+            .collect();
+        let people_field: AnyElement = if people_choices.is_empty() {
+            Paragraph::new(i18n::text(cx, "people.no_faces", &[])).into_any_element()
+        } else {
+            let weak_people = weak.clone();
+            MultiSelect::new("filter-people", people_choices)
+                .label(i18n::text(cx, "search.people", &[]))
+                .placeholder(i18n::text(cx, "filters.all", &[]))
+                .selected(self.search_filters.person_ids.clone())
+                .on_change(move |values, _, app| {
+                    if let Some(entity) = weak_people.upgrade() {
+                        entity.update(app, |state, cx| {
+                            state.search_filters.person_ids =
+                                values.iter().map(|value| value.to_string()).collect();
+                            state.reload_library_photos();
+                            cx.notify();
+                        });
+                    }
+                })
+                .into_any_element()
+        };
+
+        let any_label = i18n::text(cx, "filters.all", &[]);
+        let location_choices = facet_select_choices(&self.data.facets.locations, any_label.clone());
+        let tag_choices = facet_select_choices(&self.data.facets.tags, any_label.clone());
+        let camera_choices = facet_select_choices(&self.data.facets.cameras, any_label.clone());
+        let quality_choices = [
+            Choice::new("", any_label.clone()),
+            Choice::new("0.5", "0.5+"),
+            Choice::new("0.7", "0.7+"),
+            Choice::new("0.85", "0.85+"),
+        ];
+        let sort_choices = SearchSort::values()
+            .map(|sort| Choice::new(sort.as_setting(), i18n::text(cx, sort.label_key(), &[])));
+        let date_range_field = div()
+            .flex()
+            .flex_col()
+            .gap_1()
+            .child(Paragraph::new(i18n::text(cx, "filters.date_range", &[])))
+            .child(
+                div()
+                    .flex()
+                    .gap_2()
+                    .child(self.date_from_input.clone())
+                    .child(self.date_to_input.clone()),
+            );
+
+        let weak_location = weak.clone();
+        let weak_tag = weak.clone();
+        let weak_camera = weak.clone();
+        let weak_quality = weak.clone();
+        let weak_person_match = weak.clone();
+        let weak_alone = weak.clone();
+        let weak_faces = weak.clone();
+        let weak_papers = weak.clone();
+        let weak_nsfw = weak.clone();
+        let weak_storage = weak.clone();
+        let weak_sort = weak.clone();
+        let weak_clear_all = weak.clone();
+
+        let chips = self.filter_chips(cx);
+        let chip_buttons = chips
+            .into_iter()
+            .enumerate()
+            .map(|(index, (id, label))| {
+                let weak_chip = weak.clone();
+                Button::new(("clear-filter", index), label)
+                    .icon(IconName::X)
+                    .variant(ButtonVariant::Subtle)
+                    .on_click(move |_, _, app| {
+                        if let Some(entity) = weak_chip.upgrade() {
+                            let id = id.clone();
+                            entity.update(app, |state, cx| state.clear_filter(&id, cx));
+                        }
+                    })
+            })
+            .collect::<Vec<_>>();
+
+        div()
+            .flex()
+            .flex_col()
+            .gap_3()
+            .p_3()
+            .rounded(px(12.0))
+            .border_1()
+            .border_color(theme.colors.border)
+            .bg(theme.colors.surface)
+            .child(Heading::h4(i18n::text(cx, "search.advanced.title", &[])))
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .gap_3()
+                    .child(people_field)
+                    .child(
+                        Select::new(
+                            "filter-person-match",
+                            [
+                                Choice::new("and", i18n::text(cx, "search.person_match_and", &[])),
+                                Choice::new("or", i18n::text(cx, "search.person_match_or", &[])),
+                            ],
+                        )
+                        .label(i18n::text(cx, "search.people", &[]))
+                        .selected(match self.search_filters.person_match {
+                            PersonMatch::And => "and",
+                            PersonMatch::Or => "or",
+                        })
+                        .on_change(move |value, _, app| {
+                            if let Some(entity) = weak_person_match.upgrade() {
+                                let match_mode = if value.as_ref() == "or" {
+                                    PersonMatch::Or
+                                } else {
+                                    PersonMatch::And
+                                };
+                                entity.update(app, |state, cx| {
+                                    state.search_filters.person_match = match_mode;
+                                    state.reload_library_photos();
+                                    cx.notify();
+                                });
+                            }
+                        }),
+                    )
+                    .child(
+                        Switch::new("filter-person-alone", self.search_filters.person_alone)
+                            .label(i18n::text(cx, "search.person_alone", &[]))
+                            .on_change(move |on, _, app| {
+                                if let Some(entity) = weak_alone.upgrade() {
+                                    entity.update(app, |state, cx| {
+                                        state.search_filters.person_alone = on;
+                                        state.reload_library_photos();
+                                        cx.notify();
+                                    });
+                                }
+                            }),
+                    )
+                    .child(
+                        Select::new("filter-location", location_choices)
+                            .label(i18n::text(cx, "search.locations", &[]))
+                            .selected(self.search_filters.location.clone().unwrap_or_default())
+                            .on_change(move |value, _, app| {
+                                if let Some(entity) = weak_location.upgrade() {
+                                    let value = value.to_string();
+                                    entity.update(app, |state, cx| {
+                                        state.search_filters.location =
+                                            (!value.is_empty()).then_some(value);
+                                        state.reload_library_photos();
+                                        cx.notify();
+                                    });
+                                }
+                            }),
+                    )
+                    .child(
+                        Select::new("filter-tag", tag_choices)
+                            .label(i18n::text(cx, "search.tags", &[]))
+                            .selected(self.search_filters.tag.clone().unwrap_or_default())
+                            .on_change(move |value, _, app| {
+                                if let Some(entity) = weak_tag.upgrade() {
+                                    let value = value.to_string();
+                                    entity.update(app, |state, cx| {
+                                        state.search_filters.tag =
+                                            (!value.is_empty()).then_some(value);
+                                        state.reload_library_photos();
+                                        cx.notify();
+                                    });
+                                }
+                            }),
+                    )
+                    .child(
+                        Select::new("filter-camera", camera_choices)
+                            .label(i18n::text(cx, "search.cameras", &[]))
+                            .selected(self.search_filters.camera.clone().unwrap_or_default())
+                            .on_change(move |value, _, app| {
+                                if let Some(entity) = weak_camera.upgrade() {
+                                    let value = value.to_string();
+                                    entity.update(app, |state, cx| {
+                                        state.search_filters.camera =
+                                            (!value.is_empty()).then_some(value);
+                                        state.reload_library_photos();
+                                        cx.notify();
+                                    });
+                                }
+                            }),
+                    )
+                    .child(date_range_field)
+                    .child(
+                        Select::new("filter-quality", quality_choices)
+                            .label(i18n::text(cx, "search.advanced.quality", &[]))
+                            .selected(
+                                self.search_filters
+                                    .aesthetics_min
+                                    .map(|value| value.to_string())
+                                    .unwrap_or_default(),
+                            )
+                            .on_change(move |value, _, app| {
+                                if let Some(entity) = weak_quality.upgrade() {
+                                    let value = value.parse::<f64>().ok();
+                                    entity.update(app, |state, cx| {
+                                        state.search_filters.aesthetics_min = value;
+                                        state.reload_library_photos();
+                                        cx.notify();
+                                    });
+                                }
+                            }),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .gap_3()
+                    .child(
+                        Switch::new("filter-faces", self.search_filters.has_faces)
+                            .label(i18n::text(cx, "search.magic.faces", &[]))
+                            .on_change(move |on, _, app| {
+                                if let Some(entity) = weak_faces.upgrade() {
+                                    entity.update(app, |state, cx| {
+                                        state.search_filters.has_faces = on;
+                                        state.reload_library_photos();
+                                        cx.notify();
+                                    });
+                                }
+                            }),
+                    )
+                    .child(
+                        Switch::new("filter-papers", self.search_filters.papers)
+                            .label(i18n::text(cx, "search.magic.papers", &[]))
+                            .on_change(move |on, _, app| {
+                                if let Some(entity) = weak_papers.upgrade() {
+                                    entity.update(app, |state, cx| {
+                                        state.search_filters.papers = on;
+                                        state.reload_library_photos();
+                                        cx.notify();
+                                    });
+                                }
+                            }),
+                    )
+                    .child(
+                        Switch::new("filter-nsfw", self.search_filters.nsfw_only)
+                            .label(i18n::text(cx, "search.magic.nsfw", &[]))
+                            .on_change(move |on, _, app| {
+                                if let Some(entity) = weak_nsfw.upgrade() {
+                                    entity.update(app, |state, cx| {
+                                        state.search_filters.nsfw_only = on;
+                                        state.reload_library_photos();
+                                        cx.notify();
+                                    });
+                                }
+                            }),
+                    )
+                    .child(
+                        Select::new(
+                            "filter-storage",
+                            [
+                                Choice::new("any", i18n::text(cx, "filters.all", &[])),
+                                Choice::new("stored", i18n::text(cx, "search.magic.stored", &[])),
+                                Choice::new(
+                                    "not_stored",
+                                    i18n::text(cx, "search.magic.not_stored", &[]),
+                                ),
+                            ],
+                        )
+                        .label(i18n::text(cx, "search.magic.storage", &[]))
+                        .selected(self.search_filters.storage.as_setting())
+                        .on_change(move |value, _, app| {
+                            if let Some(entity) = weak_storage.upgrade() {
+                                let storage = SearchStorageFilter::from_setting(value.as_ref());
+                                entity.update(app, |state, cx| {
+                                    state.search_filters.storage = storage;
+                                    state.reload_library_photos();
+                                    cx.notify();
+                                });
+                            }
+                        }),
+                    )
+                    .child(
+                        Select::new("filter-sort", sort_choices)
+                            .label(i18n::text(cx, "search.sort_label", &[]))
+                            .selected(self.search_filters.sort.as_setting())
+                            .on_change(move |value, _, app| {
+                                if let Some(entity) = weak_sort.upgrade() {
+                                    let sort = SearchSort::from_setting(value.as_ref());
+                                    entity.update(app, |state, cx| {
+                                        state.search_filters.sort = sort;
+                                        state.reload_library_photos();
+                                        cx.notify();
+                                    });
+                                }
+                            }),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .gap_2()
+                    .children(chip_buttons)
+                    .child(
+                        Button::new("filter-clear-all", i18n::text(cx, "search.clear_all", &[]))
+                            .icon(IconName::X)
+                            .variant(ButtonVariant::Ghost)
+                            .on_click(move |_, _, app| {
+                                if let Some(entity) = weak_clear_all.upgrade() {
+                                    entity.update(app, |state, cx| state.clear_filter("all", cx));
+                                }
+                            }),
+                    ),
+            )
+            .into_any_element()
+    }
+
     fn library_view(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let weak_fav = cx.entity().downgrade();
         let weak_vid = cx.entity().downgrade();
         let weak_add = cx.entity().downgrade();
         let weak_scan = cx.entity().downgrade();
+        let weak_filters = cx.entity().downgrade();
 
-        let has_filters = !self.search_query.is_empty() || self.favorites_only || self.videos_only;
+        let has_filters = !self.search_query.is_empty()
+            || self.favorites_only
+            || self.videos_only
+            || self.search_filters.is_active();
         let (empty_title, empty_hint): (SharedString, SharedString) = if has_filters {
             (
                 i18n::text(cx, "media.no_results", &[]),
@@ -1469,11 +2124,30 @@ impl Siegu {
             .items_center()
             .gap_3()
             .child(
-                div()
-                    .flex_1()
-                    .min_w(px(220.0))
-                    .max_w(px(420.0))
-                    .child(SearchInput::new("library-search", &self.search_input)),
+                div().flex_1().min_w(px(220.0)).max_w(px(420.0)).child(
+                    SearchInput::new("library-search", &self.search_input)
+                        .history(self.recent_searches.clone()),
+                ),
+            )
+            .child(
+                Button::new(
+                    "library-filters",
+                    i18n::text(cx, "search.advanced.title", &[]),
+                )
+                .icon(IconName::Filter)
+                .variant(if self.filters_open {
+                    ButtonVariant::Primary
+                } else {
+                    ButtonVariant::Secondary
+                })
+                .on_click(move |_, _, app| {
+                    if let Some(entity) = weak_filters.upgrade() {
+                        entity.update(app, |state, cx| {
+                            state.filters_open = !state.filters_open;
+                            cx.notify();
+                        });
+                    }
+                }),
             )
             .child(
                 Button::new(
@@ -1535,6 +2209,27 @@ impl Siegu {
                 ))
             }));
 
+        let chips = self.filter_chips(cx);
+        let chip_row = (!chips.is_empty()).then(|| {
+            let mut row = div().flex().flex_wrap().items_center().gap_2();
+            for (index, (id, label)) in chips.into_iter().enumerate() {
+                let weak_chip = cx.entity().downgrade();
+                row = row.child(
+                    Button::new(("active-filter", index), label)
+                        .icon(IconName::X)
+                        .variant(ButtonVariant::Subtle)
+                        .on_click(move |_, _, app| {
+                            if let Some(entity) = weak_chip.upgrade() {
+                                let id = id.clone();
+                                entity.update(app, |state, cx| state.clear_filter(&id, cx));
+                            }
+                        }),
+                );
+            }
+            row
+        });
+        let filter_panel = self.filters_open.then(|| self.advanced_filters_view(cx));
+
         let width = self.grid_width.clone();
         let columns = columns_for(*width.read(cx), PHOTO_CARD_WIDTH, PHOTO_GAP).max(1) as usize;
         if self.library_columns != columns
@@ -1564,6 +2259,8 @@ impl Siegu {
             .min_h_0()
             .gap_4()
             .child(toolbar)
+            .children(chip_row)
+            .children(filter_panel)
             .child(grid)
             .child(
                 canvas(
@@ -3148,6 +3845,27 @@ fn load_library() -> LibraryData {
         .count_photos_filtered("", false, false, &PhotoFilter::default())
         .max(0) as usize;
     let date_groups = db.list_photo_date_groups("", false, false, &PhotoFilter::default());
+    let facet_rows = do_get_search_facets(&db);
+    let facets = SearchFacetsData {
+        people: facet_rows
+            .people
+            .into_iter()
+            .map(|person| (person.id, person.name.unwrap_or_default()))
+            .chain(
+                facet_rows
+                    .unnamed_faces
+                    .into_iter()
+                    .map(|group| (group.id, String::new())),
+            )
+            .collect(),
+        locations: facet_rows.locations.into_iter().map(|l| l.name).collect(),
+        tags: facet_rows.tags.into_iter().map(|tag| tag.name).collect(),
+        cameras: facet_rows
+            .cameras
+            .into_iter()
+            .map(|camera| camera.name)
+            .collect(),
+    };
     let people = db
         .get_people()
         .into_iter()
@@ -3209,6 +3927,7 @@ fn load_library() -> LibraryData {
         total_photos,
         date_groups,
         people,
+        facets,
         map_point_count,
         map_clusters,
         map_framing,
@@ -3539,6 +4258,43 @@ fn duplicate_kind_label(cx: &App, kind: &str) -> SharedString {
     }
 }
 
+/// Cache key for the virtual grid. The free-text query and the two quick
+/// switches are separate arguments to SQLite, so they belong here too.
+fn photo_filter_signature(
+    query: &str,
+    favorites_only: bool,
+    videos_only: bool,
+    filter: &PhotoFilter,
+) -> String {
+    format!("{query}|{favorites_only}|{videos_only}|{filter:?}")
+}
+
+/// Turn a local facet list into a select with an explicit "All" option.
+fn facet_select_choices(values: &[String], all_label: SharedString) -> Vec<Choice> {
+    let mut choices = vec![Choice::new("", all_label)];
+    choices.extend(
+        values
+            .iter()
+            .filter(|value| !value.trim().is_empty())
+            .map(|value| Choice::new(value.clone(), value.clone())),
+    );
+    choices
+}
+
+/// Text inputs hold ISO dates; the end of a day needs the last second so a
+/// `YYYY-MM-DD` range includes photos taken that day.
+fn date_filter_value(raw: &str, end_of_day: bool) -> Option<String> {
+    let value = raw.trim();
+    if value.is_empty() {
+        return None;
+    }
+    if end_of_day && value.len() == 10 && value.bytes().filter(|b| *b == b'-').count() == 2 {
+        Some(format!("{value} 23:59:59"))
+    } else {
+        Some(value.to_string())
+    }
+}
+
 /// Shorten a value so it fits on one line without splitting a character.
 fn clip(value: &str, max: usize) -> String {
     let mut chars = value.chars();
@@ -3793,11 +4549,68 @@ fn main() {
                     cx.subscribe(&search_input, |state: &mut Siegu, input, event, cx| {
                         if matches!(event, InputEvent::Changed | InputEvent::Submit) {
                             let query = input.read(cx).text().to_string();
+                            if matches!(event, InputEvent::Submit) {
+                                let recent = query.trim();
+                                if !recent.is_empty() {
+                                    state.recent_searches.retain(|item| item != recent);
+                                    state.recent_searches.insert(0, recent.to_string());
+                                    state.recent_searches.truncate(8);
+                                }
+                            }
                             if query != state.search_query {
                                 state.search_query = query;
                                 state.reload_library_photos();
                                 cx.notify();
                             }
+                        }
+                    })
+                    .detach();
+
+                    let date_from_input =
+                        cx.new(|cx| TextInput::new(window, cx).placeholder("YYYY-MM-DD"));
+                    cx.subscribe(&date_from_input, |state: &mut Siegu, input, event, cx| {
+                        if !matches!(event, InputEvent::Changed | InputEvent::Submit) {
+                            return;
+                        }
+                        let value = date_filter_value(&input.read(cx).text(), false);
+                        if value != state.search_filters.date_from {
+                            state.search_filters.date_from = value;
+                            state.reload_library_photos();
+                            cx.notify();
+                        }
+                    })
+                    .detach();
+                    let date_to_input =
+                        cx.new(|cx| TextInput::new(window, cx).placeholder("YYYY-MM-DD"));
+                    cx.subscribe(&date_to_input, |state: &mut Siegu, input, event, cx| {
+                        if !matches!(event, InputEvent::Changed | InputEvent::Submit) {
+                            return;
+                        }
+                        let value = date_filter_value(&input.read(cx).text(), true);
+                        if value != state.search_filters.date_to {
+                            state.search_filters.date_to = value;
+                            state.reload_library_photos();
+                            cx.notify();
+                        }
+                    })
+                    .detach();
+                    let camera_input = cx.new(|cx| {
+                        TextInput::new(window, cx)
+                            .label(i18n::text(cx, "search.cameras", &[]))
+                            .placeholder("Canon")
+                    });
+                    cx.subscribe(&camera_input, |state: &mut Siegu, input, event, cx| {
+                        if !matches!(event, InputEvent::Changed | InputEvent::Submit) {
+                            return;
+                        }
+                        let value = {
+                            let value = input.read(cx).text().trim().to_string();
+                            (!value.is_empty()).then_some(value)
+                        };
+                        if value != state.search_filters.camera {
+                            state.search_filters.camera = value;
+                            state.reload_library_photos();
+                            cx.notify();
                         }
                     })
                     .detach();
@@ -3854,10 +4667,16 @@ fn main() {
                         section: Section::Library,
                         search_input,
                         search_query: String::new(),
+                        recent_searches: Vec::new(),
+                        date_from_input,
+                        date_to_input,
+                        camera_input,
                         map_tile_url_input,
                         map_tile_key_input,
                         favorites_only: false,
                         videos_only: false,
+                        search_filters: SearchFilterState::default(),
+                        filters_open: false,
                         library_window: PhotoWindow::default(),
                         library_items: Vec::new(),
                         library_columns: 1,
@@ -4305,5 +5124,158 @@ mod tests {
         let img = decode_data_url("data:image/png;base64,AQID").expect("valid png bytes");
         assert_eq!(img.format, ImageFormat::Png);
         assert_eq!(img.bytes(), &[1, 2, 3]);
+    }
+
+    #[test]
+    fn search_filters_map_to_core_photo_filter() {
+        let mut filters = SearchFilterState::default();
+        filters.person_ids = vec!["p1".into(), "p2".into()];
+        filters.person_match = PersonMatch::Or;
+        filters.person_alone = true;
+        filters.location = Some("Paris".into());
+        filters.tag = Some("beach".into());
+        filters.date_from = Some("2026-01-01".into());
+        filters.date_to = Some("2026-01-31 23:59:59".into());
+        filters.aesthetics_min = Some(0.7);
+        filters.camera = Some("Canon".into());
+        filters.has_faces = true;
+        filters.papers = true;
+        filters.nsfw_only = true;
+        filters.storage = SearchStorageFilter::NotStored;
+        filters.sort = SearchSort::Best;
+
+        let filter = filters.to_photo_filter();
+        assert_eq!(filter.person_ids, vec!["p1".to_string(), "p2".to_string()]);
+        assert_eq!(filter.person_match, PersonMatch::Or);
+        assert!(filter.person_alone);
+        assert_eq!(filter.location.as_deref(), Some("Paris"));
+        assert_eq!(filter.tag.as_deref(), Some("beach"));
+        assert_eq!(filter.date_from.as_deref(), Some("2026-01-01"));
+        assert_eq!(filter.date_to.as_deref(), Some("2026-01-31 23:59:59"));
+        assert_eq!(filter.aesthetics_min, Some(0.7));
+        assert_eq!(filter.camera.as_deref(), Some("Canon"));
+        assert!(filter.has_faces);
+        assert!(filter.papers);
+        assert!(filter.nsfw_only);
+        assert!(!filter.stored_only);
+        assert!(filter.not_stored_only);
+        assert!(!filter.random);
+        assert_eq!(filter.order_by.as_deref(), Some("best"));
+        assert!(filters.is_active());
+    }
+
+    #[test]
+    fn random_sort_uses_the_core_random_flag() {
+        let mut filters = SearchFilterState::default();
+        assert_eq!(
+            filters.to_photo_filter().order_by.as_deref(),
+            Some("newest")
+        );
+
+        filters.sort = SearchSort::Random;
+        let filter = filters.to_photo_filter();
+        assert!(filter.random);
+        assert_eq!(filter.order_by, None);
+    }
+
+    #[test]
+    fn cache_key_changes_with_query_switches_and_facets() {
+        let base = PhotoFilter::default();
+        let empty = photo_filter_signature("", false, false, &base);
+        let query = photo_filter_signature("dog", false, false, &base);
+        let favorites = photo_filter_signature("", true, false, &base);
+        let videos = photo_filter_signature("", false, true, &base);
+        let mut advanced = base.clone();
+        advanced.has_faces = true;
+        let advanced_key = photo_filter_signature("", false, false, &advanced);
+
+        assert_ne!(empty, query);
+        assert_ne!(empty, favorites);
+        assert_ne!(empty, videos);
+        assert_ne!(empty, advanced_key);
+
+        let window = PhotoWindow {
+            filter_key: empty.clone(),
+            ..Default::default()
+        };
+        assert!(window.matches(&empty));
+        assert!(!window.matches(&query));
+    }
+
+    #[test]
+    fn date_filter_value_is_inclusive_for_a_plain_end_date() {
+        assert_eq!(
+            date_filter_value(" 2026-03-20 ", false).as_deref(),
+            Some("2026-03-20")
+        );
+        assert_eq!(
+            date_filter_value("2026-03-20", true).as_deref(),
+            Some("2026-03-20 23:59:59")
+        );
+        assert_eq!(
+            date_filter_value("2026-03-20 10:00", true).as_deref(),
+            Some("2026-03-20 10:00")
+        );
+        assert_eq!(date_filter_value("  ", true), None);
+    }
+
+    #[test]
+    fn clearing_a_chip_resets_its_related_values() {
+        let mut filters = SearchFilterState::default();
+        filters.person_ids = vec!["p1".into()];
+        filters.person_match = PersonMatch::Or;
+        filters.person_alone = true;
+        filters.date_from = Some("2026-01-01".into());
+        filters.date_to = Some("2026-01-31".into());
+        filters.sort = SearchSort::Best;
+
+        filters.clear_chip("people");
+        assert!(filters.person_ids.is_empty());
+        assert_eq!(filters.person_match, PersonMatch::And);
+        filters.clear_chip("person_alone");
+        filters.clear_chip("date_range");
+        assert_eq!(filters.date_from, None);
+        assert_eq!(filters.date_to, None);
+        filters.clear_chip("sort");
+        assert_eq!(filters.sort, SearchSort::Newest);
+        assert!(!filters.is_active());
+    }
+
+    #[test]
+    fn filtered_date_groups_keep_month_and_day_headers() {
+        let groups = vec![
+            PhotoDateGroup {
+                key: "2026-04-02".into(),
+                count: 2,
+            },
+            PhotoDateGroup {
+                key: "2026-03-31".into(),
+                count: 1,
+            },
+            PhotoDateGroup {
+                key: "2025-12-24".into(),
+                count: 3,
+            },
+        ];
+        let items = library_items_for_groups(&groups, 2);
+        let kinds: Vec<_> = items.iter().map(|item| item.kind).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                LibraryItemKind::Month,
+                LibraryItemKind::Day,
+                LibraryItemKind::Photos,
+                LibraryItemKind::Month,
+                LibraryItemKind::Day,
+                LibraryItemKind::Photos,
+                LibraryItemKind::Month,
+                LibraryItemKind::Day,
+                LibraryItemKind::Photos,
+                LibraryItemKind::Photos,
+            ]
+        );
+        assert_eq!((items[0].group_start, items[0].group_count), (0, 2));
+        assert_eq!((items[3].group_start, items[3].group_count), (2, 1));
+        assert_eq!((items[6].group_start, items[6].group_count), (3, 3));
     }
 }
