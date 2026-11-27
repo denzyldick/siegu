@@ -40,8 +40,8 @@ use siegu_ui::{
         canvas, div, list, px, relative, size, AnyElement, App, AppContext, AsyncApp, Bounds,
         Context, Entity, FocusHandle, Image, ImageFormat, ImageSource, InteractiveElement,
         IntoElement, KeyDownEvent, ListAlignment, ListOffset, ListState, ParentElement,
-        PathPromptOptions, Pixels, Render, SharedString, Styled, SystemNotification,
-        TitlebarOptions, WeakEntity, Window, WindowBounds, WindowOptions,
+        PathPromptOptions, Pixels, Render, SharedString, Styled, Subscription, SystemNotification,
+        TitlebarOptions, WeakEntity, Window, WindowAppearance, WindowBounds, WindowOptions,
     },
     gpui_platform, i18n, insight_percent, InfoCard, MediaViewer, PhotoCard, PhotoGrid,
     SieguAppShell, ViewerField, ViewerInsight, ViewerMetadata, ViewerPerson,
@@ -96,6 +96,48 @@ impl Section {
             Self::Duplicates => i18n::text(cx, "duplicates.desc", &[]),
             Self::Settings => i18n::text(cx, "settings.desc", &[]),
         }
+    }
+}
+
+/// How the desktop palette chooses light or dark.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum ThemePreference {
+    /// Follow the OS window appearance.
+    #[default]
+    System,
+    Light,
+    Dark,
+}
+
+impl ThemePreference {
+    fn from_setting(value: &str) -> Self {
+        if value.eq_ignore_ascii_case("light") {
+            Self::Light
+        } else if value.eq_ignore_ascii_case("dark") {
+            Self::Dark
+        } else {
+            Self::System
+        }
+    }
+
+    fn as_setting(self) -> &'static str {
+        match self {
+            Self::System => "system",
+            Self::Light => "light",
+            Self::Dark => "dark",
+        }
+    }
+
+    fn appearance(self, system: WindowAppearance) -> WindowAppearance {
+        match self {
+            Self::System => system,
+            Self::Light => WindowAppearance::Light,
+            Self::Dark => WindowAppearance::Dark,
+        }
+    }
+
+    fn mode(self, system: WindowAppearance) -> Mode {
+        self.appearance(system).into()
     }
 }
 
@@ -193,7 +235,7 @@ struct LibraryData {
     albums: Vec<AlbumEntry>,
     settings: Vec<(String, String)>,
     models: Vec<(String, String, bool)>,
-    dark_mode: bool,
+    theme_preference: ThemePreference,
     auto_scan: bool,
     sync_enabled: bool,
     language: String,
@@ -344,6 +386,7 @@ struct Siegu {
     device_dialog: Option<DeviceDialog>,
     device_error: Option<String>,
     data: LibraryData,
+    _appearance: Subscription,
 }
 
 impl Siegu {
@@ -1835,20 +1878,6 @@ impl Siegu {
             .items_center()
             .gap_6()
             .child(
-                Switch::new("setting-dark-mode", self.data.dark_mode)
-                    .label("Dark theme")
-                    .on_change(move |on, _, cx| {
-                        Theme::set_mode_now(if on { Mode::Dark } else { Mode::Light }, cx);
-                        if let Some(entity) = weak_theme.upgrade() {
-                            entity.update(cx, |state, cx| {
-                                state.data.dark_mode = on;
-                                persist_setting("theme", if on { "dark" } else { "light" });
-                                cx.notify();
-                            });
-                        }
-                    }),
-            )
-            .child(
                 Switch::new("setting-auto-scan", self.data.auto_scan)
                     .label("Auto scan")
                     .on_change(move |on, _, cx| {
@@ -1869,6 +1898,47 @@ impl Siegu {
                             entity.update(cx, |state, cx| {
                                 state.data.sync_enabled = on;
                                 persist_setting("sync_enabled", if on { "true" } else { "false" });
+                                cx.notify();
+                            });
+                        }
+                    }),
+            );
+
+        let theme_choices = [
+            Choice::new(
+                ThemePreference::System.as_setting(),
+                i18n::text(cx, "settings.theme_system", &[]),
+            ),
+            Choice::new(
+                ThemePreference::Light.as_setting(),
+                i18n::text(cx, "settings.theme_light", &[]),
+            ),
+            Choice::new(
+                ThemePreference::Dark.as_setting(),
+                i18n::text(cx, "settings.theme_dark", &[]),
+            ),
+        ];
+        let appearance_section = div()
+            .flex()
+            .flex_col()
+            .gap_2()
+            .child(Heading::h3(i18n::text(cx, "settings.appearance", &[])))
+            .child(
+                Select::new("setting-theme", theme_choices)
+                    .label(i18n::text(cx, "settings.appearance", &[]))
+                    .selected(self.data.theme_preference.as_setting())
+                    .on_change(move |value, window, app| {
+                        let preference = ThemePreference::from_setting(value.as_ref());
+                        let appearance = preference.appearance(window.appearance());
+                        app.set_window_appearance(match preference {
+                            ThemePreference::System => None,
+                            _ => Some(appearance),
+                        });
+                        Theme::set_mode_now(preference.mode(window.appearance()), app);
+                        if let Some(entity) = weak_theme.upgrade() {
+                            entity.update(app, |state, cx| {
+                                state.data.theme_preference = preference;
+                                persist_setting("theme", preference.as_setting());
                                 cx.notify();
                             });
                         }
@@ -1944,6 +2014,7 @@ impl Siegu {
             .gap_5()
             .child(folders_section)
             .child(toggles)
+            .child(appearance_section)
             .child(language_section)
             .children((!self.data.models.is_empty()).then(|| {
                 div()
@@ -2851,10 +2922,10 @@ fn load_library() -> LibraryData {
             AlbumEntry { album, thumbnail }
         })
         .collect();
-    let dark_mode = state
+    let theme_preference = state
         .get("theme")
-        .map(|v| !v.eq_ignore_ascii_case("light"))
-        .unwrap_or(true);
+        .map(|value| ThemePreference::from_setting(value))
+        .unwrap_or_default();
     let auto_scan = state
         .get("auto_scan")
         .map(|v| is_truthy(v))
@@ -2878,7 +2949,7 @@ fn load_library() -> LibraryData {
         albums,
         settings,
         models: model_toggles(&state),
-        dark_mode,
+        theme_preference,
         auto_scan,
         sync_enabled,
         language,
@@ -3349,14 +3420,13 @@ fn main() {
             };
             let data = load_library();
             i18n::install(cx, &data.language);
-            Theme::set_mode_now(
-                if data.dark_mode {
-                    Mode::Dark
-                } else {
-                    Mode::Light
-                },
-                cx,
-            );
+            let system_appearance = cx.window_appearance();
+            let theme_appearance = data.theme_preference.appearance(system_appearance);
+            cx.set_window_appearance(match data.theme_preference {
+                ThemePreference::System => None,
+                _ => Some(theme_appearance),
+            });
+            Theme::set_mode_now(data.theme_preference.mode(system_appearance), cx);
 
             let bounds = Bounds::centered(None, size(px(900.0), px(560.0)), cx);
             let options = WindowOptions {
@@ -3370,6 +3440,15 @@ fn main() {
 
             cx.open_window(options, |window, cx| {
                 cx.new(|cx| {
+                    let appearance =
+                        cx.observe_window_appearance(window, |state: &mut Siegu, window, cx| {
+                            if state.data.theme_preference == ThemePreference::System {
+                                Theme::set_mode_now(
+                                    ThemePreference::System.mode(window.appearance()),
+                                    cx,
+                                );
+                            }
+                        });
                     let focus = cx.focus_handle();
                     window.focus(&focus, cx);
                     let search_input = cx.new(|cx| {
@@ -3419,6 +3498,7 @@ fn main() {
                         device_dialog: None,
                         device_error: None,
                         data,
+                        _appearance: appearance,
                     }
                 })
             })
@@ -3474,6 +3554,38 @@ mod tests {
     #[test]
     fn unknown_section_falls_back_to_library() {
         assert_eq!(Section::from_id("nope"), Section::Library);
+    }
+
+    #[test]
+    fn theme_preferences_parse_and_resolve() {
+        assert_eq!(
+            ThemePreference::from_setting("LIGHT"),
+            ThemePreference::Light
+        );
+        assert_eq!(ThemePreference::from_setting("dark"), ThemePreference::Dark);
+        assert_eq!(
+            ThemePreference::from_setting("system"),
+            ThemePreference::System
+        );
+        assert_eq!(
+            ThemePreference::from_setting("unknown"),
+            ThemePreference::System
+        );
+        assert_eq!(ThemePreference::default(), ThemePreference::System);
+        assert_eq!(ThemePreference::System.as_setting(), "system");
+
+        assert_eq!(
+            ThemePreference::System.mode(WindowAppearance::Dark),
+            Mode::Dark
+        );
+        assert_eq!(
+            ThemePreference::Light.mode(WindowAppearance::Dark),
+            Mode::Light
+        );
+        assert_eq!(
+            ThemePreference::Dark.mode(WindowAppearance::Light),
+            Mode::Dark
+        );
     }
 
     #[test]

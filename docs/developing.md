@@ -166,6 +166,8 @@ builds on the shared `siegu-ui` component layer (`SieguAppShell`, `PhotoGrid`,
 `PhotoCard`, sidebar navigation) and reads the local library when one exists,
 falling back to an empty state. The sidebar switches between the Library, Map,
 People, Collections, Devices, Space saver (duplicates), and Settings sections.
+Settings writes `theme` as `system`, `light`, or `dark`; `system` follows OS
+light/dark changes while the app is open.
 
 ### Linux packages
 
