@@ -38,6 +38,8 @@ pub struct MapCluster {
 pub struct MapRoute {
     pub id: String,
     pub name: String,
+    /// Start date (`YYYY-MM-DD`) used by the map's trip timeline.
+    pub date: String,
     pub points: Vec<(f64, f64)>,
 }
 
@@ -225,12 +227,18 @@ pub fn build_trip_routes(points: &[MapPoint]) -> Vec<MapRoute> {
         }
     }
 
-    groups
+    // Keep the newest routes, but return them oldest first so the map's
+    // timeline moves forward in time as the user steps through them.
+    let mut recent: Vec<_> = groups
         .into_iter()
         .enumerate()
         .filter(|(_, group)| group.len() > 1)
-        .rev()
-        .take(MAX_TRIP_ROUTES)
+        .collect();
+    if recent.len() > MAX_TRIP_ROUTES {
+        recent.drain(..recent.len() - MAX_TRIP_ROUTES);
+    }
+    recent
+        .into_iter()
         .filter_map(|(index, group)| {
             let mut seen = HashSet::new();
             let mut coords = Vec::new();
@@ -250,6 +258,9 @@ pub fn build_trip_routes(points: &[MapPoint]) -> Vec<MapRoute> {
                 return None;
             }
             let first_day = group.first().map(|item| item.0).unwrap_or(0);
+            let date = NaiveDate::from_num_days_from_ce_opt(first_day)
+                .map(|date| date.format("%Y-%m-%d").to_string())
+                .unwrap_or_default();
             let start = group
                 .first()
                 .map(|item| item.1.location.trim())
@@ -264,14 +275,15 @@ pub fn build_trip_routes(points: &[MapPoint]) -> Vec<MapRoute> {
                 start.to_string()
             } else if !end.is_empty() {
                 end.to_string()
+            } else if !date.is_empty() {
+                date.clone()
             } else {
-                NaiveDate::from_num_days_from_ce_opt(first_day)
-                    .map(|date| date.format("%Y-%m-%d").to_string())
-                    .unwrap_or_else(|| format!("Trip {}", index + 1))
+                format!("Trip {}", index + 1)
             };
             Some(MapRoute {
                 id: format!("trip-{first_day}-{index}"),
                 name,
+                date,
                 points: coords,
             })
         })
@@ -448,9 +460,11 @@ mod tests {
         ];
         let routes = build_trip_routes(&points);
         assert_eq!(routes.len(), 2);
-        assert_eq!(routes[0].name, "Singapore");
-        assert_eq!(routes[0].points.len(), 2);
-        assert_eq!(routes[1].name, "Amsterdam → New York");
-        assert_eq!(routes[1].points.len(), 3);
+        assert_eq!(routes[0].name, "Amsterdam → New York");
+        assert_eq!(routes[0].date, "2024-01-01");
+        assert_eq!(routes[0].points.len(), 3);
+        assert_eq!(routes[1].name, "Singapore");
+        assert_eq!(routes[1].date, "2024-02-01");
+        assert_eq!(routes[1].points.len(), 2);
     }
 }

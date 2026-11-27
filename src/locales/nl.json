@@ -271,7 +271,11 @@
     "filter_from": "From {date}",
     "filter_until": "Until {date}",
     "offline_notice": "Offline map: your geotagged photos appear over built-in country outlines. Online tiles are off.",
-    "online_notice": "Online tiles are enabled. Tile requests go to your configured provider."
+    "online_notice": "Online tiles are enabled. Tile requests go to your configured provider.",
+    "route_prev": "Vorige reis",
+    "route_next": "Volgende reis",
+    "route_label": "Reis {index} van {total} · {name} · {date}",
+    "route_none": "Nog geen reisroutes"
   },
   "devices": {
     "title": "Apparaten",

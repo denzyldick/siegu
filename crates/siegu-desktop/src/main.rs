@@ -696,6 +696,8 @@ struct Siegu {
     drill_down_generation: u64,
     drill_down: Option<DrillDown>,
     map_popup: Option<MapPopupState>,
+    /// The single trip route drawn on the map. `None` means there are no routes.
+    map_route_index: Option<usize>,
     selected_photo: Option<usize>,
     viewer_override: Option<PhotoEntry>,
     /// Cached metadata for the open viewer, keyed by photo id. Opening a viewer
@@ -1056,6 +1058,22 @@ impl Siegu {
         cx.notify();
     }
 
+    /// Keeps a valid route selected as background loads replace map data.
+    fn sync_map_route_selection(&mut self) {
+        self.map_route_index = match self.map_route_index {
+            Some(index) if index < self.data.map_routes.len() => Some(index),
+            _ => self.data.map_routes.len().checked_sub(1),
+        };
+    }
+
+    /// Steps through trips in chronological order, wrapping at either end.
+    fn cycle_map_route(&mut self, delta: isize, cx: &mut Context<Self>) {
+        self.map_route_index =
+            cycle_map_route_index(self.map_route_index, self.data.map_routes.len(), delta);
+        self.map_popup = None;
+        cx.notify();
+    }
+
     /// Opens a map marker's photos in the same local drill-down grid used by
     /// People and Collections. Only SQLite is involved; no map tile request.
     fn open_map_cluster(&mut self, key: &str, cx: &mut Context<Self>) {
@@ -1377,6 +1395,7 @@ impl Siegu {
     fn refresh_data(&mut self) {
         self.data = load_library();
         self.map_popup = None;
+        self.sync_map_route_selection();
         self.library_window = PhotoWindow {
             filter_key: self.filter_signature(),
             ..Default::default()
@@ -2529,12 +2548,19 @@ impl Siegu {
                 ))
             })
             .collect::<Vec<_>>();
+        // Only one trip is drawn at a time; showing every route at once turns
+        // the map into spaghetti. The timeline below steps through them in date
+        // order, and the default selection is the newest trip.
+        let route_count = self.data.map_routes.len();
+        let route_index = self
+            .map_route_index
+            .unwrap_or(route_count.saturating_sub(1));
         let routes = self
             .data
             .map_routes
-            .iter()
-            .enumerate()
-            .filter_map(|(index, route)| {
+            .get(route_index)
+            .into_iter()
+            .filter_map(|route| {
                 let places = route
                     .points
                     .iter()
@@ -2544,7 +2570,7 @@ impl Siegu {
                         })
                     })
                     .collect::<Vec<_>>();
-                (places.len() >= 2).then(|| RouteLine::new(places).hue(index % 8))
+                (places.len() >= 2).then(|| RouteLine::new(places).hue(route_index % 8))
             })
             .collect::<Vec<_>>();
 
@@ -2654,28 +2680,66 @@ impl Siegu {
             );
             div().flex_1().min_h_0().child(world).into_any_element()
         };
+        let mut header = div()
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .gap_4()
+            .child(Paragraph::new(i18n::text(
+                cx,
+                "search.photos_count",
+                &[("count", &self.data.map_point_count.to_string())],
+            )))
+            .child(Paragraph::new(format!(
+                "{} locations",
+                self.data.map_clusters.len()
+            )));
+        if route_count == 0 {
+            header = header.child(Paragraph::new(i18n::text(cx, "map.route_none", &[])));
+        } else {
+            let route = &self.data.map_routes[route_index];
+            let index_text = (route_index + 1).to_string();
+            let total_text = route_count.to_string();
+            let label = i18n::text(
+                cx,
+                "map.route_label",
+                &[
+                    ("index", &index_text),
+                    ("total", &total_text),
+                    ("name", &route.name),
+                    ("date", &route.date),
+                ],
+            );
+            let weak_prev = weak.clone();
+            let weak_next = weak.clone();
+            header = header
+                .child(
+                    Button::new("map-route-prev", i18n::text(cx, "map.route_prev", &[]))
+                        .icon(IconName::ChevronLeft)
+                        .on_click(move |_, _, app| {
+                            if let Some(entity) = weak_prev.upgrade() {
+                                entity.update(app, |state, cx| state.cycle_map_route(-1, cx));
+                            }
+                        }),
+                )
+                .child(Paragraph::new(label))
+                .child(
+                    Button::new("map-route-next", i18n::text(cx, "map.route_next", &[]))
+                        .icon(IconName::ChevronRight)
+                        .on_click(move |_, _, app| {
+                            if let Some(entity) = weak_next.upgrade() {
+                                entity.update(app, |state, cx| state.cycle_map_route(1, cx));
+                            }
+                        }),
+                );
+        }
         div()
             .flex()
             .flex_col()
             .flex_1()
             .min_h_0()
             .gap_3()
-            .child(
-                div()
-                    .flex()
-                    .flex_wrap()
-                    .items_center()
-                    .gap_4()
-                    .child(Paragraph::new(i18n::text(
-                        cx,
-                        "search.photos_count",
-                        &[("count", &self.data.map_point_count.to_string())],
-                    )))
-                    .child(Paragraph::new(format!(
-                        "{} locations",
-                        self.data.map_clusters.len()
-                    ))),
-            )
+            .child(header)
             .child(Banner::new(
                 "map-offline-notice",
                 Severity::Info,
@@ -5136,6 +5200,15 @@ fn is_truthy(value: &str) -> bool {
     matches!(value.trim(), "1" | "true" | "True" | "TRUE")
 }
 
+/// Wraps the map's selected trip route so next/previous stay within bounds.
+fn cycle_map_route_index(current: Option<usize>, len: usize, delta: isize) -> Option<usize> {
+    if len == 0 {
+        return None;
+    }
+    let current = current.unwrap_or(len - 1) as isize;
+    Some((current + delta).rem_euclid(len as isize) as usize)
+}
+
 /// A blank stored URL means the keyless OpenStreetMap provider, so the Settings
 /// field always shows a usable value instead of making users retype it.
 fn map_tile_url_from_state(state: &HashMap<String, String>) -> String {
@@ -5970,6 +6043,7 @@ fn main() {
                         drill_down_generation: 0,
                         drill_down: None,
                         map_popup: None,
+                        map_route_index: None,
                         selected_photo: None,
                         viewer_override: opened_media_request(&initial_request)
                             .and_then(|path| photo_entry_from_path(&path)),
@@ -6019,6 +6093,7 @@ fn main() {
                                 };
                                 let _ = handle.update(cx, |state, _, cx| {
                                     merge_library_load(&mut state.data, load);
+                                    state.sync_map_route_selection();
                                     state.data_loading = false;
                                     cx.notify();
                                 });
@@ -6380,6 +6455,15 @@ mod tests {
             MapTileProvider::from_setting("carto_voyager"),
             MapTileProvider::Custom
         );
+    }
+
+    #[test]
+    fn map_route_timeline_wraps_in_both_directions() {
+        assert_eq!(cycle_map_route_index(None, 0, 1), None);
+        assert_eq!(cycle_map_route_index(None, 3, 1), Some(0));
+        assert_eq!(cycle_map_route_index(Some(0), 3, -1), Some(2));
+        assert_eq!(cycle_map_route_index(Some(2), 3, 1), Some(0));
+        assert_eq!(cycle_map_route_index(Some(1), 3, 1), Some(2));
     }
 
     #[test]
