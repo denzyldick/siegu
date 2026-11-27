@@ -234,7 +234,9 @@
     "route_prev": "Previous trip",
     "route_next": "Next trip",
     "route_label": "Trip {index} of {total} · {name} · {date}",
-    "route_none": "No trip routes yet"
+    "route_none": "No trip routes yet",
+    "marker_hint": "Select a marker to open its photos",
+    "reset_view": "Reset view"
   },
   "devices": {
     "title": "Devices",

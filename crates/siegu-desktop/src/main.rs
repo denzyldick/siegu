@@ -39,10 +39,7 @@ use siegu_ui::{
         feedback::Banner,
         forms::{Choice, InputEvent, MultiSelect, SearchInput, Select, Switch, TextInput},
         layout::{columns_for, ScrollArea},
-        maps::{
-            GeoHeatmap, LatLon, MapMarker, MapPopup, MapView, MapViewport, RouteLine, Tile,
-            WorldMap,
-        },
+        maps::{GeoHeatmap, LatLon, MapMarker, MapView, MapViewport, RouteLine, Tile, WorldMap},
         motion::{ProgressBar, Skeleton},
         overlays::{ConfirmDialog, Dialog, PromptDialog},
         primitives::{FocusScope, Icon, IconName, Image as ElyImage, Severity},
@@ -658,16 +655,6 @@ enum AlbumDialog {
     },
 }
 
-/// A cluster preview shown on the map before opening the full drill-down.
-struct MapPopupState {
-    cluster_key: String,
-    latitude: f64,
-    longitude: f64,
-    title: String,
-    count: usize,
-    thumbnail: Option<ImageSource>,
-}
-
 /// The desktop shell. Reads the local library and renders one section at a time.
 struct Siegu {
     focus: FocusHandle,
@@ -695,7 +682,8 @@ struct Siegu {
     /// Guards against a slow query overwriting a newer drill-down.
     drill_down_generation: u64,
     drill_down: Option<DrillDown>,
-    map_popup: Option<MapPopupState>,
+    /// Bumped by "Reset view" so the map re-frames all photos.
+    map_frame_nonce: u64,
     /// The single trip route drawn on the map. `None` means there are no routes.
     map_route_index: Option<usize>,
     selected_photo: Option<usize>,
@@ -1020,44 +1008,6 @@ impl Siegu {
         modal
     }
 
-    /// Shows a small preview card for a marker. Only the cluster's first photo
-    /// is fetched, so a 100k-photo library does not load thumbnails per marker.
-    fn show_map_cluster(&mut self, key: &str, cx: &mut Context<Self>) {
-        let Some(cluster) = self
-            .data
-            .map_clusters
-            .iter()
-            .find(|cluster| cluster.key == key)
-            .cloned()
-        else {
-            return;
-        };
-        let thumbnail = default_config_dir()
-            .join("siegu.db")
-            .exists()
-            .then(|| Database::new(&default_config_dir().display().to_string()))
-            .and_then(|db| {
-                db.get_photos_by_ids(&cluster.photo_ids[..1])
-                    .into_iter()
-                    .next()
-            })
-            .and_then(|photo| resolve_thumbnail(&photo));
-        let title = if cluster.label.is_empty() {
-            i18n::text(cx, "dock.map", &[]).to_string()
-        } else {
-            cluster.label
-        };
-        self.map_popup = Some(MapPopupState {
-            cluster_key: key.to_string(),
-            latitude: cluster.latitude,
-            longitude: cluster.longitude,
-            title,
-            count: cluster.count,
-            thumbnail,
-        });
-        cx.notify();
-    }
-
     /// Keeps a valid route selected as background loads replace map data.
     fn sync_map_route_selection(&mut self) {
         self.map_route_index = match self.map_route_index {
@@ -1070,7 +1020,12 @@ impl Siegu {
     fn cycle_map_route(&mut self, delta: isize, cx: &mut Context<Self>) {
         self.map_route_index =
             cycle_map_route_index(self.map_route_index, self.data.map_routes.len(), delta);
-        self.map_popup = None;
+        cx.notify();
+    }
+
+    /// Re-centres the map on the library's geotagged photos.
+    fn reset_map_view(&mut self, cx: &mut Context<Self>) {
+        self.map_frame_nonce = self.map_frame_nonce.wrapping_add(1);
         cx.notify();
     }
 
@@ -1394,7 +1349,6 @@ impl Siegu {
 
     fn refresh_data(&mut self) {
         self.data = load_library();
-        self.map_popup = None;
         self.sync_map_route_selection();
         self.library_window = PhotoWindow {
             filter_key: self.filter_signature(),
@@ -2519,12 +2473,17 @@ impl Siegu {
                 cluster.latitude.clamp(-85.0, 85.0),
                 cluster.longitude.clamp(-180.0, 180.0),
             );
-            let marker = MapMarker::new(cluster.key.clone(), at).hue(cluster_hue(cluster.count));
-            if cluster.count > 1 {
-                marker.label(cluster.count.to_string())
+            // We already group nearby photos in core. Keeping Ely's own
+            // clustering off means a press opens the photos directly instead of
+            // only zooming into a bubble that never fires `on_marker`.
+            let label = if cluster.label.is_empty() {
+                cluster.count.to_string()
             } else {
-                marker
-            }
+                format!("{} · {}", cluster.label, cluster.count)
+            };
+            MapMarker::new(cluster.key.clone(), at)
+                .hue(cluster_hue(cluster.count))
+                .label(label)
         });
         let heat = self
             .data
@@ -2575,72 +2534,24 @@ impl Siegu {
             .collect::<Vec<_>>();
 
         let weak = cx.entity().downgrade();
-        let mut map = MapView::new(("map-view", self.data.map_point_count), viewport)
-            .cluster_markers()
-            .markers(markers)
-            .on_marker({
-                let weak = weak.clone();
-                move |key, _, app| {
-                    if let Some(entity) = weak.upgrade() {
-                        let key = key.to_string();
-                        entity.update(app, |state, cx| state.show_map_cluster(&key, cx));
-                    }
+        let map_id = format!(
+            "map-view:{}:{}",
+            self.data.map_point_count, self.map_frame_nonce
+        );
+        let mut map = MapView::new(map_id, viewport).markers(markers).on_marker({
+            let weak = weak.clone();
+            move |key, _, app| {
+                if let Some(entity) = weak.upgrade() {
+                    let key = key.to_string();
+                    entity.update(app, |state, cx| state.open_map_cluster(&key, cx));
                 }
-            });
+            }
+        });
         if !heat.is_empty() {
             map = map.layer(GeoHeatmap::new(heat).hue(6));
         }
         for route in routes {
             map = map.layer(route);
-        }
-        if let Some(item) = &self.map_popup {
-            let at = LatLon::new(
-                item.latitude.clamp(-85.0, 85.0),
-                item.longitude.clamp(-180.0, 180.0),
-            );
-            let mut card = div().flex().flex_col().gap_2();
-            if let Some(thumbnail) = &item.thumbnail {
-                card = card.child(
-                    ElyImage::new(
-                        format!("map-popup-thumb:{}", item.cluster_key),
-                        thumbnail.clone(),
-                    )
-                    .w_full()
-                    .h(px(84.0))
-                    .rounded(px(8.0)),
-                );
-            }
-            card = card.child(Paragraph::new(format!("{} · {}", item.title, item.count)));
-            let open_key = item.cluster_key.clone();
-            let weak_open = weak.clone();
-            let open = Button::new(
-                format!("map-popup-open:{}", item.cluster_key),
-                "Open photos",
-            )
-            .icon(IconName::FolderOpen)
-            .on_click(move |_, _, app| {
-                if let Some(entity) = weak_open.upgrade() {
-                    let key = open_key.clone();
-                    entity.update(app, |state, cx| {
-                        state.map_popup = None;
-                        state.open_map_cluster(&key, cx);
-                    });
-                }
-            });
-            let weak_close = weak.clone();
-            map = map.popup(
-                MapPopup::new(at, item.title.clone())
-                    .child(card)
-                    .child(open)
-                    .on_close(move |_, app| {
-                        if let Some(entity) = weak_close.upgrade() {
-                            entity.update(app, |state, cx| {
-                                state.map_popup = None;
-                                cx.notify();
-                            });
-                        }
-                    }),
-            );
         }
 
         let template = self
@@ -2673,14 +2584,16 @@ impl Siegu {
         let map_body = if online_tiles {
             div().flex_1().min_h_0().child(map).into_any_element()
         } else {
-            let world = WorldMap::new(
-                ("map-world", self.data.map_point_count),
-                map,
-                std::iter::empty::<(&str, f64)>(),
+            let world_id = format!(
+                "map-world:{}:{}",
+                self.data.map_point_count, self.map_frame_nonce
             );
+            let world = WorldMap::new(world_id, map, std::iter::empty::<(&str, f64)>());
             div().flex_1().min_h_0().child(world).into_any_element()
         };
-        let mut header = div()
+        let theme = cx.theme();
+        let weak_reset = weak.clone();
+        let summary = div()
             .flex()
             .flex_wrap()
             .items_center()
@@ -2693,9 +2606,27 @@ impl Siegu {
             .child(Paragraph::new(format!(
                 "{} locations",
                 self.data.map_clusters.len()
-            )));
-        if route_count == 0 {
-            header = header.child(Paragraph::new(i18n::text(cx, "map.route_none", &[])));
+            )))
+            .child(
+                Paragraph::new(i18n::text(cx, "map.marker_hint", &[]))
+                    .text_size(theme.text_size(TextSize::Sm))
+                    .text_color(theme.colors.fg_muted),
+            )
+            .child(
+                Button::new("map-reset", i18n::text(cx, "map.reset_view", &[]))
+                    .icon(IconName::Crosshair)
+                    .on_click(move |_, _, app| {
+                        if let Some(entity) = weak_reset.upgrade() {
+                            entity.update(app, |state, cx| state.reset_map_view(cx));
+                        }
+                    }),
+            );
+        let timeline = if route_count == 0 {
+            div().child(
+                Paragraph::new(i18n::text(cx, "map.route_none", &[]))
+                    .text_size(theme.text_size(TextSize::Sm))
+                    .text_color(theme.colors.fg_muted),
+            )
         } else {
             let route = &self.data.map_routes[route_index];
             let index_text = (route_index + 1).to_string();
@@ -2712,7 +2643,11 @@ impl Siegu {
             );
             let weak_prev = weak.clone();
             let weak_next = weak.clone();
-            header = header
+            div()
+                .flex()
+                .flex_wrap()
+                .items_center()
+                .gap_2()
                 .child(
                     Button::new("map-route-prev", i18n::text(cx, "map.route_prev", &[]))
                         .icon(IconName::ChevronLeft)
@@ -2731,15 +2666,16 @@ impl Siegu {
                                 entity.update(app, |state, cx| state.cycle_map_route(1, cx));
                             }
                         }),
-                );
-        }
+                )
+        };
         div()
             .flex()
             .flex_col()
             .flex_1()
             .min_h_0()
             .gap_3()
-            .child(header)
+            .child(summary)
+            .child(timeline)
             .child(Banner::new(
                 "map-offline-notice",
                 Severity::Info,
@@ -6042,7 +5978,7 @@ fn main() {
                         data_loading: default_config_dir().join("siegu.db").exists(),
                         drill_down_generation: 0,
                         drill_down: None,
-                        map_popup: None,
+                        map_frame_nonce: 0,
                         map_route_index: None,
                         selected_photo: None,
                         viewer_override: opened_media_request(&initial_request)

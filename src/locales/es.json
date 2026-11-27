@@ -275,7 +275,9 @@
     "route_prev": "Viaje anterior",
     "route_next": "Viaje siguiente",
     "route_label": "Viaje {index} de {total} · {name} · {date}",
-    "route_none": "Aún no hay rutas de viaje"
+    "route_none": "Aún no hay rutas de viaje",
+    "marker_hint": "Selecciona un marcador para ver sus fotos",
+    "reset_view": "Restablecer vista"
   },
   "devices": {
     "title": "Dispositivos",

@@ -275,7 +275,9 @@
     "route_prev": "Vorige reis",
     "route_next": "Volgende reis",
     "route_label": "Reis {index} van {total} · {name} · {date}",
-    "route_none": "Nog geen reisroutes"
+    "route_none": "Nog geen reisroutes",
+    "marker_hint": "Selecteer een marker om de foto's te openen",
+    "reset_view": "Weergave herstellen"
   },
   "devices": {
     "title": "Apparaten",

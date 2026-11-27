@@ -275,7 +275,9 @@
     "route_prev": "Viaggio precedente",
     "route_next": "Viaggio successivo",
     "route_label": "Viaggio {index} di {total} · {name} · {date}",
-    "route_none": "Nessun itinerario di viaggio"
+    "route_none": "Nessun itinerario di viaggio",
+    "marker_hint": "Seleziona un indicatore per aprire le sue foto",
+    "reset_view": "Reimposta vista"
   },
   "devices": {
     "title": "Dispositivi",
