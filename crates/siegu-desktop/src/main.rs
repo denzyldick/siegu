@@ -1650,11 +1650,19 @@ impl Siegu {
         } else {
             "map.offline_notice"
         };
-        let world = WorldMap::new(
-            ("map-world", self.data.map_point_count),
-            map,
-            std::iter::empty::<(&str, f64)>(),
-        );
+        // WorldMap paints every country with a "no data" wash. That is the
+        // offline basemap, but it would hide real tiles, so online maps render
+        // the tile view directly.
+        let map_body = if online_tiles {
+            div().flex_1().min_h_0().child(map).into_any_element()
+        } else {
+            let world = WorldMap::new(
+                ("map-world", self.data.map_point_count),
+                map,
+                std::iter::empty::<(&str, f64)>(),
+            );
+            div().flex_1().min_h_0().child(world).into_any_element()
+        };
         div()
             .flex()
             .flex_col()
@@ -1682,7 +1690,7 @@ impl Siegu {
                 Severity::Info,
                 i18n::text(cx, notice_key, &[]),
             ))
-            .child(div().flex_1().min_h_0().child(world))
+            .child(map_body)
             .into_any_element()
     }
 
