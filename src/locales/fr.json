@@ -279,7 +279,9 @@
     "marker_hint": "Sélectionnez un repère pour ouvrir ses photos",
     "reset_view": "Réinitialiser la vue",
     "routes_hide": "Masquer les itinéraires",
-    "routes_show": "Afficher les itinéraires"
+    "routes_show": "Afficher les itinéraires",
+    "zoom_to_trip": "Zoomer sur le voyage",
+    "route_label_unnamed": "Voyage {index} sur {total} · {date}"
   },
   "devices": {
     "title": "Appareils",

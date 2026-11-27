@@ -279,7 +279,9 @@
     "marker_hint": "Seleziona un indicatore per aprire le sue foto",
     "reset_view": "Reimposta vista",
     "routes_hide": "Nascondi percorsi",
-    "routes_show": "Mostra percorsi"
+    "routes_show": "Mostra percorsi",
+    "zoom_to_trip": "Ingrandisci viaggio",
+    "route_label_unnamed": "Viaggio {index} di {total} · {date}"
   },
   "devices": {
     "title": "Dispositivi",

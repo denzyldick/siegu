@@ -121,47 +121,54 @@ pub fn cluster_map_points(points: &[MapPoint], decimals: u32) -> Vec<MapCluster>
 /// in that a globally scattered library opened on empty ocean.
 const MAP_FRAME_VIEWPORT_PX: f64 = 900.0;
 
-/// Computes a stable initial view from all geotagged photos. The median keeps
-/// the view near the bulk of the library even when a few trips are far away;
-/// zoom still fits the full spread so outliers stay reachable.
-pub fn frame_map_points(points: &[MapPoint]) -> MapFraming {
+/// Computes a view that fits a set of coordinates. The median keeps the centre
+/// near the bulk of the points, while the zoom fits the whole span.
+pub fn frame_coordinates(points: &[(f64, f64)]) -> Option<MapFraming> {
     let mut latitudes = Vec::new();
     let mut longitudes = Vec::new();
-
-    for point in points {
-        if point.latitude.is_finite() && point.longitude.is_finite() {
-            latitudes.push(point.latitude);
-            longitudes.push(point.longitude);
+    for &(latitude, longitude) in points {
+        if latitude.is_finite() && longitude.is_finite() {
+            latitudes.push(latitude);
+            longitudes.push(longitude);
         }
     }
-
     if latitudes.is_empty() {
-        return MapFraming::default();
+        return None;
     }
     if latitudes.len() == 1 {
-        return MapFraming {
+        return Some(MapFraming {
             latitude: latitudes[0],
             longitude: longitudes[0],
             zoom: 4.0,
-        };
+        });
     }
 
     let latitude_min = latitudes.iter().copied().fold(f64::MAX, f64::min);
     let latitude_max = latitudes.iter().copied().fold(f64::MIN, f64::max);
     let longitude_min = longitudes.iter().copied().fold(f64::MAX, f64::min);
     let longitude_max = longitudes.iter().copied().fold(f64::MIN, f64::max);
-
     let span = (longitude_max - longitude_min)
         .max((latitude_max - latitude_min) * 2.0)
         .max(0.02);
     let zoom = (MAP_FRAME_VIEWPORT_PX * 0.75 * 360.0 / (256.0 * span))
         .log2()
         .clamp(2.0, 10.0);
-    MapFraming {
+    Some(MapFraming {
         latitude: median(&mut latitudes),
         longitude: median(&mut longitudes),
         zoom,
-    }
+    })
+}
+
+/// Computes a stable initial view from all geotagged photos. The median keeps
+/// the view near the bulk of the library even when a few trips are far away;
+/// zoom still fits the full spread so outliers stay reachable.
+pub fn frame_map_points(points: &[MapPoint]) -> MapFraming {
+    let coords = points
+        .iter()
+        .map(|point| (point.latitude, point.longitude))
+        .collect::<Vec<_>>();
+    frame_coordinates(&coords).unwrap_or_default()
 }
 
 /// Aggregates photos into weighted half-degree cells, keeping only the busiest
@@ -289,16 +296,16 @@ pub fn build_trip_routes(points: &[MapPoint]) -> Vec<MapRoute> {
                 .last()
                 .map(|item| item.1.location.trim())
                 .unwrap_or("");
+            // Leave unnamed routes blank: the timeline already shows the date,
+            // and repeating it here reads like a broken label.
             let name = if !start.is_empty() && !end.is_empty() && start != end {
                 format!("{start} → {end}")
             } else if !start.is_empty() {
                 start.to_string()
             } else if !end.is_empty() {
                 end.to_string()
-            } else if !date.is_empty() {
-                date.clone()
             } else {
-                format!("Trip {}", index + 1)
+                String::new()
             };
             Some(MapRoute {
                 id: format!("trip-{first_day}-{index}"),
@@ -332,8 +339,8 @@ fn round_coordinate(value: f64, factor: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_heat_points, build_trip_routes, cluster_hue, cluster_map_points, frame_map_points,
-        MAX_CLUSTER_PHOTOS, MAX_HEAT_POINTS, TRIP_MAX_DAYS,
+        build_heat_points, build_trip_routes, cluster_hue, cluster_map_points, frame_coordinates,
+        frame_map_points, MAX_CLUSTER_PHOTOS, MAX_HEAT_POINTS, TRIP_MAX_DAYS,
     };
     use crate::database::MapPoint;
 
@@ -425,6 +432,14 @@ mod tests {
     }
 
     #[test]
+    fn frames_route_coordinates_tightly() {
+        assert!(frame_coordinates(&[]).is_none());
+        let framing = frame_coordinates(&[(52.0, 5.0), (52.01, 5.02)]).expect("route framing");
+        assert!(framing.latitude > 52.0 && framing.latitude < 52.01);
+        assert_eq!(framing.zoom, 10.0);
+    }
+
+    #[test]
     fn cluster_hue_scales_with_density() {
         assert_eq!(cluster_hue(0), 0);
         assert_eq!(cluster_hue(1), 0);
@@ -497,7 +512,7 @@ mod tests {
         let points = (0..TRIP_MAX_DAYS + 5)
             .map(|day| {
                 let date = base + Duration::days(day as i64);
-                let mut item = point(&format!("p{day}"), 52.0 + day as f64 * 0.01, 5.0, "Home");
+                let mut item = point(&format!("p{day}"), 52.0 + day as f64 * 0.01, 5.0, "");
                 item.created = Some(format!("{} 12:00:00", date.format("%Y-%m-%d")));
                 item
             })
@@ -505,6 +520,7 @@ mod tests {
 
         let routes = build_trip_routes(&points);
         assert_eq!(routes.len(), 2);
+        assert!(routes[0].name.is_empty());
         assert_eq!(routes[0].date, "2024-01-01");
         assert_eq!(routes[1].date, "2024-01-16");
     }

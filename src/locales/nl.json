@@ -279,7 +279,9 @@
     "marker_hint": "Selecteer een marker om de foto's te openen",
     "reset_view": "Weergave herstellen",
     "routes_hide": "Routes verbergen",
-    "routes_show": "Routes tonen"
+    "routes_show": "Routes tonen",
+    "zoom_to_trip": "Inzoomen op reis",
+    "route_label_unnamed": "Reis {index} van {total} · {date}"
   },
   "devices": {
     "title": "Apparaten",

@@ -279,7 +279,9 @@
     "marker_hint": "Selecciona un marker pa habri su foto",
     "reset_view": "Restaurá vista",
     "routes_hide": "Sconde ruta",
-    "routes_show": "Mostra ruta"
+    "routes_show": "Mostra ruta",
+    "zoom_to_trip": "Aproxima viaje",
+    "route_label_unnamed": "Viaje {index} di {total} · {date}"
   },
   "devices": {
     "title": "Aparatonan",

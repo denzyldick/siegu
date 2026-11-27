@@ -22,8 +22,8 @@ use siegu_core::devices::{
 use siegu_core::duplicates::{self, DuplicateGroupView, DuplicateStats};
 use siegu_core::library::do_get_search_facets;
 use siegu_core::map::{
-    build_heat_points, build_trip_routes, cluster_hue, cluster_map_points, frame_map_points,
-    MapCluster, MapFraming, MapHeatPoint, MapRoute,
+    build_heat_points, build_trip_routes, cluster_hue, cluster_map_points, frame_coordinates,
+    frame_map_points, MapCluster, MapFraming, MapHeatPoint, MapRoute,
 };
 use siegu_core::{
     config::default_config_dir,
@@ -656,6 +656,14 @@ enum AlbumDialog {
     },
 }
 
+/// What the map is currently framed on. A single trip is much easier to read
+/// when the map zooms to it; the whole library stays one click away.
+#[derive(Clone, Copy, PartialEq)]
+enum MapFrameMode {
+    AllPhotos,
+    Trip,
+}
+
 /// The desktop shell. Reads the local library and renders one section at a time.
 struct Siegu {
     focus: FocusHandle,
@@ -683,8 +691,10 @@ struct Siegu {
     /// Guards against a slow query overwriting a newer drill-down.
     drill_down_generation: u64,
     drill_down: Option<DrillDown>,
-    /// Bumped by "Reset view" so the map re-frames all photos.
+    /// Bumped when the framing target changes so the map view rebuilds.
     map_frame_nonce: u64,
+    /// Whether the map is framed on all photos or the selected trip.
+    map_frame_mode: MapFrameMode,
     /// The single trip route drawn on the map. `None` means there are no routes.
     map_route_index: Option<usize>,
     selected_photo: Option<usize>,
@@ -1021,11 +1031,22 @@ impl Siegu {
     fn cycle_map_route(&mut self, delta: isize, cx: &mut Context<Self>) {
         self.map_route_index =
             cycle_map_route_index(self.map_route_index, self.data.map_routes.len(), delta);
+        if self.map_frame_mode == MapFrameMode::Trip {
+            self.map_frame_nonce = self.map_frame_nonce.wrapping_add(1);
+        }
         cx.notify();
     }
 
-    /// Re-centres the map on the library's geotagged photos.
+    /// Frames the whole geotagged library again.
     fn reset_map_view(&mut self, cx: &mut Context<Self>) {
+        self.map_frame_mode = MapFrameMode::AllPhotos;
+        self.map_frame_nonce = self.map_frame_nonce.wrapping_add(1);
+        cx.notify();
+    }
+
+    /// Zooms in on the trip currently selected in the timeline.
+    fn zoom_map_to_route(&mut self, cx: &mut Context<Self>) {
+        self.map_frame_mode = MapFrameMode::Trip;
         self.map_frame_nonce = self.map_frame_nonce.wrapping_add(1);
         cx.notify();
     }
@@ -1034,6 +1055,10 @@ impl Siegu {
     /// choice local so the map can be enjoyed as a plain place browser.
     fn toggle_map_routes(&mut self, cx: &mut Context<Self>) {
         self.data.map_routes_visible = !self.data.map_routes_visible;
+        if !self.data.map_routes_visible {
+            self.map_frame_mode = MapFrameMode::AllPhotos;
+            self.map_frame_nonce = self.map_frame_nonce.wrapping_add(1);
+        }
         persist_setting(
             "map_routes_visible",
             if self.data.map_routes_visible {
@@ -2476,7 +2501,21 @@ impl Siegu {
             );
         }
 
-        let framing = self.data.map_framing;
+        let route_count = self.data.map_routes.len();
+        let route_index = self
+            .map_route_index
+            .unwrap_or(route_count.saturating_sub(1));
+        // A single trip is tiny on a world map. Default to zooming in on it and
+        // keep the whole-library view one button away.
+        let framing = if self.map_frame_mode == MapFrameMode::Trip && self.data.map_routes_visible {
+            self.data
+                .map_routes
+                .get(route_index)
+                .and_then(|route| frame_coordinates(&route.points))
+                .unwrap_or(self.data.map_framing)
+        } else {
+            self.data.map_framing
+        };
         let viewport = MapViewport::new(
             LatLon::new(
                 framing.latitude.clamp(-85.0, 85.0),
@@ -2526,10 +2565,6 @@ impl Siegu {
         // Only one short trip is drawn at a time, and routes can be turned off
         // entirely. `build_trip_routes` already refuses implausible jumps, so
         // the line stays local instead of crossing the world.
-        let route_count = self.data.map_routes.len();
-        let route_index = self
-            .map_route_index
-            .unwrap_or(route_count.saturating_sub(1));
         let routes = if self.data.map_routes_visible {
             self.data
                 .map_routes
@@ -2616,12 +2651,13 @@ impl Siegu {
         let theme = cx.theme();
         let weak_reset = weak.clone();
         let weak_routes = weak.clone();
+        let weak_zoom = weak.clone();
         let route_toggle_label = if self.data.map_routes_visible {
             i18n::text(cx, "map.routes_hide", &[])
         } else {
             i18n::text(cx, "map.routes_show", &[])
         };
-        let summary = div()
+        let mut summary = div()
             .flex()
             .flex_wrap()
             .items_center()
@@ -2651,13 +2687,24 @@ impl Siegu {
             )
             .child(
                 Button::new("map-routes-toggle", route_toggle_label)
-                    .icon(IconName::Map)
+                    .icon(IconName::GitBranch)
                     .on_click(move |_, _, app| {
                         if let Some(entity) = weak_routes.upgrade() {
                             entity.update(app, |state, cx| state.toggle_map_routes(cx));
                         }
                     }),
             );
+        if self.data.map_routes_visible && route_count > 0 {
+            summary = summary.child(
+                Button::new("map-zoom-trip", i18n::text(cx, "map.zoom_to_trip", &[]))
+                    .icon(IconName::Map)
+                    .on_click(move |_, _, app| {
+                        if let Some(entity) = weak_zoom.upgrade() {
+                            entity.update(app, |state, cx| state.zoom_map_to_route(cx));
+                        }
+                    }),
+            );
+        }
         let timeline = if !self.data.map_routes_visible {
             div()
         } else if route_count == 0 {
@@ -2670,16 +2717,28 @@ impl Siegu {
             let route = &self.data.map_routes[route_index];
             let index_text = (route_index + 1).to_string();
             let total_text = route_count.to_string();
-            let label = i18n::text(
-                cx,
-                "map.route_label",
-                &[
-                    ("index", &index_text),
-                    ("total", &total_text),
-                    ("name", &route.name),
-                    ("date", &route.date),
-                ],
-            );
+            let label = if route.name.trim().is_empty() {
+                i18n::text(
+                    cx,
+                    "map.route_label_unnamed",
+                    &[
+                        ("index", &index_text),
+                        ("total", &total_text),
+                        ("date", &route.date),
+                    ],
+                )
+            } else {
+                i18n::text(
+                    cx,
+                    "map.route_label",
+                    &[
+                        ("index", &index_text),
+                        ("total", &total_text),
+                        ("name", &route.name),
+                        ("date", &route.date),
+                    ],
+                )
+            };
             let weak_prev = weak.clone();
             let weak_next = weak.clone();
             div()
@@ -6023,6 +6082,7 @@ fn main() {
                         drill_down_generation: 0,
                         drill_down: None,
                         map_frame_nonce: 0,
+                        map_frame_mode: MapFrameMode::Trip,
                         map_route_index: None,
                         selected_photo: None,
                         viewer_override: opened_media_request(&initial_request)

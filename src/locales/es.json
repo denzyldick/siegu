@@ -279,7 +279,9 @@
     "marker_hint": "Selecciona un marcador para ver sus fotos",
     "reset_view": "Restablecer vista",
     "routes_hide": "Ocultar rutas",
-    "routes_show": "Mostrar rutas"
+    "routes_show": "Mostrar rutas",
+    "zoom_to_trip": "Acercar al viaje",
+    "route_label_unnamed": "Viaje {index} de {total} · {date}"
   },
   "devices": {
     "title": "Dispositivos",

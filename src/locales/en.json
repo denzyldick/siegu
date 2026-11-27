@@ -238,7 +238,9 @@
     "marker_hint": "Select a marker to open its photos",
     "reset_view": "Reset view",
     "routes_hide": "Hide routes",
-    "routes_show": "Show routes"
+    "routes_show": "Show routes",
+    "zoom_to_trip": "Zoom to trip",
+    "route_label_unnamed": "Trip {index} of {total} · {date}"
   },
   "devices": {
     "title": "Devices",
