@@ -281,7 +281,9 @@
     "routes_hide": "Routes verbergen",
     "routes_show": "Routes tonen",
     "zoom_to_trip": "Inzoomen op reis",
-    "route_label_unnamed": "Reis {index} van {total} · {date}"
+    "route_label_unnamed": "Reis {index} van {total} · {date}",
+    "locations_count": "{count} locaties",
+    "show_all_photos": "Alle foto's tonen"
   },
   "devices": {
     "title": "Apparaten",

@@ -1031,9 +1031,10 @@ impl Siegu {
     fn cycle_map_route(&mut self, delta: isize, cx: &mut Context<Self>) {
         self.map_route_index =
             cycle_map_route_index(self.map_route_index, self.data.map_routes.len(), delta);
-        if self.map_frame_mode == MapFrameMode::Trip {
-            self.map_frame_nonce = self.map_frame_nonce.wrapping_add(1);
-        }
+        // Stepping through trips is an intent to inspect one, so follow it
+        // with the camera instead of leaving a tiny line on a world map.
+        self.map_frame_mode = MapFrameMode::Trip;
+        self.map_frame_nonce = self.map_frame_nonce.wrapping_add(1);
         cx.notify();
     }
 
@@ -1055,10 +1056,12 @@ impl Siegu {
     /// choice local so the map can be enjoyed as a plain place browser.
     fn toggle_map_routes(&mut self, cx: &mut Context<Self>) {
         self.data.map_routes_visible = !self.data.map_routes_visible;
-        if !self.data.map_routes_visible {
-            self.map_frame_mode = MapFrameMode::AllPhotos;
-            self.map_frame_nonce = self.map_frame_nonce.wrapping_add(1);
-        }
+        self.map_frame_mode = if self.data.map_routes_visible {
+            MapFrameMode::Trip
+        } else {
+            MapFrameMode::AllPhotos
+        };
+        self.map_frame_nonce = self.map_frame_nonce.wrapping_add(1);
         persist_setting(
             "map_routes_visible",
             if self.data.map_routes_visible {
@@ -2657,7 +2660,7 @@ impl Siegu {
         } else {
             i18n::text(cx, "map.routes_show", &[])
         };
-        let mut summary = div()
+        let stats = div()
             .flex()
             .flex_wrap()
             .items_center()
@@ -2667,15 +2670,21 @@ impl Siegu {
                 "search.photos_count",
                 &[("count", &self.data.map_point_count.to_string())],
             )))
-            .child(Paragraph::new(format!(
-                "{} locations",
-                self.data.map_clusters.len()
+            .child(Paragraph::new(i18n::text(
+                cx,
+                "map.locations_count",
+                &[("count", &self.data.map_clusters.len().to_string())],
             )))
             .child(
                 Paragraph::new(i18n::text(cx, "map.marker_hint", &[]))
                     .text_size(theme.text_size(TextSize::Sm))
                     .text_color(theme.colors.fg_muted),
-            )
+            );
+        let mut controls = div()
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .gap_2()
             .child(
                 Button::new("map-reset", i18n::text(cx, "map.reset_view", &[]))
                     .icon(IconName::Crosshair)
@@ -2695,16 +2704,28 @@ impl Siegu {
                     }),
             );
         if self.data.map_routes_visible && route_count > 0 {
-            summary = summary.child(
-                Button::new("map-zoom-trip", i18n::text(cx, "map.zoom_to_trip", &[]))
-                    .icon(IconName::Map)
+            let (frame_label, frame_icon) = if self.map_frame_mode == MapFrameMode::Trip {
+                (i18n::text(cx, "map.show_all_photos", &[]), IconName::Globe)
+            } else {
+                (i18n::text(cx, "map.zoom_to_trip", &[]), IconName::Map)
+            };
+            controls = controls.child(
+                Button::new("map-frame-toggle", frame_label)
+                    .icon(frame_icon)
                     .on_click(move |_, _, app| {
                         if let Some(entity) = weak_zoom.upgrade() {
-                            entity.update(app, |state, cx| state.zoom_map_to_route(cx));
+                            entity.update(app, |state, cx| {
+                                if state.map_frame_mode == MapFrameMode::Trip {
+                                    state.reset_map_view(cx);
+                                } else {
+                                    state.zoom_map_to_route(cx);
+                                }
+                            });
                         }
                     }),
             );
         }
+        let summary = div().flex().flex_col().gap_2().child(stats).child(controls);
         let timeline = if !self.data.map_routes_visible {
             div()
         } else if route_count == 0 {
@@ -6082,7 +6103,7 @@ fn main() {
                         drill_down_generation: 0,
                         drill_down: None,
                         map_frame_nonce: 0,
-                        map_frame_mode: MapFrameMode::Trip,
+                        map_frame_mode: MapFrameMode::AllPhotos,
                         map_route_index: None,
                         selected_photo: None,
                         viewer_override: opened_media_request(&initial_request)

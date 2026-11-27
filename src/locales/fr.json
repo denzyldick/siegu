@@ -281,7 +281,9 @@
     "routes_hide": "Masquer les itinéraires",
     "routes_show": "Afficher les itinéraires",
     "zoom_to_trip": "Zoomer sur le voyage",
-    "route_label_unnamed": "Voyage {index} sur {total} · {date}"
+    "route_label_unnamed": "Voyage {index} sur {total} · {date}",
+    "locations_count": "{count} lieux",
+    "show_all_photos": "Afficher toutes les photos"
   },
   "devices": {
     "title": "Appareils",

@@ -281,7 +281,9 @@
     "routes_hide": "Routen ausblenden",
     "routes_show": "Routen einblenden",
     "zoom_to_trip": "Reise vergrößern",
-    "route_label_unnamed": "Reise {index} von {total} · {date}"
+    "route_label_unnamed": "Reise {index} von {total} · {date}",
+    "locations_count": "{count} Orte",
+    "show_all_photos": "Alle Fotos anzeigen"
   },
   "devices": {
     "title": "Geräte",

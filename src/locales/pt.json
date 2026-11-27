@@ -281,7 +281,9 @@
     "routes_hide": "Ocultar rotas",
     "routes_show": "Mostrar rotas",
     "zoom_to_trip": "Aproximar viagem",
-    "route_label_unnamed": "Viagem {index} de {total} · {date}"
+    "route_label_unnamed": "Viagem {index} de {total} · {date}",
+    "locations_count": "{count} locais",
+    "show_all_photos": "Mostrar todas as fotos"
   },
   "devices": {
     "title": "Dispositivos",

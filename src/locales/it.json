@@ -281,7 +281,9 @@
     "routes_hide": "Nascondi percorsi",
     "routes_show": "Mostra percorsi",
     "zoom_to_trip": "Ingrandisci viaggio",
-    "route_label_unnamed": "Viaggio {index} di {total} · {date}"
+    "route_label_unnamed": "Viaggio {index} di {total} · {date}",
+    "locations_count": "{count} luoghi",
+    "show_all_photos": "Mostra tutte le foto"
   },
   "devices": {
     "title": "Dispositivi",

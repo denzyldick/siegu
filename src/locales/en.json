@@ -240,7 +240,9 @@
     "routes_hide": "Hide routes",
     "routes_show": "Show routes",
     "zoom_to_trip": "Zoom to trip",
-    "route_label_unnamed": "Trip {index} of {total} · {date}"
+    "route_label_unnamed": "Trip {index} of {total} · {date}",
+    "locations_count": "{count} locations",
+    "show_all_photos": "Show all photos"
   },
   "devices": {
     "title": "Devices",

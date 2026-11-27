@@ -281,7 +281,9 @@
     "routes_hide": "Sconde ruta",
     "routes_show": "Mostra ruta",
     "zoom_to_trip": "Aproxima viaje",
-    "route_label_unnamed": "Viaje {index} di {total} · {date}"
+    "route_label_unnamed": "Viaje {index} di {total} · {date}",
+    "locations_count": "{count} luganan",
+    "show_all_photos": "Mostra tur e foto"
   },
   "devices": {
     "title": "Aparatonan",
