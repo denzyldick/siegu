@@ -550,7 +550,9 @@
     "remove": "Rimuovi",
     "save": "Salva",
     "loading": "Caricamento...",
-    "create": "Crea"
+    "create": "Crea",
+    "collapse_menu": "Riduci menu",
+    "expand_menu": "Espandi menu"
   },
   "media_card": {
     "alt_photo": "Foto",

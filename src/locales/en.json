@@ -39,7 +39,9 @@
     "delete": "Delete",
     "remove": "Remove",
     "save": "Save",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "collapse_menu": "Collapse menu",
+    "expand_menu": "Expand menu"
   },
   "media_card": {
     "alt_photo": "Photo",

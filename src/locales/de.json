@@ -550,7 +550,9 @@
     "remove": "Entfernen",
     "save": "Speichern",
     "loading": "Laden...",
-    "create": "Erstellen"
+    "create": "Erstellen",
+    "collapse_menu": "Menü einklappen",
+    "expand_menu": "Menü ausklappen"
   },
   "media_card": {
     "alt_photo": "Foto",

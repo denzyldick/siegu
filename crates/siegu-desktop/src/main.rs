@@ -477,6 +477,7 @@ struct LibraryData {
     theme_preference: ThemePreference,
     auto_scan: bool,
     sync_enabled: bool,
+    sidebar_collapsed: bool,
     language: String,
 }
 
@@ -633,6 +634,7 @@ enum AlbumDialog {
 struct Siegu {
     focus: FocusHandle,
     section: Section,
+    sidebar_collapsed: bool,
     search_input: Entity<TextInput>,
     search_query: String,
     recent_searches: Vec<String>,
@@ -2677,7 +2679,7 @@ impl Siegu {
                 )
                 .into_any_element()
         } else {
-            let mut grid = PhotoGrid::new();
+            let mut grid = PhotoGrid::new().gap(px(8.0));
             for idx in 0..self.data.albums.len() {
                 let album = self.data.albums[idx].album.clone();
                 let thumbnail = self.data.albums[idx].thumbnail.clone();
@@ -4763,6 +4765,10 @@ fn load_library() -> LibraryData {
         .get("sync_enabled")
         .map(|v| is_truthy(v))
         .unwrap_or(false);
+    let sidebar_collapsed = state
+        .get("sidebar_collapsed")
+        .map(|value| is_truthy(value))
+        .unwrap_or(false);
     let map_tiles_enabled = state
         .get("map_tiles_enabled")
         .map(|value| is_truthy(value))
@@ -4798,6 +4804,7 @@ fn load_library() -> LibraryData {
         theme_preference,
         auto_scan,
         sync_enabled,
+        sidebar_collapsed,
         language,
     }
 }
@@ -5263,6 +5270,24 @@ impl Render for Siegu {
             }
         });
 
+        let weak_menu = cx.entity().downgrade();
+        let on_toggle_menu: Rc<dyn Fn(&mut Window, &mut App)> = Rc::new(move |_, app| {
+            if let Some(entity) = weak_menu.upgrade() {
+                entity.update(app, |state, cx| {
+                    state.sidebar_collapsed = !state.sidebar_collapsed;
+                    persist_setting(
+                        "sidebar_collapsed",
+                        if state.sidebar_collapsed {
+                            "true"
+                        } else {
+                            "false"
+                        },
+                    );
+                    cx.notify();
+                });
+            }
+        });
+
         let viewer = if let Some(entry) = self.viewer_override.clone() {
             Some(self.viewer_for(0, entry, 1, cx))
         } else {
@@ -5375,7 +5400,9 @@ impl Render for Siegu {
                         div().flex_1().min_h_0().child(
                             SieguAppShell::new(shell_title)
                                 .active(self.section.id())
+                                .collapsed(self.sidebar_collapsed)
                                 .on_nav(on_nav)
+                                .on_toggle_menu(on_toggle_menu)
                                 .child(shell_body),
                         ),
                     ),
@@ -5600,6 +5627,7 @@ fn main() {
                     Siegu {
                         focus,
                         section: Section::Library,
+                        sidebar_collapsed: data.sidebar_collapsed,
                         search_input,
                         search_query: String::new(),
                         recent_searches: Vec::new(),

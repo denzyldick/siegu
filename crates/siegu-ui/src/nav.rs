@@ -1,8 +1,5 @@
-use ely_gpui_component::{
-    navigation::{NavGroup, NavItem},
-    primitives::IconName,
-};
-use gpui::{App, ParentElement};
+use ely_gpui_component::{navigation::NavItem, primitives::IconName};
+use gpui::{div, prelude::FluentBuilder, AnyElement, App, IntoElement, ParentElement, Styled};
 use std::rc::Rc;
 
 /// One selectable place in the Siegu sidebar.
@@ -52,22 +49,35 @@ pub const NAV_ITEMS: [NavItemDef; 7] = [
     },
 ];
 
-/// Builds the standard Siegu sidebar navigation group.
+/// Builds the unbranded sidebar navigation list.
 ///
 /// `on_nav` is invoked with the selected item's id whenever a user taps a nav
-/// item, and `active` marks the item for the section currently being shown.
-pub fn siegu_nav_items(on_nav: Rc<dyn Fn(&str, &mut App)>, active: Option<&str>) -> NavGroup {
-    let mut group = NavGroup::new("siegu-nav", "Siegu", true);
+/// item, `active` marks the current section, and `folded` renders the icon rail
+/// with tooltips instead of labels.
+pub fn siegu_nav_items(
+    on_nav: Rc<dyn Fn(&str, &mut App)>,
+    active: Option<&str>,
+    folded: bool,
+) -> AnyElement {
+    let mut items = Vec::with_capacity(NAV_ITEMS.len());
     for item in NAV_ITEMS {
         let handler = Rc::clone(&on_nav);
         let id = item.id;
-        group = group.child(
+        items.push(
             NavItem::new(item.id, item.icon, item.label)
                 .active(active == Some(item.id))
-                .on_click(move |_, cx| handler(id, cx)),
+                .folded(folded)
+                .on_click(move |_, cx| handler(id, cx))
+                .into_any_element(),
         );
     }
-    group
+    div()
+        .flex()
+        .flex_col()
+        .gap_0p5()
+        .when(folded, |group| group.items_center().px_2())
+        .children(items)
+        .into_any_element()
 }
 
 #[cfg(test)]

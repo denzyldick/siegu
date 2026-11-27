@@ -243,7 +243,7 @@ impl RenderOnce for CollectionCard {
             .id(self.id)
             .group(group)
             .relative()
-            .w(px(224.0))
+            .w_full()
             .h(px(184.0))
             .flex_none()
             .rounded(theme.radius(Radius::Lg))

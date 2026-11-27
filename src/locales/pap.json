@@ -550,7 +550,9 @@
     "remove": "Kitá",
     "save": "Wardá",
     "loading": "Kargando...",
-    "create": "Krea"
+    "create": "Krea",
+    "collapse_menu": "Fecha menu",
+    "expand_menu": "Abre menu"
   },
   "media_card": {
     "alt_photo": "Foto",
