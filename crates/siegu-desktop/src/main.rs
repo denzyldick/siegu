@@ -215,7 +215,7 @@ impl MapTileProvider {
     }
 
     fn accepts_key(self) -> bool {
-        self != Self::Osm
+        self == Self::Custom
     }
 }
 
@@ -3266,11 +3266,12 @@ fn map_tile_template(custom: &str, key: &str) -> Option<String> {
     } else {
         custom.to_string()
     };
-    // OpenStreetMap is keyless; appending a saved provider key would break it.
-    let key = if template == DEFAULT_MAP_TILE_URL {
-        ""
-    } else {
+    // OpenStreetMap and CARTO are keyless; only a custom provider uses the
+    // saved API key, and appending one to a built-in URL breaks the request.
+    let key = if MapTileProvider::from_url(custom).accepts_key() {
         key
+    } else {
+        ""
     };
     if !key.is_empty() && !template.contains("key=") {
         let separator = if template.contains('?') { '&' } else { '?' };
@@ -4223,9 +4224,23 @@ mod tests {
             map_tile_template("", "secret key").as_deref(),
             Some(DEFAULT_MAP_TILE_URL)
         );
-        assert!(map_tile_template(CARTO_LIGHT_MAP_TILE_URL, "secret key")
-            .as_deref()
-            .is_some_and(|url| url.contains("key=secret+key")));
+        assert_eq!(
+            map_tile_template(CARTO_LIGHT_MAP_TILE_URL, "secret key").as_deref(),
+            Some(CARTO_LIGHT_MAP_TILE_URL)
+        );
+        assert!(
+            map_tile_template("https://tiles.example.com/{z}/{x}/{y}.png", "secret key")
+                .as_deref()
+                .is_some_and(|url| url.contains("key=secret+key"))
+        );
+    }
+
+    #[test]
+    fn only_custom_tile_provider_accepts_a_key() {
+        assert!(!MapTileProvider::Osm.accepts_key());
+        assert!(!MapTileProvider::CartoLight.accepts_key());
+        assert!(!MapTileProvider::CartoVoyager.accepts_key());
+        assert!(MapTileProvider::Custom.accepts_key());
     }
 
     #[test]

@@ -80,45 +80,61 @@ pub fn cluster_map_points(points: &[MapPoint], decimals: u32) -> Vec<MapCluster>
     groups.into_values().collect()
 }
 
-/// Computes a stable initial view from all geotagged photos. A single point
-/// opens at a street-level zoom; an empty library opens on the world view.
+/// Approximate width of the desktop map viewport, used to turn a longitude
+/// span into a zoom level. Assuming a single 256px tile here zoomed far enough
+/// in that a globally scattered library opened on empty ocean.
+const MAP_FRAME_VIEWPORT_PX: f64 = 900.0;
+
+/// Computes a stable initial view from all geotagged photos. The median keeps
+/// the view near the bulk of the library even when a few trips are far away;
+/// zoom still fits the full spread so outliers stay reachable.
 pub fn frame_map_points(points: &[MapPoint]) -> MapFraming {
-    let mut latitude_min = f64::MAX;
-    let mut latitude_max = f64::MIN;
-    let mut longitude_min = f64::MAX;
-    let mut longitude_max = f64::MIN;
-    let mut count = 0usize;
+    let mut latitudes = Vec::new();
+    let mut longitudes = Vec::new();
 
     for point in points {
-        if !point.latitude.is_finite() || !point.longitude.is_finite() {
-            continue;
+        if point.latitude.is_finite() && point.longitude.is_finite() {
+            latitudes.push(point.latitude);
+            longitudes.push(point.longitude);
         }
-        latitude_min = latitude_min.min(point.latitude);
-        latitude_max = latitude_max.max(point.latitude);
-        longitude_min = longitude_min.min(point.longitude);
-        longitude_max = longitude_max.max(point.longitude);
-        count += 1;
     }
 
-    if count == 0 {
+    if latitudes.is_empty() {
         return MapFraming::default();
     }
-    if count == 1 {
+    if latitudes.len() == 1 {
         return MapFraming {
-            latitude: latitude_min,
-            longitude: longitude_min,
+            latitude: latitudes[0],
+            longitude: longitudes[0],
             zoom: 4.0,
         };
     }
 
+    let latitude_min = latitudes.iter().copied().fold(f64::MAX, f64::min);
+    let latitude_max = latitudes.iter().copied().fold(f64::MIN, f64::max);
+    let longitude_min = longitudes.iter().copied().fold(f64::MAX, f64::min);
+    let longitude_max = longitudes.iter().copied().fold(f64::MIN, f64::max);
+
     let span = (longitude_max - longitude_min)
         .max((latitude_max - latitude_min) * 2.0)
         .max(0.02);
-    let zoom = (256.0 * 0.75 / (span / 360.0)).log2().clamp(0.0, 10.0);
+    let zoom = (MAP_FRAME_VIEWPORT_PX * 0.75 * 360.0 / (256.0 * span))
+        .log2()
+        .clamp(2.0, 10.0);
     MapFraming {
-        latitude: (latitude_min + latitude_max) / 2.0,
-        longitude: (longitude_min + longitude_max) / 2.0,
+        latitude: median(&mut latitudes),
+        longitude: median(&mut longitudes),
         zoom,
+    }
+}
+
+fn median(values: &mut [f64]) -> f64 {
+    values.sort_by(f64::total_cmp);
+    let middle = values.len() / 2;
+    if values.len() % 2 == 1 {
+        values[middle]
+    } else {
+        (values[middle - 1] + values[middle]) / 2.0
     }
 }
 
@@ -195,7 +211,7 @@ mod tests {
         let framing = frame_map_points(&[point("a", 10.0, -20.0, ""), point("b", 20.0, 40.0, "")]);
         assert_eq!(framing.latitude, 15.0);
         assert_eq!(framing.longitude, 10.0);
-        assert!(framing.zoom > 0.0 && framing.zoom <= 10.0);
+        assert!(framing.zoom >= 2.0 && framing.zoom <= 10.0);
 
         let single = frame_map_points(&[point("a", 1.0, 2.0, "")]);
         assert_eq!(
@@ -208,5 +224,18 @@ mod tests {
             (empty.latitude, empty.longitude, empty.zoom),
             (20.0, 0.0, 2.0)
         );
+    }
+
+    #[test]
+    fn frames_skewed_libraries_near_the_median() {
+        let points = vec![
+            point("home-1", 52.0, 5.0, ""),
+            point("home-2", 52.0, 5.0, ""),
+            point("home-3", 52.0, 5.0, ""),
+            point("trip", 10.0, -120.0, ""),
+        ];
+        let framing = frame_map_points(&points);
+        assert_eq!((framing.latitude, framing.longitude), (52.0, 5.0));
+        assert!(framing.zoom < 6.0);
     }
 }
