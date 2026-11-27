@@ -72,6 +72,7 @@ pub const ALLOWED_CONFIG_KEYS: &[&str] = &[
     "map_tile_url",
     "map_tile_key",
     "map_tiles_enabled",
+    "map_tile_provider",
     "dup_scan_videos",
 ];
 
@@ -198,6 +199,15 @@ pub fn validate_config_value(key: &str, value: &str) -> Result<(), ConfigError> 
             }
         }
         "signaling_token" => {}
+        "map_tile_provider" => {
+            if !["osm", "carto_light", "carto_voyager", "custom"].contains(&value) {
+                return Err(ConfigError::InvalidType {
+                    key: key.to_string(),
+                    expected: "osm|carto_light|carto_voyager|custom".to_string(),
+                    got: value.to_string(),
+                });
+            }
+        }
         "map_tiles_enabled" | "dup_scan_videos" => {
             if !["true", "false"].contains(&value) {
                 return Err(ConfigError::InvalidType {
@@ -310,6 +320,9 @@ mod tests {
         )
         .is_ok());
         assert!(validate_config_value("map_tile_key", "abc123").is_ok());
+        assert!(validate_config_value("map_tile_provider", "osm").is_ok());
+        assert!(validate_config_value("map_tile_provider", "carto_voyager").is_ok());
+        assert!(validate_config_value("map_tile_provider", "nope").is_err());
     }
 
     #[test]

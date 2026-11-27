@@ -151,7 +151,72 @@ const LIBRARY_MONTH_HEADER_HEIGHT: Pixels = px(64.0);
 const LIBRARY_DAY_HEADER_HEIGHT: Pixels = px(40.0);
 const MAP_CLUSTER_DECIMALS: u32 = 2;
 const DEFAULT_MAP_TILE_URL: &str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-const CARTO_MAP_TILE_URL: &str = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+const CARTO_LIGHT_MAP_TILE_URL: &str =
+    "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+const CARTO_VOYAGER_MAP_TILE_URL: &str =
+    "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+
+/// A built-in online tile provider. OpenStreetMap is the safe default: it works
+/// without an API key and is selected the first time online tiles are enabled.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum MapTileProvider {
+    #[default]
+    Osm,
+    CartoLight,
+    CartoVoyager,
+    Custom,
+}
+
+impl MapTileProvider {
+    fn from_setting(value: &str) -> Self {
+        match value {
+            "carto_light" => Self::CartoLight,
+            "carto_voyager" => Self::CartoVoyager,
+            "custom" => Self::Custom,
+            _ => Self::Osm,
+        }
+    }
+
+    fn as_setting(self) -> &'static str {
+        match self {
+            Self::Osm => "osm",
+            Self::CartoLight => "carto_light",
+            Self::CartoVoyager => "carto_voyager",
+            Self::Custom => "custom",
+        }
+    }
+
+    fn from_url(url: &str) -> Self {
+        match url.trim() {
+            "" | DEFAULT_MAP_TILE_URL => Self::Osm,
+            CARTO_LIGHT_MAP_TILE_URL => Self::CartoLight,
+            CARTO_VOYAGER_MAP_TILE_URL => Self::CartoVoyager,
+            _ => Self::Custom,
+        }
+    }
+
+    fn url(self) -> Option<&'static str> {
+        match self {
+            Self::Osm => Some(DEFAULT_MAP_TILE_URL),
+            Self::CartoLight => Some(CARTO_LIGHT_MAP_TILE_URL),
+            Self::CartoVoyager => Some(CARTO_VOYAGER_MAP_TILE_URL),
+            Self::Custom => None,
+        }
+    }
+
+    fn label_key(self) -> &'static str {
+        match self {
+            Self::Osm => "settings.map_provider_osm",
+            Self::CartoLight => "settings.map_provider_carto_light",
+            Self::CartoVoyager => "settings.map_provider_carto_voyager",
+            Self::Custom => "settings.map_provider_custom",
+        }
+    }
+
+    fn accepts_key(self) -> bool {
+        self != Self::Osm
+    }
+}
 
 /// A library photo paired with its pre-resolved thumbnail source.
 #[derive(Clone)]
@@ -234,6 +299,7 @@ struct LibraryData {
     map_clusters: Vec<MapCluster>,
     map_framing: MapFraming,
     map_tiles_enabled: bool,
+    map_tile_provider: MapTileProvider,
     map_tile_url: String,
     map_tile_key: String,
     albums: Vec<AlbumEntry>,
@@ -1918,7 +1984,6 @@ impl Siegu {
         let weak_language = cx.entity().downgrade();
         let weak_map = cx.entity().downgrade();
         let weak_map_url_input = self.map_tile_url_input.downgrade();
-        let weak_map_key_input = self.map_tile_key_input.downgrade();
 
         let mut folder_rows = div().flex().flex_col().gap_2();
         for (idx, folder) in self.folders.iter().enumerate() {
@@ -2057,6 +2122,20 @@ impl Siegu {
             );
 
         let weak_map_switch = weak_map.clone();
+        let map_provider = self.data.map_tile_provider;
+        let map_provider_choices = [
+            MapTileProvider::Osm,
+            MapTileProvider::CartoLight,
+            MapTileProvider::CartoVoyager,
+            MapTileProvider::Custom,
+        ]
+        .map(|provider| {
+            Choice::new(
+                provider.as_setting(),
+                i18n::text(cx, provider.label_key(), &[]),
+            )
+        });
+        let weak_provider_url_input = weak_map_url_input;
         let map_section = div()
             .flex()
             .flex_col()
@@ -2079,30 +2158,40 @@ impl Siegu {
                         }
                     }),
             )
-            .child(self.map_tile_url_input.clone())
-            .child(self.map_tile_key_input.clone())
             .child(
-                Button::new("setting-map-save", i18n::text(cx, "settings.save", &[]))
-                    .icon(IconName::Check)
-                    .on_click(move |_, _, app| {
-                        let url = weak_map_url_input
-                            .upgrade()
-                            .map(|input| input.read(app).text().trim().to_string())
-                            .unwrap_or_default();
-                        let key = weak_map_key_input
-                            .upgrade()
-                            .map(|input| input.read(app).text().trim().to_string())
-                            .unwrap_or_default();
+                Select::new("setting-map-provider", map_provider_choices)
+                    .label(i18n::text(cx, "settings.map_tile_provider", &[]))
+                    .selected(map_provider.as_setting())
+                    .on_change(move |value, _, app| {
+                        let provider = MapTileProvider::from_setting(value.as_ref());
+                        let url = provider.url().map(str::to_string).unwrap_or_else(|| {
+                            weak_provider_url_input
+                                .upgrade()
+                                .map(|input| input.read(app).text().trim().to_string())
+                                .filter(|text| !text.is_empty())
+                                .unwrap_or_else(|| DEFAULT_MAP_TILE_URL.to_string())
+                        });
+                        if let Some(input) = weak_provider_url_input.upgrade() {
+                            input.update(app, |input, cx| input.set_text(url.clone(), cx));
+                        }
                         if let Some(entity) = weak_map.upgrade() {
                             entity.update(app, |state, cx| {
+                                state.data.map_tile_provider = provider;
                                 state.data.map_tile_url = url;
-                                state.data.map_tile_key = key;
                                 persist_setting("map_tile_url", &state.data.map_tile_url);
-                                persist_setting("map_tile_key", &state.data.map_tile_key);
+                                persist_setting("map_tile_provider", provider.as_setting());
                                 cx.notify();
                             });
                         }
                     }),
+            )
+            .children(
+                (map_provider == MapTileProvider::Custom).then(|| self.map_tile_url_input.clone()),
+            )
+            .children(
+                map_provider
+                    .accepts_key()
+                    .then(|| self.map_tile_key_input.clone()),
             );
 
         let language_choices = i18n::CODES
@@ -3094,7 +3183,11 @@ fn load_library() -> LibraryData {
         .get("map_tiles_enabled")
         .map(|value| is_truthy(value))
         .unwrap_or(false);
-    let map_tile_url = state.get("map_tile_url").cloned().unwrap_or_default();
+    let map_tile_url = map_tile_url_from_state(&state);
+    let map_tile_provider = state
+        .get("map_tile_provider")
+        .map(|value| MapTileProvider::from_setting(value))
+        .unwrap_or_else(|| MapTileProvider::from_url(&map_tile_url));
     let map_tile_key = state.get("map_tile_key").cloned().unwrap_or_default();
     let language = language_from_state(&state);
 
@@ -3111,6 +3204,7 @@ fn load_library() -> LibraryData {
         map_clusters,
         map_framing,
         map_tiles_enabled,
+        map_tile_provider,
         map_tile_url,
         map_tile_key,
         albums,
@@ -3142,19 +3236,32 @@ fn is_truthy(value: &str) -> bool {
     matches!(value.trim(), "1" | "true" | "True" | "TRUE")
 }
 
+/// A blank stored URL means the keyless OpenStreetMap provider, so the Settings
+/// field always shows a usable value instead of making users retype it.
+fn map_tile_url_from_state(state: &HashMap<String, String>) -> String {
+    state
+        .get("map_tile_url")
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .unwrap_or(DEFAULT_MAP_TILE_URL)
+        .to_string()
+}
+
 /// Builds the optional online tile template. An empty setting stays on the
 /// keyless OpenStreetMap tiles; anything else must be an http(s) URL.
 fn map_tile_template(custom: &str, key: &str) -> Option<String> {
     let custom = custom.trim();
     let key = key.trim();
     let mut template = if custom.is_empty() {
-        if key.is_empty() {
-            DEFAULT_MAP_TILE_URL.to_string()
-        } else {
-            CARTO_MAP_TILE_URL.to_string()
-        }
+        DEFAULT_MAP_TILE_URL.to_string()
     } else {
         custom.to_string()
+    };
+    // OpenStreetMap is keyless; appending a saved provider key would break it.
+    let key = if template == DEFAULT_MAP_TILE_URL {
+        ""
+    } else {
+        key
     };
     if !key.is_empty() && !template.contains("key=") {
         let separator = if template.contains('?') { '&' } else { '?' };
@@ -3689,6 +3796,38 @@ fn main() {
                         input.set_text(data.map_tile_key.clone(), cx);
                         input
                     });
+                    cx.subscribe(
+                        &map_tile_url_input,
+                        |state: &mut Siegu, input, event, cx| {
+                            if !matches!(event, InputEvent::Changed | InputEvent::Submit)
+                                || state.data.map_tile_provider != MapTileProvider::Custom
+                            {
+                                return;
+                            }
+                            let url = input.read(cx).text().trim().to_string();
+                            if url != state.data.map_tile_url {
+                                state.data.map_tile_url = url.clone();
+                                persist_setting("map_tile_url", &url);
+                                cx.notify();
+                            }
+                        },
+                    )
+                    .detach();
+                    cx.subscribe(
+                        &map_tile_key_input,
+                        |state: &mut Siegu, input, event, cx| {
+                            if !matches!(event, InputEvent::Changed | InputEvent::Submit) {
+                                return;
+                            }
+                            let key = input.read(cx).text().trim().to_string();
+                            if key != state.data.map_tile_key {
+                                state.data.map_tile_key = key.clone();
+                                persist_setting("map_tile_key", &key);
+                                cx.notify();
+                            }
+                        },
+                    )
+                    .detach();
 
                     Siegu {
                         focus,
@@ -4036,6 +4175,22 @@ mod tests {
     }
 
     #[test]
+    fn blank_map_url_uses_the_default_provider() {
+        let mut state = HashMap::new();
+        assert_eq!(map_tile_url_from_state(&state), DEFAULT_MAP_TILE_URL);
+        state.insert("map_tile_url".to_string(), "  ".to_string());
+        assert_eq!(map_tile_url_from_state(&state), DEFAULT_MAP_TILE_URL);
+        state.insert(
+            "map_tile_url".to_string(),
+            " https://tiles.example.com/{z}/{x}/{y}.png ".to_string(),
+        );
+        assert_eq!(
+            map_tile_url_from_state(&state),
+            "https://tiles.example.com/{z}/{x}/{y}.png"
+        );
+    }
+
+    #[test]
     fn map_tile_template_is_off_until_a_safe_url_is_available() {
         assert_eq!(
             map_tile_template("", "").as_deref(),
@@ -4045,9 +4200,27 @@ mod tests {
             map_tile_template("ftp://tiles.example.com/{z}/{x}/{y}.png", ""),
             None
         );
-        assert!(map_tile_template("", "secret key")
+        assert_eq!(
+            map_tile_template("", "secret key").as_deref(),
+            Some(DEFAULT_MAP_TILE_URL)
+        );
+        assert!(map_tile_template(CARTO_LIGHT_MAP_TILE_URL, "secret key")
             .as_deref()
             .is_some_and(|url| url.contains("key=secret+key")));
+    }
+
+    #[test]
+    fn default_map_provider_is_selected_without_saved_settings() {
+        assert_eq!(MapTileProvider::default(), MapTileProvider::Osm);
+        assert_eq!(MapTileProvider::from_url(""), MapTileProvider::Osm);
+        assert_eq!(
+            MapTileProvider::from_setting("unknown"),
+            MapTileProvider::Osm
+        );
+        assert_eq!(
+            MapTileProvider::Osm.label_key(),
+            "settings.map_provider_osm"
+        );
     }
 
     #[test]
