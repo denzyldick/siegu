@@ -12,16 +12,17 @@ This crate provides all business logic without any Tauri dependency. It can be u
 | `database`       | SQLite database (photos, config, logs, people, faces)                |
 | `error`          | `SieguError` enum (thiserror)                                        |
 | `event_bus`      | EventBus trait + Null/Tracing/Callback/Arc implementations           |
+| `devices`        | Local device inventory, rename/remove, storage percentage           |
 | `face_detector`  | UltraFace anchors, decode, NMS                                       |
 | `geocode`        | Offline reverse geocoding (embedded world cities)                    |
-| `lan_server`     | WebSocket signaling server for LAN sync                              |
+| `lan_server`     | WebSocket signalling server used by LAN, `siegu-signal`, and `siegu web` |
 | `mdns`           | mDNS service discovery                                               |
 | `ml_worker`      | Job enum, model helpers, pending count, transaction wrapping         |
 | `model_manager`  | Model registry (14 ONNX models), SHA-256 verification, memory budget |
 | `scanner`        | ScanGuard (deduplication), EXIF extraction, extension checking       |
 | `server`         | Pairing code generation with 6-word passphrase                       |
 | `shutdown`       | ShutdownCoordinator for graceful shutdown                            |
-| `signal`         | SignalMessage enum (Go signaling server protocol)                    |
+| `signal`         | SignalMessage enum (WebSocket signalling protocol)                   |
 | `sync_transport` | Filename sanitization, sync_temp cleanup                             |
 | `thumbnail`      | EXIF orientation, image/video thumbnails                             |
 

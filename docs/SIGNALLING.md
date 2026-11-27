@@ -21,58 +21,65 @@ Device B ──WebSocket──┘
 
 ## Quick Start with Docker Compose
 
-The fastest way to run both the signalling server and web client:
+The repository compose file runs a full `siegu web` host behind Caddy, including
+the embedded signalling server and its `/ws` bridge:
 
 ```bash
-docker compose up
+docker compose up --build
 ```
 
-This gives you everything on **one port** (`http://localhost:8080`):
+Local uses plain HTTP on `http://localhost/`. On a VPS, Caddy terminates TLS:
 
-- Web client (static files)
-- WebSocket signalling (proxied to the internal signalling server)
+```bash
+SIEGU_DOMAIN=photos.example.com docker compose up --build
+# signalling is then reachable at wss://photos.example.com/ws
+```
 
 ### How It Works
 
 ```
-Browser → http://localhost:8080
-              │
-              ├── /          → nginx serves webclient
-              └── /ws        → nginx proxies to signalling:8080
-                                    │
-                                    └── signalling server (internal)
+Device / Browser → Caddy (:80 or :443)
+                       │
+                       └── siegu-host:8787 (`siegu web`)
+                                  │
+                                  └── embedded signalling server + /ws bridge
 ```
 
 ### Services
 
-| Service      | Port     | Description                                        |
-| ------------ | -------- | -------------------------------------------------- |
-| `webclient`  | 8080     | nginx serves webclient + proxies WebSocket         |
-| `signalling` | internal | WebSocket signalling server (not exposed directly) |
+| Service      | Port        | Description                                              |
+| ------------ | ----------- | -------------------------------------------------------- |
+| `caddy`      | 80 / 443    | TLS/HTTP edge, reverse proxy to the host                 |
+| `siegu-host` | internal    | `siegu web` with embedded signalling and room-code API   |
 
 ## Self-Hosted Setup
 
 ### Requirements
 
-- Docker and Docker Compose (or a WebSocket server)
-- HTTPS/TLS (WebRTC requires secure origins in most browsers)
+- Docker and Docker Compose, or the Rust `siegu-signal` binary
+- HTTPS/TLS in front of the server (WebRTC requires secure origins in most browsers)
 - A public IP or domain name reachable by both devices
 
 ### Using the Reference Server
 
-Siegu includes a Rust-based signalling server in the `siegu-signal` crate:
+Siegu includes a Rust-based signalling server in `crates/siegu-signal`. It uses
+the same `siegu_core::lan_server` implementation the apps embed, so no separate
+Go application is needed:
 
 ```bash
-# Build and run the reference server
-cd siegu-signal
-cargo run --release
+# From the workspace root
+cargo run --release -p siegu-signal
+# Or a minimal server without token/web-dir options:
+cargo run --release -p siegu-cli -- serve --port 8080
 ```
 
-The server listens on port 8080 by default. Set the `RUST_LOG` environment variable for logging:
+The server listens on port 8080 by default. Set `RUST_LOG` for logging:
 
 ```bash
-RUST_LOG=info cargo run --release
+RUST_LOG=info cargo run --release -p siegu-signal
 ```
+
+For WAN clients, put it behind a TLS reverse proxy that forwards `/ws`.
 
 ### Environment Variables
 
@@ -93,9 +100,17 @@ RUST_LOG=info cargo run --release
 
 ### Docker (Standalone)
 
+Build from the repository root with the crate's Dockerfile:
+
 ```bash
-docker build -t siegu-signal .
+docker build -f crates/siegu-signal/Dockerfile -t siegu-signal .
 docker run -p 8080:8080 siegu-signal
+```
+
+Or use the published image:
+
+```bash
+docker run -p 8080:8080 ghcr.io/denzyldick/siegu-signal:latest
 ```
 
 ## Token Authentication

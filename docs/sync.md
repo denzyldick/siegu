@@ -35,33 +35,54 @@ Both devices on the same local network:
 
 For devices on different networks:
 
-1. Deploy the Go signaling server (see below)
-2. Host enters the signaling server URL
-3. Joiner connects using the same room ID
+1. Run Siegu's Rust signalling server on a public host (`siegu-signal`, or
+   `siegu-cli serve`; see below). No separate Go service is needed.
+2. Put it behind HTTPS (for example Caddy or nginx) and enter the
+   `wss://your-host.example.com/ws` URL in the host.
+3. Joiner connects to the same URL and room ID.
 
 ---
 
 ## Signaling Server
 
-LAN mode runs a built-in signaling server (embedded in the app). For remote connections, a standalone signaling server (`siegu-signal`, written in Rust) is available.
+The same Rust server implementation (`siegu_core::lan_server`) powers LAN mode,
+the `siegu web` host, and the standalone `siegu-signal` binary. WAN peers simply
+point at a publicly reachable instance; there is no Go signalling service to
+deploy.
 
 ### Self-hosting
 
+Run the standalone server from the workspace root:
+
 ```bash
-docker compose up -d
+cargo run --release -p siegu-signal
+# or, for a minimal server without token/web-dist options:
+cargo run --release -p siegu-cli -- serve --port 8080
 ```
 
-The server runs on port `8080` with these env vars:
+For a hosted web share, `docker compose up -d` starts `siegu web` behind Caddy;
+Caddy terminates TLS and proxies `/ws` to the embedded signalling server.
 
-| Variable             | Default   | Description                                             |
-| -------------------- | --------- | ------------------------------------------------------- |
-| `PORT`               | `8080`    | Listen address                                          |
-| `SIEGU_SIGNAL_TOKEN` | _(unset)_ | If set, every join/room request must include this token |
+The standalone server listens on `PORT` (default `8080`) with these env vars:
+
+| Variable              | Default   | Description                                              |
+| --------------------- | --------- | -------------------------------------------------------- |
+| `PORT`                | `8080`    | Listening port                                           |
+| `SIEGU_SIGNAL_TOKEN`  | _(unset)_ | If set, every join/room request must include this token  |
+| `SIEGU_WEB_DIST_DIR`  | _(unset)_ | Optional webclient dist served alongside `/ws`           |
 
 ### Pre-built image
 
-```
+The Rust server is published as:
+
+```bash
 ghcr.io/denzyldick/siegu-signal:latest
+```
+
+Run it behind a TLS reverse proxy for WAN clients:
+
+```bash
+docker run -p 8080:8080 ghcr.io/denzyldick/siegu-signal:latest
 ```
 
 ---

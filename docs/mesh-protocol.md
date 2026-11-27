@@ -54,10 +54,13 @@ Built-in warp WebSocket server (`lan_server.rs`):
 
 ### Remote Signaling
 
-Connects to a Go signaling server.
+Uses the same Rust signalling server as LAN mode, deployed on a public host as
+`siegu-signal` (or `siegu-cli serve`), or the embedded `/ws` endpoint of
+`siegu web` behind Caddy. No separate Go application is required.
 
 - Default: `wss://siegu.io/ws`
-- Self-hosted via `docker-compose.yml`
+- Self-hosted with `cargo run --release -p siegu-signal`, the published
+  `siegu-signal` image, or `docker compose up` (`siegu web` + Caddy)
 
 ## WebRTC Transport
 
