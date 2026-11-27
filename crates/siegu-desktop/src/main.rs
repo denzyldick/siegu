@@ -37,7 +37,7 @@ use siegu_ui::{
         forms::{Choice, InputEvent, MultiSelect, SearchInput, Select, Switch, TextInput},
         layout::{columns_for, ScrollArea},
         maps::{LatLon, MapMarker, MapView, MapViewport, Tile, WorldMap},
-        motion::ProgressBar,
+        motion::{ProgressBar, Skeleton},
         overlays::{ConfirmDialog, Dialog, PromptDialog},
         primitives::{FocusScope, Icon, IconName, Image as ElyImage, Severity},
         theme::{ActiveTheme, IconSize, Mode, Radius, TextSize, Theme},
@@ -288,6 +288,34 @@ struct AlbumEntry {
     thumbnail: Option<ImageSource>,
 }
 
+/// A thumbnail that can cross a thread boundary. `ImageSource` itself cannot,
+/// but the decoded image or its local path can be resolved on the UI thread.
+enum StoredImage {
+    Image(Arc<Image>),
+    Path(PathBuf),
+}
+
+impl StoredImage {
+    fn into_source(self) -> ImageSource {
+        match self {
+            Self::Image(image) => ImageSource::Image(image),
+            Self::Path(path) => ImageSource::from(path),
+        }
+    }
+}
+
+/// The heavy half of startup: local SQLite queries and thumbnail lookups.
+struct LibraryLoad {
+    total_photos: usize,
+    date_groups: Vec<PhotoDateGroup>,
+    people: Vec<(PersonWithFace, Option<StoredImage>)>,
+    facets: SearchFacetsData,
+    map_point_count: usize,
+    map_clusters: Vec<MapCluster>,
+    map_framing: MapFraming,
+    albums: Vec<(Album, Option<StoredImage>)>,
+}
+
 /// Facet values offered by the library filter panel. They come from the local
 /// SQLite indexes; no network or second device is involved.
 #[derive(Clone, Default)]
@@ -498,6 +526,9 @@ const DISPLAY_SETTINGS: &[(&str, &str)] = &[
 struct DrillDown {
     title: String,
     subtitle: String,
+    /// Set immediately so the header and back button paint without waiting
+    /// for the photo query. Cleared when the query returns.
+    loading: bool,
     photos: Vec<PhotoEntry>,
 }
 
@@ -652,6 +683,10 @@ struct Siegu {
     library_columns: usize,
     library_list: ListState,
     grid_width: Entity<Pixels>,
+    /// True until the first background library query completes.
+    data_loading: bool,
+    /// Guards against a slow query overwriting a newer drill-down.
+    drill_down_generation: u64,
     drill_down: Option<DrillDown>,
     selected_photo: Option<usize>,
     viewer_override: Option<PhotoEntry>,
@@ -1014,6 +1049,7 @@ impl Siegu {
         self.drill_down = Some(DrillDown {
             title,
             subtitle,
+            loading: false,
             photos,
         });
         self.selected_photo = None;
@@ -1623,28 +1659,63 @@ impl Siegu {
         &mut self,
         title: String,
         subtitle: String,
-        query: impl FnOnce(&Database) -> Vec<Photo>,
+        query: impl FnOnce(&Database) -> Vec<Photo> + Send + 'static,
+        cx: &mut Context<Self>,
     ) {
-        let dir = default_config_dir();
-        let photos = if dir.join("siegu.db").exists() {
-            let db = Database::new(&dir.display().to_string());
-            query(&db)
-                .into_iter()
-                .map(|photo| {
-                    let thumbnail = resolve_thumbnail(&photo);
-                    PhotoEntry { photo, thumbnail }
-                })
-                .collect()
-        } else {
-            Vec::new()
-        };
+        // Paint the header, back button, and skeletons on this frame. The
+        // SQLite query and thumbnail path resolution run on a background
+        // thread so a large collection cannot stall the window.
+        let generation = self.drill_down_generation.wrapping_add(1);
+        self.drill_down_generation = generation;
         self.drill_down = Some(DrillDown {
             title,
             subtitle,
-            photos,
+            loading: true,
+            photos: Vec::new(),
         });
         self.selected_photo = None;
         self.viewer_override = None;
+        cx.notify();
+
+        let task = cx.background_executor().spawn(async move {
+            let dir = default_config_dir();
+            if dir.join("siegu.db").exists() {
+                let db = Database::new(&dir.display().to_string());
+                query(&db)
+                    .into_iter()
+                    .map(|photo| {
+                        let thumbnail = resolve_stored_thumbnail(&photo);
+                        (photo, thumbnail)
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            }
+        });
+        cx.spawn(async move |weak, cx| {
+            let photos = task.await;
+            let _ = cx.update(|cx| {
+                if let Some(entity) = weak.upgrade() {
+                    entity.update(cx, |state, cx| {
+                        if state.drill_down_generation != generation {
+                            return;
+                        }
+                        if let Some(drill) = &mut state.drill_down {
+                            drill.photos = photos
+                                .into_iter()
+                                .map(|(photo, thumbnail)| PhotoEntry {
+                                    photo,
+                                    thumbnail: thumbnail.map(StoredImage::into_source),
+                                })
+                                .collect();
+                            drill.loading = false;
+                        }
+                        cx.notify();
+                    });
+                }
+            });
+        })
+        .detach();
     }
 
     fn status_view(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -1732,12 +1803,25 @@ impl Siegu {
     fn body(&mut self, cx: &mut Context<Self>) -> AnyElement {
         if let Some(dd) = &self.drill_down {
             let weak = cx.entity().downgrade();
-            let content = self.photo_grid_view(
-                &dd.photos,
-                "No photos here yet.",
-                "Matching photos will appear here once indexed.",
-                cx,
-            );
+            let content = if dd.loading {
+                let mut grid = PhotoGrid::new();
+                for index in 0usize..12 {
+                    grid = grid.child(
+                        Skeleton::new(("collection-loading", index))
+                            .w_full()
+                            .h(px(184.0))
+                            .rounded(px(12.0)),
+                    );
+                }
+                grid.into_any_element()
+            } else {
+                self.photo_grid_view(
+                    &dd.photos,
+                    "No photos here yet.",
+                    "Matching photos will appear here once indexed.",
+                    cx,
+                )
+            };
             return div()
                 .flex()
                 .flex_col()
@@ -2484,10 +2568,12 @@ impl Siegu {
                         let title = display_name.clone();
                         let subtitle = detail.clone();
                         entity.update(cx, |state, cx| {
-                            state.open_drill_down(title, subtitle.to_string(), |db| {
-                                db.get_photos_for_person(&id, 0, 60)
-                            });
-                            cx.notify();
+                            state.open_drill_down(
+                                title,
+                                subtitle.to_string(),
+                                move |db| db.get_photos_for_person(&id, 0, 60),
+                                cx,
+                            );
                         });
                     }
                 });
@@ -2618,7 +2704,18 @@ impl Siegu {
                     .into_any_element()
             });
 
-        let body = if self.data.albums.is_empty() {
+        let body = if self.data_loading {
+            let mut grid = PhotoGrid::new().gap(px(8.0));
+            for index in 0usize..8 {
+                grid = grid.child(
+                    Skeleton::new(("collection-overview-loading", index))
+                        .w_full()
+                        .h(px(184.0))
+                        .rounded(px(12.0)),
+                );
+            }
+            grid.into_any_element()
+        } else if self.data.albums.is_empty() {
             let weak_empty = cx.entity().downgrade();
             div()
                 .flex()
@@ -2710,10 +2807,12 @@ impl Siegu {
                             let title = open_title.clone();
                             let subtitle = open_subtitle.clone();
                             entity.update(cx, |state, cx| {
-                                state.open_drill_down(title, subtitle, |db| {
-                                    db.get_album_contents(&id, 0, 60)
-                                });
-                                cx.notify();
+                                state.open_drill_down(
+                                    title,
+                                    subtitle,
+                                    move |db| db.get_album_contents(&id, 0, 60),
+                                    cx,
+                                );
                             });
                         }
                     })
@@ -2921,10 +3020,14 @@ impl Siegu {
                         let title = drill_title.clone();
                         let subtitle = drill_subtitle.clone();
                         entity.update(app, |state, cx| {
-                            state.open_drill_down(title, subtitle, |db| {
-                                ids.iter().filter_map(|id| db.get_photo_by_id(id)).collect()
-                            });
-                            cx.notify();
+                            state.open_drill_down(
+                                title,
+                                subtitle,
+                                move |db| {
+                                    ids.iter().filter_map(|id| db.get_photo_by_id(id)).collect()
+                                },
+                                cx,
+                            );
                         });
                     }
                 });
@@ -4693,13 +4796,77 @@ fn run_duplicate_scan(config_dir: PathBuf, tx: UnboundedSender<DuplicateMessage>
 
 /// Opens the existing local library, if any. We never create a database here:
 /// the desktop spike must not leave side effects in a user's real config dir.
-fn load_library() -> LibraryData {
+fn load_settings() -> LibraryData {
     let dir = default_config_dir();
     if !dir.join("siegu.db").exists() {
         return LibraryData::default();
     }
     let db = Database::new(&dir.display().to_string());
     let state = db.get_state();
+    let theme_preference = state
+        .get("theme")
+        .map(|value| ThemePreference::from_setting(value))
+        .unwrap_or_default();
+    let auto_scan = state
+        .get("auto_scan")
+        .map(|v| is_truthy(v))
+        .unwrap_or(false);
+    let sync_enabled = state
+        .get("sync_enabled")
+        .map(|v| is_truthy(v))
+        .unwrap_or(false);
+    let sidebar_collapsed = state
+        .get("sidebar_collapsed")
+        .map(|value| is_truthy(value))
+        .unwrap_or(false);
+    let map_tiles_enabled = state
+        .get("map_tiles_enabled")
+        .map(|value| is_truthy(value))
+        .unwrap_or(false);
+    let map_tile_url = map_tile_url_from_state(&state);
+    let map_tile_provider = state
+        .get("map_tile_provider")
+        .map(|value| MapTileProvider::from_setting(value))
+        .unwrap_or_else(|| MapTileProvider::from_url(&map_tile_url));
+    let map_tile_key = state.get("map_tile_key").cloned().unwrap_or_default();
+    let language = language_from_state(&state);
+    let mut settings = safe_settings(&state);
+    if let Some(last_scan) = db.get_last_scan_time() {
+        settings.insert(0, ("Last scan".to_string(), last_scan));
+    }
+
+    LibraryData {
+        map_tiles_enabled,
+        map_tile_provider,
+        map_tile_url,
+        map_tile_key,
+        settings,
+        models: model_toggles(&state),
+        theme_preference,
+        auto_scan,
+        sync_enabled,
+        sidebar_collapsed,
+        language,
+        ..Default::default()
+    }
+}
+
+/// Runs the expensive local-library queries without touching GPUI state.
+fn load_library_rows() -> LibraryLoad {
+    let dir = default_config_dir();
+    if !dir.join("siegu.db").exists() {
+        return LibraryLoad {
+            total_photos: 0,
+            date_groups: Vec::new(),
+            people: Vec::new(),
+            facets: SearchFacetsData::default(),
+            map_point_count: 0,
+            map_clusters: Vec::new(),
+            map_framing: MapFraming::default(),
+            albums: Vec::new(),
+        };
+    }
+    let db = Database::new(&dir.display().to_string());
     let total_photos = db
         .count_photos_filtered("", false, false, &PhotoFilter::default())
         .max(0) as usize;
@@ -4729,11 +4896,11 @@ fn load_library() -> LibraryData {
         .get_people()
         .into_iter()
         .map(|person| {
-            let thumbnail = resolve_image_source(
+            let thumbnail = resolve_stored_image(
                 person.encoded.as_deref(),
                 person.representative_crop.as_deref(),
             );
-            PersonEntry { person, thumbnail }
+            (person, thumbnail)
         })
         .collect();
     let map_points = db.get_heatmap_points();
@@ -4749,44 +4916,11 @@ fn load_library() -> LibraryData {
                 .as_deref()
                 .and_then(|id| db.get_photo_by_id(id))
                 .or_else(|| db.get_album_contents(&album.id, 0, 1).into_iter().next());
-            let thumbnail = cover.as_ref().and_then(resolve_thumbnail);
-            AlbumEntry { album, thumbnail }
+            let thumbnail = cover.as_ref().and_then(resolve_stored_thumbnail);
+            (album, thumbnail)
         })
         .collect();
-    let theme_preference = state
-        .get("theme")
-        .map(|value| ThemePreference::from_setting(value))
-        .unwrap_or_default();
-    let auto_scan = state
-        .get("auto_scan")
-        .map(|v| is_truthy(v))
-        .unwrap_or(false);
-    let sync_enabled = state
-        .get("sync_enabled")
-        .map(|v| is_truthy(v))
-        .unwrap_or(false);
-    let sidebar_collapsed = state
-        .get("sidebar_collapsed")
-        .map(|value| is_truthy(value))
-        .unwrap_or(false);
-    let map_tiles_enabled = state
-        .get("map_tiles_enabled")
-        .map(|value| is_truthy(value))
-        .unwrap_or(false);
-    let map_tile_url = map_tile_url_from_state(&state);
-    let map_tile_provider = state
-        .get("map_tile_provider")
-        .map(|value| MapTileProvider::from_setting(value))
-        .unwrap_or_else(|| MapTileProvider::from_url(&map_tile_url));
-    let map_tile_key = state.get("map_tile_key").cloned().unwrap_or_default();
-    let language = language_from_state(&state);
-
-    let mut settings = safe_settings(&state);
-    if let Some(last_scan) = db.get_last_scan_time() {
-        settings.insert(0, ("Last scan".to_string(), last_scan));
-    }
-
-    LibraryData {
+    LibraryLoad {
         total_photos,
         date_groups,
         people,
@@ -4794,19 +4928,46 @@ fn load_library() -> LibraryData {
         map_point_count,
         map_clusters,
         map_framing,
-        map_tiles_enabled,
-        map_tile_provider,
-        map_tile_url,
-        map_tile_key,
         albums,
-        settings,
-        models: model_toggles(&state),
-        theme_preference,
-        auto_scan,
-        sync_enabled,
-        sidebar_collapsed,
-        language,
     }
+}
+
+/// Converts background-loaded values into GPUI image sources on the UI thread.
+fn library_data_from_load(load: LibraryLoad) -> LibraryData {
+    let mut data = load_settings();
+    merge_library_load(&mut data, load);
+    data
+}
+
+/// Merges only the heavy fields so settings edited while loading are preserved.
+fn merge_library_load(data: &mut LibraryData, load: LibraryLoad) {
+    data.total_photos = load.total_photos;
+    data.date_groups = load.date_groups;
+    data.people = load
+        .people
+        .into_iter()
+        .map(|(person, thumbnail)| PersonEntry {
+            person,
+            thumbnail: thumbnail.map(StoredImage::into_source),
+        })
+        .collect();
+    data.facets = load.facets;
+    data.map_point_count = load.map_point_count;
+    data.map_clusters = load.map_clusters;
+    data.map_framing = load.map_framing;
+    data.albums = load
+        .albums
+        .into_iter()
+        .map(|(album, thumbnail)| AlbumEntry {
+            album,
+            thumbnail: thumbnail.map(StoredImage::into_source),
+        })
+        .collect();
+}
+
+/// Synchronous reload used after a scan mutates the library.
+fn load_library() -> LibraryData {
+    library_data_from_load(load_library_rows())
 }
 
 fn language_from_state(state: &HashMap<String, String>) -> String {
@@ -4884,20 +5045,29 @@ fn render_map_tile_url(template: &str, tile: Tile) -> String {
 /// decode, works for videos and evicted view-only items) and falls back to the
 /// local file path when present.
 fn resolve_thumbnail(photo: &Photo) -> Option<ImageSource> {
+    resolve_stored_thumbnail(photo).map(StoredImage::into_source)
+}
+
+/// Resolves a thumbnail into a thread-safe form for asynchronous loading.
+fn resolve_stored_thumbnail(photo: &Photo) -> Option<StoredImage> {
     let path = (!photo.view_only).then_some(photo.location.as_str());
-    resolve_image_source(Some(photo.encoded.as_str()), path)
+    resolve_stored_image(Some(photo.encoded.as_str()), path)
 }
 
 /// Resolves an image source from an optional data URL or local file path.
 fn resolve_image_source(encoded: Option<&str>, path: Option<&str>) -> Option<ImageSource> {
+    resolve_stored_image(encoded, path).map(StoredImage::into_source)
+}
+
+fn resolve_stored_image(encoded: Option<&str>, path: Option<&str>) -> Option<StoredImage> {
     if let Some(data_url) = encoded {
         if let Some(image) = decode_data_url(data_url) {
-            return Some(ImageSource::Image(image));
+            return Some(StoredImage::Image(image));
         }
     }
     if let Some(path) = path {
         if !path.is_empty() && Path::new(path).exists() {
-            return Some(ImageSource::from(PathBuf::from(path)));
+            return Some(StoredImage::Path(PathBuf::from(path)));
         }
     }
     None
@@ -5468,7 +5638,11 @@ fn main() {
                     Vec::new()
                 }
             };
-            let data = load_library();
+            // Read cheap settings first so the shell can paint immediately.
+            // The heavy library queries (people, maps, album covers) arrive on
+            // a background thread and are merged into state when ready.
+            let data = load_settings();
+            let (load_tx, mut load_rx) = mpsc::unbounded_channel::<LibraryLoad>();
             i18n::install(cx, &data.language);
             let system_appearance = cx.window_appearance();
             let theme_appearance = data.theme_preference.appearance(system_appearance);
@@ -5645,6 +5819,8 @@ fn main() {
                         library_columns: 1,
                         library_list: ListState::new(0, ListAlignment::Top, px(128.0)),
                         grid_width: cx.new(|_| Pixels::ZERO),
+                        data_loading: default_config_dir().join("siegu.db").exists(),
+                        drill_down_generation: 0,
                         drill_down: None,
                         selected_photo: None,
                         viewer_override: opened_media_request(&initial_request)
@@ -5675,6 +5851,33 @@ fn main() {
             cx.spawn(move |cx: &mut AsyncApp| {
                 let cx = cx.clone();
                 async move {
+                    let background = cx.background_executor().clone();
+                    background
+                        .spawn(async move {
+                            let load = load_library_rows();
+                            let _ = load_tx.send(load);
+                        })
+                        .detach();
+
+                    while let Some(load) = load_rx.recv().await {
+                        let mut load = Some(load);
+                        let _ = cx.update(|cx| {
+                            for window in cx.windows() {
+                                let Some(handle) = window.downcast::<Siegu>() else {
+                                    continue;
+                                };
+                                let Some(load) = load.take() else {
+                                    break;
+                                };
+                                let _ = handle.update(cx, |state, _, cx| {
+                                    merge_library_load(&mut state.data, load);
+                                    state.data_loading = false;
+                                    cx.notify();
+                                });
+                            }
+                        });
+                    }
+
                     while let Some(request) = request_rx.recv().await {
                         let path = opened_media_request(&request);
                         cx.update(|cx| {
