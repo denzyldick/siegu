@@ -269,7 +269,9 @@
     "no_photos": "Aucune photo géolocalisée",
     "no_photos_desc": "Les photos avec données de localisation apparaîtront ici.",
     "filter_from": "From {date}",
-    "filter_until": "Until {date}"
+    "filter_until": "Until {date}",
+    "offline_notice": "Offline map: your geotagged photos appear over built-in country outlines. Online tiles are off.",
+    "online_notice": "Online tiles are enabled. Tile requests go to your configured provider."
   },
   "devices": {
     "title": "Appareils",
@@ -467,7 +469,7 @@
     "pro_dialog_watching": "En attente du lien… il se débloquera automatiquement.",
     "pro_dialog_close": "Fermer",
     "map": "Map tiles",
-    "map_hint": "A keyless OpenStreetMap basemap is used by default. If your tile provider requires an API key (e.g. CARTO), add it here — the watermark disappears.",
+    "map_hint": "Offline maps use built-in country outlines. Enable online tiles only if you agree to send tile requests to your provider.",
     "map_tile_url": "Tile provider URL (optional)",
     "map_tile_key": "Tile API key",
     "pro": "Siegu Pro",
@@ -492,7 +494,8 @@
     "pro_advanced_hide": "Masquer avancé",
     "pro_upsell_title": "Débloquez Siegu Pro",
     "pro_upsell_desc": "Privé, sur l’appareil, un prix pour chaque appareil.",
-    "pro_upsell_cta": "Obtenir Pro"
+    "pro_upsell_cta": "Obtenir Pro",
+    "map_tiles_enabled": "Use online map tiles"
   },
   "open_with": {
     "opened_in_siegu": "Ouvert dans Siegu : {file}"

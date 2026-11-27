@@ -169,6 +169,11 @@ People, Collections, Devices, Space saver (duplicates), and Settings sections.
 Settings writes `theme` as `system`, `light`, or `dark`; `system` follows OS
 light/dark changes while the app is open.
 
+The Map section plots local GPS points over Ely's bundled country outlines and
+does not request remote map tiles by default. Users must enable **Settings →
+Map tiles → Use online map tiles** before any tile URL is loaded; the optional
+tile URL and API key are persisted only when saved explicitly.
+
 ### Linux packages
 
 Ubuntu 24.04 (the list the Ely CI uses for the same stack):

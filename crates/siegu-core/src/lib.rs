@@ -9,6 +9,7 @@ pub mod geocode;
 pub mod lan_server;
 pub mod library;
 pub mod logfmt;
+pub mod map;
 pub mod mdns;
 pub mod memory_pressure;
 pub mod mesh;
@@ -39,6 +40,7 @@ pub use database::{
 pub use devices::{list_devices, os_icon, remove_device, rename_device, storage_percent};
 pub use error::{Result, SieguError};
 pub use event_bus::{ArcEventBus, CallbackEventBus, EventBus, Level, LogCollector, NullEventBus};
+pub use map::{cluster_map_points, frame_map_points, MapCluster, MapFraming, MAX_CLUSTER_PHOTOS};
 pub use mesh::{MeshManager, SyncEvent, SyncMessage, SyncPhase, SyncProgress};
 #[cfg(feature = "ml")]
 pub use ml_worker::MlContext;

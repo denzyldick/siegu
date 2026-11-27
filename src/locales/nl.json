@@ -269,7 +269,9 @@
     "no_photos": "Geen foto's met locatie",
     "no_photos_desc": "Foto's met locatiegegevens verschijnen hier.",
     "filter_from": "From {date}",
-    "filter_until": "Until {date}"
+    "filter_until": "Until {date}",
+    "offline_notice": "Offline map: your geotagged photos appear over built-in country outlines. Online tiles are off.",
+    "online_notice": "Online tiles are enabled. Tile requests go to your configured provider."
   },
   "devices": {
     "title": "Apparaten",
@@ -467,7 +469,7 @@
     "pro_dialog_watching": "Wachten tot je de link tikt… hij wordt automatisch ontgrendeld.",
     "pro_dialog_close": "Sluiten",
     "map": "Map tiles",
-    "map_hint": "A keyless OpenStreetMap basemap is used by default. If your tile provider requires an API key (e.g. CARTO), add it here — the watermark disappears.",
+    "map_hint": "Offline maps use built-in country outlines. Enable online tiles only if you agree to send tile requests to your provider.",
     "map_tile_url": "Tile provider URL (optional)",
     "map_tile_key": "Tile API key",
     "pro": "Siegu Pro",
@@ -492,7 +494,8 @@
     "pro_advanced_hide": "Geavanceerd verbergen",
     "pro_upsell_title": "Ontgrendel Siegu Pro",
     "pro_upsell_desc": "Privé, op je apparaat, één prijs voor elk apparaat.",
-    "pro_upsell_cta": "Pro kopen"
+    "pro_upsell_cta": "Pro kopen",
+    "map_tiles_enabled": "Use online map tiles"
   },
   "open_with": {
     "opened_in_siegu": "Geopend in Siegu: {file}"

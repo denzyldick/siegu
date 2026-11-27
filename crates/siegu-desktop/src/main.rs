@@ -11,12 +11,13 @@ mod app_ipc;
 
 use base64::Engine as _;
 use rayon::prelude::*;
-use siegu_core::database::{Album, DeviceInfo, LocationGroup, PhotoDateGroup, PhotoFilter};
+use siegu_core::database::{Album, DeviceInfo, PhotoDateGroup, PhotoFilter};
 use siegu_core::devices::{
     list_devices as list_core_devices, remove_device as remove_core_device,
     rename_device as rename_core_device, storage_percent,
 };
 use siegu_core::duplicates::{self, DuplicateGroupView, DuplicateStats};
+use siegu_core::map::{cluster_map_points, frame_map_points, MapCluster, MapFraming};
 use siegu_core::{
     config::default_config_dir,
     memory_pressure,
@@ -30,6 +31,7 @@ use siegu_ui::{
         feedback::Banner,
         forms::{Choice, InputEvent, SearchInput, Select, Switch, TextInput},
         layout::{columns_for, ScrollArea},
+        maps::{LatLon, MapMarker, MapView, MapViewport, Tile, WorldMap},
         motion::ProgressBar,
         overlays::{ConfirmDialog, Dialog, PromptDialog},
         primitives::{FocusScope, Icon, IconName, Image as ElyImage, Severity},
@@ -147,6 +149,9 @@ const PHOTO_CARD_WIDTH: Pixels = px(220.0);
 const PHOTO_ROW_HEIGHT: Pixels = px(236.0);
 const LIBRARY_MONTH_HEADER_HEIGHT: Pixels = px(64.0);
 const LIBRARY_DAY_HEADER_HEIGHT: Pixels = px(40.0);
+const MAP_CLUSTER_DECIMALS: u32 = 2;
+const DEFAULT_MAP_TILE_URL: &str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+const CARTO_MAP_TILE_URL: &str = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
 
 /// A library photo paired with its pre-resolved thumbnail source.
 #[derive(Clone)]
@@ -213,12 +218,6 @@ struct PersonEntry {
     thumbnail: Option<ImageSource>,
 }
 
-/// A place paired with its pre-resolved representative photo thumbnail.
-struct PlaceEntry {
-    place: LocationGroup,
-    thumbnail: Option<ImageSource>,
-}
-
 /// An album paired with its pre-resolved cover thumbnail.
 struct AlbumEntry {
     album: Album,
@@ -231,7 +230,12 @@ struct LibraryData {
     total_photos: usize,
     date_groups: Vec<PhotoDateGroup>,
     people: Vec<PersonEntry>,
-    places: Vec<PlaceEntry>,
+    map_point_count: usize,
+    map_clusters: Vec<MapCluster>,
+    map_framing: MapFraming,
+    map_tiles_enabled: bool,
+    map_tile_url: String,
+    map_tile_key: String,
     albums: Vec<AlbumEntry>,
     settings: Vec<(String, String)>,
     models: Vec<(String, String, bool)>,
@@ -361,6 +365,8 @@ struct Siegu {
     section: Section,
     search_input: Entity<TextInput>,
     search_query: String,
+    map_tile_url_input: Entity<TextInput>,
+    map_tile_key_input: Entity<TextInput>,
     favorites_only: bool,
     videos_only: bool,
     library_window: PhotoWindow,
@@ -520,6 +526,52 @@ impl Siegu {
             modal = modal.fallback(thumb.clone());
         }
         modal
+    }
+
+    /// Opens a map marker's photos in the same local drill-down grid used by
+    /// People and Collections. Only SQLite is involved; no map tile request.
+    fn open_map_cluster(&mut self, key: &str, cx: &mut Context<Self>) {
+        let Some(cluster) = self
+            .data
+            .map_clusters
+            .iter()
+            .find(|cluster| cluster.key == key)
+            .cloned()
+        else {
+            return;
+        };
+        let dir = default_config_dir();
+        if !dir.join("siegu.db").exists() {
+            return;
+        }
+        let db = Database::new(&dir.display().to_string());
+        let photos = db
+            .get_photos_by_ids(&cluster.photo_ids)
+            .into_iter()
+            .map(|photo| {
+                let thumbnail = resolve_thumbnail(&photo);
+                PhotoEntry { photo, thumbnail }
+            })
+            .collect::<Vec<_>>();
+        let title = if cluster.label.is_empty() {
+            i18n::text(cx, "dock.map", &[]).to_string()
+        } else {
+            cluster.label
+        };
+        let subtitle = i18n::text(
+            cx,
+            "media.items_count",
+            &[("count", &cluster.count.to_string())],
+        )
+        .to_string();
+        self.drill_down = Some(DrillDown {
+            title,
+            subtitle,
+            photos,
+        });
+        self.selected_photo = None;
+        self.viewer_override = None;
+        cx.notify();
     }
 
     /// Metadata for the open viewer, cached per photo id so repaints do not
@@ -1468,48 +1520,104 @@ impl Siegu {
     }
 
     fn map_view(&self, cx: &mut Context<Self>) -> AnyElement {
-        if self.data.places.is_empty() {
+        if self.data.map_clusters.is_empty() {
             return empty_state(
-                "No places yet.",
-                "Photos with GPS or resolved location data will appear here.",
+                &i18n::text(cx, "map.no_photos", &[]),
+                &i18n::text(cx, "map.no_photos_desc", &[]),
             );
         }
-        let mut grid = PhotoGrid::new();
-        for (idx, entry) in self.data.places.iter().enumerate() {
-            let weak = cx.entity().downgrade();
-            let name = entry.place.name.clone();
-            let detail = plural(entry.place.count as usize, "photo");
-            let mut card = InfoCard::new(("place", idx), IconName::MapPin, name.clone())
-                .detail(detail.clone())
-                .on_click(move |_, cx| {
-                    if let Some(entity) = weak.upgrade() {
-                        let place_name = name.clone();
-                        let subtitle = detail.clone();
-                        entity.update(cx, |state, cx| {
-                            state.open_drill_down(place_name.clone(), subtitle, |db| {
-                                db.list_photos_filtered(
-                                    "",
-                                    0,
-                                    60,
-                                    false,
-                                    false,
-                                    &PhotoFilter {
-                                        location: Some(place_name),
-                                        ..Default::default()
-                                    },
-                                    true,
-                                )
-                            });
-                            cx.notify();
-                        });
-                    }
-                });
-            if let Some(thumb) = &entry.thumbnail {
-                card = card.source(thumb.clone());
+
+        let framing = self.data.map_framing;
+        let viewport = MapViewport::new(
+            LatLon::new(
+                framing.latitude.clamp(-85.0, 85.0),
+                framing.longitude.clamp(-180.0, 180.0),
+            ),
+            framing.zoom,
+        );
+        let markers = self.data.map_clusters.iter().map(|cluster| {
+            let at = LatLon::new(
+                cluster.latitude.clamp(-85.0, 85.0),
+                cluster.longitude.clamp(-180.0, 180.0),
+            );
+            let marker = MapMarker::new(cluster.key.clone(), at);
+            if cluster.count > 1 {
+                marker.label(cluster.count.to_string())
+            } else {
+                marker
             }
-            grid = grid.child(card);
+        });
+        let weak = cx.entity().downgrade();
+        let mut map = MapView::new(("map-view", self.data.map_point_count), viewport)
+            .cluster_markers()
+            .markers(markers)
+            .on_marker(move |key, _, app| {
+                if let Some(entity) = weak.upgrade() {
+                    let key = key.to_string();
+                    entity.update(app, |state, cx| state.open_map_cluster(&key, cx));
+                }
+            });
+
+        let template = self
+            .data
+            .map_tiles_enabled
+            .then(|| map_tile_template(&self.data.map_tile_url, &self.data.map_tile_key))
+            .flatten();
+        let online_tiles = template.is_some();
+        if let Some(template) = template {
+            let attribution = if template.contains("cartocdn.com") {
+                "Tiles: CARTO, OpenStreetMap contributors"
+            } else if template.contains("openstreetmap.org") {
+                "Tiles: OpenStreetMap contributors"
+            } else {
+                "Online tiles: custom provider"
+            };
+            map = map
+                .tiles(move |tile| ImageSource::from(render_map_tile_url(&template, tile)))
+                .attribution(attribution);
+        } else {
+            map = map.attribution("Offline: Natural Earth");
         }
-        grid.into_any_element()
+
+        let notice_key = if online_tiles {
+            "map.online_notice"
+        } else {
+            "map.offline_notice"
+        };
+        let world = WorldMap::new(
+            ("map-world", self.data.map_point_count),
+            map,
+            std::iter::empty::<(&str, f64)>(),
+        );
+        div()
+            .flex()
+            .flex_col()
+            .size_full()
+            .min_h_0()
+            .gap_3()
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .gap_4()
+                    .child(Paragraph::new(i18n::text(
+                        cx,
+                        "search.photos_count",
+                        &[("count", &self.data.map_point_count.to_string())],
+                    )))
+                    .child(Paragraph::new(format!(
+                        "{} locations",
+                        self.data.map_clusters.len()
+                    ))),
+            )
+            .child(Banner::new(
+                "map-offline-notice",
+                Severity::Info,
+                i18n::text(cx, notice_key, &[]),
+            ))
+            .child(div().flex_1().min_h_0().child(world))
+            .into_any_element()
     }
 
     fn people_view(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -1808,6 +1916,9 @@ impl Siegu {
         let weak_folder = cx.entity().downgrade();
         let weak_add_folder = cx.entity().downgrade();
         let weak_language = cx.entity().downgrade();
+        let weak_map = cx.entity().downgrade();
+        let weak_map_url_input = self.map_tile_url_input.downgrade();
+        let weak_map_key_input = self.map_tile_key_input.downgrade();
 
         let mut folder_rows = div().flex().flex_col().gap_2();
         for (idx, folder) in self.folders.iter().enumerate() {
@@ -1945,6 +2056,55 @@ impl Siegu {
                     }),
             );
 
+        let weak_map_switch = weak_map.clone();
+        let map_section = div()
+            .flex()
+            .flex_col()
+            .gap_2()
+            .child(Heading::h3(i18n::text(cx, "settings.map", &[])))
+            .child(Paragraph::new(i18n::text(cx, "settings.map_hint", &[])))
+            .child(
+                Switch::new("setting-map-tiles", self.data.map_tiles_enabled)
+                    .label(i18n::text(cx, "settings.map_tiles_enabled", &[]))
+                    .on_change(move |on, _, app| {
+                        if let Some(entity) = weak_map_switch.upgrade() {
+                            entity.update(app, |state, cx| {
+                                state.data.map_tiles_enabled = on;
+                                persist_setting(
+                                    "map_tiles_enabled",
+                                    if on { "true" } else { "false" },
+                                );
+                                cx.notify();
+                            });
+                        }
+                    }),
+            )
+            .child(self.map_tile_url_input.clone())
+            .child(self.map_tile_key_input.clone())
+            .child(
+                Button::new("setting-map-save", i18n::text(cx, "settings.save", &[]))
+                    .icon(IconName::Check)
+                    .on_click(move |_, _, app| {
+                        let url = weak_map_url_input
+                            .upgrade()
+                            .map(|input| input.read(app).text().trim().to_string())
+                            .unwrap_or_default();
+                        let key = weak_map_key_input
+                            .upgrade()
+                            .map(|input| input.read(app).text().trim().to_string())
+                            .unwrap_or_default();
+                        if let Some(entity) = weak_map.upgrade() {
+                            entity.update(app, |state, cx| {
+                                state.data.map_tile_url = url;
+                                state.data.map_tile_key = key;
+                                persist_setting("map_tile_url", &state.data.map_tile_url);
+                                persist_setting("map_tile_key", &state.data.map_tile_key);
+                                cx.notify();
+                            });
+                        }
+                    }),
+            );
+
         let language_choices = i18n::CODES
             .iter()
             .map(|code| Choice::new(*code, i18n::language_label(cx, code)));
@@ -2015,6 +2175,7 @@ impl Siegu {
             .child(folders_section)
             .child(toggles)
             .child(appearance_section)
+            .child(map_section)
             .child(language_section)
             .children((!self.data.models.is_empty()).then(|| {
                 div()
@@ -2900,15 +3061,10 @@ fn load_library() -> LibraryData {
             PersonEntry { person, thumbnail }
         })
         .collect();
-    let places = db
-        .get_location_groups(60)
-        .into_iter()
-        .map(|place| {
-            let thumbnail =
-                resolve_image_source(place.encoded.as_deref(), place.photo_location.as_deref());
-            PlaceEntry { place, thumbnail }
-        })
-        .collect();
+    let map_points = db.get_heatmap_points();
+    let map_point_count = map_points.len();
+    let map_clusters = cluster_map_points(&map_points, MAP_CLUSTER_DECIMALS);
+    let map_framing = frame_map_points(&map_points);
     let albums = db
         .list_albums()
         .into_iter()
@@ -2934,6 +3090,12 @@ fn load_library() -> LibraryData {
         .get("sync_enabled")
         .map(|v| is_truthy(v))
         .unwrap_or(false);
+    let map_tiles_enabled = state
+        .get("map_tiles_enabled")
+        .map(|value| is_truthy(value))
+        .unwrap_or(false);
+    let map_tile_url = state.get("map_tile_url").cloned().unwrap_or_default();
+    let map_tile_key = state.get("map_tile_key").cloned().unwrap_or_default();
     let language = language_from_state(&state);
 
     let mut settings = safe_settings(&state);
@@ -2945,7 +3107,12 @@ fn load_library() -> LibraryData {
         total_photos,
         date_groups,
         people,
-        places,
+        map_point_count,
+        map_clusters,
+        map_framing,
+        map_tiles_enabled,
+        map_tile_url,
+        map_tile_key,
         albums,
         settings,
         models: model_toggles(&state),
@@ -2973,6 +3140,44 @@ fn persist_setting(key: &str, value: &str) {
 
 fn is_truthy(value: &str) -> bool {
     matches!(value.trim(), "1" | "true" | "True" | "TRUE")
+}
+
+/// Builds the optional online tile template. An empty setting stays on the
+/// keyless OpenStreetMap tiles; anything else must be an http(s) URL.
+fn map_tile_template(custom: &str, key: &str) -> Option<String> {
+    let custom = custom.trim();
+    let key = key.trim();
+    let mut template = if custom.is_empty() {
+        if key.is_empty() {
+            DEFAULT_MAP_TILE_URL.to_string()
+        } else {
+            CARTO_MAP_TILE_URL.to_string()
+        }
+    } else {
+        custom.to_string()
+    };
+    if !key.is_empty() && !template.contains("key=") {
+        let separator = if template.contains('?') { '&' } else { '?' };
+        template.push_str(&format!(
+            "{separator}key={}",
+            url::form_urlencoded::byte_serialize(key.as_bytes()).collect::<String>()
+        ));
+    }
+    let probe = render_map_tile_url(&template, Tile { z: 0, x: 0, y: 0 });
+    let parsed = Url::parse(&probe).ok()?;
+    matches!(parsed.scheme(), "http" | "https").then_some(template)
+}
+
+/// Fills Ely's tile placeholders with the provider's URL conventions.
+fn render_map_tile_url(template: &str, tile: Tile) -> String {
+    let subdomains = ["a", "b", "c"];
+    let subdomain = subdomains[(tile.x as usize + tile.y as usize) % subdomains.len()];
+    template
+        .replace("{s}", subdomain)
+        .replace("{r}", "")
+        .replace("{z}", &tile.z.to_string())
+        .replace("{x}", &tile.x.to_string())
+        .replace("{y}", &tile.y.to_string())
 }
 
 /// Resolves a photo's thumbnail: prefers the pre-encoded thumbnail (fast in-memory
@@ -3470,11 +3675,28 @@ fn main() {
                     })
                     .detach();
 
+                    let map_tile_url_input = cx.new(|cx| {
+                        let mut input = TextInput::new(window, cx)
+                            .label(i18n::text(cx, "settings.map_tile_url", &[]))
+                            .placeholder(DEFAULT_MAP_TILE_URL);
+                        input.set_text(data.map_tile_url.clone(), cx);
+                        input
+                    });
+                    let map_tile_key_input = cx.new(|cx| {
+                        let mut input = TextInput::new(window, cx)
+                            .label(i18n::text(cx, "settings.map_tile_key", &[]))
+                            .masked();
+                        input.set_text(data.map_tile_key.clone(), cx);
+                        input
+                    });
+
                     Siegu {
                         focus,
                         section: Section::Library,
                         search_input,
                         search_query: String::new(),
+                        map_tile_url_input,
+                        map_tile_key_input,
                         favorites_only: false,
                         videos_only: false,
                         library_window: PhotoWindow::default(),
@@ -3811,6 +4033,30 @@ mod tests {
         assert_eq!(language_from_state(&state), "pt");
         state.insert("language".to_string(), "unknown".to_string());
         assert_eq!(language_from_state(&state), "en");
+    }
+
+    #[test]
+    fn map_tile_template_is_off_until_a_safe_url_is_available() {
+        assert_eq!(
+            map_tile_template("", "").as_deref(),
+            Some("https://tile.openstreetmap.org/{z}/{x}/{y}.png")
+        );
+        assert_eq!(
+            map_tile_template("ftp://tiles.example.com/{z}/{x}/{y}.png", ""),
+            None
+        );
+        assert!(map_tile_template("", "secret key")
+            .as_deref()
+            .is_some_and(|url| url.contains("key=secret+key")));
+    }
+
+    #[test]
+    fn map_tile_rendering_replaces_provider_placeholders() {
+        let url = render_map_tile_url(
+            "https://{s}.example.com/{z}/{x}/{y}{r}.png?key=abc",
+            Tile { z: 4, x: 3, y: 5 },
+        );
+        assert_eq!(url, "https://c.example.com/4/3/5.png?key=abc");
     }
 
     #[test]
