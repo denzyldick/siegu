@@ -1,9 +1,20 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
+
+use chrono::{Datelike, NaiveDate};
 
 use crate::database::MapPoint;
 
 /// How many photo ids a single map marker keeps for its drill-down.
 pub const MAX_CLUSTER_PHOTOS: usize = 50;
+/// Photos farther apart than this many days start a new trip route.
+pub const TRIP_GAP_DAYS: i32 = 3;
+/// Keep the route layer bounded even for very large libraries.
+pub const MAX_TRIP_ROUTES: usize = 24;
+pub const MAX_ROUTE_POINTS: usize = 200;
+/// Ely evaluates every heat point on every paint, so feed it aggregated cells
+/// instead of one point per photo.
+pub const MAX_HEAT_POINTS: usize = 512;
+const HEAT_GRID_DEGREES: f64 = 0.5;
 
 /// A group of geotagged photos close enough to share one map marker.
 #[derive(Debug, Clone, PartialEq)]
@@ -20,6 +31,22 @@ pub struct MapCluster {
     pub count: usize,
     /// Photo ids to open when the marker is pressed, capped for UI performance.
     pub photo_ids: Vec<String>,
+}
+
+/// A chronological path through geotagged photos, drawn as a route layer.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MapRoute {
+    pub id: String,
+    pub name: String,
+    pub points: Vec<(f64, f64)>,
+}
+
+/// One aggregated density cell for the heat layer.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MapHeatPoint {
+    pub latitude: f64,
+    pub longitude: f64,
+    pub weight: f32,
 }
 
 /// Where a map should open before the user pans or zooms.
@@ -128,6 +155,129 @@ pub fn frame_map_points(points: &[MapPoint]) -> MapFraming {
     }
 }
 
+/// Aggregates photos into weighted half-degree cells, keeping only the busiest
+/// ones. This bounds Ely's per-paint heat work independently of library size.
+pub fn build_heat_points(points: &[MapPoint]) -> Vec<MapHeatPoint> {
+    let mut cells: BTreeMap<(i32, i32), (f64, f64, usize)> = BTreeMap::new();
+    for point in points {
+        if !point.latitude.is_finite() || !point.longitude.is_finite() {
+            continue;
+        }
+        let latitude = point.latitude.clamp(-85.0, 85.0);
+        let longitude = point.longitude.clamp(-180.0, 180.0);
+        let cell = (
+            (latitude / HEAT_GRID_DEGREES).round() as i32,
+            (longitude / HEAT_GRID_DEGREES).round() as i32,
+        );
+        let entry = cells.entry(cell).or_insert((0.0, 0.0, 0));
+        entry.0 += latitude;
+        entry.1 += longitude;
+        entry.2 += 1;
+    }
+    let mut cells: Vec<_> = cells.into_iter().collect();
+    cells.sort_by(|a, b| b.1 .2.cmp(&a.1 .2).then_with(|| a.0.cmp(&b.0)));
+    cells
+        .into_iter()
+        .take(MAX_HEAT_POINTS)
+        .map(|(_, (latitude_sum, longitude_sum, count))| MapHeatPoint {
+            latitude: latitude_sum / count as f64,
+            longitude: longitude_sum / count as f64,
+            weight: count as f32,
+        })
+        .collect()
+}
+
+/// Chart hue for a cluster. Busier clusters run hotter; there are eight hues
+/// in Ely's chart palette.
+pub fn cluster_hue(count: usize) -> usize {
+    ((count.max(1) as f64).log2() as usize).min(7)
+}
+
+/// Groups photos into recent trips by capture date. Consecutive shots within
+/// [`TRIP_GAP_DAYS`] belong to one route; only the newest routes are kept and
+/// each is thinned to avoid loading a path per photo.
+pub fn build_trip_routes(points: &[MapPoint]) -> Vec<MapRoute> {
+    let mut dated: Vec<(i32, &MapPoint)> = points
+        .iter()
+        .filter_map(|point| {
+            if !point.latitude.is_finite() || !point.longitude.is_finite() {
+                return None;
+            }
+            let created = point.created.as_deref()?;
+            let date = NaiveDate::parse_from_str(created.get(..10)?, "%Y-%m-%d").ok()?;
+            Some((date.num_days_from_ce(), point))
+        })
+        .collect();
+    dated.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.id.cmp(&b.1.id)));
+
+    let mut groups: Vec<Vec<(i32, &MapPoint)>> = Vec::new();
+    for entry in dated {
+        let new_trip = match groups.last() {
+            Some(last) => {
+                entry.0 - last.last().map(|item| item.0).unwrap_or(entry.0) > TRIP_GAP_DAYS
+            }
+            None => true,
+        };
+        if new_trip {
+            groups.push(vec![entry]);
+        } else {
+            groups.last_mut().expect("trip group").push(entry);
+        }
+    }
+
+    groups
+        .into_iter()
+        .enumerate()
+        .filter(|(_, group)| group.len() > 1)
+        .rev()
+        .take(MAX_TRIP_ROUTES)
+        .filter_map(|(index, group)| {
+            let mut seen = HashSet::new();
+            let mut coords = Vec::new();
+            for (_, point) in &group {
+                let key = format!("{:.2}:{:.2}", point.latitude, point.longitude);
+                if seen.insert(key) {
+                    coords.push((
+                        point.latitude.clamp(-85.0, 85.0),
+                        point.longitude.clamp(-180.0, 180.0),
+                    ));
+                    if coords.len() == MAX_ROUTE_POINTS {
+                        break;
+                    }
+                }
+            }
+            if coords.len() < 2 {
+                return None;
+            }
+            let first_day = group.first().map(|item| item.0).unwrap_or(0);
+            let start = group
+                .first()
+                .map(|item| item.1.location.trim())
+                .unwrap_or("");
+            let end = group
+                .last()
+                .map(|item| item.1.location.trim())
+                .unwrap_or("");
+            let name = if !start.is_empty() && !end.is_empty() && start != end {
+                format!("{start} → {end}")
+            } else if !start.is_empty() {
+                start.to_string()
+            } else if !end.is_empty() {
+                end.to_string()
+            } else {
+                NaiveDate::from_num_days_from_ce_opt(first_day)
+                    .map(|date| date.format("%Y-%m-%d").to_string())
+                    .unwrap_or_else(|| format!("Trip {}", index + 1))
+            };
+            Some(MapRoute {
+                id: format!("trip-{first_day}-{index}"),
+                name,
+                points: coords,
+            })
+        })
+        .collect()
+}
+
 fn median(values: &mut [f64]) -> f64 {
     values.sort_by(f64::total_cmp);
     let middle = values.len() / 2;
@@ -149,7 +299,10 @@ fn round_coordinate(value: f64, factor: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{cluster_map_points, frame_map_points, MAX_CLUSTER_PHOTOS};
+    use super::{
+        build_heat_points, build_trip_routes, cluster_hue, cluster_map_points, frame_map_points,
+        MAX_CLUSTER_PHOTOS, MAX_HEAT_POINTS,
+    };
     use crate::database::MapPoint;
 
     fn point(id: &str, latitude: f64, longitude: f64, location: &str) -> MapPoint {
@@ -237,5 +390,67 @@ mod tests {
         let framing = frame_map_points(&points);
         assert_eq!((framing.latitude, framing.longitude), (52.0, 5.0));
         assert!(framing.zoom < 6.0);
+    }
+
+    #[test]
+    fn cluster_hue_scales_with_density() {
+        assert_eq!(cluster_hue(0), 0);
+        assert_eq!(cluster_hue(1), 0);
+        assert_eq!(cluster_hue(8), 3);
+        assert_eq!(cluster_hue(10_000), 7);
+    }
+
+    #[test]
+    fn heat_points_are_aggregated_and_bounded() {
+        let mut points = (0..MAX_HEAT_POINTS * 2)
+            .map(|index| {
+                point(
+                    &format!("home-{index}"),
+                    1.0 + (index % 3) as f64 * 0.01,
+                    2.0,
+                    "",
+                )
+            })
+            .collect::<Vec<_>>();
+        points.push(point("away", 40.0, 5.0, ""));
+        let heat = build_heat_points(&points);
+        assert_eq!(heat.len(), 2);
+        assert_eq!(heat[0].weight, (MAX_HEAT_POINTS * 2) as f32);
+        assert!((heat[0].latitude - 1.01).abs() < 0.01);
+        assert_eq!(heat[1].weight, 1.0);
+
+        let scattered = (0..MAX_HEAT_POINTS + 20)
+            .map(|index| {
+                point(
+                    &format!("{index}"),
+                    (index % 80) as f64,
+                    (index / 80) as f64 * 2.0,
+                    "",
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(build_heat_points(&scattered).len(), MAX_HEAT_POINTS);
+    }
+
+    #[test]
+    fn builds_trip_routes_from_dated_photos() {
+        let dated = |id: &str, lat, lon, location, created: &str| {
+            let mut item = point(id, lat, lon, location);
+            item.created = Some(created.to_string());
+            item
+        };
+        let points = vec![
+            dated("a", 52.0, 5.0, "Amsterdam", "2024-01-01 10:00:00"),
+            dated("b", 48.0, 2.0, "Paris", "2024-01-02 10:00:00"),
+            dated("c", 40.0, -74.0, "New York", "2024-01-03 10:00:00"),
+            dated("d", 1.0, 103.0, "Singapore", "2024-02-01 10:00:00"),
+            dated("e", 2.0, 104.0, "Singapore", "2024-02-02 10:00:00"),
+        ];
+        let routes = build_trip_routes(&points);
+        assert_eq!(routes.len(), 2);
+        assert_eq!(routes[0].name, "Singapore");
+        assert_eq!(routes[0].points.len(), 2);
+        assert_eq!(routes[1].name, "Amsterdam → New York");
+        assert_eq!(routes[1].points.len(), 3);
     }
 }

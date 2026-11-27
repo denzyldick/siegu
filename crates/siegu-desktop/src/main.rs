@@ -21,7 +21,10 @@ use siegu_core::devices::{
 };
 use siegu_core::duplicates::{self, DuplicateGroupView, DuplicateStats};
 use siegu_core::library::do_get_search_facets;
-use siegu_core::map::{cluster_map_points, frame_map_points, MapCluster, MapFraming};
+use siegu_core::map::{
+    build_heat_points, build_trip_routes, cluster_hue, cluster_map_points, frame_map_points,
+    MapCluster, MapFraming, MapHeatPoint, MapRoute,
+};
 use siegu_core::{
     config::default_config_dir,
     memory_pressure,
@@ -36,7 +39,10 @@ use siegu_ui::{
         feedback::Banner,
         forms::{Choice, InputEvent, MultiSelect, SearchInput, Select, Switch, TextInput},
         layout::{columns_for, ScrollArea},
-        maps::{LatLon, MapMarker, MapView, MapViewport, Tile, WorldMap},
+        maps::{
+            GeoHeatmap, LatLon, MapMarker, MapPopup, MapView, MapViewport, RouteLine, Tile,
+            WorldMap,
+        },
         motion::{ProgressBar, Skeleton},
         overlays::{ConfirmDialog, Dialog, PromptDialog},
         primitives::{FocusScope, Icon, IconName, Image as ElyImage, Severity},
@@ -157,28 +163,23 @@ const LIBRARY_MONTH_HEADER_HEIGHT: Pixels = px(64.0);
 const LIBRARY_DAY_HEADER_HEIGHT: Pixels = px(40.0);
 const MAP_CLUSTER_DECIMALS: u32 = 2;
 const DEFAULT_MAP_TILE_URL: &str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-const CARTO_LIGHT_MAP_TILE_URL: &str =
-    "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
-const CARTO_VOYAGER_MAP_TILE_URL: &str =
-    "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
 
 /// A built-in online tile provider. OpenStreetMap is the safe default: it works
 /// without an API key and is selected the first time online tiles are enabled.
+/// Everything else is a user-supplied custom tile URL.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum MapTileProvider {
     #[default]
     Osm,
-    CartoLight,
-    CartoVoyager,
     Custom,
 }
 
 impl MapTileProvider {
     fn from_setting(value: &str) -> Self {
         match value {
-            "carto_light" => Self::CartoLight,
-            "carto_voyager" => Self::CartoVoyager,
-            "custom" => Self::Custom,
+            // Older builds offered CARTO presets. Treat their saved setting as
+            // custom so the URL stays editable now that only OSM is built in.
+            "custom" | "carto_light" | "carto_voyager" => Self::Custom,
             _ => Self::Osm,
         }
     }
@@ -186,8 +187,6 @@ impl MapTileProvider {
     fn as_setting(self) -> &'static str {
         match self {
             Self::Osm => "osm",
-            Self::CartoLight => "carto_light",
-            Self::CartoVoyager => "carto_voyager",
             Self::Custom => "custom",
         }
     }
@@ -195,8 +194,6 @@ impl MapTileProvider {
     fn from_url(url: &str) -> Self {
         match url.trim() {
             "" | DEFAULT_MAP_TILE_URL => Self::Osm,
-            CARTO_LIGHT_MAP_TILE_URL => Self::CartoLight,
-            CARTO_VOYAGER_MAP_TILE_URL => Self::CartoVoyager,
             _ => Self::Custom,
         }
     }
@@ -204,8 +201,6 @@ impl MapTileProvider {
     fn url(self) -> Option<&'static str> {
         match self {
             Self::Osm => Some(DEFAULT_MAP_TILE_URL),
-            Self::CartoLight => Some(CARTO_LIGHT_MAP_TILE_URL),
-            Self::CartoVoyager => Some(CARTO_VOYAGER_MAP_TILE_URL),
             Self::Custom => None,
         }
     }
@@ -213,8 +208,6 @@ impl MapTileProvider {
     fn label_key(self) -> &'static str {
         match self {
             Self::Osm => "settings.map_provider_osm",
-            Self::CartoLight => "settings.map_provider_carto_light",
-            Self::CartoVoyager => "settings.map_provider_carto_voyager",
             Self::Custom => "settings.map_provider_custom",
         }
     }
@@ -313,6 +306,8 @@ struct LibraryLoad {
     map_point_count: usize,
     map_clusters: Vec<MapCluster>,
     map_framing: MapFraming,
+    map_heat: Vec<MapHeatPoint>,
+    map_routes: Vec<MapRoute>,
     albums: Vec<(Album, Option<StoredImage>)>,
 }
 
@@ -495,6 +490,8 @@ struct LibraryData {
     map_point_count: usize,
     map_clusters: Vec<MapCluster>,
     map_framing: MapFraming,
+    map_heat: Vec<MapHeatPoint>,
+    map_routes: Vec<MapRoute>,
     map_tiles_enabled: bool,
     map_tile_provider: MapTileProvider,
     map_tile_url: String,
@@ -661,6 +658,16 @@ enum AlbumDialog {
     },
 }
 
+/// A cluster preview shown on the map before opening the full drill-down.
+struct MapPopupState {
+    cluster_key: String,
+    latitude: f64,
+    longitude: f64,
+    title: String,
+    count: usize,
+    thumbnail: Option<ImageSource>,
+}
+
 /// The desktop shell. Reads the local library and renders one section at a time.
 struct Siegu {
     focus: FocusHandle,
@@ -688,6 +695,7 @@ struct Siegu {
     /// Guards against a slow query overwriting a newer drill-down.
     drill_down_generation: u64,
     drill_down: Option<DrillDown>,
+    map_popup: Option<MapPopupState>,
     selected_photo: Option<usize>,
     viewer_override: Option<PhotoEntry>,
     /// Cached metadata for the open viewer, keyed by photo id. Opening a viewer
@@ -1010,6 +1018,44 @@ impl Siegu {
         modal
     }
 
+    /// Shows a small preview card for a marker. Only the cluster's first photo
+    /// is fetched, so a 100k-photo library does not load thumbnails per marker.
+    fn show_map_cluster(&mut self, key: &str, cx: &mut Context<Self>) {
+        let Some(cluster) = self
+            .data
+            .map_clusters
+            .iter()
+            .find(|cluster| cluster.key == key)
+            .cloned()
+        else {
+            return;
+        };
+        let thumbnail = default_config_dir()
+            .join("siegu.db")
+            .exists()
+            .then(|| Database::new(&default_config_dir().display().to_string()))
+            .and_then(|db| {
+                db.get_photos_by_ids(&cluster.photo_ids[..1])
+                    .into_iter()
+                    .next()
+            })
+            .and_then(|photo| resolve_thumbnail(&photo));
+        let title = if cluster.label.is_empty() {
+            i18n::text(cx, "dock.map", &[]).to_string()
+        } else {
+            cluster.label
+        };
+        self.map_popup = Some(MapPopupState {
+            cluster_key: key.to_string(),
+            latitude: cluster.latitude,
+            longitude: cluster.longitude,
+            title,
+            count: cluster.count,
+            thumbnail,
+        });
+        cx.notify();
+    }
+
     /// Opens a map marker's photos in the same local drill-down grid used by
     /// People and Collections. Only SQLite is involved; no map tile request.
     fn open_map_cluster(&mut self, key: &str, cx: &mut Context<Self>) {
@@ -1330,6 +1376,7 @@ impl Siegu {
 
     fn refresh_data(&mut self) {
         self.data = load_library();
+        self.map_popup = None;
         self.library_window = PhotoWindow {
             filter_key: self.filter_signature(),
             ..Default::default()
@@ -2453,23 +2500,122 @@ impl Siegu {
                 cluster.latitude.clamp(-85.0, 85.0),
                 cluster.longitude.clamp(-180.0, 180.0),
             );
-            let marker = MapMarker::new(cluster.key.clone(), at);
+            let marker = MapMarker::new(cluster.key.clone(), at).hue(cluster_hue(cluster.count));
             if cluster.count > 1 {
                 marker.label(cluster.count.to_string())
             } else {
                 marker
             }
         });
+        let heat = self
+            .data
+            .map_heat
+            .iter()
+            .filter_map(|point| {
+                if !point.latitude.is_finite() || !point.longitude.is_finite() {
+                    return None;
+                }
+                let weight = if point.weight.is_finite() && point.weight >= 0.0 {
+                    point.weight
+                } else {
+                    return None;
+                };
+                Some((
+                    LatLon::new(
+                        point.latitude.clamp(-85.0, 85.0),
+                        point.longitude.clamp(-180.0, 180.0),
+                    ),
+                    weight,
+                ))
+            })
+            .collect::<Vec<_>>();
+        let routes = self
+            .data
+            .map_routes
+            .iter()
+            .enumerate()
+            .filter_map(|(index, route)| {
+                let places = route
+                    .points
+                    .iter()
+                    .filter_map(|(latitude, longitude)| {
+                        (latitude.is_finite() && longitude.is_finite()).then(|| {
+                            LatLon::new(latitude.clamp(-85.0, 85.0), longitude.clamp(-180.0, 180.0))
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                (places.len() >= 2).then(|| RouteLine::new(places).hue(index % 8))
+            })
+            .collect::<Vec<_>>();
+
         let weak = cx.entity().downgrade();
         let mut map = MapView::new(("map-view", self.data.map_point_count), viewport)
             .cluster_markers()
             .markers(markers)
-            .on_marker(move |key, _, app| {
-                if let Some(entity) = weak.upgrade() {
-                    let key = key.to_string();
-                    entity.update(app, |state, cx| state.open_map_cluster(&key, cx));
+            .on_marker({
+                let weak = weak.clone();
+                move |key, _, app| {
+                    if let Some(entity) = weak.upgrade() {
+                        let key = key.to_string();
+                        entity.update(app, |state, cx| state.show_map_cluster(&key, cx));
+                    }
                 }
             });
+        if !heat.is_empty() {
+            map = map.layer(GeoHeatmap::new(heat).hue(6));
+        }
+        for route in routes {
+            map = map.layer(route);
+        }
+        if let Some(item) = &self.map_popup {
+            let at = LatLon::new(
+                item.latitude.clamp(-85.0, 85.0),
+                item.longitude.clamp(-180.0, 180.0),
+            );
+            let mut card = div().flex().flex_col().gap_2();
+            if let Some(thumbnail) = &item.thumbnail {
+                card = card.child(
+                    ElyImage::new(
+                        format!("map-popup-thumb:{}", item.cluster_key),
+                        thumbnail.clone(),
+                    )
+                    .w_full()
+                    .h(px(84.0))
+                    .rounded(px(8.0)),
+                );
+            }
+            card = card.child(Paragraph::new(format!("{} · {}", item.title, item.count)));
+            let open_key = item.cluster_key.clone();
+            let weak_open = weak.clone();
+            let open = Button::new(
+                format!("map-popup-open:{}", item.cluster_key),
+                "Open photos",
+            )
+            .icon(IconName::FolderOpen)
+            .on_click(move |_, _, app| {
+                if let Some(entity) = weak_open.upgrade() {
+                    let key = open_key.clone();
+                    entity.update(app, |state, cx| {
+                        state.map_popup = None;
+                        state.open_map_cluster(&key, cx);
+                    });
+                }
+            });
+            let weak_close = weak.clone();
+            map = map.popup(
+                MapPopup::new(at, item.title.clone())
+                    .child(card)
+                    .child(open)
+                    .on_close(move |_, app| {
+                        if let Some(entity) = weak_close.upgrade() {
+                            entity.update(app, |state, cx| {
+                                state.map_popup = None;
+                                cx.notify();
+                            });
+                        }
+                    }),
+            );
+        }
 
         let template = self
             .data
@@ -2478,9 +2624,7 @@ impl Siegu {
             .flatten();
         let online_tiles = template.is_some();
         if let Some(template) = template {
-            let attribution = if template.contains("cartocdn.com") {
-                "Tiles: CARTO, OpenStreetMap contributors"
-            } else if template.contains("openstreetmap.org") {
+            let attribution = if template.contains("openstreetmap.org") {
                 "Tiles: OpenStreetMap contributors"
             } else {
                 "Online tiles: custom provider"
@@ -3237,18 +3381,13 @@ impl Siegu {
 
         let weak_map_switch = weak_map.clone();
         let map_provider = self.data.map_tile_provider;
-        let map_provider_choices = [
-            MapTileProvider::Osm,
-            MapTileProvider::CartoLight,
-            MapTileProvider::CartoVoyager,
-            MapTileProvider::Custom,
-        ]
-        .map(|provider| {
-            Choice::new(
-                provider.as_setting(),
-                i18n::text(cx, provider.label_key(), &[]),
-            )
-        });
+        let map_provider_choices =
+            [MapTileProvider::Osm, MapTileProvider::Custom].map(|provider| {
+                Choice::new(
+                    provider.as_setting(),
+                    i18n::text(cx, provider.label_key(), &[]),
+                )
+            });
         let weak_provider_url_input = weak_map_url_input;
         let map_section = div()
             .flex()
@@ -4863,6 +5002,8 @@ fn load_library_rows() -> LibraryLoad {
             map_point_count: 0,
             map_clusters: Vec::new(),
             map_framing: MapFraming::default(),
+            map_heat: Vec::new(),
+            map_routes: Vec::new(),
             albums: Vec::new(),
         };
     }
@@ -4907,6 +5048,8 @@ fn load_library_rows() -> LibraryLoad {
     let map_point_count = map_points.len();
     let map_clusters = cluster_map_points(&map_points, MAP_CLUSTER_DECIMALS);
     let map_framing = frame_map_points(&map_points);
+    let map_heat = build_heat_points(&map_points);
+    let map_routes = build_trip_routes(&map_points);
     let albums = db
         .list_albums()
         .into_iter()
@@ -4928,6 +5071,8 @@ fn load_library_rows() -> LibraryLoad {
         map_point_count,
         map_clusters,
         map_framing,
+        map_heat,
+        map_routes,
         albums,
     }
 }
@@ -4955,6 +5100,8 @@ fn merge_library_load(data: &mut LibraryData, load: LibraryLoad) {
     data.map_point_count = load.map_point_count;
     data.map_clusters = load.map_clusters;
     data.map_framing = load.map_framing;
+    data.map_heat = load.map_heat;
+    data.map_routes = load.map_routes;
     data.albums = load
         .albums
         .into_iter()
@@ -5010,8 +5157,8 @@ fn map_tile_template(custom: &str, key: &str) -> Option<String> {
     } else {
         custom.to_string()
     };
-    // OpenStreetMap and CARTO are keyless; only a custom provider uses the
-    // saved API key, and appending one to a built-in URL breaks the request.
+    // OpenStreetMap is keyless; appending a saved key to it breaks requests.
+    // Only a custom provider uses the key field.
     let key = if MapTileProvider::from_url(custom).accepts_key() {
         key
     } else {
@@ -5822,6 +5969,7 @@ fn main() {
                         data_loading: default_config_dir().join("siegu.db").exists(),
                         drill_down_generation: 0,
                         drill_down: None,
+                        map_popup: None,
                         selected_photo: None,
                         viewer_override: opened_media_request(&initial_request)
                             .and_then(|path| photo_entry_from_path(&path)),
@@ -6213,10 +6361,6 @@ mod tests {
             map_tile_template("", "secret key").as_deref(),
             Some(DEFAULT_MAP_TILE_URL)
         );
-        assert_eq!(
-            map_tile_template(CARTO_LIGHT_MAP_TILE_URL, "secret key").as_deref(),
-            Some(CARTO_LIGHT_MAP_TILE_URL)
-        );
         assert!(
             map_tile_template("https://tiles.example.com/{z}/{x}/{y}.png", "secret key")
                 .as_deref()
@@ -6227,9 +6371,15 @@ mod tests {
     #[test]
     fn only_custom_tile_provider_accepts_a_key() {
         assert!(!MapTileProvider::Osm.accepts_key());
-        assert!(!MapTileProvider::CartoLight.accepts_key());
-        assert!(!MapTileProvider::CartoVoyager.accepts_key());
         assert!(MapTileProvider::Custom.accepts_key());
+        assert_eq!(
+            MapTileProvider::from_setting("carto_light"),
+            MapTileProvider::Custom
+        );
+        assert_eq!(
+            MapTileProvider::from_setting("carto_voyager"),
+            MapTileProvider::Custom
+        );
     }
 
     #[test]

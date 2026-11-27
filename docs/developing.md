@@ -172,9 +172,8 @@ light/dark changes while the app is open.
 The Map section plots local GPS points over Ely's bundled country outlines and
 does not request remote map tiles by default. Users must enable **Settings →
 Map tiles → Use online map tiles** before any tile URL is loaded. The provider
-dropdown selects keyless OpenStreetMap (the default), keyless CARTO, or a custom
-tile URL; changes persist as they are made. Only a custom provider shows the API
-key field.
+dropdown selects keyless OpenStreetMap (the default) or a custom tile URL;
+changes persist as they are made. Only a custom provider shows the API key field.
 
 ### Linux packages
 
