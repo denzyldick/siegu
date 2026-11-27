@@ -277,7 +277,9 @@
     "route_label": "Viaggio {index} di {total} · {name} · {date}",
     "route_none": "Nessun itinerario di viaggio",
     "marker_hint": "Seleziona un indicatore per aprire le sue foto",
-    "reset_view": "Reimposta vista"
+    "reset_view": "Reimposta vista",
+    "routes_hide": "Nascondi percorsi",
+    "routes_show": "Mostra percorsi"
   },
   "devices": {
     "title": "Dispositivi",

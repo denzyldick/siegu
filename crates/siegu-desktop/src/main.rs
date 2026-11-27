@@ -489,6 +489,7 @@ struct LibraryData {
     map_framing: MapFraming,
     map_heat: Vec<MapHeatPoint>,
     map_routes: Vec<MapRoute>,
+    map_routes_visible: bool,
     map_tiles_enabled: bool,
     map_tile_provider: MapTileProvider,
     map_tile_url: String,
@@ -1026,6 +1027,21 @@ impl Siegu {
     /// Re-centres the map on the library's geotagged photos.
     fn reset_map_view(&mut self, cx: &mut Context<Self>) {
         self.map_frame_nonce = self.map_frame_nonce.wrapping_add(1);
+        cx.notify();
+    }
+
+    /// Routes are useful for some libraries and pure noise in others. Keep the
+    /// choice local so the map can be enjoyed as a plain place browser.
+    fn toggle_map_routes(&mut self, cx: &mut Context<Self>) {
+        self.data.map_routes_visible = !self.data.map_routes_visible;
+        persist_setting(
+            "map_routes_visible",
+            if self.data.map_routes_visible {
+                "true"
+            } else {
+                "false"
+            },
+        );
         cx.notify();
     }
 
@@ -2507,31 +2523,37 @@ impl Siegu {
                 ))
             })
             .collect::<Vec<_>>();
-        // Only one trip is drawn at a time; showing every route at once turns
-        // the map into spaghetti. The timeline below steps through them in date
-        // order, and the default selection is the newest trip.
+        // Only one short trip is drawn at a time, and routes can be turned off
+        // entirely. `build_trip_routes` already refuses implausible jumps, so
+        // the line stays local instead of crossing the world.
         let route_count = self.data.map_routes.len();
         let route_index = self
             .map_route_index
             .unwrap_or(route_count.saturating_sub(1));
-        let routes = self
-            .data
-            .map_routes
-            .get(route_index)
-            .into_iter()
-            .filter_map(|route| {
-                let places = route
-                    .points
-                    .iter()
-                    .filter_map(|(latitude, longitude)| {
-                        (latitude.is_finite() && longitude.is_finite()).then(|| {
-                            LatLon::new(latitude.clamp(-85.0, 85.0), longitude.clamp(-180.0, 180.0))
+        let routes = if self.data.map_routes_visible {
+            self.data
+                .map_routes
+                .get(route_index)
+                .into_iter()
+                .filter_map(|route| {
+                    let places = route
+                        .points
+                        .iter()
+                        .filter_map(|(latitude, longitude)| {
+                            (latitude.is_finite() && longitude.is_finite()).then(|| {
+                                LatLon::new(
+                                    latitude.clamp(-85.0, 85.0),
+                                    longitude.clamp(-180.0, 180.0),
+                                )
+                            })
                         })
-                    })
-                    .collect::<Vec<_>>();
-                (places.len() >= 2).then(|| RouteLine::new(places).hue(route_index % 8))
-            })
-            .collect::<Vec<_>>();
+                        .collect::<Vec<_>>();
+                    (places.len() >= 2).then(|| RouteLine::new(places).hue(route_index % 8))
+                })
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
 
         let weak = cx.entity().downgrade();
         let map_id = format!(
@@ -2593,6 +2615,12 @@ impl Siegu {
         };
         let theme = cx.theme();
         let weak_reset = weak.clone();
+        let weak_routes = weak.clone();
+        let route_toggle_label = if self.data.map_routes_visible {
+            i18n::text(cx, "map.routes_hide", &[])
+        } else {
+            i18n::text(cx, "map.routes_show", &[])
+        };
         let summary = div()
             .flex()
             .flex_wrap()
@@ -2620,8 +2648,19 @@ impl Siegu {
                             entity.update(app, |state, cx| state.reset_map_view(cx));
                         }
                     }),
+            )
+            .child(
+                Button::new("map-routes-toggle", route_toggle_label)
+                    .icon(IconName::Map)
+                    .on_click(move |_, _, app| {
+                        if let Some(entity) = weak_routes.upgrade() {
+                            entity.update(app, |state, cx| state.toggle_map_routes(cx));
+                        }
+                    }),
             );
-        let timeline = if route_count == 0 {
+        let timeline = if !self.data.map_routes_visible {
+            div()
+        } else if route_count == 0 {
             div().child(
                 Paragraph::new(i18n::text(cx, "map.route_none", &[]))
                     .text_size(theme.text_size(TextSize::Sm))
@@ -4958,6 +4997,10 @@ fn load_settings() -> LibraryData {
         .get("sidebar_collapsed")
         .map(|value| is_truthy(value))
         .unwrap_or(false);
+    let map_routes_visible = state
+        .get("map_routes_visible")
+        .map(|value| is_truthy(value))
+        .unwrap_or(true);
     let map_tiles_enabled = state
         .get("map_tiles_enabled")
         .map(|value| is_truthy(value))
@@ -4975,6 +5018,7 @@ fn load_settings() -> LibraryData {
     }
 
     LibraryData {
+        map_routes_visible,
         map_tiles_enabled,
         map_tile_provider,
         map_tile_url,

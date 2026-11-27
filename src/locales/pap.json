@@ -277,7 +277,9 @@
     "route_label": "Viaje {index} di {total} · {name} · {date}",
     "route_none": "No tin ruta di viaje ainda",
     "marker_hint": "Selecciona un marker pa habri su foto",
-    "reset_view": "Restaurá vista"
+    "reset_view": "Restaurá vista",
+    "routes_hide": "Sconde ruta",
+    "routes_show": "Mostra ruta"
   },
   "devices": {
     "title": "Aparatonan",

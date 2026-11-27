@@ -277,7 +277,9 @@
     "route_label": "Reis {index} van {total} · {name} · {date}",
     "route_none": "Nog geen reisroutes",
     "marker_hint": "Selecteer een marker om de foto's te openen",
-    "reset_view": "Weergave herstellen"
+    "reset_view": "Weergave herstellen",
+    "routes_hide": "Routes verbergen",
+    "routes_show": "Routes tonen"
   },
   "devices": {
     "title": "Apparaten",

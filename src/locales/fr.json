@@ -277,7 +277,9 @@
     "route_label": "Voyage {index} sur {total} · {name} · {date}",
     "route_none": "Aucun itinéraire pour l'instant",
     "marker_hint": "Sélectionnez un repère pour ouvrir ses photos",
-    "reset_view": "Réinitialiser la vue"
+    "reset_view": "Réinitialiser la vue",
+    "routes_hide": "Masquer les itinéraires",
+    "routes_show": "Afficher les itinéraires"
   },
   "devices": {
     "title": "Appareils",

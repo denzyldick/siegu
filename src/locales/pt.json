@@ -277,7 +277,9 @@
     "route_label": "Viagem {index} de {total} · {name} · {date}",
     "route_none": "Ainda não há rotas de viagem",
     "marker_hint": "Selecione um marcador para abrir suas fotos",
-    "reset_view": "Redefinir visualização"
+    "reset_view": "Redefinir visualização",
+    "routes_hide": "Ocultar rotas",
+    "routes_show": "Mostrar rotas"
   },
   "devices": {
     "title": "Dispositivos",

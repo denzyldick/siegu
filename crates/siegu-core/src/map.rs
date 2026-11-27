@@ -2,12 +2,19 @@ use std::collections::{BTreeMap, HashSet};
 
 use chrono::{Datelike, NaiveDate};
 
-use crate::database::MapPoint;
+use crate::database::{haversine_km, MapPoint};
 
 /// How many photo ids a single map marker keeps for its drill-down.
 pub const MAX_CLUSTER_PHOTOS: usize = 50;
 /// Photos farther apart than this many days start a new trip route.
 pub const TRIP_GAP_DAYS: i32 = 3;
+/// Even a dense photo run must not become a months-long line. Split it so the
+/// timeline shows short, readable outings instead of one endless path.
+pub const TRIP_MAX_DAYS: i32 = 14;
+/// Consecutive photos farther apart than this start a new route. Bad metadata
+/// can put two places thousands of kilometres apart a day apart; never join
+/// those with a line. Real flights are intentionally not drawn.
+pub const MAX_ROUTE_SEGMENT_KM: f64 = 250.0;
 /// Keep the route layer bounded even for very large libraries.
 pub const MAX_TRIP_ROUTES: usize = 24;
 pub const MAX_ROUTE_POINTS: usize = 200;
@@ -195,9 +202,10 @@ pub fn cluster_hue(count: usize) -> usize {
     ((count.max(1) as f64).log2() as usize).min(7)
 }
 
-/// Groups photos into recent trips by capture date. Consecutive shots within
-/// [`TRIP_GAP_DAYS`] belong to one route; only the newest routes are kept and
-/// each is thinned to avoid loading a path per photo.
+/// Groups photos into short, plausible routes. A date gap, a long run of days,
+/// or a jump across the map starts a new route. Only the newest routes are kept
+/// and each is thinned to avoid loading a path per photo. The bounds matter:
+/// a few bad GPS dates otherwise turn one "trip" into a line across the world.
 pub fn build_trip_routes(points: &[MapPoint]) -> Vec<MapRoute> {
     let mut dated: Vec<(i32, &MapPoint)> = points
         .iter()
@@ -214,13 +222,25 @@ pub fn build_trip_routes(points: &[MapPoint]) -> Vec<MapRoute> {
 
     let mut groups: Vec<Vec<(i32, &MapPoint)>> = Vec::new();
     for entry in dated {
-        let new_trip = match groups.last() {
-            Some(last) => {
-                entry.0 - last.last().map(|item| item.0).unwrap_or(entry.0) > TRIP_GAP_DAYS
+        let starts_new = match groups.last() {
+            Some(group) => {
+                let first = group.first().expect("non-empty route group");
+                let last = group.last().expect("non-empty route group");
+                let last_coord = (
+                    last.1.latitude.clamp(-85.0, 85.0),
+                    last.1.longitude.clamp(-180.0, 180.0),
+                );
+                let next_coord = (
+                    entry.1.latitude.clamp(-85.0, 85.0),
+                    entry.1.longitude.clamp(-180.0, 180.0),
+                );
+                entry.0 - last.0 > TRIP_GAP_DAYS
+                    || entry.0 - first.0 > TRIP_MAX_DAYS
+                    || haversine_km(last_coord, next_coord) > MAX_ROUTE_SEGMENT_KM
             }
             None => true,
         };
-        if new_trip {
+        if starts_new {
             groups.push(vec![entry]);
         } else {
             groups.last_mut().expect("trip group").push(entry);
@@ -313,7 +333,7 @@ fn round_coordinate(value: f64, factor: f64) -> f64 {
 mod tests {
     use super::{
         build_heat_points, build_trip_routes, cluster_hue, cluster_map_points, frame_map_points,
-        MAX_CLUSTER_PHOTOS, MAX_HEAT_POINTS,
+        MAX_CLUSTER_PHOTOS, MAX_HEAT_POINTS, TRIP_MAX_DAYS,
     };
     use crate::database::MapPoint;
 
@@ -445,7 +465,7 @@ mod tests {
     }
 
     #[test]
-    fn builds_trip_routes_from_dated_photos() {
+    fn builds_short_local_trip_routes_from_dated_photos() {
         let dated = |id: &str, lat, lon, location, created: &str| {
             let mut item = point(id, lat, lon, location);
             item.created = Some(created.to_string());
@@ -453,18 +473,39 @@ mod tests {
         };
         let points = vec![
             dated("a", 52.0, 5.0, "Amsterdam", "2024-01-01 10:00:00"),
-            dated("b", 48.0, 2.0, "Paris", "2024-01-02 10:00:00"),
-            dated("c", 40.0, -74.0, "New York", "2024-01-03 10:00:00"),
-            dated("d", 1.0, 103.0, "Singapore", "2024-02-01 10:00:00"),
-            dated("e", 2.0, 104.0, "Singapore", "2024-02-02 10:00:00"),
+            dated("b", 52.09, 5.12, "Utrecht", "2024-01-02 10:00:00"),
+            dated("c", 51.92, 4.48, "Rotterdam", "2024-01-03 10:00:00"),
+            dated("d", 40.71, -74.0, "New York", "2024-01-04 10:00:00"),
+            dated("e", 1.3, 103.8, "Singapore", "2024-02-01 10:00:00"),
+            dated("f", 1.31, 103.82, "Singapore", "2024-02-02 10:00:00"),
         ];
         let routes = build_trip_routes(&points);
         assert_eq!(routes.len(), 2);
-        assert_eq!(routes[0].name, "Amsterdam → New York");
+        assert_eq!(routes[0].name, "Amsterdam → Rotterdam");
         assert_eq!(routes[0].date, "2024-01-01");
         assert_eq!(routes[0].points.len(), 3);
         assert_eq!(routes[1].name, "Singapore");
         assert_eq!(routes[1].date, "2024-02-01");
         assert_eq!(routes[1].points.len(), 2);
+    }
+
+    #[test]
+    fn splits_dense_photo_runs_that_span_months() {
+        use chrono::{Duration, NaiveDate};
+
+        let base = NaiveDate::from_ymd_opt(2024, 1, 1).expect("valid date");
+        let points = (0..TRIP_MAX_DAYS + 5)
+            .map(|day| {
+                let date = base + Duration::days(day as i64);
+                let mut item = point(&format!("p{day}"), 52.0 + day as f64 * 0.01, 5.0, "Home");
+                item.created = Some(format!("{} 12:00:00", date.format("%Y-%m-%d")));
+                item
+            })
+            .collect::<Vec<_>>();
+
+        let routes = build_trip_routes(&points);
+        assert_eq!(routes.len(), 2);
+        assert_eq!(routes[0].date, "2024-01-01");
+        assert_eq!(routes[1].date, "2024-01-16");
     }
 }

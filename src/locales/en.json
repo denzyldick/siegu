@@ -236,7 +236,9 @@
     "route_label": "Trip {index} of {total} · {name} · {date}",
     "route_none": "No trip routes yet",
     "marker_hint": "Select a marker to open its photos",
-    "reset_view": "Reset view"
+    "reset_view": "Reset view",
+    "routes_hide": "Hide routes",
+    "routes_show": "Show routes"
   },
   "devices": {
     "title": "Devices",

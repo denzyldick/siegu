@@ -542,7 +542,7 @@ struct HomePlace {
 }
 
 /// Great-circle distance in kilometres between two WGS84 coordinates.
-fn haversine_km(a: (f64, f64), b: (f64, f64)) -> f64 {
+pub(crate) fn haversine_km(a: (f64, f64), b: (f64, f64)) -> f64 {
     const EARTH_RADIUS_KM: f64 = 6371.0088;
     let to_rad = |degrees: f64| degrees.to_radians();
     let dlat = to_rad(b.0 - a.0);
@@ -2614,8 +2614,12 @@ impl Database {
     /// Get all photos that have non-zero GPS coordinates, for map heatmap display.
     pub fn get_heatmap_points(&self) -> Vec<MapPoint> {
         let mut points = Vec::new();
-        let sql = "SELECT id, latitude, longitude, location, created FROM photo \
-            WHERE (latitude != 0.0 OR longitude != 0.0) AND deleted_at IS NULL";
+        // `photo.location` is the original file path, not a place name. Read
+        // the resolved place instead so map labels and route names are human.
+        let sql = "SELECT p.id, p.latitude, p.longitude, \
+            COALESCE((SELECT pl.name FROM place pl WHERE pl.id = p.place_id LIMIT 1), ''), \
+            p.created FROM photo p \
+            WHERE (p.latitude != 0.0 OR p.longitude != 0.0) AND p.deleted_at IS NULL";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([], |row| {
                 Ok(MapPoint {
