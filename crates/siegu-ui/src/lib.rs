@@ -5,6 +5,7 @@
 //! the same GPUI types.
 
 pub use app_shell::SieguAppShell;
+pub use collection_card::CollectionCard;
 pub use ely_gpui_component as ely;
 pub use gpui;
 pub use gpui_platform;
@@ -18,6 +19,7 @@ pub use photo_card::PhotoCard;
 pub use photo_grid::PhotoGrid;
 
 mod app_shell;
+mod collection_card;
 mod info_card;
 mod media_viewer;
 mod nav;
