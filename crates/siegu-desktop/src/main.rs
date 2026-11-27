@@ -590,6 +590,20 @@ enum DeviceDialog {
     },
 }
 
+/// A pending person management dialog. The rename field is an entity so its
+/// text and selection survive repaints while the dialog is open.
+#[derive(Clone)]
+enum PersonDialog {
+    Rename {
+        id: String,
+        field: Entity<TextInput>,
+    },
+    Merge {
+        id: String,
+        target_id: Option<String>,
+    },
+}
+
 /// The desktop shell. Reads the local library and renders one section at a time.
 struct Siegu {
     focus: FocusHandle,
@@ -628,6 +642,7 @@ struct Siegu {
     devices: Vec<DeviceInfo>,
     device_dialog: Option<DeviceDialog>,
     device_error: Option<String>,
+    person_dialog: Option<PersonDialog>,
     data: LibraryData,
     _appearance: Subscription,
 }
@@ -2392,11 +2407,11 @@ impl Siegu {
             .into_any_element()
     }
 
-    fn people_view(&self, cx: &mut Context<Self>) -> AnyElement {
+    fn people_view(&mut self, cx: &mut Context<Self>) -> AnyElement {
         if self.data.people.is_empty() {
             return empty_state(
-                "No people yet.",
-                "Named faces from your library will be grouped here.",
+                &i18n::text(cx, "people.no_faces", &[]),
+                &i18n::text(cx, "people.no_faces_desc", &[]),
             );
         }
         let mut grid = PhotoGrid::new();
@@ -2404,16 +2419,22 @@ impl Siegu {
             let weak = cx.entity().downgrade();
             let person_id = entry.person.id.clone();
             let name = entry.person.name.clone();
-            let detail = plural(entry.person.face_count as usize, "face");
-            let mut card = InfoCard::new(("person", idx), IconName::Users, name.clone())
+            let unnamed = i18n::text(cx, "search.unnamed_faces", &[]);
+            let display_name = person_display_name(&name, &unnamed);
+            let detail = i18n::text(
+                cx,
+                "search.faces_count",
+                &[("count", &entry.person.face_count.to_string())],
+            );
+            let mut card = InfoCard::new(("person", idx), IconName::Users, display_name.clone())
                 .detail(detail.clone())
                 .on_click(move |_, cx| {
                     if let Some(entity) = weak.upgrade() {
                         let id = person_id.clone();
-                        let title = name.clone();
+                        let title = display_name.clone();
                         let subtitle = detail.clone();
                         entity.update(cx, |state, cx| {
-                            state.open_drill_down(title, subtitle, |db| {
+                            state.open_drill_down(title, subtitle.to_string(), |db| {
                                 db.get_photos_for_person(&id, 0, 60)
                             });
                             cx.notify();
@@ -2423,7 +2444,52 @@ impl Siegu {
             if let Some(thumb) = &entry.thumbnail {
                 card = card.source(thumb.clone());
             }
-            grid = grid.child(card);
+
+            let weak_rename = cx.entity().downgrade();
+            let rename_id = entry.person.id.clone();
+            let rename_name = entry.person.name.clone();
+            let rename = Button::new(("person-rename", idx), i18n::text(cx, "people.rename", &[]))
+                .icon(IconName::Pencil)
+                .variant(ButtonVariant::Ghost)
+                .on_click(move |_, window, app| {
+                    if let Some(entity) = weak_rename.upgrade() {
+                        let id = rename_id.clone();
+                        let name = rename_name.clone();
+                        entity.update(app, |state, cx| {
+                            let field = cx.new(|cx| TextInput::new(window, cx));
+                            field.update(cx, |input, cx| input.set_text(name, cx));
+                            state.person_dialog = Some(PersonDialog::Rename { id, field });
+                            cx.notify();
+                        });
+                    }
+                });
+
+            let weak_merge = cx.entity().downgrade();
+            let merge_id = entry.person.id.clone();
+            let merge = Button::new(("person-merge", idx), i18n::text(cx, "people.merge", &[]))
+                .icon(IconName::Merge)
+                .variant(ButtonVariant::Ghost)
+                .on_click(move |_, _, app| {
+                    if let Some(entity) = weak_merge.upgrade() {
+                        let id = merge_id.clone();
+                        entity.update(app, |state, cx| {
+                            state.person_dialog = Some(PersonDialog::Merge {
+                                id,
+                                target_id: None,
+                            });
+                            cx.notify();
+                        });
+                    }
+                });
+
+            grid = grid.child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .child(card)
+                    .child(div().flex().gap_2().child(rename).child(merge)),
+            );
         }
         grid.into_any_element()
     }
@@ -3017,6 +3083,38 @@ impl Siegu {
         }
     }
 
+    /// Shared cleanup after a person rename or merge: reload every local view
+    /// that can hold the old id and drop any open drill-down built from it.
+    fn finish_person_change(&mut self, cx: &mut Context<Self>) {
+        self.person_dialog = None;
+        self.drill_down = None;
+        self.selected_photo = None;
+        self.viewer_override = None;
+        self.refresh_data();
+        cx.notify();
+    }
+
+    fn rename_person(&mut self, id: &str, name: &str, cx: &mut Context<Self>) {
+        let dir = default_config_dir();
+        if dir.join("siegu.db").exists() {
+            let db = Database::new(&dir.display().to_string());
+            db.rename_person(id, name.trim());
+            self.finish_person_change(cx);
+        }
+    }
+
+    fn merge_person(&mut self, from_id: &str, to_id: &str, cx: &mut Context<Self>) {
+        if from_id == to_id {
+            return;
+        }
+        let dir = default_config_dir();
+        if dir.join("siegu.db").exists() {
+            let db = Database::new(&dir.display().to_string());
+            db.merge_people(from_id, to_id);
+            self.finish_person_change(cx);
+        }
+    }
+
     fn devices_view(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let weak_reload = cx.entity().downgrade();
         let toolbar = div().flex().flex_wrap().items_center().gap_3().child(
@@ -3324,6 +3422,140 @@ impl Siegu {
                         let id = confirm_id.clone();
                         entity.update(app, |state, cx| state.remove_device(&id, cx));
                     }
+                })
+                .into_any_element()]
+            }
+        }
+    }
+
+    fn person_dialogs(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let Some(dialog) = self.person_dialog.clone() else {
+            return Vec::new();
+        };
+        let weak_close = cx.entity().downgrade();
+        let close = move |_: &mut Window, cx: &mut App| {
+            if let Some(entity) = weak_close.upgrade() {
+                entity.update(cx, |state, cx| {
+                    state.person_dialog = None;
+                    cx.notify();
+                });
+            }
+        };
+
+        match dialog {
+            PersonDialog::Rename { id, field } => {
+                let name = self
+                    .data
+                    .people
+                    .iter()
+                    .find(|entry| entry.person.id == id)
+                    .map(|entry| entry.person.name.clone())
+                    .unwrap_or_default();
+                let unnamed = i18n::text(cx, "search.unnamed_faces", &[]);
+                let display_name = person_display_name(&name, &unnamed);
+                let weak_submit = cx.entity().downgrade();
+                let submit_id = id.clone();
+                vec![PromptDialog::new(
+                    format!("person-rename-{id}"),
+                    i18n::text(cx, "people.rename", &[]),
+                    &field,
+                    close,
+                )
+                .label(i18n::text(
+                    cx,
+                    "people.new_name_for",
+                    &[("name", display_name.as_str())],
+                ))
+                .submit(i18n::text(cx, "people.update_name", &[]))
+                .check(|text| {
+                    if text.trim().is_empty() {
+                        Err("Name cannot be empty".into())
+                    } else {
+                        Ok(())
+                    }
+                })
+                .on_submit(move |text, _, app| {
+                    if let Some(entity) = weak_submit.upgrade() {
+                        let id = submit_id.clone();
+                        let name = text.trim().to_string();
+                        entity.update(app, |state, cx| state.rename_person(&id, &name, cx));
+                    }
+                })
+                .into_any_element()]
+            }
+            PersonDialog::Merge { id, target_id } => {
+                let name = self
+                    .data
+                    .people
+                    .iter()
+                    .find(|entry| entry.person.id == id)
+                    .map(|entry| entry.person.name.clone())
+                    .unwrap_or_default();
+                let unnamed = i18n::text(cx, "search.unnamed_faces", &[]);
+                let display_name = person_display_name(&name, &unnamed);
+                let choices = person_option_rows(
+                    self.data.people.iter().map(|entry| &entry.person),
+                    &id,
+                    &unnamed,
+                )
+                .into_iter()
+                .map(|(value, label)| Choice::new(value, label))
+                .collect::<Vec<_>>();
+                let weak_target = cx.entity().downgrade();
+                let select = Select::new("person-merge-target", choices)
+                    .label(i18n::text(cx, "people.target_profile", &[]))
+                    .selected(target_id.clone().unwrap_or_default())
+                    .on_change(move |value, _, app| {
+                        let target = (!value.is_empty()).then(|| value.to_string());
+                        if let Some(entity) = weak_target.upgrade() {
+                            entity.update(app, |state, cx| {
+                                if let Some(PersonDialog::Merge { target_id, .. }) =
+                                    &mut state.person_dialog
+                                {
+                                    *target_id = target;
+                                    cx.notify();
+                                }
+                            });
+                        }
+                    });
+
+                let weak_confirm = cx.entity().downgrade();
+                let from_id = id.clone();
+                let confirm_target = target_id.clone();
+                let cancel_label = i18n::text(cx, "common.cancel", &[]);
+                let confirm_label = i18n::text(cx, "people.confirm_merge", &[]);
+                vec![Dialog::new(
+                    format!("person-merge-{id}"),
+                    i18n::text(cx, "people.merge", &[]),
+                    close,
+                )
+                .detail(i18n::text(
+                    cx,
+                    "people.merge_desc",
+                    &[("name", display_name.as_str())],
+                ))
+                .child(select)
+                .action(move |close| {
+                    let label = cancel_label.clone();
+                    Button::new("person-merge-cancel", label)
+                        .variant(ButtonVariant::Ghost)
+                        .on_click(move |_, window, app| close(window, app))
+                })
+                .action(move |close| {
+                    Button::new("person-merge-confirm", confirm_label)
+                        .disabled(confirm_target.is_none())
+                        .on_click(move |_, window, app| {
+                            close(window, app);
+                            let Some(to_id) = confirm_target.clone() else {
+                                return;
+                            };
+                            if let Some(entity) = weak_confirm.upgrade() {
+                                let from_id = from_id.clone();
+                                entity.update(app, |state, cx| {
+                                    state.merge_person(&from_id, &to_id, cx);
+                                });
+                            }
+                        })
                 })
                 .into_any_element()]
             }
@@ -4269,6 +4501,37 @@ fn photo_filter_signature(
     format!("{query}|{favorites_only}|{videos_only}|{filter:?}")
 }
 
+/// Localized display name for a person, falling back to the unnamed-group
+/// label for face clusters the user has not named yet.
+fn person_display_name(name: &str, unnamed: &str) -> String {
+    if name.trim().is_empty() {
+        unnamed.to_string()
+    } else {
+        name.to_string()
+    }
+}
+
+/// Candidate rows for the person merge dialog: every person except the one
+/// being replaced, with unnamed groups given a localized display name.
+fn person_option_rows<'a>(
+    people: impl IntoIterator<Item = &'a PersonWithFace>,
+    from_id: &str,
+    unnamed: &str,
+) -> Vec<(String, String)> {
+    people
+        .into_iter()
+        .filter(|person| person.id != from_id)
+        .map(|person| {
+            let name = if person.name.trim().is_empty() {
+                unnamed.to_string()
+            } else {
+                person.name.clone()
+            };
+            (person.id.clone(), name)
+        })
+        .collect()
+}
+
 /// Turn a local facet list into a select with an explicit "All" option.
 fn facet_select_choices(values: &[String], all_label: SharedString) -> Vec<Choice> {
     let mut choices = vec![Choice::new("", all_label)];
@@ -4332,6 +4595,7 @@ impl Render for Siegu {
                     state.viewer_override = None;
                     state.device_dialog = None;
                     state.device_error = None;
+                    state.person_dialog = None;
                     if state.section == Section::Devices {
                         state.reload_devices(cx);
                     }
@@ -4378,6 +4642,11 @@ impl Render for Siegu {
         };
         let device_dialogs = if self.device_dialog.is_some() {
             self.device_dialogs(cx)
+        } else {
+            Vec::new()
+        };
+        let person_dialogs = if self.person_dialog.is_some() {
+            self.person_dialogs(cx)
         } else {
             Vec::new()
         };
@@ -4450,6 +4719,7 @@ impl Render for Siegu {
             .children(viewer)
             .children(onboarding)
             .children(device_dialogs)
+            .children(person_dialogs)
     }
 }
 
@@ -4697,6 +4967,7 @@ fn main() {
                         devices: Vec::new(),
                         device_dialog: None,
                         device_error: None,
+                        person_dialog: None,
                         data,
                         _appearance: appearance,
                     }
@@ -5277,5 +5548,47 @@ mod tests {
         assert_eq!((items[0].group_start, items[0].group_count), (0, 2));
         assert_eq!((items[3].group_start, items[3].group_count), (2, 1));
         assert_eq!((items[6].group_start, items[6].group_count), (3, 3));
+    }
+
+    fn test_person(id: &str, name: &str) -> PersonWithFace {
+        PersonWithFace {
+            id: id.to_string(),
+            name: name.to_string(),
+            representative_crop: None,
+            representative_face_id: None,
+            encoded: None,
+            embedding: None,
+            face_count: 1,
+        }
+    }
+
+    #[test]
+    fn person_display_name_falls_back_for_unnamed_groups() {
+        assert_eq!(person_display_name("Ada", "Other faces"), "Ada");
+        assert_eq!(person_display_name("  ", "Other faces"), "Other faces");
+    }
+
+    #[test]
+    fn merge_targets_exclude_the_source_and_label_unnamed_people() {
+        let people = vec![
+            test_person("a", ""),
+            test_person("b", "Ada"),
+            test_person("c", "Grace"),
+        ];
+
+        assert_eq!(
+            person_option_rows(&people, "a", "Other faces"),
+            vec![
+                ("b".to_string(), "Ada".to_string()),
+                ("c".to_string(), "Grace".to_string()),
+            ]
+        );
+        assert_eq!(
+            person_option_rows(&people, "b", "Other faces"),
+            vec![
+                ("a".to_string(), "Other faces".to_string()),
+                ("c".to_string(), "Grace".to_string()),
+            ]
+        );
     }
 }
