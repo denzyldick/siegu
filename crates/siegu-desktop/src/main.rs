@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 mod app_ipc;
+mod tile_http;
 
 use base64::Engine as _;
 use rayon::prelude::*;
@@ -1666,7 +1667,7 @@ impl Siegu {
         div()
             .flex()
             .flex_col()
-            .size_full()
+            .flex_1()
             .min_h_0()
             .gap_3()
             .child(
@@ -3604,9 +3605,12 @@ impl Render for Siegu {
             None
         };
         let weak_keys = cx.entity().downgrade();
-        let library_owns_scroll = self.section == Section::Library && self.drill_down.is_none();
+        // Library and Map manage their own height; wrapping them in a scroll
+        // area collapses the map's flex box to zero and no tiles are requested.
+        let fills_height =
+            self.drill_down.is_none() && matches!(self.section, Section::Library | Section::Map);
         let shell_body = self.body(cx);
-        let shell_body = if library_owns_scroll {
+        let shell_body = if fills_height {
             shell_body
         } else {
             ScrollArea::new("siegu-shell-scroll")
@@ -3717,8 +3721,15 @@ fn main() {
         request.extend(urls);
         let _ = url_tx.send(request);
     });
+    let http_runtime = Arc::new(
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .expect("tile HTTP runtime"),
+    );
     application
         .with_assets(ely::Assets)
+        .with_http_client(Arc::new(tile_http::TileHttpClient::new(http_runtime)))
         .run(move |cx: &mut App| {
             cx.set_app_identity(DESKTOP_APP_ID, "Siegu");
             cx.on_system_notification_response(|_, cx| {

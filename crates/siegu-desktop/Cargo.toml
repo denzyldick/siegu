@@ -13,8 +13,10 @@ path = "src/main.rs"
 
 [dependencies]
 base64 = { workspace = true }
+futures-util = { workspace = true }
 jwalk = "0.8.1"
 rayon = { workspace = true }
+reqwest = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
 siegu-core = { workspace = true, default-features = true }

@@ -9943,8 +9943,10 @@ name = "siegu-desktop"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "futures-util",
  "jwalk",
  "rayon",
+ "reqwest 0.12.28",
  "siegu-core",
  "siegu-ui",
  "tokio",
