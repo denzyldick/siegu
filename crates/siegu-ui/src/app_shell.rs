@@ -159,7 +159,7 @@ fn brand_image() -> &'static Arc<Image> {
     IMAGE.get_or_init(|| {
         Arc::new(Image::from_bytes(
             ImageFormat::Png,
-            include_bytes!("../../../branding/logo_square.png").to_vec(),
+            include_bytes!("../../../branding/logo_mark_padded.png").to_vec(),
         ))
     })
 }
@@ -185,7 +185,7 @@ fn brand_mark(cx: &App) -> impl IntoElement {
 mod tests {
     #[test]
     fn brand_mark_is_embedded() {
-        let bytes = include_bytes!("../../../branding/logo_square.png");
+        let bytes = include_bytes!("../../../branding/logo_mark_padded.png");
         assert_eq!(&bytes[1..4], b"PNG");
     }
 }
