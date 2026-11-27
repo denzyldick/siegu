@@ -512,6 +512,14 @@ const TRIP_GAP_DAYS: i64 = 1;
 /// Minimum photos a trip must contain to be shown.
 const TRIP_MIN_PHOTOS: usize = 3;
 
+/// Minimum photos in a cluster that must be away from the library's home place
+/// before the cluster counts as a trip. Date-only runs are not trips.
+const TRIP_MIN_AWAY_PHOTOS: usize = 2;
+
+/// Two different place names count as the same location when their coordinates
+/// are closer than this. Avoids treating nearby neighbourhoods as travel.
+const TRIP_HOME_DISTANCE_KM: f64 = 25.0;
+
 /// Window (days) within which an adjacent same-country cluster is folded into
 /// the current trip, so one journey spanning several cities with quiet gaps
 /// in between reads as a single trip.
@@ -523,6 +531,49 @@ fn location_country(location: &str) -> Option<&str> {
         .rsplit_once(", ")
         .map(|(_, country)| country.trim())
         .filter(|c| !c.is_empty())
+}
+
+/// The library's most common place, used as the "home" baseline. A tie between
+/// places means there is no reliable home, so every known place can count as
+/// travel.
+struct HomePlace {
+    name: String,
+    coordinates: Option<(f64, f64)>,
+}
+
+/// Great-circle distance in kilometres between two WGS84 coordinates.
+fn haversine_km(a: (f64, f64), b: (f64, f64)) -> f64 {
+    const EARTH_RADIUS_KM: f64 = 6371.0088;
+    let to_rad = |degrees: f64| degrees.to_radians();
+    let dlat = to_rad(b.0 - a.0);
+    let dlon = to_rad(b.1 - a.1);
+    let h = (dlat / 2.0).sin().powi(2)
+        + to_rad(a.0).cos() * to_rad(b.0).cos() * (dlon / 2.0).sin().powi(2);
+    2.0 * EARTH_RADIUS_KM * h.sqrt().asin()
+}
+
+/// True when a photo's place is different enough from home to count as travel.
+/// Unknown locations never count, so a date-only run cannot become a trip.
+fn is_away_from_home(
+    place: &str,
+    coordinates: Option<(f64, f64)>,
+    home: Option<&HomePlace>,
+) -> bool {
+    if place.trim().is_empty() {
+        return false;
+    }
+    let Some(home) = home else {
+        return true;
+    };
+    if place.eq_ignore_ascii_case(&home.name) {
+        return false;
+    }
+    match (coordinates, home.coordinates) {
+        (Some(photo), Some(home_coords)) => {
+            haversine_km(photo, home_coords) > TRIP_HOME_DISTANCE_KM
+        }
+        _ => true,
+    }
 }
 
 /// Parses `YYYY-MM-DD` into `(year, month, day)`.
@@ -587,27 +638,58 @@ fn trip_sort_key(album_id: &str) -> (i64, i64) {
     }
 }
 
-/// Accumulator for one candidate trip: its photos, date span, and resolved
-/// locations (`location_name` → photo count). Used to fold same-country
-/// clusters into a single trip and to derive a display name.
+/// One photo considered by trip detection: id, day index, place name, and GPS.
+type TripRow = (String, i64, String, Option<f64>, Option<f64>);
+
+/// Finds the library's usual place. A single place is home; a unique most
+/// common place is home; a tie means there is no trustworthy baseline.
+fn detect_home_place(rows: &[TripRow]) -> Option<HomePlace> {
+    let mut counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+    for (_, _, place, _, _) in rows {
+        if !place.trim().is_empty() {
+            *counts.entry(place.as_str()).or_insert(0) += 1;
+        }
+    }
+    let mut ranked: Vec<(&str, usize)> = counts.into_iter().collect();
+    ranked.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+    if ranked.is_empty() || (ranked.len() > 1 && ranked[0].1 == ranked[1].1) {
+        return None;
+    }
+    let name = ranked[0].0.to_string();
+    let coordinates = rows
+        .iter()
+        .find(|row| row.2.eq_ignore_ascii_case(&name))
+        .and_then(|row| row.3.zip(row.4));
+    Some(HomePlace { name, coordinates })
+}
+
+/// Accumulator for one candidate trip: its photos, date span, resolved
+/// locations (`location_name` → photo count), and how many photos are away
+/// from the library's home place. Used to fold same-country clusters and to
+/// reject runs that are not really travel.
 #[derive(Default)]
 struct TripAcc {
     photos: Vec<String>,
     first_day: i64,
     last_day: i64,
     locations: std::collections::HashMap<String, i64>,
+    away_photos: usize,
 }
 
 impl TripAcc {
-    fn from_cluster(cluster: &[(String, i64, String)]) -> Self {
+    fn from_cluster(cluster: &[TripRow], home: Option<&HomePlace>) -> Self {
         let mut acc = TripAcc {
             first_day: cluster.iter().map(|c| c.1).min().unwrap_or(0),
             last_day: cluster.iter().map(|c| c.1).max().unwrap_or(0),
             ..TripAcc::default()
         };
-        for (id, _day, location) in cluster {
+        for (id, _day, location, latitude, longitude) in cluster {
             acc.photos.push(id.clone());
             if !location.is_empty() {
+                let coordinates = (*latitude).zip(*longitude);
+                if is_away_from_home(location, coordinates, home) {
+                    acc.away_photos += 1;
+                }
                 *acc.locations.entry(location.clone()).or_insert(0) += 1;
             }
         }
@@ -618,9 +700,16 @@ impl TripAcc {
         self.first_day = self.first_day.min(other.first_day);
         self.last_day = self.last_day.max(other.last_day);
         self.photos.extend(other.photos);
+        self.away_photos += other.away_photos;
         for (location, count) in other.locations {
             *self.locations.entry(location).or_insert(0) += count;
         }
+    }
+
+    /// A cluster only becomes a trip when it has enough photos and enough of
+    /// them were taken away from the library's usual place.
+    fn qualifies_as_trip(&self) -> bool {
+        self.photos.len() >= TRIP_MIN_PHOTOS && self.away_photos >= TRIP_MIN_AWAY_PHOTOS
     }
 
     /// Distinct countries visited by this trip's photos.
@@ -5125,7 +5214,7 @@ impl Database {
         map
     }
 
-    /// Turn one time-clustered group of photos into a trip: a display name, a
+    /// Turn one qualified cluster of photos into a trip: a display name, a
     /// `from|to` date range, and the photo ids. Returns None for clusters that
     /// are too small (fewer than `TRIP_MIN_PHOTOS`).
     fn finalize_trip(&self, acc: &TripAcc) -> Option<(String, String, Vec<String>)> {
@@ -5150,12 +5239,15 @@ impl Database {
     /// synced. Gaps of more than `TRIP_GAP_DAYS` between consecutive photos
     /// split trips; adjacent clusters that revisit the same country within
     /// `TRIP_MERGE_DAYS` are then folded into a single trip (Rome → Florence
-    /// → Venice shows as one "Italy" trip). Clusters need at least
-    /// `TRIP_MIN_PHOTOS` photos (even on a single day, e.g. a day trip).
+    /// → Venice shows as one "Italy" trip). A cluster only qualifies when it
+    /// has at least `TRIP_MIN_PHOTOS` photos and at least
+    /// `TRIP_MIN_AWAY_PHOTOS` of them were taken away from the library's home
+    /// place; date-only runs are not trips.
     pub fn sync_trips(&self) -> i64 {
-        let mut rows: Vec<(String, i64, String)> = Vec::new();
+        let mut rows: Vec<TripRow> = Vec::new();
         let sql = "SELECT p.id, p.created, COALESCE( \
-            (SELECT pl.name FROM place pl WHERE pl.id = p.place_id LIMIT 1), '') \
+            (SELECT pl.name FROM place pl WHERE pl.id = p.place_id LIMIT 1), ''), \
+            p.latitude, p.longitude \
             FROM photo p WHERE p.created IS NOT NULL AND p.created != ''";
         if let Ok(mut stmt) = self.connection.prepare(sql) {
             if let Ok(iter) = stmt.query_map([], |r| {
@@ -5164,6 +5256,8 @@ impl Database {
                     r.get::<_, String>(0)?,
                     date_day_index(&created).unwrap_or(i64::MIN),
                     r.get::<_, String>(2).unwrap_or_default(),
+                    r.get(3).ok(),
+                    r.get(4).ok(),
                 ))
             }) {
                 for row in iter.flatten() {
@@ -5175,9 +5269,11 @@ impl Database {
         }
         rows.sort_by(|a, b| a.1.cmp(&b.1).then(a.0.cmp(&b.0)));
 
+        let home = detect_home_place(&rows);
+
         // Stage 1: cluster photos into time runs separated by large gaps.
-        let mut time_clusters: Vec<Vec<(String, i64, String)>> = Vec::new();
-        let mut current: Vec<(String, i64, String)> = Vec::new();
+        let mut time_clusters: Vec<Vec<TripRow>> = Vec::new();
+        let mut current: Vec<TripRow> = Vec::new();
         let mut prev_day: Option<i64> = None;
         for row in rows {
             if let Some(prev) = prev_day {
@@ -5196,7 +5292,7 @@ impl Database {
         // same country within a short window (one trip spanning several cities).
         let mut merged: Vec<TripAcc> = Vec::new();
         for cluster in time_clusters {
-            let acc = TripAcc::from_cluster(&cluster);
+            let acc = TripAcc::from_cluster(&cluster, home.as_ref());
             if let Some(prev) = merged.last_mut() {
                 if acc.first_day - prev.last_day <= TRIP_MERGE_DAYS
                     && prev.shares_country_with(&acc)
@@ -5210,6 +5306,9 @@ impl Database {
 
         let mut trip_ids: Vec<String> = Vec::new();
         for acc in merged {
+            if !acc.qualifies_as_trip() {
+                continue;
+            }
             let Some((name, range, _photo_ids)) = self.finalize_trip(&acc) else {
                 continue;
             };
@@ -5711,6 +5810,48 @@ mod tests {
         Database::new(&dir.display().to_string())
     }
 
+    fn insert_trip_photo(
+        db: &Database,
+        id: &str,
+        created: &str,
+        place: Option<&str>,
+        coordinates: Option<(f64, f64)>,
+        aesthetics: f64,
+    ) {
+        let (latitude, longitude) = match coordinates {
+            Some((lat, lon)) => (Some(lat), Some(lon)),
+            None => (None, None),
+        };
+        db.connection
+            .execute(
+                "INSERT INTO photo (id, location, created, encoded, aesthetics_score, \
+                 latitude, longitude) VALUES (?1, ?2, ?3, '', ?4, ?5, ?6)",
+                rusqlite::params![
+                    id,
+                    format!("/{id}.jpg"),
+                    created,
+                    aesthetics,
+                    latitude,
+                    longitude
+                ],
+            )
+            .unwrap();
+        if let Some(name) = place {
+            db.connection
+                .execute(
+                    "INSERT INTO place (name) VALUES (?1) ON CONFLICT(name) DO NOTHING",
+                    rusqlite::params![name],
+                )
+                .unwrap();
+            db.connection
+                .execute(
+                    "UPDATE photo SET place_id = (SELECT id FROM place WHERE name = ?1) WHERE id = ?2",
+                    rusqlite::params![name, id],
+                )
+                .unwrap();
+        }
+    }
+
     #[test]
     fn test_database_creation() {
         let db = test_db();
@@ -6195,25 +6336,25 @@ mod tests {
     fn test_trip_cover_prefers_highest_aesthetics() {
         let db = test_db();
         for (id, aesthetics) in [("p1", 0.2f64), ("p2", 0.5), ("p3", 0.9)] {
-            db.connection
-                .execute(
-                    "INSERT INTO photo (id, location, created, encoded, aesthetics_score) \
-                     VALUES (?1, ?2, ?3, '', ?4)",
-                    (id, format!("/{id}.jpg"), "2023-06-01 10:00:00", aesthetics),
-                )
-                .unwrap();
-            db.connection
-                .execute(
-                    "INSERT INTO place (name) VALUES ('Rome, Italy') ON CONFLICT(name) DO NOTHING",
-                    (),
-                )
-                .unwrap();
-            db.connection
-                .execute(
-                    "UPDATE photo SET place_id = (SELECT id FROM place WHERE name = 'Rome, Italy') WHERE id = ?1",
-                    (id,),
-                )
-                .unwrap();
+            insert_trip_photo(
+                &db,
+                id,
+                "2023-06-01 10:00:00",
+                Some("Rome, Italy"),
+                Some((41.9028, 12.4964)),
+                aesthetics,
+            );
+        }
+        // Two photos away from the dominant home place make this a trip.
+        for (id, day, aesthetics) in [("p4", 4, 0.1f64), ("p5", 5, 0.2)] {
+            insert_trip_photo(
+                &db,
+                id,
+                &format!("2023-06-{day:02} 10:00:00"),
+                Some("Florence, Italy"),
+                Some((43.7696, 11.2558)),
+                aesthetics,
+            );
         }
 
         assert_eq!(db.sync_trips(), 1);
@@ -6226,16 +6367,24 @@ mod tests {
     fn test_sync_trips_dismissed_trip_is_skipped() {
         let db = test_db();
         for (id, day) in [("d1", 1), ("d2", 2), ("d3", 3)] {
-            db.connection
-                .execute(
-                    "INSERT INTO photo (id, location, created, encoded) VALUES (?1, ?2, ?3, '')",
-                    (
-                        id,
-                        format!("/{id}.jpg"),
-                        format!("2023-06-{day:02} 10:00:00"),
-                    ),
-                )
-                .unwrap();
+            insert_trip_photo(
+                &db,
+                id,
+                &format!("2023-06-{day:02} 10:00:00"),
+                Some("Home, Test"),
+                Some((0.0, 0.0)),
+                0.5,
+            );
+        }
+        for (id, day) in [("a1", 4), ("a2", 5)] {
+            insert_trip_photo(
+                &db,
+                id,
+                &format!("2023-06-{day:02} 10:00:00"),
+                Some("Away, Test"),
+                Some((10.0, 10.0)),
+                0.5,
+            );
         }
 
         assert_eq!(db.sync_trips(), 1);
@@ -6248,25 +6397,102 @@ mod tests {
     }
 
     #[test]
-    fn test_sync_trips_names_trip_without_location() {
+    fn test_sync_trips_ignores_runs_without_location() {
         let db = test_db();
         for (id, day) in [("n1", 1), ("n2", 2), ("n3", 3)] {
-            db.connection
-                .execute(
-                    "INSERT INTO photo (id, location, created, encoded) VALUES (?1, ?2, ?3, '')",
-                    (
-                        id,
-                        format!("/{id}.jpg"),
-                        format!("2023-06-{day:02} 10:00:00"),
-                    ),
-                )
-                .unwrap();
+            insert_trip_photo(
+                &db,
+                id,
+                &format!("2023-06-{day:02} 10:00:00"),
+                None,
+                None,
+                0.5,
+            );
         }
 
+        assert_eq!(db.sync_trips(), 0);
+        assert!(db.list_albums_by_kind(AlbumKind::Trip).is_empty());
+    }
+
+    #[test]
+    fn test_sync_trips_ignores_single_place_library() {
+        let db = test_db();
+        for (id, day) in [("h1", 1), ("h2", 2), ("h3", 3)] {
+            insert_trip_photo(
+                &db,
+                id,
+                &format!("2023-06-{day:02} 10:00:00"),
+                Some("Home, Test"),
+                Some((0.0, 0.0)),
+                0.5,
+            );
+        }
+
+        assert_eq!(db.sync_trips(), 0);
+        assert!(db.list_albums_by_kind(AlbumKind::Trip).is_empty());
+    }
+
+    #[test]
+    fn test_sync_trips_requires_enough_photos_away_from_home() {
+        let db = test_db();
+        for (id, day) in [("h1", 1), ("h2", 2), ("h3", 3)] {
+            insert_trip_photo(
+                &db,
+                id,
+                &format!("2023-06-{day:02} 10:00:00"),
+                Some("Home, Test"),
+                Some((0.0, 0.0)),
+                0.5,
+            );
+        }
+        insert_trip_photo(
+            &db,
+            "a1",
+            "2023-06-04 10:00:00",
+            Some("Away, Test"),
+            Some((10.0, 10.0)),
+            0.5,
+        );
+        assert_eq!(db.sync_trips(), 0);
+
+        insert_trip_photo(
+            &db,
+            "a2",
+            "2023-06-05 10:00:00",
+            Some("Away, Test"),
+            Some((10.0, 10.0)),
+            0.5,
+        );
         assert_eq!(db.sync_trips(), 1);
-        let trips = db.list_albums_by_kind(AlbumKind::Trip);
-        assert_eq!(trips.len(), 1);
-        assert_eq!(trips[0].name, "Jun 1 – 3, 2023");
+    }
+
+    #[test]
+    fn test_sync_trips_uses_coordinates_to_ignore_nearby_places() {
+        let db = test_db();
+        for (id, day) in [("h1", 1), ("h2", 2), ("h3", 3)] {
+            insert_trip_photo(
+                &db,
+                id,
+                &format!("2023-06-{day:02} 10:00:00"),
+                Some("Home, Test"),
+                Some((0.0, 0.0)),
+                0.5,
+            );
+        }
+        for (id, day) in [("n1", 4), ("n2", 5)] {
+            // Different label, but only ~55 metres away: still home.
+            insert_trip_photo(
+                &db,
+                id,
+                &format!("2023-06-{day:02} 10:00:00"),
+                Some("Nearby, Test"),
+                Some((0.0005, 0.0)),
+                0.5,
+            );
+        }
+
+        assert_eq!(db.sync_trips(), 0);
+        assert!(db.list_albums_by_kind(AlbumKind::Trip).is_empty());
     }
 
     #[test]
