@@ -14,7 +14,7 @@ pub struct NavItemDef {
 }
 
 /// The built-in navigation sections, in display order.
-pub const NAV_ITEMS: [NavItemDef; 6] = [
+pub const NAV_ITEMS: [NavItemDef; 7] = [
     NavItemDef {
         id: "library",
         icon: IconName::LayoutGrid,
@@ -34,6 +34,11 @@ pub const NAV_ITEMS: [NavItemDef; 6] = [
         id: "collections",
         icon: IconName::Layers,
         label: "Collections",
+    },
+    NavItemDef {
+        id: "devices",
+        icon: IconName::Monitor,
+        label: "Devices",
     },
     NavItemDef {
         id: "duplicates",
@@ -79,6 +84,7 @@ mod tests {
                 "map",
                 "people",
                 "collections",
+                "devices",
                 "duplicates",
                 "settings"
             ]

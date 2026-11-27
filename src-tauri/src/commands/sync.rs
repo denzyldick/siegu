@@ -51,93 +51,12 @@ pub fn do_join_network(db: &database::Database, ip: &str, name: &str) {
     });
 }
 
-/// Pure business logic — removes a device by id from the database.
-pub fn do_remove_device(db: &database::Database, id: &str) -> Result<(), String> {
-    db.remove_peer_device(id);
-    Ok(())
-}
-
-/// MDI platform logo for a device `os` value (std::env::consts::OS style).
-fn os_icon(os: &str) -> &'static str {
-    match os {
-        "windows" => "mdi-microsoft-windows",
-        "macos" => "mdi-apple",
-        "ios" => "mdi-apple-ios",
-        "android" => "mdi-android",
-        "linux" => "mdi-linux",
-        "freebsd" | "openbsd" | "netbsd" => "mdi-freebsd",
-        _ => "mdi-laptop",
-    }
-}
-
-/// Pure business logic — lists devices and prepends the host device.
-pub fn do_list_devices(db: &database::Database, config_path: &str) -> Vec<database::DeviceInfo> {
-    let mut devices: Vec<database::DeviceInfo> = db
-        .list_peer_devices()
-        .into_iter()
-        .map(|peer| database::DeviceInfo {
-            id: peer.device_id,
-            title: peer.name,
-            icon: os_icon(&peer.os).to_string(),
-            up_to_date: true,
-            host: false,
-            photo_count: peer.photo_count,
-            video_count: peer.video_count,
-            remote_photo_count: peer.remote_photo_count,
-            remote_video_count: peer.remote_video_count,
-            os: peer.os,
-            storage_used: peer.storage_used.max(0) as u64,
-            storage_capacity: peer.storage_capacity.max(0) as u64,
-        })
-        .collect();
-
-    let hostname = std::env::var("HOSTNAME").unwrap_or_else(|_| "localhost".to_string());
-    let state = db.get_state();
-    let host_title = state
-        .get("device_name")
-        .cloned()
-        .unwrap_or_else(|| format!("Siegu ({hostname})"));
-    let (photo_count, video_count) = db.get_media_counts();
-
-    devices.insert(
-        0,
-        database::DeviceInfo {
-            id: "host".to_string(),
-            title: host_title,
-            icon: os_icon(std::env::consts::OS).to_string(),
-            up_to_date: true,
-            host: true,
-            photo_count,
-            video_count,
-            // The host card shows this device's own library; remote_* mirror
-            // it so the UI can use one code path.
-            remote_photo_count: photo_count,
-            remote_video_count: video_count,
-            os: std::env::consts::OS.to_string(),
-            storage_used: siegu_core::mesh::MeshManager::get_total_storage_used(config_path),
-            storage_capacity: siegu_core::mesh::MeshManager::get_storage_quota(config_path),
-        },
-    );
-
-    devices
-}
-
-/// Pure business logic — renames a device. The host device's name is persisted
-/// in config state so it survives restarts and is used when advertising over LAN.
-pub fn do_rename_device(db: &database::Database, id: &str, new_name: &str) -> Result<(), String> {
-    let name = new_name.trim();
-    if name.is_empty() {
-        return Err("Name cannot be empty".to_string());
-    }
-    if id == "host" {
-        let mut state = std::collections::HashMap::new();
-        state.insert("device_name".to_string(), name.to_string());
-        db.set_state(state);
-        return Ok(());
-    }
-    db.rename_peer_device(id, name);
-    Ok(())
-}
+// Pure device helpers live in `siegu-core` so the Tauri shell and GPUI shell
+// share the same local behavior.
+pub use siegu_core::devices::{
+    list_devices as do_list_devices, remove_device as do_remove_device,
+    rename_device as do_rename_device,
+};
 
 #[tauri::command]
 #[allow(non_snake_case)]

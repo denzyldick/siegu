@@ -11,7 +11,11 @@ mod app_ipc;
 
 use base64::Engine as _;
 use rayon::prelude::*;
-use siegu_core::database::{Album, LocationGroup, PhotoDateGroup, PhotoFilter};
+use siegu_core::database::{Album, DeviceInfo, LocationGroup, PhotoDateGroup, PhotoFilter};
+use siegu_core::devices::{
+    list_devices as list_core_devices, remove_device as remove_core_device,
+    rename_device as rename_core_device, storage_percent,
+};
 use siegu_core::duplicates::{self, DuplicateGroupView, DuplicateStats};
 use siegu_core::{
     config::default_config_dir,
@@ -27,17 +31,17 @@ use siegu_ui::{
         forms::{Choice, InputEvent, SearchInput, Select, Switch, TextInput},
         layout::{columns_for, ScrollArea},
         motion::ProgressBar,
-        overlays::Dialog,
+        overlays::{ConfirmDialog, Dialog, PromptDialog},
         primitives::{FocusScope, Icon, IconName, Image as ElyImage, Severity},
         theme::{ActiveTheme, Mode, Theme},
         typography::{Heading, Paragraph},
     },
     gpui::{
-        canvas, div, list, px, size, AnyElement, App, AppContext, AsyncApp, Bounds, Context,
-        Entity, FocusHandle, Image, ImageFormat, ImageSource, InteractiveElement, IntoElement,
-        KeyDownEvent, ListAlignment, ListOffset, ListState, ParentElement, PathPromptOptions,
-        Pixels, Render, SharedString, Styled, SystemNotification, TitlebarOptions, WeakEntity,
-        Window, WindowBounds, WindowOptions,
+        canvas, div, list, px, relative, size, AnyElement, App, AppContext, AsyncApp, Bounds,
+        Context, Entity, FocusHandle, Image, ImageFormat, ImageSource, InteractiveElement,
+        IntoElement, KeyDownEvent, ListAlignment, ListOffset, ListState, ParentElement,
+        PathPromptOptions, Pixels, Render, SharedString, Styled, SystemNotification,
+        TitlebarOptions, WeakEntity, Window, WindowBounds, WindowOptions,
     },
     gpui_platform, i18n, insight_percent, InfoCard, MediaViewer, PhotoCard, PhotoGrid,
     SieguAppShell, ViewerField, ViewerInsight, ViewerMetadata, ViewerPerson,
@@ -52,6 +56,7 @@ enum Section {
     Map,
     People,
     Collections,
+    Devices,
     Duplicates,
     Settings,
 }
@@ -62,6 +67,7 @@ impl Section {
             "map" => Self::Map,
             "people" => Self::People,
             "collections" => Self::Collections,
+            "devices" => Self::Devices,
             "duplicates" => Self::Duplicates,
             "settings" => Self::Settings,
             _ => Self::Library,
@@ -74,6 +80,7 @@ impl Section {
             Self::Map => "map",
             Self::People => "people",
             Self::Collections => "collections",
+            Self::Devices => "devices",
             Self::Duplicates => "duplicates",
             Self::Settings => "settings",
         }
@@ -85,6 +92,7 @@ impl Section {
             Self::Map => i18n::text(cx, "map.desc", &[]),
             Self::People => i18n::text(cx, "people.desc", &[]),
             Self::Collections => i18n::text(cx, "albums.desc", &[]),
+            Self::Devices => i18n::text(cx, "devices.desc", &[]),
             Self::Duplicates => i18n::text(cx, "duplicates.desc", &[]),
             Self::Settings => i18n::text(cx, "settings.desc", &[]),
         }
@@ -291,6 +299,20 @@ enum DuplicateMessage {
     Failed(String),
 }
 
+/// A pending device management dialog. The rename field is an entity so its
+/// text and selection survive repaints while the dialog is open.
+#[derive(Clone)]
+enum DeviceDialog {
+    Rename {
+        id: String,
+        field: Entity<TextInput>,
+    },
+    Remove {
+        id: String,
+        title: String,
+    },
+}
+
 /// The desktop shell. Reads the local library and renders one section at a time.
 struct Siegu {
     focus: FocusHandle,
@@ -317,6 +339,10 @@ struct Siegu {
     scan_abort: Option<Arc<AtomicBool>>,
     duplicates: Option<DuplicateData>,
     duplicate_status: DuplicateStatus,
+    /// Devices are read from SQLite on demand; no networking is involved.
+    devices: Vec<DeviceInfo>,
+    device_dialog: Option<DeviceDialog>,
+    device_error: Option<String>,
     data: LibraryData,
 }
 
@@ -327,6 +353,7 @@ impl Siegu {
             Section::Map => i18n::text(cx, "dock.map", &[]),
             Section::People => i18n::text(cx, "search.people_section", &[]),
             Section::Collections => i18n::text(cx, "dock.collections", &[]),
+            Section::Devices => i18n::text(cx, "dock.devices", &[]),
             Section::Duplicates => i18n::text(cx, "dock.duplicates", &[]),
             Section::Settings => i18n::text(cx, "dock.settings", &[]),
         }
@@ -1206,6 +1233,7 @@ impl Siegu {
             Section::Map => self.map_view(cx),
             Section::People => self.people_view(cx),
             Section::Collections => self.collections_view(cx),
+            Section::Devices => self.devices_view(cx),
             Section::Duplicates => self.duplicates_view(cx),
             Section::Settings => self.settings_view(cx),
         };
@@ -1927,6 +1955,352 @@ impl Siegu {
             }))
             .children((!self.data.settings.is_empty()).then_some(grid))
             .into_any_element()
+    }
+
+    fn reload_devices(&mut self, cx: &mut Context<Self>) {
+        let dir = default_config_dir();
+        let config_path = dir.display().to_string();
+        let db = Database::new(&config_path);
+        self.devices = list_core_devices(&db, &config_path);
+        self.device_error = None;
+        cx.notify();
+    }
+
+    fn rename_device(&mut self, id: &str, name: &str, cx: &mut Context<Self>) {
+        let dir = default_config_dir();
+        let db = Database::new(&dir.display().to_string());
+        match rename_core_device(&db, id, name) {
+            Ok(()) => self.reload_devices(cx),
+            Err(error) => {
+                self.device_error = Some(error);
+                cx.notify();
+            }
+        }
+    }
+
+    fn remove_device(&mut self, id: &str, cx: &mut Context<Self>) {
+        let dir = default_config_dir();
+        let db = Database::new(&dir.display().to_string());
+        match remove_core_device(&db, id) {
+            Ok(()) => self.reload_devices(cx),
+            Err(error) => {
+                self.device_error = Some(error);
+                cx.notify();
+            }
+        }
+    }
+
+    fn devices_view(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let weak_reload = cx.entity().downgrade();
+        let toolbar = div().flex().flex_wrap().items_center().gap_3().child(
+            Button::new("devices-reload", i18n::text(cx, "sync.refresh", &[]))
+                .icon(IconName::RefreshCw)
+                .on_click(move |_, _, app| {
+                    if let Some(entity) = weak_reload.upgrade() {
+                        entity.update(app, |state, cx| state.reload_devices(cx));
+                    }
+                }),
+        );
+
+        let weak_dismiss = cx.entity().downgrade();
+        let error = self.device_error.as_ref().map(|message| {
+            Banner::new("devices-error", Severity::Danger, message.clone())
+                .action(i18n::text(cx, "common.close", &[]), move |_, cx| {
+                    if let Some(entity) = weak_dismiss.upgrade() {
+                        entity.update(cx, |state, cx| {
+                            state.device_error = None;
+                            cx.notify();
+                        });
+                    }
+                })
+                .into_any_element()
+        });
+
+        if self.devices.is_empty() {
+            return div()
+                .flex()
+                .flex_col()
+                .size_full()
+                .min_h_0()
+                .gap_4()
+                .child(toolbar)
+                .children(error)
+                .child(empty_state(
+                    &i18n::text(cx, "devices.no_devices", &[]),
+                    &i18n::text(cx, "devices.no_devices_desc", &[]),
+                ))
+                .into_any_element();
+        }
+
+        let mut cards = div().flex().flex_wrap().gap_3();
+        for (idx, device) in self.devices.iter().enumerate() {
+            cards = cards.child(self.device_card(device, idx, cx));
+        }
+
+        div()
+            .flex()
+            .flex_col()
+            .size_full()
+            .min_h_0()
+            .gap_4()
+            .child(toolbar)
+            .children(error)
+            .child(cards)
+            .into_any_element()
+    }
+
+    fn device_card(&self, device: &DeviceInfo, idx: usize, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme();
+        let status_severity = if device.host {
+            Severity::Success
+        } else {
+            Severity::Info
+        };
+        let status_label = if device.host {
+            i18n::text(cx, "devices.this_device", &[])
+        } else {
+            i18n::text(cx, "devices.status_idle", &[])
+        };
+        let system = if device.os.trim().is_empty() {
+            "—".to_string()
+        } else {
+            device.os.clone()
+        };
+        let photos = effective_count(device.remote_photo_count, device.photo_count);
+        let videos = effective_count(device.remote_video_count, device.video_count);
+        let percent = storage_percent(device.storage_used, device.storage_capacity);
+        let storage_severity = storage_severity(percent);
+        let storage_label = if device.storage_capacity > 0 {
+            format!(
+                "{} / {}",
+                human_bytes(device.storage_used),
+                human_bytes(device.storage_capacity)
+            )
+        } else {
+            "—".to_string()
+        };
+
+        let mut actions = div().flex().flex_wrap().items_center().gap_2().child(
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .rounded_full()
+                .border_1()
+                .border_color(theme.colors.border)
+                .px_2()
+                .py_1()
+                .child(
+                    div()
+                        .size(px(8.0))
+                        .rounded_full()
+                        .bg(status_severity.color(&theme.colors)),
+                )
+                .child(Paragraph::new(status_label)),
+        );
+
+        if !device.host {
+            let weak_rename = cx.entity().downgrade();
+            let rename_id = device.id.clone();
+            let rename_title = device.title.clone();
+            let rename = Button::new(
+                ("device-rename", idx),
+                i18n::text(cx, "devices.rename_device", &[]),
+            )
+            .icon(IconName::Pencil)
+            .on_click(move |_, window, app| {
+                if let Some(entity) = weak_rename.upgrade() {
+                    let id = rename_id.clone();
+                    let title = rename_title.clone();
+                    entity.update(app, |state, cx| {
+                        let field = cx.new(|cx| TextInput::new(window, cx));
+                        field.update(cx, |input, cx| input.set_text(title, cx));
+                        state.device_dialog = Some(DeviceDialog::Rename { id, field });
+                        state.device_error = None;
+                        cx.notify();
+                    });
+                }
+            });
+
+            let weak_remove = cx.entity().downgrade();
+            let remove_id = device.id.clone();
+            let remove_title = device.title.clone();
+            let remove = Button::new(
+                ("device-remove", idx),
+                i18n::text(cx, "devices.remove_device", &[]),
+            )
+            .icon(IconName::Trash2)
+            .variant(ButtonVariant::Ghost)
+            .on_click(move |_, _, app| {
+                if let Some(entity) = weak_remove.upgrade() {
+                    let id = remove_id.clone();
+                    let title = remove_title.clone();
+                    entity.update(app, |state, cx| {
+                        state.device_dialog = Some(DeviceDialog::Remove { id, title });
+                        state.device_error = None;
+                        cx.notify();
+                    });
+                }
+            });
+            actions = actions.child(rename).child(remove);
+        }
+
+        div()
+            .id(("device-card", idx))
+            .w(px(320.0))
+            .flex()
+            .flex_col()
+            .gap_3()
+            .p_4()
+            .rounded(px(12.0))
+            .border_1()
+            .border_color(theme.colors.border)
+            .bg(theme.colors.surface)
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_3()
+                    .child(
+                        div()
+                            .flex()
+                            .flex_none()
+                            .items_center()
+                            .justify_center()
+                            .size(px(40.0))
+                            .rounded(px(10.0))
+                            .bg(theme.colors.hover)
+                            .child(Icon::new(device_icon(device))),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(Heading::h4(device.title.clone()))
+                            .child(Paragraph::new(format!(
+                                "{} {}",
+                                i18n::text(cx, "devices.system", &[]),
+                                system
+                            ))),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .child(Paragraph::new(format!(
+                        "{} {}",
+                        i18n::text(cx, "media.label_photos", &[]),
+                        photos
+                    )))
+                    .child(Paragraph::new(format!(
+                        "{} {}",
+                        i18n::text(cx, "media.label_videos", &[]),
+                        videos
+                    )))
+                    .child(Paragraph::new(format!(
+                        "{} {}",
+                        i18n::text(cx, "devices.storage", &[]),
+                        storage_label
+                    ))),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .child(Paragraph::new(format!("{percent}%")))
+                    .child(
+                        div()
+                            .relative()
+                            .h(px(6.0))
+                            .rounded_full()
+                            .bg(theme.colors.sunken)
+                            .child(
+                                div()
+                                    .absolute()
+                                    .top_0()
+                                    .left_0()
+                                    .h_full()
+                                    .rounded_full()
+                                    .w(relative(percent as f32 / 100.0))
+                                    .bg(storage_severity.color(&theme.colors)),
+                            ),
+                    ),
+            )
+            .child(actions)
+            .into_any_element()
+    }
+
+    fn device_dialogs(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let Some(dialog) = self.device_dialog.clone() else {
+            return Vec::new();
+        };
+        let weak_close = cx.entity().downgrade();
+        let close = move |_: &mut Window, cx: &mut App| {
+            if let Some(entity) = weak_close.upgrade() {
+                entity.update(cx, |state, cx| {
+                    state.device_dialog = None;
+                    state.device_error = None;
+                    cx.notify();
+                });
+            }
+        };
+
+        match dialog {
+            DeviceDialog::Rename { id, field } => {
+                let weak_submit = cx.entity().downgrade();
+                let submit_id = id.clone();
+                vec![PromptDialog::new(
+                    format!("device-rename-{id}"),
+                    i18n::text(cx, "devices.rename_device_title", &[]),
+                    &field,
+                    close,
+                )
+                .label(i18n::text(cx, "devices.device_name", &[]))
+                .submit(i18n::text(cx, "common.save", &[]))
+                .check(|text| {
+                    if text.trim().is_empty() {
+                        Err("Name cannot be empty".into())
+                    } else {
+                        Ok(())
+                    }
+                })
+                .on_submit(move |text, _, app| {
+                    if let Some(entity) = weak_submit.upgrade() {
+                        let id = submit_id.clone();
+                        entity.update(app, |state, cx| state.rename_device(&id, text, cx));
+                    }
+                })
+                .into_any_element()]
+            }
+            DeviceDialog::Remove { id, title } => {
+                let weak_confirm = cx.entity().downgrade();
+                let confirm_id = id.clone();
+                let message = i18n::text(
+                    cx,
+                    "devices.remove_device_confirm",
+                    &[("name", title.as_str())],
+                );
+                vec![ConfirmDialog::new(
+                    format!("device-remove-{id}"),
+                    i18n::text(cx, "devices.remove_device_title", &[]),
+                    message,
+                    close,
+                )
+                .confirm(i18n::text(cx, "common.remove", &[]))
+                .destructive()
+                .on_confirm(move |_, app| {
+                    if let Some(entity) = weak_confirm.upgrade() {
+                        let id = confirm_id.clone();
+                        entity.update(app, |state, cx| state.remove_device(&id, cx));
+                    }
+                })
+                .into_any_element()]
+            }
+        }
     }
 }
 
@@ -2728,6 +3102,42 @@ fn human_bytes(bytes: u64) -> String {
     }
 }
 
+/// Prefer the peer's self-reported library size, falling back to the local
+/// count for the host and for peers that have not announced yet.
+fn effective_count(remote: i64, local: i64) -> i64 {
+    if remote > 0 {
+        remote
+    } else {
+        local
+    }
+}
+
+fn device_icon(device: &DeviceInfo) -> IconName {
+    icon_for_os(&device.os, device.host)
+}
+
+fn icon_for_os(os: &str, host: bool) -> IconName {
+    if host {
+        return IconName::Monitor;
+    }
+    match os {
+        "android" | "ios" => IconName::Smartphone,
+        "linux" | "freebsd" | "openbsd" | "netbsd" => IconName::Server,
+        "" => IconName::HardDrive,
+        _ => IconName::Monitor,
+    }
+}
+
+fn storage_severity(percent: u8) -> Severity {
+    if percent >= 90 {
+        Severity::Danger
+    } else if percent >= 75 {
+        Severity::Warning
+    } else {
+        Severity::Success
+    }
+}
+
 fn duplicate_kind_label(cx: &App, kind: &str) -> SharedString {
     match kind {
         "exact" => i18n::text(cx, "duplicates.kind_exact", &[]),
@@ -2771,6 +3181,11 @@ impl Render for Siegu {
                     state.drill_down = None;
                     state.selected_photo = None;
                     state.viewer_override = None;
+                    state.device_dialog = None;
+                    state.device_error = None;
+                    if state.section == Section::Devices {
+                        state.reload_devices(cx);
+                    }
                     cx.notify();
                 });
             }
@@ -2808,6 +3223,11 @@ impl Render for Siegu {
                 .size_full()
                 .child(shell_body)
                 .into_any_element()
+        };
+        let device_dialogs = if self.device_dialog.is_some() {
+            self.device_dialogs(cx)
+        } else {
+            Vec::new()
         };
 
         FocusScope::new(&self.focus)
@@ -2877,6 +3297,7 @@ impl Render for Siegu {
             )
             .children(viewer)
             .children(onboarding)
+            .children(device_dialogs)
     }
 }
 
@@ -2994,6 +3415,9 @@ fn main() {
                         scan_abort: None,
                         duplicates: None,
                         duplicate_status: DuplicateStatus::default(),
+                        devices: Vec::new(),
+                        device_dialog: None,
+                        device_error: None,
                         data,
                     }
                 })
@@ -3039,6 +3463,7 @@ mod tests {
             Section::Map,
             Section::People,
             Section::Collections,
+            Section::Devices,
             Section::Duplicates,
             Section::Settings,
         ] {
@@ -3240,6 +3665,30 @@ mod tests {
         assert_eq!(human_bytes(1536), "1.5 KB");
         assert_eq!(human_bytes(2 * 1024 * 1024), "2.0 MB");
         assert_eq!(human_bytes(3 * 1024 * 1024 * 1024), "3.0 GB");
+    }
+
+    #[test]
+    fn device_counts_prefer_remote_values() {
+        assert_eq!(effective_count(120, 8), 120);
+        assert_eq!(effective_count(0, 8), 8);
+    }
+
+    #[test]
+    fn device_icons_follow_platform_and_host() {
+        assert_eq!(icon_for_os("linux", true), IconName::Monitor);
+        assert_eq!(icon_for_os("android", false), IconName::Smartphone);
+        assert_eq!(icon_for_os("ios", false), IconName::Smartphone);
+        assert_eq!(icon_for_os("linux", false), IconName::Server);
+        assert_eq!(icon_for_os("", false), IconName::HardDrive);
+        assert_eq!(icon_for_os("windows", false), IconName::Monitor);
+    }
+
+    #[test]
+    fn storage_color_matches_legacy_thresholds() {
+        assert_eq!(storage_severity(74), Severity::Success);
+        assert_eq!(storage_severity(75), Severity::Warning);
+        assert_eq!(storage_severity(89), Severity::Warning);
+        assert_eq!(storage_severity(90), Severity::Danger);
     }
 
     #[test]

@@ -1,5 +1,6 @@
 pub mod config;
 pub mod database;
+pub mod devices;
 pub mod duplicates;
 pub mod error;
 pub mod event_bus;
@@ -35,6 +36,7 @@ pub use database::{
     AiStatus, Database, DeviceInfo, Face, ImportedPhoto, MapPoint, PeerDevice, PersonWithFace,
     Photo, PhotoSyncInfo, SavedSession, SearchSuggestion,
 };
+pub use devices::{list_devices, os_icon, remove_device, rename_device, storage_percent};
 pub use error::{Result, SieguError};
 pub use event_bus::{ArcEventBus, CallbackEventBus, EventBus, Level, LogCollector, NullEventBus};
 pub use mesh::{MeshManager, SyncEvent, SyncMessage, SyncPhase, SyncProgress};
