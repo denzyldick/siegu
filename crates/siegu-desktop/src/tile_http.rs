@@ -24,12 +24,19 @@ impl TileHttpClient {
     pub fn new(runtime: Arc<Runtime>) -> Self {
         let client = Client::builder()
             .redirect(reqwest::redirect::Policy::limited(10))
+            // OSM serves an "Access blocked" PNG to browser-like or bare
+            // User-Agents. Identify Siegu so tile requests follow the policy.
+            .user_agent("Siegu/0.1.0 (+https://github.com/denzyldick/siegu)")
             .build()
             .expect("tile HTTP client");
         Self {
             client,
             runtime,
-            user_agent: HeaderValue::from_static(concat!("Siegu/", env!("CARGO_PKG_VERSION"))),
+            user_agent: HeaderValue::from_static(concat!(
+                "Siegu/",
+                env!("CARGO_PKG_VERSION"),
+                " (+https://github.com/denzyldick/siegu)"
+            )),
         }
     }
 }
